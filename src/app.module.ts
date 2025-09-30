@@ -5,6 +5,7 @@ import { AppService } from './app.service'
 import { ConfigService } from './config/config.service'
 import configuration from './config/configuration'
 import { validate } from './config/validation'
+import { PortfolioModule } from './modules/portfolio/portfolio.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -12,7 +13,8 @@ import { validate } from './config/validation'
       validate,
       isGlobal: true,
       cache: true
-    })
+    }),
+    PortfolioModule
   ],
   controllers: [AppController],
   providers: [AppService, ConfigService],

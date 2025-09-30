@@ -144,7 +144,7 @@ model PropertyBatch {
 
 model ServiceType {
   id         String      @id @default(auto()) @map("_id") @db.ObjectId
-  type       String
+  type       String      @unique
   is_active  Boolean
   portfolios Portfolio[]
 

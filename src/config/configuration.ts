@@ -11,8 +11,8 @@ export interface Configuration {
     url: string
   }
   jwt: {
-    refreshSecret: string
     accessSecret: string
+    refreshSecret: string
     accessExpiresIn: string
     refreshExpiresIn: string
   }
