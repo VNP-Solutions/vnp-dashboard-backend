@@ -34,8 +34,18 @@ export class ConfigService {
 
   get jwt() {
     return {
-      secret: this.configService.get('jwt.secret', { infer: true })!,
-      expiresIn: this.configService.get('jwt.expiresIn', { infer: true })!
+      accessSecret: this.configService.get('jwt.accessSecret', {
+        infer: true
+      })!,
+      refreshSecret: this.configService.get('jwt.refreshSecret', {
+        infer: true
+      })!,
+      accessExpiresIn: this.configService.get('jwt.accessExpiresIn', {
+        infer: true
+      })!,
+      refreshExpiresIn: this.configService.get('jwt.refreshExpiresIn', {
+        infer: true
+      })!
     }
   }
 

@@ -37,12 +37,20 @@ export class ConfigurationSchema {
 
   @IsString()
   @IsNotEmpty()
-  JWT_SECRET: string
+  JWT_REFRESH_SECRET: string
 
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  JWT_EXPIRES_IN?: string
+  JWT_ACCESS_SECRET: string
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_ACCESS_EXPIRES_IN: string
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_REFRESH_EXPIRES_IN: string
 
   @IsString()
   @IsNotEmpty()

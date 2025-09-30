@@ -11,8 +11,10 @@ export interface Configuration {
     url: string
   }
   jwt: {
-    secret: string
-    expiresIn: string
+    refreshSecret: string
+    accessSecret: string
+    accessExpiresIn: string
+    refreshExpiresIn: string
   }
   s3: {
     bucketName: string
@@ -40,8 +42,10 @@ export default (): Configuration => ({
     url: process.env.DATABASE_URL!
   },
   jwt: {
-    secret: process.env.JWT_SECRET!,
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+    refreshSecret: process.env.JWT_REFRESH_SECRET!,
+    accessSecret: process.env.JWT_ACCESS_SECRET!,
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '7d',
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '14d'
   },
   s3: {
     bucketName: process.env.S3_BUCKET_NAME!,
