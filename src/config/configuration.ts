@@ -28,6 +28,11 @@ export interface Configuration {
     password: string
   }
   invitationRedirectUrl?: string
+  auth: {
+    passwordRegex: RegExp
+    otpExpiryMinutes: number
+    tempPasswordExpiryDays: number
+  }
 }
 
 export default (): Configuration => ({
@@ -58,5 +63,11 @@ export default (): Configuration => ({
     email: process.env.SMTP_EMAIL!,
     password: process.env.SMTP_PASSWORD!
   },
-  invitationRedirectUrl: process.env.INVITATION_REDIRECT_URL
+  invitationRedirectUrl: process.env.INVITATION_REDIRECT_URL,
+  auth: {
+    passwordRegex:
+      /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,32}$/,
+    otpExpiryMinutes: 5,
+    tempPasswordExpiryDays: 7
+  }
 })
