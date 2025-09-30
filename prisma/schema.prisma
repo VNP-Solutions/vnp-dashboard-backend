@@ -162,20 +162,20 @@ model AuditStatus {
 }
 
 model UserRole {
-  id                            String                   @id @default(auto()) @map("_id") @db.ObjectId
-  name                          String                   @unique
+  id                            String                    @id @default(auto()) @map("_id") @db.ObjectId
+  name                          String                    @unique
   description                   String
   is_external                   Boolean
-  portfolio_permission_id       String                   @db.ObjectId
-  portfolioPermission           PortfolioPermission      @relation(fields: [portfolio_permission_id], references: [id])
-  property_permission_id        String                   @db.ObjectId
-  propertyPermission            PropertyPermission       @relation(fields: [property_permission_id], references: [id])
-  audit_permission_id           String                   @db.ObjectId
-  auditPermission               AuditPermission          @relation(fields: [audit_permission_id], references: [id])
-  user_permission_id            String                   @db.ObjectId
-  userPermission                UserPermission           @relation(fields: [user_permission_id], references: [id])
-  system_settings_permission_id String                   @db.ObjectId
-  systemSettingsPermission      SystemSettingsPermission @relation(fields: [system_settings_permission_id], references: [id])
+  portfolio_permission_id       String?                   @db.ObjectId
+  portfolioPermission           PortfolioPermission?      @relation(fields: [portfolio_permission_id], references: [id])
+  property_permission_id        String?                   @db.ObjectId
+  propertyPermission            PropertyPermission?       @relation(fields: [property_permission_id], references: [id])
+  audit_permission_id           String?                   @db.ObjectId
+  auditPermission               AuditPermission?          @relation(fields: [audit_permission_id], references: [id])
+  user_permission_id            String?                   @db.ObjectId
+  userPermission                UserPermission?           @relation(fields: [user_permission_id], references: [id])
+  system_settings_permission_id String?                   @db.ObjectId
+  systemSettingsPermission      SystemSettingsPermission? @relation(fields: [system_settings_permission_id], references: [id])
   users                         User[]
 
   created_at DateTime @default(now())

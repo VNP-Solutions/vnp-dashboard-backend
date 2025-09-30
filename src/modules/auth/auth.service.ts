@@ -39,7 +39,10 @@ export class AuthService implements IAuthService {
     private emailUtil: EmailUtil
   ) {}
 
-  async requestLoginOtp(email: string): Promise<{ message: string }> {
+  async requestLoginOtp(
+    email: string,
+    password: string
+  ): Promise<{ message: string }> {
     const user = await this.authRepository.findUserByEmail(email)
 
     if (!user) {
@@ -50,6 +53,15 @@ export class AuthService implements IAuthService {
       throw new BadRequestException(
         'Please complete your invitation verification first'
       )
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      user.password
+    )
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials')
     }
 
     const otp = EncryptionUtil.generateOtp()

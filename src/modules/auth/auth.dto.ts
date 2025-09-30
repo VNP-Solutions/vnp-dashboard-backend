@@ -19,6 +19,14 @@ export class LoginRequestOtpDto {
   @IsEmail()
   @IsNotEmpty()
   email: string
+
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
 }
 
 export class VerifyLoginOtpDto {

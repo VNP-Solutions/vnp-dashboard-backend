@@ -24,7 +24,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Request OTP for login' })
   @ApiResponse({ status: 200, description: 'OTP sent successfully' })
   async requestLoginOtp(@Body() body: LoginRequestOtpDto) {
-    const result = await this.authService.requestLoginOtp(body.email)
+    const result = await this.authService.requestLoginOtp(
+      body.email,
+      body.password
+    )
     return {
       message: result.message,
       data: null

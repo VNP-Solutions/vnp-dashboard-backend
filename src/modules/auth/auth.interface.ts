@@ -32,7 +32,7 @@ export interface IAuthRepository {
 }
 
 export interface IAuthService {
-  requestLoginOtp(email: string): Promise<{ message: string }>
+  requestLoginOtp(email: string, password: string): Promise<{ message: string }>
   verifyLoginOtp(data: VerifyLoginOtpDto): Promise<AuthResponseDto>
   inviteUser(data: InviteUserDto): Promise<{ message: string }>
   verifyInvitation(data: VerifyInvitationDto): Promise<AuthResponseDto>
