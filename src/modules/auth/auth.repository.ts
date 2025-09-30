@@ -11,7 +11,21 @@ export class AuthRepository implements IAuthRepository {
     return this.prisma.user.findUnique({
       where: { email },
       include: {
-        role: true
+        role: {
+          include: {
+            portfolioPermission: true,
+            propertyPermission: true,
+            auditPermission: true,
+            userPermission: true,
+            systemSettingsPermission: true
+          }
+        },
+        userAccessedProperties: {
+          select: {
+            portfolio_id: true,
+            property_id: true
+          }
+        }
       }
     })
   }
