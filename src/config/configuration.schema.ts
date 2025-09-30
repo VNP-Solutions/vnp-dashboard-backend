@@ -42,7 +42,7 @@ export class ConfigurationSchema {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  JWT_EXPIRES_IN?: string = '7d'
+  JWT_EXPIRES_IN?: string
 
   @IsString()
   @IsNotEmpty()

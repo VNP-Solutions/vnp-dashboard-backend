@@ -1,0 +1,242 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Portfolio {
+  id                 String      @id @default(auto()) @map("_id") @db.ObjectId
+  name               String      @unique
+  service_type_id    String      @db.ObjectId
+  serviceType        ServiceType @relation(fields: [service_type_id], references: [id])
+  is_contract_signed Boolean
+  contract_url       String?
+  is_active          Boolean
+  contact_email      String?
+  is_commissionable  Boolean
+
+  properties Property[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Property {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  name            String    @unique
+  address         String
+  currency_id     String    @db.ObjectId
+  currency        Currency  @relation(fields: [currency_id], references: [id])
+  card_descriptor String
+  is_active       Boolean   @default(true)
+  next_due_date   DateTime
+  portfolio_id    String    @db.ObjectId
+  portfolio       Portfolio @relation(fields: [portfolio_id], references: [id])
+
+  audits      Audit[]
+  credentials PropertyCredentials?
+  bankDetails PropertyBankDetails?
+  batches     PropertyBatch[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model User {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  first_name     String
+  last_name      String
+  email          String   @unique
+  language       String
+  user_role_id   String   @db.ObjectId
+  role           UserRole @relation(fields: [user_role_id], references: [id])
+  password       String
+  display_image  String?
+  contact_number String?
+  is_verified    Boolean
+  temp_password  String?
+
+  otps                   Otp[]
+  userAccessedProperties UserAccessedProperty[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Otp {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id    String   @db.ObjectId
+  user       User     @relation(fields: [user_id], references: [id])
+  otp        Int
+  is_used    Boolean
+  expires_at DateTime
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Audit {
+  id                 String      @id @default(auto()) @map("_id") @db.ObjectId
+  type_of_ota        OtaType?
+  ota_id             String      @db.ObjectId
+  audit_status_id    String      @db.ObjectId
+  auditStatus        AuditStatus @relation(fields: [audit_status_id], references: [id])
+  amount_collectable Int?
+  amount_confirmed   Int?
+  is_archived        Boolean     @default(false)
+  start_date         DateTime
+  end_date           DateTime
+  property_id        String      @db.ObjectId
+  property           Property    @relation(fields: [property_id], references: [id])
+  report_url         String
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model PropertyCredentials {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  expedia_id       String?
+  expedia_username String?
+  expedia_password String?
+  agoda_id         String?
+  agoda_username   String?
+  agoda_password   String?
+  booking_id       String?
+  booking_username String?
+  booking_password String?
+  property_id      String   @unique @db.ObjectId
+  property         Property @relation(fields: [property_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model PropertyBankDetails {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  bank_type            BankType @default(bank)
+  account_number       String?
+  account_name         String?
+  bank_name            String?
+  bank_branch          String?
+  swift_code           String?
+  routing_number       String?
+  stripe_account_email String?
+  property_id          String   @unique @db.ObjectId
+  property             Property @relation(fields: [property_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model PropertyBatch {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  batch_no    String
+  property_id String   @db.ObjectId
+  property    Property @relation(fields: [property_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model ServiceType {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  type       String
+  is_active  Boolean
+  portfolios Portfolio[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model AuditStatus {
+  id     String  @id @default(auto()) @map("_id") @db.ObjectId
+  status String
+  audits Audit[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model UserRole {
+  id                         String  @id @default(auto()) @map("_id") @db.ObjectId
+  name                       String
+  description                String
+  is_external                Boolean
+  portfolio_permission       Json
+  property_permission        Json
+  audit_permission           Json
+  user_permission            Json
+  system_settings_permission Json
+  users                      User[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model UserAccessedProperty {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id      String   @db.ObjectId
+  user         User     @relation(fields: [user_id], references: [id])
+  portfolio_id String[] @db.ObjectId
+  property_id  String[] @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model PropertyPermission {
+  id               String          @id @default(auto()) @map("_id") @db.ObjectId
+  permission_level PermissionLevel
+  access_level     AccessLevel
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model PortfolioPermission {
+  id               String          @id @default(auto()) @map("_id") @db.ObjectId
+  permission_level PermissionLevel
+  access_level     AccessLevel
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Currency {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  code       String     @unique
+  name       String
+  symbol     String?
+  is_active  Boolean    @default(true)
+  properties Property[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+enum OtaType {
+  expedia
+  agoda
+  booking
+}
+
+enum BankType {
+  bank
+  stripe
+}
+
+enum PermissionLevel {
+  all
+  update
+  view
+}
+
+enum AccessLevel {
+  all
+  partial
+  none
+}
