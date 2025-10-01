@@ -80,7 +80,7 @@ export class ConfigurationSchema {
   @IsNotEmpty()
   SMTP_PASSWORD: string
 
-  @IsUrl()
+  @IsString()
   @IsNotEmpty()
   INVITATION_REDIRECT_URL?: string
 }
