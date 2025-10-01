@@ -1,16 +1,17 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 import { Configuration } from '../../../config/configuration'
-import { JwtPayload } from '../auth.interface'
-import { AuthRepository } from '../auth.repository'
+import type { IAuthRepository, JwtPayload } from '../auth.interface'
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
+    @Inject(ConfigService)
     private configService: ConfigService<Configuration>,
-    private authRepository: AuthRepository
+    @Inject('IAuthRepository')
+    private authRepository: IAuthRepository
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -27,10 +28,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     return {
-      id: (user as unknown as { id: string }).id,
-      email: (user as unknown as { email: string }).email,
-      role_id: (user as unknown as { user_role_id: string }).user_role_id,
-      role: (user as unknown as { role: unknown }).role
+      id: user.id,
+      email: user.email,
+      role_id: user.user_role_id,
+      role: user.role
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Otp, User } from '@prisma/client'
+import { Otp, Prisma, User } from '@prisma/client'
 import {
   AuthResponseDto,
   InviteUserDto,
@@ -7,8 +7,28 @@ import {
   VerifyLoginOtpDto
 } from './auth.dto'
 
+type UserWithRelations = Prisma.UserGetPayload<{
+  include: {
+    role: {
+      include: {
+        portfolioPermission: true
+        propertyPermission: true
+        auditPermission: true
+        userPermission: true
+        systemSettingsPermission: true
+      }
+    }
+    userAccessedProperties: {
+      select: {
+        portfolio_id: true
+        property_id: true
+      }
+    }
+  }
+}>
+
 export interface IAuthRepository {
-  findUserByEmail(email: string): Promise<User | null>
+  findUserByEmail(email: string): Promise<UserWithRelations | null>
   createOtp(userId: string, otp: number, expiresAt: Date): Promise<void>
   findValidOtp(userId: string, otp: number): Promise<Otp | null>
   markOtpAsUsed(otpId: string): Promise<void>

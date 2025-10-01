@@ -1,4 +1,11 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Post
+} from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import {
   AuthResponseDto,
@@ -10,14 +17,17 @@ import {
   VerifyInvitationDto,
   VerifyLoginOtpDto
 } from './auth.dto'
-import { AuthService } from './auth.service'
+import type { IAuthService } from './auth.interface'
 import { Public } from './decorators/public.decorator'
 
 @ApiTags('Authentication')
 @Controller('auth')
 @Public()
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    @Inject('IAuthService')
+    private readonly authService: IAuthService
+  ) {}
 
   @Post('login/request-otp')
   @HttpCode(HttpStatus.OK)

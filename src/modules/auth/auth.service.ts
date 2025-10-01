@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   UnauthorizedException
 } from '@nestjs/common'
@@ -16,8 +17,11 @@ import {
   VerifyInvitationDto,
   VerifyLoginOtpDto
 } from './auth.dto'
-import { IAuthService, JwtPayload } from './auth.interface'
-import { AuthRepository } from './auth.repository'
+import type {
+  IAuthRepository,
+  IAuthService,
+  JwtPayload
+} from './auth.interface'
 
 interface UserWithRole {
   id: string
@@ -33,9 +37,13 @@ interface UserWithRole {
 @Injectable()
 export class AuthService implements IAuthService {
   constructor(
-    private authRepository: AuthRepository,
+    @Inject('IAuthRepository')
+    private authRepository: IAuthRepository,
+    @Inject(JwtService)
     private jwtService: JwtService,
+    @Inject(ConfigService)
     private configService: ConfigService<Configuration>,
+    @Inject(EmailUtil)
     private emailUtil: EmailUtil
   ) {}
 

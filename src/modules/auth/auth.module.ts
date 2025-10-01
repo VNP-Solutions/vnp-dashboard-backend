@@ -17,12 +17,25 @@ import { JwtStrategy } from './strategies/jwt.strategy'
   ],
   controllers: [AuthController],
   providers: [
-    AuthService,
-    AuthRepository,
+    {
+      provide: 'IAuthService',
+      useClass: AuthService
+    },
+    {
+      provide: 'IAuthRepository',
+      useClass: AuthRepository
+    },
     JwtStrategy,
     PrismaService,
     EmailUtil
   ],
-  exports: [AuthService, JwtStrategy, PassportModule]
+  exports: [
+    {
+      provide: 'IAuthService',
+      useClass: AuthService
+    },
+    JwtStrategy,
+    PassportModule
+  ]
 })
 export class AuthModule {}

@@ -1,13 +1,33 @@
-import { Injectable } from '@nestjs/common'
-import { Otp, User } from '@prisma/client'
+import { Inject, Injectable } from '@nestjs/common'
+import { Otp, Prisma, User } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
-import { IAuthRepository } from './auth.interface'
+import type { IAuthRepository } from './auth.interface'
+
+type UserWithRelations = Prisma.UserGetPayload<{
+  include: {
+    role: {
+      include: {
+        portfolioPermission: true
+        propertyPermission: true
+        auditPermission: true
+        userPermission: true
+        systemSettingsPermission: true
+      }
+    }
+    userAccessedProperties: {
+      select: {
+        portfolio_id: true
+        property_id: true
+      }
+    }
+  }
+}>
 
 @Injectable()
 export class AuthRepository implements IAuthRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
-  async findUserByEmail(email: string): Promise<User | null> {
+  async findUserByEmail(email: string): Promise<UserWithRelations | null> {
     return this.prisma.user.findUnique({
       where: { email },
       include: {
