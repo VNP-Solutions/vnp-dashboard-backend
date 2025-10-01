@@ -81,9 +81,7 @@ export class AuthService implements IAuthService {
     await this.authRepository.createOtp(user.id, otp, expiresAt)
     await this.emailUtil.sendOtpEmail(email, otp)
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[DEV] Login OTP for ${email}: ${otp}`)
-    }
+    console.log(`Login OTP for ${email}: ${otp}`)
 
     return { message: 'OTP sent to your email' }
   }

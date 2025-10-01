@@ -7,6 +7,7 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
+import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { CreateUserRoleDto, UpdateUserRoleDto } from './user-role.dto'
 import type {
@@ -34,11 +35,11 @@ export class UserRoleService implements IUserRoleService {
 
     // Validate role configuration and log warnings
     const warnings = this.permissionService.validateRoleConfiguration({
-      portfolio_permission: data.portfolio_permission || null,
-      property_permission: data.property_permission || null,
-      audit_permission: data.audit_permission || null,
-      user_permission: data.user_permission || null,
-      system_settings_permission: data.system_settings_permission || null
+      portfolio_permission: data.portfolio_permission ?? null,
+      property_permission: data.property_permission ?? null,
+      audit_permission: data.audit_permission ?? null,
+      user_permission: data.user_permission ?? null,
+      system_settings_permission: data.system_settings_permission ?? null
     })
 
     if (warnings.length > 0) {
@@ -49,8 +50,22 @@ export class UserRoleService implements IUserRoleService {
     return this.userRoleRepository.create(data)
   }
 
-  async findAll(_user: IUserWithPermissions) {
-    return this.userRoleRepository.findAll()
+  async findAll(user: IUserWithPermissions) {
+    // Check user's access level for USER_ROLE module
+    // USER_ROLE doesn't support partial access, so this will return either 'all' or []
+    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.USER_ROLE
+    )
+
+    if (accessibleIds === 'all') {
+      // User has full access - return all roles
+      return this.userRoleRepository.findAll()
+    }
+
+    // User has 'partial' or 'none' access
+    // Since USER_ROLE doesn't support partial access, return empty array
+    return []
   }
 
   async findOne(id: string, _user: IUserWithPermissions) {
@@ -85,15 +100,15 @@ export class UserRoleService implements IUserRoleService {
     // Validate updated role configuration
     const warnings = this.permissionService.validateRoleConfiguration({
       portfolio_permission:
-        data.portfolio_permission || userRole.portfolio_permission || null,
+        data.portfolio_permission ?? userRole.portfolio_permission ?? null,
       property_permission:
-        data.property_permission || userRole.property_permission || null,
+        data.property_permission ?? userRole.property_permission ?? null,
       audit_permission:
-        data.audit_permission || userRole.audit_permission || null,
-      user_permission: data.user_permission || userRole.user_permission || null,
+        data.audit_permission ?? userRole.audit_permission ?? null,
+      user_permission: data.user_permission ?? userRole.user_permission ?? null,
       system_settings_permission:
-        data.system_settings_permission ||
-        userRole.system_settings_permission ||
+        data.system_settings_permission ??
+        userRole.system_settings_permission ??
         null
     })
 
