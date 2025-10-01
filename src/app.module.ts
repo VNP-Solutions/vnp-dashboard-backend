@@ -13,6 +13,7 @@ import { validate } from './config/validation'
 import { AuthModule } from './modules/auth/auth.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
+import { UserRoleModule } from './modules/user-role/user-role.module'
 
 @Module({
   imports: [
@@ -23,7 +24,8 @@ import { PortfolioModule } from './modules/portfolio/portfolio.module'
       cache: true
     }),
     AuthModule,
-    PortfolioModule
+    PortfolioModule,
+    UserRoleModule
   ],
   controllers: [AppController],
   providers: [

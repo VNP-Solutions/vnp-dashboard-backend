@@ -22,6 +22,7 @@ export enum ModuleType {
   PROPERTY = 'property',
   AUDIT = 'audit',
   USER = 'user',
+  USER_ROLE = 'user_role',
   SYSTEM_SETTINGS = 'system_settings'
 }
 
