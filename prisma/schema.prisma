@@ -162,24 +162,44 @@ model AuditStatus {
 }
 
 model UserRole {
-  id                            String                    @id @default(auto()) @map("_id") @db.ObjectId
-  name                          String                    @unique
-  description                   String
-  is_external                   Boolean
-  portfolio_permission_id       String?                   @db.ObjectId
-  portfolioPermission           PortfolioPermission?      @relation(fields: [portfolio_permission_id], references: [id])
-  property_permission_id        String?                   @db.ObjectId
-  propertyPermission            PropertyPermission?       @relation(fields: [property_permission_id], references: [id])
-  audit_permission_id           String?                   @db.ObjectId
-  auditPermission               AuditPermission?          @relation(fields: [audit_permission_id], references: [id])
-  user_permission_id            String?                   @db.ObjectId
-  userPermission                UserPermission?           @relation(fields: [user_permission_id], references: [id])
-  system_settings_permission_id String?                   @db.ObjectId
-  systemSettingsPermission      SystemSettingsPermission? @relation(fields: [system_settings_permission_id], references: [id])
-  users                         User[]
+  id                         String                    @id @default(auto()) @map("_id") @db.ObjectId
+  name                       String                    @unique
+  description                String
+  is_external                Boolean
+  portfolio_permission       PortfolioPermission?
+  property_permission        PropertyPermission?
+  audit_permission           AuditPermission?
+  user_permission            UserPermission?
+  system_settings_permission SystemSettingsPermission?
+  users                      User[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+}
+
+type PortfolioPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type PropertyPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type AuditPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type UserPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type SystemSettingsPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
 }
 
 model UserAccessedProperty {
@@ -188,56 +208,6 @@ model UserAccessedProperty {
   user         User     @relation(fields: [user_id], references: [id])
   portfolio_id String[] @db.ObjectId
   property_id  String[] @db.ObjectId
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
-model PropertyPermission {
-  id               String          @id @default(auto()) @map("_id") @db.ObjectId
-  permission_level PermissionLevel
-  access_level     AccessLevel
-  userRoles        UserRole[]
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
-model PortfolioPermission {
-  id               String          @id @default(auto()) @map("_id") @db.ObjectId
-  permission_level PermissionLevel
-  access_level     AccessLevel
-  userRoles        UserRole[]
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
-model AuditPermission {
-  id               String          @id @default(auto()) @map("_id") @db.ObjectId
-  permission_level PermissionLevel
-  access_level     AccessLevel
-  userRoles        UserRole[]
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
-model UserPermission {
-  id               String          @id @default(auto()) @map("_id") @db.ObjectId
-  permission_level PermissionLevel
-  access_level     AccessLevel
-  userRoles        UserRole[]
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
-model SystemSettingsPermission {
-  id               String          @id @default(auto()) @map("_id") @db.ObjectId
-  permission_level PermissionLevel
-  access_level     AccessLevel
-  userRoles        UserRole[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
