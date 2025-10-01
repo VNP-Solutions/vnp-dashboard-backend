@@ -81,6 +81,10 @@ export class AuthService implements IAuthService {
     await this.authRepository.createOtp(user.id, otp, expiresAt)
     await this.emailUtil.sendOtpEmail(email, otp)
 
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEV] Login OTP for ${email}: ${otp}`)
+    }
+
     return { message: 'OTP sent to your email' }
   }
 
@@ -196,6 +200,10 @@ export class AuthService implements IAuthService {
 
     await this.authRepository.createOtp(user.id, otp, expiresAt)
     await this.emailUtil.sendPasswordResetOtpEmail(email, otp)
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEV] Password Reset OTP for ${email}: ${otp}`)
+    }
 
     return { message: 'If the email exists, an OTP has been sent' }
   }
