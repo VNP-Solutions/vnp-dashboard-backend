@@ -9,15 +9,7 @@ import {
 
 type UserWithRelations = Prisma.UserGetPayload<{
   include: {
-    role: {
-      include: {
-        portfolioPermission: true
-        propertyPermission: true
-        auditPermission: true
-        userPermission: true
-        systemSettingsPermission: true
-      }
-    }
+    role: true
     userAccessedProperties: {
       select: {
         portfolio_id: true

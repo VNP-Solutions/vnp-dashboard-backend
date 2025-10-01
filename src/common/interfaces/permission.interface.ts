@@ -37,11 +37,11 @@ export interface IUserWithPermissions {
   role: {
     id: string
     name: string
-    portfolioPermission: IPermission
-    propertyPermission: IPermission
-    auditPermission: IPermission
-    userPermission: IPermission
-    systemSettingsPermission: IPermission
+    portfolio_permission: IPermission | null
+    property_permission: IPermission | null
+    audit_permission: IPermission | null
+    user_permission: IPermission | null
+    system_settings_permission: IPermission | null
   }
   userAccessedProperties?: {
     portfolio_id: string[]

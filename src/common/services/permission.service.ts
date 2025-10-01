@@ -154,15 +154,15 @@ export class PermissionService {
   ): IPermission | null {
     switch (module) {
       case ModuleType.PORTFOLIO:
-        return user.role.portfolioPermission
+        return user.role.portfolio_permission
       case ModuleType.PROPERTY:
-        return user.role.propertyPermission
+        return user.role.property_permission
       case ModuleType.AUDIT:
-        return user.role.auditPermission
+        return user.role.audit_permission
       case ModuleType.USER:
-        return user.role.userPermission
+        return user.role.user_permission
       case ModuleType.SYSTEM_SETTINGS:
-        return user.role.systemSettingsPermission
+        return user.role.system_settings_permission
       default:
         return null
     }

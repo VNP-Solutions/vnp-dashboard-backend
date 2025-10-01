@@ -5,15 +5,7 @@ import type { IAuthRepository } from './auth.interface'
 
 type UserWithRelations = Prisma.UserGetPayload<{
   include: {
-    role: {
-      include: {
-        portfolioPermission: true
-        propertyPermission: true
-        auditPermission: true
-        userPermission: true
-        systemSettingsPermission: true
-      }
-    }
+    role: true
     userAccessedProperties: {
       select: {
         portfolio_id: true
@@ -31,15 +23,7 @@ export class AuthRepository implements IAuthRepository {
     return this.prisma.user.findUnique({
       where: { email },
       include: {
-        role: {
-          include: {
-            portfolioPermission: true,
-            propertyPermission: true,
-            auditPermission: true,
-            userPermission: true,
-            systemSettingsPermission: true
-          }
-        },
+        role: true,
         userAccessedProperties: {
           select: {
             portfolio_id: true,
