@@ -38,7 +38,7 @@ export class UserRoleController {
   ) {}
 
   @Post()
-  @RequirePermission(ModuleType.USER_ROLE, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.USER, PermissionAction.CREATE)
   @ApiOperation({ summary: 'Create a new role' })
   @ApiResponse({ status: 201, description: 'Role created successfully' })
   @ApiResponse({
@@ -53,7 +53,7 @@ export class UserRoleController {
   }
 
   @Get()
-  @RequirePermission(ModuleType.USER_ROLE, PermissionAction.READ)
+  @RequirePermission(ModuleType.USER, PermissionAction.READ)
   @ApiOperation({ summary: 'Get all roles' })
   @ApiResponse({
     status: 200,
@@ -64,7 +64,7 @@ export class UserRoleController {
   }
 
   @Get(':id')
-  @RequirePermission(ModuleType.USER_ROLE, PermissionAction.READ, true)
+  @RequirePermission(ModuleType.USER, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get a role by ID' })
   @ApiResponse({ status: 200, description: 'Role retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Role not found' })
@@ -77,7 +77,7 @@ export class UserRoleController {
   }
 
   @Patch(':id')
-  @RequirePermission(ModuleType.USER_ROLE, PermissionAction.UPDATE, true)
+  @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
   @ApiOperation({ summary: 'Update a role' })
   @ApiResponse({ status: 200, description: 'Role updated successfully' })
   @ApiResponse({ status: 404, description: 'Role not found' })
@@ -94,7 +94,7 @@ export class UserRoleController {
   }
 
   @Delete(':id')
-  @RequirePermission(ModuleType.USER_ROLE, PermissionAction.DELETE, true)
+  @RequirePermission(ModuleType.USER, PermissionAction.DELETE, true)
   @ApiOperation({ summary: 'Delete a role' })
   @ApiResponse({ status: 200, description: 'Role deleted successfully' })
   @ApiResponse({ status: 404, description: 'Role not found' })

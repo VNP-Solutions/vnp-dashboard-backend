@@ -51,11 +51,11 @@ export class UserRoleService implements IUserRoleService {
   }
 
   async findAll(user: IUserWithPermissions) {
-    // Check user's access level for USER_ROLE module
-    // USER_ROLE doesn't support partial access, so this will return either 'all' or []
+    // Check user's access level for USER module
+    // USER module doesn't support partial access, so this will return either 'all' or []
     const accessibleIds = this.permissionService.getAccessibleResourceIds(
       user,
-      ModuleType.USER_ROLE
+      ModuleType.USER
     )
 
     if (accessibleIds === 'all') {
@@ -64,7 +64,7 @@ export class UserRoleService implements IUserRoleService {
     }
 
     // User has 'partial' or 'none' access
-    // Since USER_ROLE doesn't support partial access, return empty array
+    // Since USER module doesn't support partial access, return empty array
     return []
   }
 

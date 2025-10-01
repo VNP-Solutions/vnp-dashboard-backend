@@ -178,7 +178,7 @@ export class PermissionService {
         return user.userAccessedProperties.property_id || []
       }
 
-      // Other modules (AUDIT, USER, USER_ROLE, SYSTEM_SETTINGS) don't support partial access
+      // Other modules (AUDIT, USER, SYSTEM_SETTINGS) don't support partial access
       // If a user has PARTIAL access to these modules, treat as no access
       return []
     }
@@ -198,8 +198,6 @@ export class PermissionService {
       case ModuleType.AUDIT:
         return user.role.audit_permission
       case ModuleType.USER:
-        return user.role.user_permission
-      case ModuleType.USER_ROLE:
         return user.role.user_permission
       case ModuleType.SYSTEM_SETTINGS:
         return user.role.system_settings_permission
@@ -295,7 +293,7 @@ export class PermissionService {
       return propertyIds.includes(resourceId)
     }
 
-    // Other modules (AUDIT, USER, USER_ROLE, SYSTEM_SETTINGS) don't support partial access
+    // Other modules (AUDIT, USER, SYSTEM_SETTINGS) don't support partial access
     // For these modules, PARTIAL access_level should not be used
     // If someone tries to use PARTIAL for these modules, deny access
     return false

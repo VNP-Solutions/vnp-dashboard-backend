@@ -27,14 +27,13 @@ export enum PermissionAction {
 /**
  * Module Type represents different system modules.
  * Each module can have its own permission configuration.
- * Note: USER_ROLE uses user_permission from the role configuration
+ * Note: Both 'user' and 'user_role' modules are controlled by USER permission
  */
 export enum ModuleType {
   PORTFOLIO = 'portfolio',
   PROPERTY = 'property',
   AUDIT = 'audit',
   USER = 'user',
-  USER_ROLE = 'user_role',
   SYSTEM_SETTINGS = 'system_settings'
 }
 
