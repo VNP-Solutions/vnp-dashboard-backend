@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
@@ -24,14 +25,17 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CreatePortfolioDto, UpdatePortfolioDto } from './portfolio.dto'
-import { PortfolioService } from './portfolio.service'
+import type { IPortfolioService } from './portfolio.interface'
 
 @ApiTags('Portfolio')
 @ApiBearerAuth('JWT-auth')
 @Controller('portfolio')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class PortfolioController {
-  constructor(private readonly portfolioService: PortfolioService) {}
+  constructor(
+    @Inject('IPortfolioService')
+    private readonly portfolioService: IPortfolioService
+  ) {}
 
   @Post()
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)

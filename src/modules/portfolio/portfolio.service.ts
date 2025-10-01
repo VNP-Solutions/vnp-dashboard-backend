@@ -1,21 +1,25 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import {
-  IUserWithPermissions,
-  ModuleType
-} from '../../common/interfaces/permission.interface'
+import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
+import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { CreatePortfolioDto, UpdatePortfolioDto } from './portfolio.dto'
-import { PortfolioRepository } from './portfolio.repository'
+import type {
+  IPortfolioRepository,
+  IPortfolioService
+} from './portfolio.interface'
 
 @Injectable()
-export class PortfolioService {
+export class PortfolioService implements IPortfolioService {
   constructor(
-    private portfolioRepository: PortfolioRepository,
+    @Inject('IPortfolioRepository')
+    private portfolioRepository: IPortfolioRepository,
+    @Inject(PermissionService)
     private permissionService: PermissionService
   ) {}
 

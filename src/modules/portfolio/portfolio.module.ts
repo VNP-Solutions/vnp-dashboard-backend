@@ -8,11 +8,22 @@ import { PortfolioService } from './portfolio.service'
 @Module({
   controllers: [PortfolioController],
   providers: [
-    PortfolioService,
-    PortfolioRepository,
+    {
+      provide: 'IPortfolioService',
+      useClass: PortfolioService
+    },
+    {
+      provide: 'IPortfolioRepository',
+      useClass: PortfolioRepository
+    },
     PermissionService,
     PrismaService
   ],
-  exports: [PortfolioService]
+  exports: [
+    {
+      provide: 'IPortfolioService',
+      useClass: PortfolioService
+    }
+  ]
 })
 export class PortfolioModule {}

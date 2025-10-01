@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreatePortfolioDto, UpdatePortfolioDto } from './portfolio.dto'
+import type { IPortfolioRepository } from './portfolio.interface'
 
 @Injectable()
-export class PortfolioRepository {
-  constructor(private prisma: PrismaService) {}
+export class PortfolioRepository implements IPortfolioRepository {
+  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async create(data: CreatePortfolioDto) {
     return this.prisma.portfolio.create({
