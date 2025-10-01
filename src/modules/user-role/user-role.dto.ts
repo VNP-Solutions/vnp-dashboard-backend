@@ -10,18 +10,10 @@ import {
   IsString,
   ValidateNested
 } from 'class-validator'
-
-enum PermissionLevel {
-  all = 'all',
-  update = 'update',
-  view = 'view'
-}
-
-enum AccessLevel {
-  all = 'all',
-  partial = 'partial',
-  none = 'none'
-}
+import {
+  AccessLevel,
+  PermissionLevel
+} from '../../common/interfaces/permission.interface'
 
 export class PermissionDto {
   @ApiProperty({
