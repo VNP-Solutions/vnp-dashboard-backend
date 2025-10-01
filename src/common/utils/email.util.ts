@@ -65,7 +65,7 @@ export class EmailUtil {
           </div>
           <p style="color: #d9534f; font-weight: bold;">⚠️ This temporary password is valid for 7 days only.</p>
           <p>After logging in with your temporary password, you will be required to set a new password.</p>
-          ${redirectUrl ? `<p><a href="${redirectUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 10px;">Login Now</a></p>` : ''}
+          ${redirectUrl ? `<p><a href="${redirectUrl}?email=${email}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 10px;">Login Now</a></p>` : ''}
           <p style="color: #666; margin-top: 30px;">If you didn't expect this invitation, please contact the administrator.</p>
         </div>
       `,

@@ -10,6 +10,7 @@ import { PermissionService } from './common/services/permission.service'
 import { ConfigService } from './config/config.service'
 import configuration from './config/configuration'
 import { validate } from './config/validation'
+import { AuditStatusModule } from './modules/audit-status/audit-status.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
@@ -25,6 +26,7 @@ import { UserRoleModule } from './modules/user-role/user-role.module'
       cache: true
     }),
     AuthModule,
+    AuditStatusModule,
     PortfolioModule,
     ServiceTypeModule,
     UserRoleModule
