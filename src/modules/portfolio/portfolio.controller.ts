@@ -28,6 +28,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   CreatePortfolioDto,
   PortfolioQueryDto,
+  SendPortfolioEmailDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 import type { IPortfolioService } from './portfolio.interface'
@@ -119,5 +120,31 @@ export class PortfolioController {
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.portfolioService.remove(id, user)
+  }
+
+  @Post(':id/send-email')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
+  @ApiOperation({ summary: 'Send email to portfolio contact' })
+  @ApiResponse({ status: 200, description: 'Email sent successfully' })
+  @ApiResponse({ status: 404, description: 'Portfolio not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Portfolio does not have a contact email configured'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - No access to this portfolio'
+  })
+  sendEmail(
+    @Param('id') id: string,
+    @Body() sendEmailDto: SendPortfolioEmailDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.sendEmail(
+      id,
+      sendEmailDto.subject,
+      sendEmailDto.body,
+      user
+    )
   }
 }

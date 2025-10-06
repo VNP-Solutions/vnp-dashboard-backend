@@ -96,4 +96,15 @@ export class EmailUtil {
 
     await this.transporter.sendMail(mailOptions)
   }
+
+  async sendEmail(to: string, subject: string, body: string): Promise<void> {
+    const mailOptions = {
+      from: this.configService.get('smtp.email', { infer: true }),
+      to,
+      subject,
+      text: body
+    }
+
+    await this.transporter.sendMail(mailOptions)
+  }
 }

@@ -90,3 +90,22 @@ export class PortfolioQueryDto extends QueryDto {
   @IsString()
   is_contract_signed?: string
 }
+
+export class SendPortfolioEmailDto {
+  @ApiProperty({
+    example: 'Quarterly Review Meeting',
+    description: 'Email subject'
+  })
+  @IsString()
+  @IsNotEmpty()
+  subject: string
+
+  @ApiProperty({
+    example:
+      'Dear Team,\n\nWe would like to schedule a quarterly review meeting...',
+    description: 'Email body (plain text)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  body: string
+}

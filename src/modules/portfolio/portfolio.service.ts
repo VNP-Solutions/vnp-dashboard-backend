@@ -8,6 +8,7 @@ import {
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { EmailUtil } from '../../common/utils/email.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   CreatePortfolioDto,
@@ -25,7 +26,9 @@ export class PortfolioService implements IPortfolioService {
     @Inject('IPortfolioRepository')
     private portfolioRepository: IPortfolioRepository,
     @Inject(PermissionService)
-    private permissionService: PermissionService
+    private permissionService: PermissionService,
+    @Inject(EmailUtil)
+    private emailUtil: EmailUtil
   ) {}
 
   async create(data: CreatePortfolioDto, _user: IUserWithPermissions) {
@@ -181,5 +184,28 @@ export class PortfolioService implements IPortfolioService {
     await this.portfolioRepository.delete(id)
 
     return { message: 'Portfolio deleted successfully' }
+  }
+
+  async sendEmail(
+    id: string,
+    subject: string,
+    body: string,
+    _user: IUserWithPermissions
+  ) {
+    const portfolio = await this.portfolioRepository.findById(id)
+
+    if (!portfolio) {
+      throw new NotFoundException('Portfolio not found')
+    }
+
+    if (!portfolio.contact_email) {
+      throw new BadRequestException(
+        'Portfolio does not have a contact email configured'
+      )
+    }
+
+    await this.emailUtil.sendEmail(portfolio.contact_email, subject, body)
+
+    return { message: 'Email sent successfully' }
   }
 }
