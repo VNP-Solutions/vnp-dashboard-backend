@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString
 } from 'class-validator'
+import { QueryDto } from '../../common/dto/query.dto'
 
 export class CreatePortfolioDto {
   @ApiProperty({
@@ -62,3 +63,30 @@ export class CreatePortfolioDto {
 }
 
 export class UpdatePortfolioDto extends PartialType(CreatePortfolioDto) {}
+
+export class PortfolioQueryDto extends QueryDto {
+  @ApiPropertyOptional({
+    description:
+      'Filter by service type ID (can be comma-separated for multiple)',
+    example: '507f1f77bcf86cd799439011'
+  })
+  @IsOptional()
+  @IsString()
+  service_type_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by active status (true/false/All)',
+    example: 'true'
+  })
+  @IsOptional()
+  @IsString()
+  is_active?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by contract signed status (true/false/All)',
+    example: 'true'
+  })
+  @IsOptional()
+  @IsString()
+  is_contract_signed?: string
+}

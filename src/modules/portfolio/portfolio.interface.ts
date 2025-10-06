@@ -1,6 +1,11 @@
 import { Portfolio, Prisma } from '@prisma/client'
+import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { CreatePortfolioDto, UpdatePortfolioDto } from './portfolio.dto'
+import {
+  CreatePortfolioDto,
+  PortfolioQueryDto,
+  UpdatePortfolioDto
+} from './portfolio.dto'
 
 type PortfolioWithServiceType = Prisma.PortfolioGetPayload<{
   include: {
@@ -57,7 +62,11 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
 
 export interface IPortfolioRepository {
   create(data: CreatePortfolioDto): Promise<PortfolioWithServiceType>
-  findAll(portfolioIds?: string[]): Promise<PortfolioWithRelations[]>
+  findAll(
+    queryOptions: any,
+    portfolioIds?: string[]
+  ): Promise<PortfolioWithRelations[]>
+  count(whereClause: any, portfolioIds?: string[]): Promise<number>
   findById(id: string): Promise<PortfolioWithFullDetails | null>
   findByName(name: string): Promise<Portfolio | null>
   update(
@@ -73,7 +82,10 @@ export interface IPortfolioService {
     data: CreatePortfolioDto,
     user: IUserWithPermissions
   ): Promise<PortfolioWithServiceType>
-  findAll(user: IUserWithPermissions): Promise<PortfolioWithRelations[]>
+  findAll(
+    query: PortfolioQueryDto,
+    user: IUserWithPermissions
+  ): Promise<PaginatedResult<PortfolioWithRelations>>
   findOne(
     id: string,
     user: IUserWithPermissions

@@ -22,15 +22,14 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
-  async findAll(portfolioIds?: string[]) {
+  async findAll(queryOptions: any, portfolioIds?: string[]) {
+    const { where, skip, take, orderBy } = queryOptions
+
     return this.prisma.portfolio.findMany({
-      where: portfolioIds
-        ? {
-            id: {
-              in: portfolioIds
-            }
-          }
-        : undefined,
+      where,
+      skip,
+      take,
+      orderBy,
       include: {
         serviceType: {
           select: {
@@ -46,10 +45,13 @@ export class PortfolioRepository implements IPortfolioRepository {
             is_active: true
           }
         }
-      },
-      orderBy: {
-        created_at: 'desc'
       }
+    })
+  }
+
+  async count(whereClause: any, portfolioIds?: string[]): Promise<number> {
+    return this.prisma.portfolio.count({
+      where: whereClause
     })
   }
 

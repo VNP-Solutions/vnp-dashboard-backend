@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards
 } from '@nestjs/common'
 import {
@@ -24,7 +25,11 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreatePortfolioDto, UpdatePortfolioDto } from './portfolio.dto'
+import {
+  CreatePortfolioDto,
+  PortfolioQueryDto,
+  UpdatePortfolioDto
+} from './portfolio.dto'
 import type { IPortfolioService } from './portfolio.interface'
 
 @ApiTags('Portfolio')
@@ -54,13 +59,19 @@ export class PortfolioController {
 
   @Get()
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
-  @ApiOperation({ summary: 'Get all portfolios accessible to the user' })
+  @ApiOperation({
+    summary:
+      'Get all portfolios accessible to the user with pagination, search, filter, and sort'
+  })
   @ApiResponse({
     status: 200,
-    description: 'List of portfolios retrieved successfully'
+    description: 'Paginated list of portfolios retrieved successfully'
   })
-  findAll(@CurrentUser() user: IUserWithPermissions) {
-    return this.portfolioService.findAll(user)
+  findAll(
+    @Query() query: PortfolioQueryDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.findAll(query, user)
   }
 
   @Get(':id')

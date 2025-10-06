@@ -8,7 +8,12 @@ import {
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
-import { CreatePortfolioDto, UpdatePortfolioDto } from './portfolio.dto'
+import { QueryBuilder } from '../../common/utils/query-builder.util'
+import {
+  CreatePortfolioDto,
+  PortfolioQueryDto,
+  UpdatePortfolioDto
+} from './portfolio.dto'
 import type {
   IPortfolioRepository,
   IPortfolioService
@@ -35,21 +40,93 @@ export class PortfolioService implements IPortfolioService {
     return this.portfolioRepository.create(data)
   }
 
-  async findAll(user: IUserWithPermissions) {
+  async findAll(query: PortfolioQueryDto, user: IUserWithPermissions) {
     const accessibleIds = this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PORTFOLIO
     )
 
-    if (accessibleIds === 'all') {
-      return this.portfolioRepository.findAll()
+    if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
+      return QueryBuilder.buildPaginatedResult(
+        [],
+        0,
+        query.page || 1,
+        query.limit || 10
+      )
     }
 
-    if (accessibleIds.length === 0) {
-      return []
+    // Build additional filters from query params
+    const additionalFilters: any = {}
+    if (query.service_type_id) {
+      additionalFilters.service_type_id = query.service_type_id
+    }
+    if (query.is_active) {
+      additionalFilters.is_active = query.is_active
+    }
+    if (query.is_contract_signed) {
+      additionalFilters.is_contract_signed = query.is_contract_signed
     }
 
-    return this.portfolioRepository.findAll(accessibleIds)
+    // Merge with existing filters
+    const mergedQuery = {
+      ...query,
+      filters: {
+        ...(typeof query.filters === 'object' ? query.filters : {}),
+        ...additionalFilters
+      }
+    }
+
+    // Configuration for query builder
+    const queryConfig = {
+      searchFields: ['name'], // Search only by portfolio name
+      filterableFields: ['service_type_id', 'is_active', 'is_contract_signed'],
+      sortableFields: [
+        'name',
+        'created_at',
+        'updated_at',
+        'is_active',
+        'is_contract_signed',
+        'is_commissionable'
+      ],
+      defaultSortField: 'created_at',
+      defaultSortOrder: 'desc' as const,
+      nestedFieldMap: {
+        service_type_name: 'serviceType.type'
+      }
+    }
+
+    // Build base where clause with permission filter
+    const baseWhere =
+      accessibleIds === 'all'
+        ? {}
+        : {
+            id: {
+              in: accessibleIds
+            }
+          }
+
+    // Build Prisma query options
+    const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      baseWhere
+    )
+
+    // Fetch data and count
+    const [data, total] = await Promise.all([
+      this.portfolioRepository.findAll(
+        { where, skip, take, orderBy },
+        undefined
+      ),
+      this.portfolioRepository.count(where, undefined)
+    ])
+
+    return QueryBuilder.buildPaginatedResult(
+      data,
+      total,
+      query.page || 1,
+      query.limit || 10
+    )
   }
 
   async findOne(id: string, _user: IUserWithPermissions) {
