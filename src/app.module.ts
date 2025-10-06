@@ -14,6 +14,7 @@ import { AuditStatusModule } from './modules/audit-status/audit-status.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { CurrencyModule } from './modules/currency/currency.module'
+import { FileUploadModule } from './modules/file-upload/file-upload.module'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
 import { ServiceTypeModule } from './modules/service-type/service-type.module'
 import { UserRoleModule } from './modules/user-role/user-role.module'
@@ -29,6 +30,7 @@ import { UserRoleModule } from './modules/user-role/user-role.module'
     AuthModule,
     AuditStatusModule,
     CurrencyModule,
+    FileUploadModule,
     PortfolioModule,
     ServiceTypeModule,
     UserRoleModule
