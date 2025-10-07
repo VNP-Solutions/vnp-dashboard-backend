@@ -16,6 +16,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { CurrencyModule } from './modules/currency/currency.module'
 import { FileUploadModule } from './modules/file-upload/file-upload.module'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
+import { PropertyModule } from './modules/property/property.module'
 import { ServiceTypeModule } from './modules/service-type/service-type.module'
 import { UserRoleModule } from './modules/user-role/user-role.module'
 import { UserModule } from './modules/user/user.module'
@@ -33,6 +34,7 @@ import { UserModule } from './modules/user/user.module'
     CurrencyModule,
     FileUploadModule,
     PortfolioModule,
+    PropertyModule,
     ServiceTypeModule,
     UserModule,
     UserRoleModule

@@ -25,21 +25,22 @@ model Portfolio {
 }
 
 model Property {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  name            String    @unique
+  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+  name            String         @unique
   address         String
-  currency_id     String    @db.ObjectId
-  currency        Currency  @relation(fields: [currency_id], references: [id])
+  currency_id     String         @db.ObjectId
+  currency        Currency       @relation(fields: [currency_id], references: [id])
   card_descriptor String
-  is_active       Boolean   @default(true)
+  is_active       Boolean        @default(true)
   next_due_date   DateTime
-  portfolio_id    String    @db.ObjectId
-  portfolio       Portfolio @relation(fields: [portfolio_id], references: [id])
+  portfolio_id    String         @db.ObjectId
+  portfolio       Portfolio      @relation(fields: [portfolio_id], references: [id])
+  batch_id        String?        @db.ObjectId
+  batch           PropertyBatch? @relation(fields: [batch_id], references: [id])
 
   audits      Audit[]
   credentials PropertyCredentials?
   bankDetails PropertyBankDetails?
-  batches     PropertyBatch[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -133,10 +134,9 @@ model PropertyBankDetails {
 }
 
 model PropertyBatch {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  batch_no    String
-  property_id String   @db.ObjectId
-  property    Property @relation(fields: [property_id], references: [id])
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  batch_no   String     @unique
+  properties Property[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -166,6 +166,7 @@ model UserRole {
   name                       String                    @unique
   description                String
   is_external                Boolean
+  is_active                  Boolean                   @default(true)
   portfolio_permission       PortfolioPermission?
   property_permission        PropertyPermission?
   audit_permission           AuditPermission?
