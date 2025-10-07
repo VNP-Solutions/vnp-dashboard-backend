@@ -76,6 +76,9 @@ export class PropertyService implements IPropertyService {
     if (query.bank_type) {
       additionalFilters.bank_type = query.bank_type
     }
+    if (query.access_level) {
+      additionalFilters.access_level = query.access_level
+    }
 
     // Merge with existing filters
     const mergedQuery = {
@@ -120,11 +123,51 @@ export class PropertyService implements IPropertyService {
           }
 
     // Build Prisma query options
-    const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
+    let { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
       mergedQuery,
       queryConfig,
       baseWhere
     )
+
+    // Handle access_level filter for credentials
+    if (query.access_level && query.access_level.toLowerCase() !== 'all') {
+      const accessLevel = query.access_level.toLowerCase()
+
+      if (accessLevel === 'full') {
+        // All three IDs must exist
+        where = {
+          ...where,
+          credentials: {
+            AND: [
+              { expedia_id: { not: null } },
+              { agoda_id: { not: null } },
+              { booking_id: { not: null } }
+            ]
+          }
+        }
+      } else if (accessLevel === 'expedia') {
+        where = {
+          ...where,
+          credentials: {
+            expedia_id: { not: null }
+          }
+        }
+      } else if (accessLevel === 'booking') {
+        where = {
+          ...where,
+          credentials: {
+            booking_id: { not: null }
+          }
+        }
+      } else if (accessLevel === 'agoda') {
+        where = {
+          ...where,
+          credentials: {
+            agoda_id: { not: null }
+          }
+        }
+      }
+    }
 
     // Fetch data and count
     const [data, total] = await Promise.all([

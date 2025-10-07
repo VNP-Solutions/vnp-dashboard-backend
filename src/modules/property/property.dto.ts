@@ -109,4 +109,12 @@ export class PropertyQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   is_active?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by access level (full/expedia/booking/agoda/All)',
+    example: 'full'
+  })
+  @IsOptional()
+  @IsString()
+  access_level?: string
 }
