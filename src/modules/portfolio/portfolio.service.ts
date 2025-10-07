@@ -5,12 +5,15 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
+import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import type { IServiceTypeRepository } from '../service-type/service-type.interface'
 import {
+  BulkImportResultDto,
   CreatePortfolioDto,
   PortfolioQueryDto,
   UpdatePortfolioDto
@@ -25,6 +28,8 @@ export class PortfolioService implements IPortfolioService {
   constructor(
     @Inject('IPortfolioRepository')
     private portfolioRepository: IPortfolioRepository,
+    @Inject('IServiceTypeRepository')
+    private serviceTypeRepository: IServiceTypeRepository,
     @Inject(PermissionService)
     private permissionService: PermissionService,
     @Inject(EmailUtil)
@@ -207,5 +212,184 @@ export class PortfolioService implements IPortfolioService {
     await this.emailUtil.sendEmail(portfolio.contact_email, subject, body)
 
     return { message: 'Email sent successfully' }
+  }
+
+  async bulkImport(
+    file: Express.Multer.File,
+    _user: IUserWithPermissions
+  ): Promise<BulkImportResultDto> {
+    if (!file) {
+      throw new BadRequestException('No file provided')
+    }
+
+    if (
+      !file.originalname.endsWith('.xlsx') &&
+      !file.originalname.endsWith('.xls')
+    ) {
+      throw new BadRequestException(
+        'File must be an Excel file (.xlsx or .xls)'
+      )
+    }
+
+    const result: BulkImportResultDto = {
+      totalRows: 0,
+      successCount: 0,
+      failureCount: 0,
+      errors: [],
+      successfulImports: []
+    }
+
+    try {
+      // Parse Excel file
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const data = XLSX.utils.sheet_to_json(worksheet)
+
+      if (!data || data.length === 0) {
+        throw new BadRequestException('Excel file is empty')
+      }
+
+      result.totalRows = data.length
+
+      // Helper function to find header value with flexible naming
+      const findHeaderValue = (
+        row: any,
+        possibleNames: string[]
+      ): string | undefined => {
+        for (const name of possibleNames) {
+          const value = row[name]
+          if (value !== undefined && value !== null && value !== '') {
+            return String(value).trim()
+          }
+        }
+        return undefined
+      }
+
+      // Process each row
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i] as any
+        const rowNumber = i + 2 // Excel row number (header is row 1)
+
+        try {
+          // Extract portfolio name
+          const portfolioName = findHeaderValue(row, [
+            'Portfolio Name',
+            'Portofolio',
+            'Portfolio name',
+            'Name'
+          ])
+
+          if (!portfolioName) {
+            result.errors.push({
+              row: rowNumber,
+              portfolio: 'Unknown',
+              error: 'Portfolio name is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Check if portfolio already exists
+          const existingPortfolio =
+            await this.portfolioRepository.findByName(portfolioName)
+          if (existingPortfolio) {
+            result.errors.push({
+              row: rowNumber,
+              portfolio: portfolioName,
+              error: 'Portfolio with this name already exists'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Extract service type name
+          const serviceTypeName = findHeaderValue(row, [
+            'Service Type',
+            'Service type'
+          ])
+
+          if (!serviceTypeName) {
+            result.errors.push({
+              row: rowNumber,
+              portfolio: portfolioName,
+              error: 'Service type is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Find or create service type
+          let serviceType =
+            await this.serviceTypeRepository.findByType(serviceTypeName)
+
+          if (!serviceType) {
+            // Create new service type
+            serviceType = await this.serviceTypeRepository.create({
+              type: serviceTypeName,
+              is_active: true
+            })
+          }
+
+          // Extract contract URL
+          const contractUrl = findHeaderValue(row, [
+            'Contract URL',
+            'Contract Url',
+            'Contract url'
+          ])
+
+          const isContractSigned = contractUrl ? true : false
+
+          // Extract commissionable status
+          const commissionableValue = findHeaderValue(row, ['Commissionable'])
+          const isCommissionable =
+            commissionableValue?.toLowerCase() === 'yes' ? true : false
+
+          // Extract contact email (optional)
+          const contactEmail = findHeaderValue(row, [
+            'Contact Email',
+            'Contact email',
+            'Contact'
+          ])
+
+          // Create portfolio
+          const portfolioData: CreatePortfolioDto = {
+            name: portfolioName,
+            service_type_id: serviceType.id,
+            is_contract_signed: isContractSigned,
+            contract_url: contractUrl || undefined,
+            is_active: true,
+            contact_email: contactEmail || undefined,
+            is_commissionable: isCommissionable
+          }
+
+          await this.portfolioRepository.create(portfolioData)
+
+          result.successCount++
+          result.successfulImports.push(portfolioName)
+        } catch (error) {
+          const portfolioName =
+            findHeaderValue(row, [
+              'Portfolio Name',
+              'Portofolio',
+              'Portfolio name',
+              'Name'
+            ]) || 'Unknown'
+
+          result.errors.push({
+            row: rowNumber,
+            portfolio: portfolioName,
+            error: error.message || 'Unknown error occurred'
+          })
+          result.failureCount++
+        }
+      }
+
+      return result
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to process Excel file: ${error.message}`
+      )
+    }
   }
 }

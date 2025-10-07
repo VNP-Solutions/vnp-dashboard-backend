@@ -102,4 +102,8 @@ export interface IPortfolioService {
     body: string,
     user: IUserWithPermissions
   ): Promise<{ message: string }>
+  bulkImport(
+    file: Express.Multer.File,
+    user: IUserWithPermissions
+  ): Promise<any>
 }

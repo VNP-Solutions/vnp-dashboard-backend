@@ -109,3 +109,35 @@ export class SendPortfolioEmailDto {
   @IsNotEmpty()
   body: string
 }
+
+export class BulkImportResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  totalRows: number
+
+  @ApiProperty({
+    example: 8,
+    description: 'Number of portfolios successfully imported'
+  })
+  successCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of rows that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      { row: 3, portfolio: 'Test Portfolio', error: 'Portfolio already exists' }
+    ],
+    description: 'List of errors encountered during import'
+  })
+  errors: Array<{
+    row: number
+    portfolio: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: ['Portfolio A', 'Portfolio B'],
+    description: 'List of successfully imported portfolio names'
+  })
+  successfulImports: string[]
+}

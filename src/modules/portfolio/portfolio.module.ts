@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
 import { PrismaService } from '../prisma/prisma.service'
+import { ServiceTypeRepository } from '../service-type/service-type.repository'
 import { PortfolioController } from './portfolio.controller'
 import { PortfolioRepository } from './portfolio.repository'
 import { PortfolioService } from './portfolio.service'
@@ -16,6 +17,10 @@ import { PortfolioService } from './portfolio.service'
     {
       provide: 'IPortfolioRepository',
       useClass: PortfolioRepository
+    },
+    {
+      provide: 'IServiceTypeRepository',
+      useClass: ServiceTypeRepository
     },
     PermissionService,
     PrismaService,

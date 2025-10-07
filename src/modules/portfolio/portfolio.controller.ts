@@ -8,10 +8,15 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards
+  UploadedFile,
+  UseGuards,
+  UseInterceptors
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiTags
@@ -146,5 +151,41 @@ export class PortfolioController {
       sendEmailDto.body,
       user
     )
+  }
+
+  @Post('bulk-import')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Bulk import portfolios from Excel file' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Excel file (.xlsx) containing portfolio data'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Bulk import completed with results'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file format or missing file'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkImport(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.bulkImport(file, user)
   }
 }
