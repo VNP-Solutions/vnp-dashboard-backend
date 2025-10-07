@@ -61,6 +61,15 @@ export class CreateUserRoleDto {
   is_external: boolean
 
   @ApiPropertyOptional({
+    example: true,
+    description: 'Whether the role is active',
+    default: true
+  })
+  @IsBoolean()
+  @IsOptional()
+  is_active?: boolean
+
+  @ApiPropertyOptional({
     type: PermissionDto,
     description: 'Portfolio permission settings'
   })
