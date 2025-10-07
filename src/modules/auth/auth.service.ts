@@ -30,7 +30,15 @@ interface UserWithRole {
   last_name: string
   user_role_id: string
   role: {
+    id: string
     name: string
+    description: string
+    is_external: boolean
+    portfolio_permission: any
+    property_permission: any
+    audit_permission: any
+    user_permission: any
+    system_settings_permission: any
   }
 }
 
@@ -289,7 +297,7 @@ export class AuthService implements IAuthService {
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
-        role: user.role.name
+        role: user.role
       }
     }
   }
