@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { AppController } from './app.controller'
@@ -6,6 +6,7 @@ import { AppService } from './app.service'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { PermissionGuard } from './common/guards/permission.guard'
 import { ResponseInterceptor } from './common/interceptors/response.interceptor'
+import { LoggerMiddleware } from './common/middlewares/logger.middleware'
 import { PermissionService } from './common/services/permission.service'
 import { ConfigService } from './config/config.service'
 import configuration from './config/configuration'
@@ -67,4 +68,8 @@ import { UserModule } from './modules/user/user.module'
   ],
   exports: [ConfigService]
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LoggerMiddleware).forRoutes('*')
+  }
+}
