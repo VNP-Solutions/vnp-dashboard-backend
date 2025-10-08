@@ -15,7 +15,8 @@ export class CreatePropertyBankDetailsDto {
   @ApiProperty({
     enum: BankType,
     example: BankType.bank,
-    description: 'Type of bank account (bank or stripe)',
+    description:
+      'Type of bank account (bank or stripe). Note: This will be automatically determined based on whether stripe_account_email is provided.',
     default: BankType.bank
   })
   @IsEnum(BankType)
@@ -24,7 +25,8 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: '1234567890',
-    description: 'Bank account number'
+    description:
+      'Bank account number (Required for bank type, ignored for stripe type)'
   })
   @IsString()
   @IsOptional()
@@ -32,7 +34,8 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'John Doe',
-    description: 'Account holder name'
+    description:
+      'Account holder name (Required for bank type, ignored for stripe type)'
   })
   @IsString()
   @IsOptional()
@@ -40,7 +43,8 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'Chase Bank',
-    description: 'Name of the bank'
+    description:
+      'Name of the bank (Required for bank type, ignored for stripe type)'
   })
   @IsString()
   @IsOptional()
@@ -48,7 +52,8 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'New York Branch',
-    description: 'Bank branch name or location'
+    description:
+      'Bank branch name or location (Required for bank type, ignored for stripe type)'
   })
   @IsString()
   @IsOptional()
@@ -56,7 +61,8 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'CHASUS33XXX',
-    description: 'SWIFT/BIC code'
+    description:
+      'SWIFT/BIC code (Required for bank type, ignored for stripe type)'
   })
   @IsString()
   @IsOptional()
@@ -64,7 +70,8 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: '021000021',
-    description: 'Routing number (US banks)'
+    description:
+      'Routing number (Required for bank type, ignored for stripe type)'
   })
   @IsString()
   @IsOptional()
@@ -72,7 +79,8 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'stripe@example.com',
-    description: 'Stripe account email (for Stripe accounts)'
+    description:
+      'Stripe account email. If provided, bank_type will be automatically set to stripe and all bank fields will be ignored. This is the only required field for stripe accounts.'
   })
   @IsString()
   @IsOptional()

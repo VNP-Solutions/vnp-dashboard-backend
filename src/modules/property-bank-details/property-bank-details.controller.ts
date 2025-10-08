@@ -41,10 +41,19 @@ export class PropertyBankDetailsController {
 
   @Post()
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
-  @ApiOperation({ summary: 'Create property bank details' })
+  @ApiOperation({
+    summary: 'Create property bank details',
+    description:
+      'Creates bank details for a property. Automatically determines bank_type based on provided fields: If stripe_account_email is provided, sets type to stripe (only stripe_account_email required). Otherwise, sets type to bank (all bank fields required: account_number, account_name, bank_name, bank_branch, swift_code, routing_number).'
+  })
   @ApiResponse({
     status: 201,
     description: 'Bank details created successfully'
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - Missing required fields for the selected bank type'
   })
   @ApiResponse({
     status: 409,
@@ -88,10 +97,19 @@ export class PropertyBankDetailsController {
 
   @Patch('property/:propertyId')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
-  @ApiOperation({ summary: 'Update bank details by property ID' })
+  @ApiOperation({
+    summary: 'Update bank details by property ID',
+    description:
+      'Updates bank details for a property. Automatically determines bank_type based on provided fields: If stripe_account_email is provided, sets type to stripe (only stripe_account_email required). Otherwise, sets type to bank (all bank fields required: account_number, account_name, bank_name, bank_branch, swift_code, routing_number).'
+  })
   @ApiResponse({
     status: 200,
     description: 'Bank details updated successfully'
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - Missing required fields for the selected bank type'
   })
   @ApiResponse({
     status: 404,
