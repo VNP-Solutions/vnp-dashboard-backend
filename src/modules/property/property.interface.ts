@@ -2,8 +2,10 @@ import { Prisma, Property } from '@prisma/client'
 import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
+  BulkTransferPropertyDto,
   CreatePropertyDto,
   PropertyQueryDto,
+  TransferPropertyDto,
   UpdatePropertyDto
 } from './property.dto'
 
@@ -111,5 +113,22 @@ export interface IPropertyService {
     data: UpdatePropertyDto,
     user: IUserWithPermissions
   ): Promise<PropertyWithRelations>
+  transfer(
+    id: string,
+    data: TransferPropertyDto,
+    user: IUserWithPermissions
+  ): Promise<PropertyWithRelations>
+  bulkTransfer(
+    data: BulkTransferPropertyDto,
+    user: IUserWithPermissions
+  ): Promise<{
+    success: number
+    failed: number
+    results: Array<{
+      property_id: string
+      success: boolean
+      message?: string
+    }>
+  }>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
 }

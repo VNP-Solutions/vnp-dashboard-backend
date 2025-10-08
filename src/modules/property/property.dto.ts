@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
+  IsArray,
   IsBoolean,
   IsDateString,
   IsNotEmpty,
@@ -76,6 +77,36 @@ export class CreatePropertyDto {
 }
 
 export class UpdatePropertyDto extends PartialType(CreatePropertyDto) {}
+
+export class TransferPropertyDto {
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439012',
+    description: 'New Portfolio ID to transfer the property to'
+  })
+  @IsString()
+  @IsNotEmpty()
+  new_portfolio_id: string
+}
+
+export class BulkTransferPropertyDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of Property IDs to transfer',
+    type: [String]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty()
+  property_ids: string[]
+
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439013',
+    description: 'Target Portfolio ID to transfer all properties to'
+  })
+  @IsString()
+  @IsNotEmpty()
+  new_portfolio_id: string
+}
 
 export class PropertyQueryDto extends QueryDto {
   @ApiPropertyOptional({

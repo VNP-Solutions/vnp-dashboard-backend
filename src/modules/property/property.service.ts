@@ -11,8 +11,10 @@ import { PermissionService } from '../../common/services/permission.service'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import {
+  BulkTransferPropertyDto,
   CreatePropertyDto,
   PropertyQueryDto,
+  TransferPropertyDto,
   UpdatePropertyDto
 } from './property.dto'
 import type {
@@ -228,6 +230,112 @@ export class PropertyService implements IPropertyService {
     }
 
     return this.propertyRepository.update(id, data)
+  }
+
+  async transfer(
+    id: string,
+    data: TransferPropertyDto,
+    _user: IUserWithPermissions
+  ) {
+    const property = await this.propertyRepository.findById(id)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    // Validate the new portfolio exists
+    const newPortfolio = await this.portfolioRepository.findById(
+      data.new_portfolio_id
+    )
+    if (!newPortfolio) {
+      throw new NotFoundException('Target portfolio not found')
+    }
+
+    // Check if property is already in the target portfolio
+    if (property.portfolio_id === data.new_portfolio_id) {
+      throw new BadRequestException(
+        'Property is already in the target portfolio'
+      )
+    }
+
+    // Perform the transfer by updating the portfolio_id
+    return this.propertyRepository.update(id, {
+      portfolio_id: data.new_portfolio_id
+    })
+  }
+
+  async bulkTransfer(
+    data: BulkTransferPropertyDto,
+    _user: IUserWithPermissions
+  ) {
+    // Validate the target portfolio exists
+    const targetPortfolio = await this.portfolioRepository.findById(
+      data.new_portfolio_id
+    )
+    if (!targetPortfolio) {
+      throw new NotFoundException('Target portfolio not found')
+    }
+
+    const results: Array<{
+      property_id: string
+      success: boolean
+      message?: string
+    }> = []
+    let successCount = 0
+    let failedCount = 0
+
+    // Process each property
+    for (const propertyId of data.property_ids) {
+      try {
+        // Find the property
+        const property = await this.propertyRepository.findById(propertyId)
+
+        if (!property) {
+          results.push({
+            property_id: propertyId,
+            success: false,
+            message: 'Property not found'
+          })
+          failedCount++
+          continue
+        }
+
+        // Check if property is already in the target portfolio
+        if (property.portfolio_id === data.new_portfolio_id) {
+          results.push({
+            property_id: propertyId,
+            success: false,
+            message: 'Property is already in the target portfolio'
+          })
+          failedCount++
+          continue
+        }
+
+        // Transfer the property
+        await this.propertyRepository.update(propertyId, {
+          portfolio_id: data.new_portfolio_id
+        })
+
+        results.push({
+          property_id: propertyId,
+          success: true
+        })
+        successCount++
+      } catch (error) {
+        results.push({
+          property_id: propertyId,
+          success: false,
+          message: error.message || 'Unknown error occurred'
+        })
+        failedCount++
+      }
+    }
+
+    return {
+      success: successCount,
+      failed: failedCount,
+      results
+    }
   }
 
   async remove(id: string, _user: IUserWithPermissions) {

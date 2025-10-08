@@ -26,8 +26,10 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
+  BulkTransferPropertyDto,
   CreatePropertyDto,
   PropertyQueryDto,
+  TransferPropertyDto,
   UpdatePropertyDto
 } from './property.dto'
 import type { IPropertyService } from './property.interface'
@@ -102,6 +104,51 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.propertyService.update(id, updatePropertyDto, user)
+  }
+
+  @Patch(':id/transfer')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
+  @ApiOperation({ summary: 'Transfer a property to another portfolio' })
+  @ApiResponse({
+    status: 200,
+    description: 'Property transferred successfully'
+  })
+  @ApiResponse({ status: 404, description: 'Property or Portfolio not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Property is already in the target portfolio'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  transfer(
+    @Param('id') id: string,
+    @Body() transferPropertyDto: TransferPropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.transfer(id, transferPropertyDto, user)
+  }
+
+  @Post('bulk-transfer')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary: 'Bulk transfer multiple properties to another portfolio'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk transfer completed with results'
+  })
+  @ApiResponse({ status: 404, description: 'Target portfolio not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkTransfer(
+    @Body() bulkTransferPropertyDto: BulkTransferPropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.bulkTransfer(bulkTransferPropertyDto, user)
   }
 
   @Delete(':id')
