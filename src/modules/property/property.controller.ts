@@ -8,10 +8,15 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards
+  UploadedFile,
+  UseGuards,
+  UseInterceptors
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiTags
@@ -166,5 +171,41 @@ export class PropertyController {
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.propertyService.remove(id, user)
+  }
+
+  @Post('bulk-import')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Bulk import properties from Excel file' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Excel file (.xlsx) containing property data'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Bulk import completed with results'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file format or missing file'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkImport(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.bulkImport(file, user)
   }
 }

@@ -149,3 +149,35 @@ export class PropertyQueryDto extends QueryDto {
   @IsString()
   access_level?: string
 }
+
+export class BulkImportResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  totalRows: number
+
+  @ApiProperty({
+    example: 8,
+    description: 'Number of properties successfully imported'
+  })
+  successCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of rows that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      { row: 3, property: 'Test Property', error: 'Property already exists' }
+    ],
+    description: 'List of errors encountered during import'
+  })
+  errors: Array<{
+    row: number
+    property: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: ['Property A', 'Property B'],
+    description: 'List of successfully imported property names'
+  })
+  successfulImports: string[]
+}
