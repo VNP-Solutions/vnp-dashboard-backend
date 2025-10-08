@@ -6,14 +6,10 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { ModuleType } from '../../common/interfaces/permission.interface'
-import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
-import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IPropertyRepository } from '../property/property.interface'
 import {
   CreatePropertyCredentialsDto,
-  PropertyCredentialsQueryDto,
   PropertyCredentialsResponseDto,
   UpdatePropertyCredentialsDto
 } from './property-credentials.dto'
@@ -28,9 +24,7 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
     @Inject('IPropertyCredentialsRepository')
     private credentialsRepository: IPropertyCredentialsRepository,
     @Inject('IPropertyRepository')
-    private propertyRepository: IPropertyRepository,
-    @Inject(PermissionService)
-    private permissionService: PermissionService
+    private propertyRepository: IPropertyRepository
   ) {}
 
   async create(
@@ -85,88 +79,6 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
 
     // Return without decrypted passwords (decrypt only on read)
     return this.formatResponse(credentials)
-  }
-
-  async findAll(
-    query: PropertyCredentialsQueryDto,
-    user: IUserWithPermissions
-  ): Promise<any> {
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
-      user,
-      ModuleType.PROPERTY
-    )
-
-    if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
-      return QueryBuilder.buildPaginatedResult(
-        [],
-        0,
-        query.page || 1,
-        query.limit || 10
-      )
-    }
-
-    // Build additional filters from query params
-    const additionalFilters: any = {}
-    if (query.property_id) {
-      additionalFilters.property_id = query.property_id
-    }
-
-    // Merge with existing filters
-    const mergedQuery = {
-      ...query,
-      filters: {
-        ...(typeof query.filters === 'object' ? query.filters : {}),
-        ...additionalFilters
-      }
-    }
-
-    // Configuration for query builder
-    const queryConfig = {
-      searchFields: ['property.name'],
-      filterableFields: ['property_id'],
-      sortableFields: ['created_at', 'updated_at'],
-      defaultSortField: 'created_at',
-      defaultSortOrder: 'desc' as const,
-      nestedFieldMap: {
-        property_name: 'property.name'
-      }
-    }
-
-    // Build base where clause with permission filter
-    const baseWhere =
-      accessibleIds === 'all'
-        ? {}
-        : {
-            property_id: {
-              in: accessibleIds
-            }
-          }
-
-    // Build Prisma query options
-    const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
-      mergedQuery,
-      queryConfig,
-      baseWhere
-    )
-
-    // Fetch data and count
-    const [data, total] = await Promise.all([
-      this.credentialsRepository.findAll(
-        { where, skip, take, orderBy },
-        undefined
-      ),
-      this.credentialsRepository.count(where, undefined)
-    ])
-
-    // Decrypt passwords before returning
-    const decryptedData = data.map(item => this.formatResponse(item, false))
-
-    return QueryBuilder.buildPaginatedResult(
-      decryptedData,
-      total,
-      query.page || 1,
-      query.limit || 10
-    )
   }
 
   async findByPropertyId(
@@ -278,14 +190,6 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
     )
 
     return this.formatResponse(updatedCredentials, false)
-  }
-
-  async remove(
-    id: string,
-    _user: IUserWithPermissions
-  ): Promise<{ message: string }> {
-    await this.credentialsRepository.delete(id)
-    return { message: 'Property credentials deleted successfully' }
   }
 
   private formatResponse(

@@ -1,7 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator'
-import { QueryDto } from '../../common/dto/query.dto'
 
 export class OtaCredentialsDto {
   @ApiPropertyOptional({
@@ -63,16 +62,6 @@ export class CreatePropertyCredentialsDto {
 export class UpdatePropertyCredentialsDto extends PartialType(
   CreatePropertyCredentialsDto
 ) {}
-
-export class PropertyCredentialsQueryDto extends QueryDto {
-  @ApiPropertyOptional({
-    description: 'Filter by property ID (can be comma-separated for multiple)',
-    example: '507f1f77bcf86cd799439011'
-  })
-  @IsOptional()
-  @IsString()
-  property_id?: string
-}
 
 export class PropertyCredentialsResponseDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })

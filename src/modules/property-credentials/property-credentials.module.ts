@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common'
-import { PermissionService } from '../../common/services/permission.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { PropertyRepository } from '../property/property.repository'
 import { PropertyCredentialsController } from './property-credentials.controller'
@@ -21,7 +20,6 @@ import { PropertyCredentialsService } from './property-credentials.service'
       provide: 'IPropertyRepository',
       useClass: PropertyRepository
     },
-    PermissionService,
     PrismaService
   ],
   exports: [

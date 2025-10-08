@@ -1,13 +1,11 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Inject,
   Param,
   Patch,
   Post,
-  Query,
   UseGuards
 } from '@nestjs/common'
 import {
@@ -27,7 +25,6 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   CreatePropertyCredentialsDto,
-  PropertyCredentialsQueryDto,
   UpdatePropertyCredentialsDto
 } from './property-credentials.dto'
 import type { IPropertyCredentialsService } from './property-credentials.interface'
@@ -62,23 +59,6 @@ export class PropertyCredentialsController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.credentialsService.create(createDto, user)
-  }
-
-  @Get()
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
-  @ApiOperation({
-    summary:
-      'Get all property credentials with pagination, search, filter, and sort'
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Paginated list of property credentials retrieved successfully'
-  })
-  findAll(
-    @Query() query: PropertyCredentialsQueryDto,
-    @CurrentUser() user: IUserWithPermissions
-  ) {
-    return this.credentialsService.findAll(query, user)
   }
 
   @Get('property/:propertyId')
@@ -118,21 +98,5 @@ export class PropertyCredentialsController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.credentialsService.update(propertyId, updateDto, user)
-  }
-
-  @Delete(':id')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE, true)
-  @ApiOperation({ summary: 'Delete property credentials' })
-  @ApiResponse({
-    status: 200,
-    description: 'Property credentials deleted successfully'
-  })
-  @ApiResponse({ status: 404, description: 'Credentials not found' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Insufficient permissions'
-  })
-  remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.credentialsService.remove(id, user)
   }
 }
