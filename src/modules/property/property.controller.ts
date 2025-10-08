@@ -81,6 +81,23 @@ export class PropertyController {
     return this.propertyService.findAll(query, user)
   }
 
+  @Get('export/all')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
+  @ApiOperation({
+    summary:
+      'Get all properties without pagination for export purposes (supports search, filter, and sort)'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All properties retrieved successfully'
+  })
+  findAllForExport(
+    @Query() query: PropertyQueryDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.findAllForExport(query, user)
+  }
+
   @Get(':id')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get a property by ID' })

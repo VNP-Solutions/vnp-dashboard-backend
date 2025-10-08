@@ -137,6 +137,82 @@ export class PortfolioService implements IPortfolioService {
     )
   }
 
+  async findAllForExport(query: PortfolioQueryDto, user: IUserWithPermissions) {
+    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PORTFOLIO
+    )
+
+    if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
+      return []
+    }
+
+    // Build additional filters from query params
+    const additionalFilters: any = {}
+    if (query.service_type_id) {
+      additionalFilters.service_type_id = query.service_type_id
+    }
+    if (query.is_active) {
+      additionalFilters.is_active = query.is_active
+    }
+    if (query.is_contract_signed) {
+      additionalFilters.is_contract_signed = query.is_contract_signed
+    }
+
+    // Merge with existing filters
+    const mergedQuery = {
+      ...query,
+      filters: {
+        ...(typeof query.filters === 'object' ? query.filters : {}),
+        ...additionalFilters
+      }
+    }
+
+    // Configuration for query builder
+    const queryConfig = {
+      searchFields: ['name'], // Search only by portfolio name
+      filterableFields: ['service_type_id', 'is_active', 'is_contract_signed'],
+      sortableFields: [
+        'name',
+        'created_at',
+        'updated_at',
+        'is_active',
+        'is_contract_signed',
+        'is_commissionable'
+      ],
+      defaultSortField: 'created_at',
+      defaultSortOrder: 'desc' as const,
+      nestedFieldMap: {
+        service_type_name: 'serviceType.type'
+      }
+    }
+
+    // Build base where clause with permission filter
+    const baseWhere =
+      accessibleIds === 'all'
+        ? {}
+        : {
+            id: {
+              in: accessibleIds
+            }
+          }
+
+    // Build Prisma query options (without pagination)
+    const { where, orderBy } = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      baseWhere
+    )
+
+    // Fetch all data without pagination
+    const data = await this.portfolioRepository.findAll(
+      { where, orderBy },
+      undefined
+    )
+
+    return data
+  }
+
   async findOne(id: string, _user: IUserWithPermissions) {
     const portfolio = await this.portfolioRepository.findById(id)
 

@@ -86,6 +86,10 @@ export interface IPortfolioService {
     query: PortfolioQueryDto,
     user: IUserWithPermissions
   ): Promise<PaginatedResult<PortfolioWithRelations>>
+  findAllForExport(
+    query: PortfolioQueryDto,
+    user: IUserWithPermissions
+  ): Promise<PortfolioWithRelations[]>
   findOne(
     id: string,
     user: IUserWithPermissions

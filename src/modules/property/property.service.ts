@@ -210,6 +210,137 @@ export class PropertyService implements IPropertyService {
     )
   }
 
+  async findAllForExport(query: PropertyQueryDto, user: IUserWithPermissions) {
+    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
+      return []
+    }
+
+    // Build additional filters from query params
+    const additionalFilters: any = {}
+    if (query.batch_id) {
+      additionalFilters.batch_id = query.batch_id
+    }
+    if (query.portfolio_id) {
+      additionalFilters.portfolio_id = query.portfolio_id
+    }
+    if (query.is_active) {
+      additionalFilters.is_active = query.is_active
+    }
+    if (query.bank_type) {
+      additionalFilters.bank_type = query.bank_type
+    }
+    if (query.access_level) {
+      additionalFilters.access_level = query.access_level
+    }
+
+    // Merge with existing filters
+    const mergedQuery = {
+      ...query,
+      filters: {
+        ...(typeof query.filters === 'object' ? query.filters : {}),
+        ...additionalFilters
+      }
+    }
+
+    // Configuration for query builder
+    const queryConfig = {
+      searchFields: ['name', 'address', 'portfolio.name', 'batch.batch_no'],
+      filterableFields: ['batch_id', 'portfolio_id', 'is_active', 'bank_type'],
+      sortableFields: [
+        'name',
+        'address',
+        'card_descriptor',
+        'next_due_date',
+        'created_at',
+        'updated_at',
+        'is_active'
+      ],
+      defaultSortField: 'created_at',
+      defaultSortOrder: 'desc' as const,
+      nestedFieldMap: {
+        portfolio_name: 'portfolio.name',
+        batch_name: 'batch.batch_no',
+        currency_code: 'currency.code',
+        bank_type: 'bankDetails.bank_type'
+      }
+    }
+
+    // Build base where clause with permission filter
+    const baseWhere =
+      accessibleIds === 'all'
+        ? {}
+        : {
+            id: {
+              in: accessibleIds
+            }
+          }
+
+    // Build Prisma query options (without pagination)
+    const { orderBy } = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      baseWhere
+    )
+    let { where } = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      baseWhere
+    )
+
+    // Handle access_level filter for credentials
+    if (query.access_level && query.access_level.toLowerCase() !== 'all') {
+      const accessLevel = query.access_level.toLowerCase()
+
+      if (accessLevel === 'full') {
+        // All three IDs must exist
+        where = {
+          ...where,
+          credentials: {
+            AND: [
+              { expedia_id: { not: null } },
+              { agoda_id: { not: null } },
+              { booking_id: { not: null } }
+            ]
+          }
+        }
+      } else if (accessLevel === 'expedia') {
+        where = {
+          ...where,
+          credentials: {
+            expedia_id: { not: null }
+          }
+        }
+      } else if (accessLevel === 'booking') {
+        where = {
+          ...where,
+          credentials: {
+            booking_id: { not: null }
+          }
+        }
+      } else if (accessLevel === 'agoda') {
+        where = {
+          ...where,
+          credentials: {
+            agoda_id: { not: null }
+          }
+        }
+      }
+    }
+
+    // Fetch all data without pagination
+    const data = await this.propertyRepository.findAll(
+      { where, orderBy },
+      undefined
+    )
+
+    return data
+  }
+
   async findOne(id: string, _user: IUserWithPermissions) {
     const property = await this.propertyRepository.findById(id)
 

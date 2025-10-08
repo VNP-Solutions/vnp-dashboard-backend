@@ -104,6 +104,10 @@ export interface IPropertyService {
     query: PropertyQueryDto,
     user: IUserWithPermissions
   ): Promise<PaginatedResult<PropertyWithRelations>>
+  findAllForExport(
+    query: PropertyQueryDto,
+    user: IUserWithPermissions
+  ): Promise<PropertyWithRelations[]>
   findOne(
     id: string,
     user: IUserWithPermissions

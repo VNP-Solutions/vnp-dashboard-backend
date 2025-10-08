@@ -80,6 +80,23 @@ export class PortfolioController {
     return this.portfolioService.findAll(query, user)
   }
 
+  @Get('export/all')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
+  @ApiOperation({
+    summary:
+      'Get all portfolios without pagination for export purposes (supports search, filter, and sort)'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All portfolios retrieved successfully'
+  })
+  findAllForExport(
+    @Query() query: PortfolioQueryDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.findAllForExport(query, user)
+  }
+
   @Get(':id')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get a portfolio by ID' })
