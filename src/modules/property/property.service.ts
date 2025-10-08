@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { BankType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -12,6 +13,7 @@ import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import { Configuration } from '../../config/configuration'
 import type { ICurrencyRepository } from '../currency/currency.interface'
 import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import type { IPropertyBankDetailsRepository } from '../property-bank-details/property-bank-details.interface'
@@ -43,7 +45,9 @@ export class PropertyService implements IPropertyService {
     @Inject('IPropertyBankDetailsRepository')
     private bankDetailsRepository: IPropertyBankDetailsRepository,
     @Inject(PermissionService)
-    private permissionService: PermissionService
+    private permissionService: PermissionService,
+    @Inject(ConfigService)
+    private configService: ConfigService<Configuration>
   ) {}
 
   async create(data: CreatePropertyDto, _user: IUserWithPermissions) {
@@ -731,6 +735,13 @@ export class PropertyService implements IPropertyService {
             const existingCredentials =
               await this.credentialsRepository.findByPropertyId(propertyId)
 
+            const encryptionSecret = this.configService.get(
+              'encryption.secret',
+              {
+                infer: true
+              }
+            )!
+
             const credentialsData: any = {}
 
             // Update Expedia credentials only if provided
@@ -742,8 +753,10 @@ export class PropertyService implements IPropertyService {
                 credentialsData.expedia_username = expediaUsername || null
               }
               if (expediaPassword) {
-                credentialsData.expedia_password =
-                  await EncryptionUtil.hashPassword(expediaPassword)
+                credentialsData.expedia_password = EncryptionUtil.encrypt(
+                  expediaPassword,
+                  encryptionSecret
+                )
               }
             }
 
@@ -756,8 +769,10 @@ export class PropertyService implements IPropertyService {
                 credentialsData.agoda_username = agodaUsername || null
               }
               if (agodaPassword) {
-                credentialsData.agoda_password =
-                  await EncryptionUtil.hashPassword(agodaPassword)
+                credentialsData.agoda_password = EncryptionUtil.encrypt(
+                  agodaPassword,
+                  encryptionSecret
+                )
               }
             }
 
@@ -770,8 +785,10 @@ export class PropertyService implements IPropertyService {
                 credentialsData.booking_username = bookingUsername || null
               }
               if (bookingPassword) {
-                credentialsData.booking_password =
-                  await EncryptionUtil.hashPassword(bookingPassword)
+                credentialsData.booking_password = EncryptionUtil.encrypt(
+                  bookingPassword,
+                  encryptionSecret
+                )
               }
             }
 

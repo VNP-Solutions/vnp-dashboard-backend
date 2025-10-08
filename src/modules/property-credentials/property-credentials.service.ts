@@ -5,8 +5,10 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { Configuration } from '../../config/configuration'
 import type { IPropertyRepository } from '../property/property.interface'
 import {
   CreatePropertyCredentialsDto,
@@ -24,7 +26,9 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
     @Inject('IPropertyCredentialsRepository')
     private credentialsRepository: IPropertyCredentialsRepository,
     @Inject('IPropertyRepository')
-    private propertyRepository: IPropertyRepository
+    private propertyRepository: IPropertyRepository,
+    @Inject(ConfigService)
+    private configService: ConfigService<Configuration>
   ) {}
 
   async create(
@@ -47,6 +51,10 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
     }
 
     // Encrypt passwords before saving
+    const encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+
     const encryptedData: any = {
       property_id: data.property_id
     }
@@ -55,7 +63,7 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
       encryptedData.expedia_id = data.expedia.id || null
       encryptedData.expedia_username = data.expedia.username || null
       encryptedData.expedia_password = data.expedia.password
-        ? await EncryptionUtil.hashPassword(data.expedia.password)
+        ? EncryptionUtil.encrypt(data.expedia.password, encryptionSecret)
         : null
     }
 
@@ -63,7 +71,7 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
       encryptedData.agoda_id = data.agoda.id || null
       encryptedData.agoda_username = data.agoda.username || null
       encryptedData.agoda_password = data.agoda.password
-        ? await EncryptionUtil.hashPassword(data.agoda.password)
+        ? EncryptionUtil.encrypt(data.agoda.password, encryptionSecret)
         : null
     }
 
@@ -71,7 +79,7 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
       encryptedData.booking_id = data.booking.id || null
       encryptedData.booking_username = data.booking.username || null
       encryptedData.booking_password = data.booking.password
-        ? await EncryptionUtil.hashPassword(data.booking.password)
+        ? EncryptionUtil.encrypt(data.booking.password, encryptionSecret)
         : null
     }
 
@@ -122,6 +130,10 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
       )
     }
 
+    const encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+
     const updateData: any = {}
 
     // Handle Expedia credentials
@@ -134,8 +146,9 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
         updateData.expedia_id =
           data.expedia.id || existingCredentials.expedia_id
         updateData.expedia_username = data.expedia.username
-        updateData.expedia_password = await EncryptionUtil.hashPassword(
-          data.expedia.password
+        updateData.expedia_password = EncryptionUtil.encrypt(
+          data.expedia.password,
+          encryptionSecret
         )
       } else if (data.expedia.id !== undefined) {
         // Only ID provided
@@ -152,8 +165,9 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
         // Both username and password provided - use new password
         updateData.agoda_id = data.agoda.id || existingCredentials.agoda_id
         updateData.agoda_username = data.agoda.username
-        updateData.agoda_password = await EncryptionUtil.hashPassword(
-          data.agoda.password
+        updateData.agoda_password = EncryptionUtil.encrypt(
+          data.agoda.password,
+          encryptionSecret
         )
       } else if (data.agoda.id !== undefined) {
         // Only ID provided
@@ -171,8 +185,9 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
         updateData.booking_id =
           data.booking.id || existingCredentials.booking_id
         updateData.booking_username = data.booking.username
-        updateData.booking_password = await EncryptionUtil.hashPassword(
-          data.booking.password
+        updateData.booking_password = EncryptionUtil.encrypt(
+          data.booking.password,
+          encryptionSecret
         )
       } else if (data.booking.id !== undefined) {
         // Only ID provided

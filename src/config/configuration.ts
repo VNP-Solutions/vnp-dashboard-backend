@@ -33,6 +33,9 @@ export interface Configuration {
     otpExpiryMinutes: number
     tempPasswordExpiryDays: number
   }
+  encryption: {
+    secret: string
+  }
 }
 
 export default (): Configuration => ({
@@ -69,5 +72,8 @@ export default (): Configuration => ({
       /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,32}$/,
     otpExpiryMinutes: 5,
     tempPasswordExpiryDays: 7
+  },
+  encryption: {
+    secret: process.env.JWT_ACCESS_SECRET!
   }
 })
