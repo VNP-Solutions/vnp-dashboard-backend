@@ -2,9 +2,9 @@ import { Prisma, User } from '@prisma/client'
 import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
+  AssignUserRoleDto,
   UpdateOwnProfileDto,
   UpdateUserDto,
-  UpdateUserRoleDto,
   UserQueryDto
 } from './user.dto'
 
@@ -93,7 +93,7 @@ export interface IUserService {
   ): Promise<UserWithRole>
   updateRole(
     id: string,
-    data: UpdateUserRoleDto,
+    data: AssignUserRoleDto,
     user: IUserWithPermissions
   ): Promise<UserWithRole>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>

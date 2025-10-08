@@ -10,9 +10,9 @@ import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
+  AssignUserRoleDto,
   UpdateOwnProfileDto,
   UpdateUserDto,
-  UpdateUserRoleDto,
   UserQueryDto
 } from './user.dto'
 import type { IUserRepository, IUserService } from './user.interface'
@@ -134,7 +134,7 @@ export class UserService implements IUserService {
 
   async updateRole(
     id: string,
-    data: UpdateUserRoleDto,
+    data: AssignUserRoleDto,
     currentUser: IUserWithPermissions
   ) {
     const user = await this.userRepository.findById(id)

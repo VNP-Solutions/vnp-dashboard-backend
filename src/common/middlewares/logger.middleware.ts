@@ -21,11 +21,6 @@ export class LoggerMiddleware implements NestMiddleware {
 
     // Extract module name from URL
     const path = originalUrl || url
-    const match = path.match(/^\/api\/([^/?]+)/)
-    const moduleName = match ? match[1] : 'root'
-
-    // Debug log to verify middleware is being called
-    console.log(`[Logger Middleware] Request received: ${method} ${path}`)
 
     // Log after response is sent
     res.on('finish', () => {
@@ -50,8 +45,7 @@ export class LoggerMiddleware implements NestMiddleware {
         `${methodColor}${method}${this.colors.reset} ` +
           `${this.colors.cyan}${path}${this.colors.reset} ` +
           `${statusColor}${statusCode}${this.colors.reset} ` +
-          `${this.colors.magenta}${responseTime}ms${this.colors.reset} ` +
-          `- Module: ${this.colors.bright}${moduleName}${this.colors.reset}`
+          `${this.colors.magenta}${responseTime}ms${this.colors.reset} `
       )
     })
 

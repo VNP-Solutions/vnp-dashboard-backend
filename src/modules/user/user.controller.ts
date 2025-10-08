@@ -25,9 +25,9 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
+  AssignUserRoleDto,
   UpdateOwnProfileDto,
   UpdateUserDto,
-  UpdateUserRoleDto,
   UserQueryDto
 } from './user.dto'
 import type { IUserService } from './user.interface'
@@ -136,10 +136,10 @@ export class UserController {
   })
   updateRole(
     @Param('id') id: string,
-    @Body() updateUserRoleDto: UpdateUserRoleDto,
+    @Body() assignUserRoleDto: AssignUserRoleDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.userService.updateRole(id, updateUserRoleDto, user)
+    return this.userService.updateRole(id, assignUserRoleDto, user)
   }
 
   @Delete(':id')
