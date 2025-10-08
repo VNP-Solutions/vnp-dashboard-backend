@@ -22,7 +22,7 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
-  async findAll(queryOptions: any, portfolioIds?: string[]) {
+  async findAll(queryOptions: any, _portfolioIds?: string[]) {
     const { where, skip, take, orderBy } = queryOptions
 
     return this.prisma.portfolio.findMany({
@@ -49,7 +49,7 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
-  async count(whereClause: any, portfolioIds?: string[]): Promise<number> {
+  async count(whereClause: any, _portfolioIds?: string[]): Promise<number> {
     return this.prisma.portfolio.count({
       where: whereClause
     })

@@ -125,7 +125,12 @@ export class PropertyService implements IPropertyService {
           }
 
     // Build Prisma query options
-    let { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
+    const { skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      baseWhere
+    )
+    let { where } = QueryBuilder.buildPrismaQuery(
       mergedQuery,
       queryConfig,
       baseWhere

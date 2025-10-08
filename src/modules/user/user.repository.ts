@@ -13,7 +13,7 @@ export class UserRepository implements IUserRepository {
 
   async findAll(
     queryOptions: any,
-    userIds?: string[]
+    _userIds?: string[]
   ): Promise<UserWithRole[]> {
     const { where, skip, take, orderBy } = queryOptions
 
@@ -45,7 +45,7 @@ export class UserRepository implements IUserRepository {
     })
   }
 
-  async count(whereClause: any, userIds?: string[]): Promise<number> {
+  async count(whereClause: any, _userIds?: string[]): Promise<number> {
     return this.prisma.user.count({
       where: whereClause
     })

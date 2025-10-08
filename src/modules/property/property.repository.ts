@@ -39,7 +39,7 @@ export class PropertyRepository implements IPropertyRepository {
     })
   }
 
-  async findAll(queryOptions: any, propertyIds?: string[]) {
+  async findAll(queryOptions: any, _propertyIds?: string[]) {
     const { where, skip, take, orderBy } = queryOptions
 
     return this.prisma.property.findMany({
@@ -73,7 +73,7 @@ export class PropertyRepository implements IPropertyRepository {
     })
   }
 
-  async count(whereClause: any, propertyIds?: string[]): Promise<number> {
+  async count(whereClause: any, _propertyIds?: string[]): Promise<number> {
     return this.prisma.property.count({
       where: whereClause
     })
