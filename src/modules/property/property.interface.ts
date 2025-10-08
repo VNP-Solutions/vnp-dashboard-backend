@@ -5,7 +5,9 @@ import {
   BulkTransferPropertyDto,
   CreatePropertyDto,
   PropertyQueryDto,
+  SharePropertyDto,
   TransferPropertyDto,
+  UnsharePropertyDto,
   UpdatePropertyDto
 } from './property.dto'
 
@@ -134,6 +136,16 @@ export interface IPropertyService {
       message?: string
     }>
   }>
+  share(
+    id: string,
+    data: SharePropertyDto,
+    user: IUserWithPermissions
+  ): Promise<PropertyWithRelations>
+  unshare(
+    id: string,
+    data: UnsharePropertyDto,
+    user: IUserWithPermissions
+  ): Promise<PropertyWithRelations>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
   bulkImport(
     file: Express.Multer.File,

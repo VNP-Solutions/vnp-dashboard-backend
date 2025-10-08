@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException
@@ -23,7 +24,9 @@ import {
   BulkTransferPropertyDto,
   CreatePropertyDto,
   PropertyQueryDto,
+  SharePropertyDto,
   TransferPropertyDto,
+  UnsharePropertyDto,
   UpdatePropertyDto
 } from './property.dto'
 import type {
@@ -86,9 +89,6 @@ export class PropertyService implements IPropertyService {
     if (query.batch_id) {
       additionalFilters.batch_id = query.batch_id
     }
-    if (query.portfolio_id) {
-      additionalFilters.portfolio_id = query.portfolio_id
-    }
     if (query.is_active) {
       additionalFilters.is_active = query.is_active
     }
@@ -97,6 +97,18 @@ export class PropertyService implements IPropertyService {
     }
     if (query.access_level) {
       additionalFilters.access_level = query.access_level
+    }
+
+    // Handle portfolio_id filter with shared properties support
+    let portfolioFilter: any = {}
+    if (query.portfolio_id) {
+      // Include both owned properties and shared properties for this portfolio
+      portfolioFilter = {
+        OR: [
+          { portfolio_id: query.portfolio_id },
+          { show_in_portfolio: { has: query.portfolio_id } }
+        ]
+      }
     }
 
     // Merge with existing filters
@@ -111,7 +123,7 @@ export class PropertyService implements IPropertyService {
     // Configuration for query builder
     const queryConfig = {
       searchFields: ['name', 'address', 'portfolio.name', 'batch.batch_no'],
-      filterableFields: ['batch_id', 'portfolio_id', 'is_active', 'bank_type'],
+      filterableFields: ['batch_id', 'is_active', 'bank_type'],
       sortableFields: [
         'name',
         'address',
@@ -132,7 +144,7 @@ export class PropertyService implements IPropertyService {
     }
 
     // Build base where clause with permission filter
-    const baseWhere =
+    let baseWhere: any =
       accessibleIds === 'all'
         ? {}
         : {
@@ -140,6 +152,14 @@ export class PropertyService implements IPropertyService {
               in: accessibleIds
             }
           }
+
+    // Add portfolio filter if specified
+    if (Object.keys(portfolioFilter).length > 0) {
+      baseWhere = {
+        ...baseWhere,
+        ...portfolioFilter
+      }
+    }
 
     // Build Prisma query options
     const { skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
@@ -202,8 +222,20 @@ export class PropertyService implements IPropertyService {
       this.propertyRepository.count(where, undefined)
     ])
 
+    // Add access_type field to each property
+    const enrichedData = data.map((property: any) => {
+      const accessType =
+        query.portfolio_id && property.portfolio_id !== query.portfolio_id
+          ? 'shared'
+          : 'owned'
+      return {
+        ...property,
+        access_type: accessType
+      }
+    })
+
     return QueryBuilder.buildPaginatedResult(
-      data,
+      enrichedData,
       total,
       query.page || 1,
       query.limit || 10
@@ -225,9 +257,6 @@ export class PropertyService implements IPropertyService {
     if (query.batch_id) {
       additionalFilters.batch_id = query.batch_id
     }
-    if (query.portfolio_id) {
-      additionalFilters.portfolio_id = query.portfolio_id
-    }
     if (query.is_active) {
       additionalFilters.is_active = query.is_active
     }
@@ -236,6 +265,18 @@ export class PropertyService implements IPropertyService {
     }
     if (query.access_level) {
       additionalFilters.access_level = query.access_level
+    }
+
+    // Handle portfolio_id filter with shared properties support
+    let portfolioFilter: any = {}
+    if (query.portfolio_id) {
+      // Include both owned properties and shared properties for this portfolio
+      portfolioFilter = {
+        OR: [
+          { portfolio_id: query.portfolio_id },
+          { show_in_portfolio: { has: query.portfolio_id } }
+        ]
+      }
     }
 
     // Merge with existing filters
@@ -250,7 +291,7 @@ export class PropertyService implements IPropertyService {
     // Configuration for query builder
     const queryConfig = {
       searchFields: ['name', 'address', 'portfolio.name', 'batch.batch_no'],
-      filterableFields: ['batch_id', 'portfolio_id', 'is_active', 'bank_type'],
+      filterableFields: ['batch_id', 'is_active', 'bank_type'],
       sortableFields: [
         'name',
         'address',
@@ -271,7 +312,7 @@ export class PropertyService implements IPropertyService {
     }
 
     // Build base where clause with permission filter
-    const baseWhere =
+    let baseWhere: any =
       accessibleIds === 'all'
         ? {}
         : {
@@ -279,6 +320,14 @@ export class PropertyService implements IPropertyService {
               in: accessibleIds
             }
           }
+
+    // Add portfolio filter if specified
+    if (Object.keys(portfolioFilter).length > 0) {
+      baseWhere = {
+        ...baseWhere,
+        ...portfolioFilter
+      }
+    }
 
     // Build Prisma query options (without pagination)
     const { orderBy } = QueryBuilder.buildPrismaQuery(
@@ -338,29 +387,64 @@ export class PropertyService implements IPropertyService {
       undefined
     )
 
-    return data
+    // Add access_type field to each property
+    const enrichedData = data.map((property: any) => {
+      const accessType =
+        query.portfolio_id && property.portfolio_id !== query.portfolio_id
+          ? 'shared'
+          : 'owned'
+      return {
+        ...property,
+        access_type: accessType
+      }
+    })
+
+    return enrichedData
   }
 
-  async findOne(id: string, _user: IUserWithPermissions) {
+  async findOne(id: string, user: IUserWithPermissions) {
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
       throw new NotFoundException('Property not found')
     }
 
-    return property
+    // Determine access type based on user's accessible portfolios
+    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    // Check if user has access to this property
+    if (
+      accessibleIds !== 'all' &&
+      Array.isArray(accessibleIds) &&
+      !accessibleIds.includes(id)
+    ) {
+      throw new NotFoundException('Property not found')
+    }
+
+    // Add access_type field - for findOne, we consider it owned if it's in user's portfolio
+    // This is a simplified approach; you may want to add portfolio context if needed
+    return {
+      ...property,
+      access_type: 'owned' as const
+    }
   }
 
   async update(
     id: string,
     data: UpdatePropertyDto,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ) {
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
       throw new NotFoundException('Property not found')
     }
+
+    // Check ownership: Only the owner portfolio can update the property
+    this.validatePropertyOwnership(property, user)
 
     if (data.name && data.name !== property.name) {
       const existingProperty = await this.propertyRepository.findByName(
@@ -388,13 +472,16 @@ export class PropertyService implements IPropertyService {
   async transfer(
     id: string,
     data: TransferPropertyDto,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ) {
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
       throw new NotFoundException('Property not found')
     }
+
+    // Check ownership: Only the owner portfolio can transfer the property
+    this.validatePropertyOwnership(property, user)
 
     // Validate the new portfolio exists
     const newPortfolio = await this.portfolioRepository.findById(
@@ -491,12 +578,15 @@ export class PropertyService implements IPropertyService {
     }
   }
 
-  async remove(id: string, _user: IUserWithPermissions) {
+  async remove(id: string, user: IUserWithPermissions) {
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
       throw new NotFoundException('Property not found')
     }
+
+    // Check ownership: Only the owner portfolio can delete the property
+    this.validatePropertyOwnership(property, user)
 
     const auditCount = await this.propertyRepository.countAudits(id)
 
@@ -1086,6 +1176,106 @@ export class PropertyService implements IPropertyService {
     } catch (error) {
       throw new BadRequestException(
         `Failed to process Excel file: ${error.message}`
+      )
+    }
+  }
+
+  async share(id: string, data: SharePropertyDto, user: IUserWithPermissions) {
+    const property = await this.propertyRepository.findById(id)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    // Check ownership: Only the owner portfolio can share the property
+    this.validatePropertyOwnership(property, user)
+
+    // Validate all portfolio IDs exist
+    for (const portfolioId of data.portfolio_ids) {
+      const portfolio = await this.portfolioRepository.findById(portfolioId)
+      if (!portfolio) {
+        throw new NotFoundException(
+          `Portfolio with ID ${portfolioId} not found`
+        )
+      }
+
+      // Prevent sharing with the owner portfolio
+      if (portfolioId === property.portfolio_id) {
+        throw new BadRequestException(
+          'Cannot share property with its owner portfolio'
+        )
+      }
+    }
+
+    // Get current show_in_portfolio array
+    const currentSharedPortfolios = (property as any).show_in_portfolio || []
+
+    // Add new portfolio IDs (avoid duplicates)
+    const updatedSharedPortfolios = [
+      ...new Set([...currentSharedPortfolios, ...data.portfolio_ids])
+    ]
+
+    // Update the property
+    return this.propertyRepository.update(id, {
+      show_in_portfolio: updatedSharedPortfolios
+    })
+  }
+
+  async unshare(
+    id: string,
+    data: UnsharePropertyDto,
+    user: IUserWithPermissions
+  ) {
+    const property = await this.propertyRepository.findById(id)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    // Check ownership: Only the owner portfolio can unshare the property
+    this.validatePropertyOwnership(property, user)
+
+    // Get current show_in_portfolio array
+    const currentSharedPortfolios = (property as any).show_in_portfolio || []
+
+    // Remove specified portfolio IDs
+    const updatedSharedPortfolios = currentSharedPortfolios.filter(
+      portfolioId => !data.portfolio_ids.includes(portfolioId)
+    )
+
+    // Update the property
+    return this.propertyRepository.update(id, {
+      show_in_portfolio: updatedSharedPortfolios
+    })
+  }
+
+  /**
+   * Validates that the user has ownership rights to the property.
+   * Only users with access to the property's owner portfolio can perform ownership actions.
+   */
+  private validatePropertyOwnership(
+    property: any,
+    user: IUserWithPermissions
+  ): void {
+    // Get accessible portfolio IDs for the user
+    const accessiblePortfolioIds =
+      this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PORTFOLIO
+      )
+
+    // If user has access to all portfolios, they have ownership rights
+    if (accessiblePortfolioIds === 'all') {
+      return
+    }
+
+    // Check if user has access to the property's owner portfolio
+    if (
+      Array.isArray(accessiblePortfolioIds) &&
+      !accessiblePortfolioIds.includes(property.portfolio_id)
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission to modify this property. This property is shared with you for view-only access.'
       )
     }
   }

@@ -10,6 +10,8 @@ import {
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
 
+export type AccessType = 'owned' | 'shared'
+
 export class CreatePropertyDto {
   @ApiProperty({
     example: 'Grand Hotel',
@@ -74,6 +76,17 @@ export class CreatePropertyDto {
   @IsString()
   @IsOptional()
   batch_id?: string
+
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439014', '507f1f77bcf86cd799439015'],
+    description:
+      'Array of Portfolio IDs where this property should be visible (optional)',
+    type: [String]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  show_in_portfolio?: string[]
 }
 
 export class UpdatePropertyDto extends PartialType(CreatePropertyDto) {}
@@ -148,6 +161,30 @@ export class PropertyQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   access_level?: string
+}
+
+export class SharePropertyDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439014', '507f1f77bcf86cd799439015'],
+    description: 'Array of Portfolio IDs to share this property with',
+    type: [String]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty()
+  portfolio_ids: string[]
+}
+
+export class UnsharePropertyDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439014', '507f1f77bcf86cd799439015'],
+    description: 'Array of Portfolio IDs to remove access from',
+    type: [String]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty()
+  portfolio_ids: string[]
 }
 
 export class BulkImportResultDto {

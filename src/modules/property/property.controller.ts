@@ -34,7 +34,9 @@ import {
   BulkTransferPropertyDto,
   CreatePropertyDto,
   PropertyQueryDto,
+  SharePropertyDto,
   TransferPropertyDto,
+  UnsharePropertyDto,
   UpdatePropertyDto
 } from './property.dto'
 import type { IPropertyService } from './property.interface'
@@ -150,6 +152,60 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.propertyService.transfer(id, transferPropertyDto, user)
+  }
+
+  @Patch(':id/share')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Share a property with other portfolios (view-only access)'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Property shared successfully'
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Property or one of the target portfolios not found'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot share property with its owner portfolio'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only property owner can share'
+  })
+  share(
+    @Param('id') id: string,
+    @Body() sharePropertyDto: SharePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.share(id, sharePropertyDto, user)
+  }
+
+  @Patch(':id/unshare')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Remove property sharing from specified portfolios'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Property unshared successfully'
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Property not found'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only property owner can unshare'
+  })
+  unshare(
+    @Param('id') id: string,
+    @Body() unsharePropertyDto: UnsharePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.unshare(id, unsharePropertyDto, user)
   }
 
   @Post('bulk-transfer')

@@ -25,18 +25,19 @@ model Portfolio {
 }
 
 model Property {
-  id              String         @id @default(auto()) @map("_id") @db.ObjectId
-  name            String         @unique
-  address         String
-  currency_id     String         @db.ObjectId
-  currency        Currency       @relation(fields: [currency_id], references: [id])
-  card_descriptor String
-  is_active       Boolean        @default(true)
-  next_due_date   DateTime
-  portfolio_id    String         @db.ObjectId
-  portfolio       Portfolio      @relation(fields: [portfolio_id], references: [id])
-  batch_id        String?        @db.ObjectId
-  batch           PropertyBatch? @relation(fields: [batch_id], references: [id])
+  id                String         @id @default(auto()) @map("_id") @db.ObjectId
+  name              String         @unique
+  address           String
+  currency_id       String         @db.ObjectId
+  currency          Currency       @relation(fields: [currency_id], references: [id])
+  card_descriptor   String
+  is_active         Boolean        @default(true)
+  next_due_date     DateTime
+  portfolio_id      String         @db.ObjectId
+  portfolio         Portfolio      @relation(fields: [portfolio_id], references: [id])
+  batch_id          String?        @db.ObjectId
+  batch             PropertyBatch? @relation(fields: [batch_id], references: [id])
+  show_in_portfolio String[]       @db.ObjectId
 
   audits      Audit[]
   credentials PropertyCredentials?
