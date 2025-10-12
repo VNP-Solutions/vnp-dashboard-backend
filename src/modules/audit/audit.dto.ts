@@ -1,0 +1,133 @@
+import { PartialType } from '@nestjs/mapped-types'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { OtaType } from '@prisma/client'
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString
+} from 'class-validator'
+import { QueryDto } from '../../common/dto/query.dto'
+
+export class CreateAuditDto {
+  @ApiPropertyOptional({
+    enum: OtaType,
+    example: OtaType.expedia,
+    description: 'Type of OTA (expedia, agoda, booking)'
+  })
+  @IsEnum(OtaType)
+  @IsOptional()
+  type_of_ota?: OtaType
+
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'OTA ID'
+  })
+  @IsString()
+  @IsNotEmpty()
+  ota_id: string
+
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'Audit status ID'
+  })
+  @IsString()
+  @IsNotEmpty()
+  audit_status_id: string
+
+  @ApiPropertyOptional({
+    example: 5000,
+    description: 'Amount collectable'
+  })
+  @IsNumber()
+  @IsOptional()
+  amount_collectable?: number
+
+  @ApiPropertyOptional({
+    example: 4500,
+    description: 'Amount confirmed'
+  })
+  @IsNumber()
+  @IsOptional()
+  amount_confirmed?: number
+
+  @ApiProperty({
+    example: false,
+    description: 'Whether audit is archived'
+  })
+  @IsBoolean()
+  @IsOptional()
+  is_archived?: boolean
+
+  @ApiProperty({
+    example: '2024-01-01T00:00:00Z',
+    description: 'Audit start date'
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  start_date: string
+
+  @ApiProperty({
+    example: '2024-01-31T23:59:59Z',
+    description: 'Audit end date'
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  end_date: string
+
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'Property ID'
+  })
+  @IsString()
+  @IsNotEmpty()
+  property_id: string
+
+  @ApiProperty({
+    example: 'https://example.com/report.pdf',
+    description: 'Report URL'
+  })
+  @IsString()
+  @IsNotEmpty()
+  report_url: string
+}
+
+export class UpdateAuditDto extends PartialType(CreateAuditDto) {}
+
+export class AuditQueryDto extends QueryDto {
+  @ApiPropertyOptional({
+    enum: OtaType,
+    description: 'Filter by OTA type (expedia, agoda, booking)',
+    example: OtaType.expedia
+  })
+  @IsOptional()
+  @IsString()
+  type_of_ota?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by audit status ID',
+    example: '507f1f77bcf86cd799439011'
+  })
+  @IsOptional()
+  @IsString()
+  audit_status_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by property ID',
+    example: '507f1f77bcf86cd799439011'
+  })
+  @IsOptional()
+  @IsString()
+  property_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by archived status (true/false/All)',
+    example: 'false'
+  })
+  @IsOptional()
+  @IsString()
+  is_archived?: string
+}

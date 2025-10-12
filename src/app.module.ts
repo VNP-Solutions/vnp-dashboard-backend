@@ -12,6 +12,7 @@ import { ConfigService } from './config/config.service'
 import configuration from './config/configuration'
 import { validate } from './config/validation'
 import { AuditStatusModule } from './modules/audit-status/audit-status.module'
+import { AuditModule } from './modules/audit/audit.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { CurrencyModule } from './modules/currency/currency.module'
@@ -33,6 +34,7 @@ import { UserModule } from './modules/user/user.module'
       cache: true
     }),
     AuthModule,
+    AuditModule,
     AuditStatusModule,
     CurrencyModule,
     FileUploadModule,
