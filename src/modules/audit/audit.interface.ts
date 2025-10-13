@@ -1,7 +1,12 @@
 import { Audit, Prisma } from '@prisma/client'
 import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { AuditQueryDto, CreateAuditDto, UpdateAuditDto } from './audit.dto'
+import {
+  AuditQueryDto,
+  BulkUpdateAuditDto,
+  CreateAuditDto,
+  UpdateAuditDto
+} from './audit.dto'
 
 type AuditWithRelations = Prisma.AuditGetPayload<{
   include: {
@@ -47,6 +52,12 @@ type AuditWithFullDetails = Prisma.AuditGetPayload<{
             id: true
             name: true
             is_active: true
+            serviceType: {
+              select: {
+                id: true
+                type: true
+              }
+            }
           }
         }
         credentials: {
@@ -72,6 +83,11 @@ export interface IAuditRepository {
   findById(id: string): Promise<AuditWithFullDetails | null>
   update(id: string, data: UpdateAuditDto): Promise<AuditWithRelations>
   delete(id: string): Promise<Audit>
+  archive(id: string): Promise<AuditWithRelations>
+  bulkUpdate(
+    auditIds: string[],
+    data: UpdateAuditDto
+  ): Promise<{ count: number }>
 }
 
 export interface IAuditService {
@@ -94,4 +110,9 @@ export interface IAuditService {
     user: IUserWithPermissions
   ): Promise<AuditWithRelations>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  archive(id: string, user: IUserWithPermissions): Promise<AuditWithRelations>
+  bulkUpdate(
+    data: BulkUpdateAuditDto,
+    user: IUserWithPermissions
+  ): Promise<{ message: string; updated_count: number }>
 }

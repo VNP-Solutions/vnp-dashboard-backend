@@ -25,7 +25,12 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { AuditQueryDto, CreateAuditDto, UpdateAuditDto } from './audit.dto'
+import {
+  AuditQueryDto,
+  BulkUpdateAuditDto,
+  CreateAuditDto,
+  UpdateAuditDto
+} from './audit.dto'
 import type { IAuditService } from './audit.interface'
 
 @ApiTags('Audit')
@@ -136,5 +141,50 @@ export class AuditController {
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.auditService.remove(id, user)
+  }
+
+  @Patch(':id/archive')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary:
+      'Archive an audit (only works for OTA POST with COMPLETE status and invoiced, or MOR with INVOICED status)'
+  })
+  @ApiResponse({ status: 200, description: 'Audit archived successfully' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Cannot archive audit due to validation failure'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  archive(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
+    return this.auditService.archive(id, user)
+  }
+
+  @Patch('bulk-update')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary:
+      'Bulk update multiple audits with same values. Provide an array of audit IDs and the values to update'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Audits updated successfully'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid data'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkUpdate(
+    @Body() bulkUpdateDto: BulkUpdateAuditDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.auditService.bulkUpdate(bulkUpdateDto, user)
   }
 }

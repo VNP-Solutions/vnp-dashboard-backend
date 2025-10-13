@@ -119,7 +119,13 @@ export class AuditRepository implements IAuditRepository {
               select: {
                 id: true,
                 name: true,
-                is_active: true
+                is_active: true,
+                serviceType: {
+                  select: {
+                    id: true,
+                    type: true
+                  }
+                }
               }
             },
             credentials: {
@@ -177,5 +183,55 @@ export class AuditRepository implements IAuditRepository {
     return this.prisma.audit.delete({
       where: { id }
     })
+  }
+
+  async archive(id: string) {
+    return this.prisma.audit.update({
+      where: { id },
+      data: { is_archived: true },
+      include: {
+        auditStatus: {
+          select: {
+            id: true,
+            status: true
+          }
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            is_active: true,
+            portfolio: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    })
+  }
+
+  async bulkUpdate(auditIds: string[], data: UpdateAuditDto) {
+    const updateData: any = { ...data }
+
+    if (data.start_date) {
+      updateData.start_date = new Date(data.start_date)
+    }
+    if (data.end_date) {
+      updateData.end_date = new Date(data.end_date)
+    }
+
+    const result = await this.prisma.audit.updateMany({
+      where: {
+        id: {
+          in: auditIds
+        }
+      },
+      data: updateData
+    })
+
+    return { count: result.count }
   }
 }

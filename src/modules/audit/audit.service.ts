@@ -8,7 +8,12 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
-import { AuditQueryDto, CreateAuditDto, UpdateAuditDto } from './audit.dto'
+import {
+  AuditQueryDto,
+  BulkUpdateAuditDto,
+  CreateAuditDto,
+  UpdateAuditDto
+} from './audit.dto'
 import type { IAuditRepository, IAuditService } from './audit.interface'
 
 @Injectable()
@@ -59,8 +64,13 @@ export class AuditService implements IAuditService {
     if (query.property_id) {
       additionalFilters.property_id = query.property_id
     }
-    if (query.is_archived) {
-      additionalFilters.is_archived = query.is_archived
+    // Handle is_archived filter: true/false/All/empty
+    if (
+      query.is_archived &&
+      query.is_archived !== 'All' &&
+      query.is_archived !== ''
+    ) {
+      additionalFilters.is_archived = query.is_archived === 'true'
     }
 
     // Merge with existing filters
@@ -158,8 +168,13 @@ export class AuditService implements IAuditService {
     if (query.property_id) {
       additionalFilters.property_id = query.property_id
     }
-    if (query.is_archived) {
-      additionalFilters.is_archived = query.is_archived
+    // Handle is_archived filter: true/false/All/empty
+    if (
+      query.is_archived &&
+      query.is_archived !== 'All' &&
+      query.is_archived !== ''
+    ) {
+      additionalFilters.is_archived = query.is_archived === 'true'
     }
 
     // Merge with existing filters
@@ -264,5 +279,82 @@ export class AuditService implements IAuditService {
     await this.auditRepository.delete(id)
 
     return { message: 'Audit deleted successfully' }
+  }
+
+  async archive(id: string, _user: IUserWithPermissions) {
+    const audit = await this.auditRepository.findById(id)
+
+    if (!audit) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    // Check if audit is already archived
+    if (audit.is_archived) {
+      throw new BadRequestException('Audit is already archived')
+    }
+
+    // Check if audit has report URL (invoiced)
+    if (!audit.report_url || audit.report_url.trim() === '') {
+      throw new BadRequestException(
+        'Cannot archive audit without a report URL (not invoiced)'
+      )
+    }
+
+    // Get the service type from property's portfolio
+    const serviceType = audit.property.portfolio.serviceType.type
+    const auditStatus = audit.auditStatus.status.toUpperCase()
+
+    // Validation logic based on service type
+    if (serviceType === 'OTA POST') {
+      // For OTA POST: must be COMPLETE status
+      if (auditStatus !== 'COMPLETE') {
+        throw new BadRequestException(
+          'Cannot archive OTA POST audit. Status must be COMPLETE and audit must be invoiced'
+        )
+      }
+    } else if (serviceType === 'MOR') {
+      // For MOR: must be INVOICED status
+      if (auditStatus !== 'INVOICED') {
+        throw new BadRequestException(
+          'Cannot archive MOR audit. Status must be INVOICED'
+        )
+      }
+    } else {
+      throw new BadRequestException(
+        `Cannot archive audit with service type: ${serviceType}. Only OTA POST and MOR audits can be archived`
+      )
+    }
+
+    // If all validations pass, archive the audit
+    return this.auditRepository.archive(id)
+  }
+
+  async bulkUpdate(data: BulkUpdateAuditDto, _user: IUserWithPermissions) {
+    const { audit_ids, ...updateData } = data
+
+    if (!audit_ids || audit_ids.length === 0) {
+      throw new BadRequestException('No audit IDs provided')
+    }
+
+    // Validate date range if dates are being updated
+    if (updateData.start_date || updateData.end_date) {
+      const startDate = new Date(updateData.start_date || new Date())
+      const endDate = new Date(updateData.end_date || new Date())
+
+      if (
+        updateData.start_date &&
+        updateData.end_date &&
+        startDate >= endDate
+      ) {
+        throw new BadRequestException('Start date must be before end date')
+      }
+    }
+
+    const result = await this.auditRepository.bulkUpdate(audit_ids, updateData)
+
+    return {
+      message: `Successfully updated ${result.count} audit(s)`,
+      updated_count: result.count
+    }
   }
 }

@@ -2,7 +2,6 @@ import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { OtaType } from '@prisma/client'
 import {
-  IsBoolean,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -53,14 +52,6 @@ export class CreateAuditDto {
   @IsNumber()
   @IsOptional()
   amount_confirmed?: number
-
-  @ApiProperty({
-    example: false,
-    description: 'Whether audit is archived'
-  })
-  @IsBoolean()
-  @IsOptional()
-  is_archived?: boolean
 
   @ApiProperty({
     example: '2024-01-01T00:00:00Z',
@@ -124,10 +115,20 @@ export class AuditQueryDto extends QueryDto {
   property_id?: string
 
   @ApiPropertyOptional({
-    description: 'Filter by archived status (true/false/All)',
+    description:
+      'Filter by archived status (true/false/All/empty string to ignore filter)',
     example: 'false'
   })
   @IsOptional()
   @IsString()
   is_archived?: string
+}
+
+export class BulkUpdateAuditDto extends PartialType(CreateAuditDto) {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of audit IDs to update'
+  })
+  @IsNotEmpty()
+  audit_ids: string[]
 }
