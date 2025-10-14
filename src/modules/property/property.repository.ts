@@ -8,11 +8,13 @@ export class PropertyRepository implements IPropertyRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async create(data: CreatePropertyDto) {
+    const createData: any = { ...data }
+    if (data.next_due_date) {
+      createData.next_due_date = new Date(data.next_due_date)
+    }
+
     return this.prisma.property.create({
-      data: {
-        ...data,
-        next_due_date: new Date(data.next_due_date)
-      },
+      data: createData,
       include: {
         currency: {
           select: {

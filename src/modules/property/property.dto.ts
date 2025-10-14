@@ -53,13 +53,13 @@ export class CreatePropertyDto {
   @IsNotEmpty()
   is_active: boolean
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '2025-12-31T23:59:59.000Z',
-    description: 'Next due date for payment or audit'
+    description: 'Next due date for payment or audit (optional)'
   })
   @IsDateString()
-  @IsNotEmpty()
-  next_due_date: string
+  @IsOptional()
+  next_due_date?: string
 
   @ApiProperty({
     example: '507f1f77bcf86cd799439012',

@@ -34,7 +34,7 @@ model Property {
   currency          Currency       @relation(fields: [currency_id], references: [id])
   card_descriptor   String
   is_active         Boolean        @default(true)
-  next_due_date     DateTime
+  next_due_date     DateTime?
   portfolio_id      String         @db.ObjectId
   portfolio         Portfolio      @relation(fields: [portfolio_id], references: [id])
   batch_id          String?        @db.ObjectId

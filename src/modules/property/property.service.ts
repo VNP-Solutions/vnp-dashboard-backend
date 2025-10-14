@@ -765,25 +765,26 @@ export class PropertyService implements IPropertyService {
             continue
           }
 
-          // Extract next due date
+          // Extract next due date (optional)
           const nextDueDateValue = findHeaderValue(row, [
             'Next Due Date',
             'Next due date',
             'Due Date'
           ])
-          const nextDueDate = nextDueDateValue
-            ? parseDate(nextDueDateValue)
-            : new Date()
+          let nextDueDate: Date | null = null
 
-          if (!nextDueDate) {
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error:
-                'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
-            })
-            result.failureCount++
-            continue
+          if (nextDueDateValue) {
+            nextDueDate = parseDate(nextDueDateValue)
+            if (!nextDueDate) {
+              result.errors.push({
+                row: rowNumber,
+                property: propertyName,
+                error:
+                  'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
+              })
+              result.failureCount++
+              continue
+            }
           }
 
           // Extract portfolio name
@@ -860,7 +861,9 @@ export class PropertyService implements IPropertyService {
               currency_id: currency.id,
               card_descriptor: cardDescriptor,
               is_active: true,
-              next_due_date: nextDueDate.toISOString(),
+              next_due_date: nextDueDate
+                ? nextDueDate.toISOString()
+                : undefined,
               portfolio_id: portfolio.id,
               batch_id: batchId
             }
@@ -878,7 +881,9 @@ export class PropertyService implements IPropertyService {
               currency_id: currency.id,
               card_descriptor: cardDescriptor,
               is_active: true,
-              next_due_date: nextDueDate.toISOString(),
+              next_due_date: nextDueDate
+                ? nextDueDate.toISOString()
+                : undefined,
               portfolio_id: portfolio.id,
               batch_id: batchId
             }
