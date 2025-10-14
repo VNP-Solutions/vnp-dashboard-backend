@@ -6,11 +6,8 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import {
-  ModuleType,
-  PermissionAction
-} from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import {
   CreateTaskDto,
   DeleteAllTasksDto,
@@ -29,12 +26,20 @@ export class TaskService implements ITaskService {
   ) {}
 
   async create(data: CreateTaskDto, user: IUserWithPermissions) {
+    // Only super admin can access tasks
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access tasks. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     if (!data.portfolio_id && !data.property_id) {
       throw new BadRequestException(
         'Task must be associated with either a portfolio or property'
       )
     }
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Check permission based on the entity type
     if (data.portfolio_id) {
       const hasPermission = this.permissionService.checkPermission(
@@ -63,14 +68,23 @@ export class TaskService implements ITaskService {
         )
       }
     }
+    */
 
     return this.taskRepository.create(data)
   }
 
   async findAll(query: TaskQueryDto, user: IUserWithPermissions) {
+    // Only super admin can access tasks
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access tasks. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     // Build where clause
     const where: any = {}
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Get accessible portfolio and property IDs
     const accessiblePortfolioIds =
       this.permissionService.getAccessibleResourceIds(
@@ -158,6 +172,17 @@ export class TaskService implements ITaskService {
     ) {
       return []
     }
+    */
+
+    // Add portfolio filter if provided
+    if (query.portfolio_id) {
+      where.portfolio_id = query.portfolio_id
+    }
+
+    // Add property filter if provided
+    if (query.property_id) {
+      where.property_id = query.property_id
+    }
 
     // Filter by is_done
     if (query.is_done !== undefined && query.is_done !== '') {
@@ -171,45 +196,20 @@ export class TaskService implements ITaskService {
 
     // Search by title or description
     if (query.search) {
-      // If there's already an OR condition (from access control), wrap it with AND
-      if (where.OR) {
-        const accessControlOR = where.OR
-        delete where.OR
-        where.AND = [
-          { OR: accessControlOR },
-          {
-            OR: [
-              {
-                title: {
-                  contains: query.search,
-                  mode: 'insensitive'
-                }
-              },
-              {
-                description: {
-                  contains: query.search,
-                  mode: 'insensitive'
-                }
-              }
-            ]
+      where.OR = [
+        {
+          title: {
+            contains: query.search,
+            mode: 'insensitive'
           }
-        ]
-      } else {
-        where.OR = [
-          {
-            title: {
-              contains: query.search,
-              mode: 'insensitive'
-            }
-          },
-          {
-            description: {
-              contains: query.search,
-              mode: 'insensitive'
-            }
+        },
+        {
+          description: {
+            contains: query.search,
+            mode: 'insensitive'
           }
-        ]
-      }
+        }
+      ]
     }
 
     // Build orderBy - sort by created_at or due_date
@@ -224,12 +224,20 @@ export class TaskService implements ITaskService {
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
+    // Only super admin can access tasks
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access tasks. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     const task = await this.taskRepository.findById(id)
 
     if (!task) {
       throw new NotFoundException('Task not found')
     }
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Check permission based on the entity type
     if (task.portfolio_id) {
       const hasPermission = this.permissionService.checkPermission(
@@ -258,17 +266,26 @@ export class TaskService implements ITaskService {
         )
       }
     }
+    */
 
     return task
   }
 
   async update(id: string, data: UpdateTaskDto, user: IUserWithPermissions) {
+    // Only super admin can access tasks
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access tasks. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     const task = await this.taskRepository.findById(id)
 
     if (!task) {
       throw new NotFoundException('Task not found')
     }
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Check permission based on the entity type
     if (task.portfolio_id) {
       const hasPermission = this.permissionService.checkPermission(
@@ -297,17 +314,26 @@ export class TaskService implements ITaskService {
         )
       }
     }
+    */
 
     return this.taskRepository.update(id, data)
   }
 
   async remove(id: string, user: IUserWithPermissions) {
+    // Only super admin can access tasks
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access tasks. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     const task = await this.taskRepository.findById(id)
 
     if (!task) {
       throw new NotFoundException('Task not found')
     }
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Check permission based on the entity type
     if (task.portfolio_id) {
       const hasPermission = this.permissionService.checkPermission(
@@ -336,6 +362,7 @@ export class TaskService implements ITaskService {
         )
       }
     }
+    */
 
     await this.taskRepository.delete(id)
 
@@ -343,6 +370,13 @@ export class TaskService implements ITaskService {
   }
 
   async removeAll(query: DeleteAllTasksDto, user: IUserWithPermissions) {
+    // Only super admin can access tasks
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access tasks. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     // Build where clause
     const where: any = {}
 
@@ -357,6 +391,7 @@ export class TaskService implements ITaskService {
       )
     }
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Check permissions and build filter
     if (query.portfolio_id) {
       const hasPermission = this.permissionService.checkPermission(
@@ -387,6 +422,16 @@ export class TaskService implements ITaskService {
             'Insufficient permissions to delete property tasks'
         )
       }
+      where.property_id = query.property_id
+    }
+    */
+
+    // Build filter based on query
+    if (query.portfolio_id) {
+      where.portfolio_id = query.portfolio_id
+    }
+
+    if (query.property_id) {
       where.property_id = query.property_id
     }
 

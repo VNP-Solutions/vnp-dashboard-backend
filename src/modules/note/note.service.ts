@@ -6,11 +6,8 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import {
-  ModuleType,
-  PermissionAction
-} from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import {
   CreateNoteDto,
   DeleteAllNotesDto,
@@ -29,12 +26,20 @@ export class NoteService implements INoteService {
   ) {}
 
   async create(data: CreateNoteDto, user: IUserWithPermissions) {
+    // Only super admin can access notes
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     if (!data.portfolio_id && !data.property_id) {
       throw new BadRequestException(
         'Note must be associated with either a portfolio or property'
       )
     }
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Check permission based on the entity type
     if (data.portfolio_id) {
       const hasPermission = this.permissionService.checkPermission(
@@ -63,14 +68,23 @@ export class NoteService implements INoteService {
         )
       }
     }
+    */
 
     return this.noteRepository.create(data)
   }
 
   async findAll(query: NoteQueryDto, user: IUserWithPermissions) {
+    // Only super admin can access notes
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     // Build where clause
     const where: any = {}
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Get accessible portfolio and property IDs
     const accessiblePortfolioIds =
       this.permissionService.getAccessibleResourceIds(
@@ -158,6 +172,17 @@ export class NoteService implements INoteService {
     ) {
       return []
     }
+    */
+
+    // Add portfolio filter if provided
+    if (query.portfolio_id) {
+      where.portfolio_id = query.portfolio_id
+    }
+
+    // Add property filter if provided
+    if (query.property_id) {
+      where.property_id = query.property_id
+    }
 
     // Filter by is_done
     if (query.is_done !== undefined && query.is_done !== '') {
@@ -183,12 +208,20 @@ export class NoteService implements INoteService {
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
+    // Only super admin can access notes
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
       throw new NotFoundException('Note not found')
     }
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Check permission based on the entity type
     if (note.portfolio_id) {
       const hasPermission = this.permissionService.checkPermission(
@@ -217,17 +250,26 @@ export class NoteService implements INoteService {
         )
       }
     }
+    */
 
     return note
   }
 
   async update(id: string, data: UpdateNoteDto, user: IUserWithPermissions) {
+    // Only super admin can access notes
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
       throw new NotFoundException('Note not found')
     }
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Check permission based on the entity type
     if (note.portfolio_id) {
       const hasPermission = this.permissionService.checkPermission(
@@ -256,17 +298,26 @@ export class NoteService implements INoteService {
         )
       }
     }
+    */
 
     return this.noteRepository.update(id, data)
   }
 
   async remove(id: string, user: IUserWithPermissions) {
+    // Only super admin can access notes
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
       throw new NotFoundException('Note not found')
     }
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Check permission based on the entity type
     if (note.portfolio_id) {
       const hasPermission = this.permissionService.checkPermission(
@@ -295,6 +346,7 @@ export class NoteService implements INoteService {
         )
       }
     }
+    */
 
     await this.noteRepository.delete(id)
 
@@ -302,6 +354,13 @@ export class NoteService implements INoteService {
   }
 
   async removeAll(query: DeleteAllNotesDto, user: IUserWithPermissions) {
+    // Only super admin can access notes
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
+      )
+    }
+
     // Build where clause
     const where: any = {}
 
@@ -316,6 +375,7 @@ export class NoteService implements INoteService {
       )
     }
 
+    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Check permissions and build filter
     if (query.portfolio_id) {
       const hasPermission = this.permissionService.checkPermission(
@@ -346,6 +406,16 @@ export class NoteService implements INoteService {
             'Insufficient permissions to delete property notes'
         )
       }
+      where.property_id = query.property_id
+    }
+    */
+
+    // Build filter based on query
+    if (query.portfolio_id) {
+      where.portfolio_id = query.portfolio_id
+    }
+
+    if (query.property_id) {
       where.property_id = query.property_id
     }
 

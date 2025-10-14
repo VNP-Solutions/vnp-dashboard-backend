@@ -1,6 +1,7 @@
 import {
   AccessLevel,
   IPermission,
+  IUserWithPermissions,
   PermissionAction,
   PermissionLevel
 } from '../interfaces/permission.interface'
@@ -172,4 +173,39 @@ export function isValidPermission(permission: IPermission | null): boolean {
     validLevels.includes(permission.permission_level) &&
     validAccess.includes(permission.access_level)
   )
+}
+
+/**
+ * Check if a user is a super admin
+ * Super admin has all permission levels set to 'all' and access level set to 'all' for all modules
+ */
+export function isSuperAdmin(permission: IPermission | null): boolean {
+  if (!permission) return false
+
+  return (
+    permission.permission_level === PermissionLevel.all &&
+    permission.access_level === AccessLevel.all
+  )
+}
+
+/**
+ * Check if a user has super admin privileges across all modules
+ * Super admin must have permission_level 'all' and access_level 'all' for every module
+ */
+export function isUserSuperAdmin(user: IUserWithPermissions): boolean {
+  if (!user || !user.role) return false
+
+  const { role } = user
+
+  // Check all module permissions
+  const allPermissions = [
+    role.portfolio_permission,
+    role.property_permission,
+    role.audit_permission,
+    role.user_permission,
+    role.system_settings_permission
+  ]
+
+  // User must have all permissions set with 'all' level and 'all' access
+  return allPermissions.every(permission => isSuperAdmin(permission))
 }
