@@ -19,6 +19,8 @@ model Portfolio {
   is_commissionable  Boolean
 
   properties Property[]
+  notes      Note[]
+  tasks      Task[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -42,6 +44,8 @@ model Property {
   audits      Audit[]
   credentials PropertyCredentials?
   bankDetails PropertyBankDetails?
+  notes       Note[]
+  tasks       Task[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -222,6 +226,36 @@ model Currency {
   symbol     String?
   is_active  Boolean    @default(true)
   properties Property[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Note {
+  id      String  @id @default(auto()) @map("_id") @db.ObjectId
+  text    String
+  is_done Boolean @default(false)
+
+  portfolio_id String?    @db.ObjectId
+  portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id])
+  property_id  String?    @db.ObjectId
+  property     Property?  @relation(fields: [property_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Task {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  is_done     Boolean   @default(false)
+  due_date    DateTime?
+
+  portfolio_id String?    @db.ObjectId
+  portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id])
+  property_id  String?    @db.ObjectId
+  property     Property?  @relation(fields: [property_id], references: [id])
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt

@@ -17,6 +17,7 @@ import { AuthModule } from './modules/auth/auth.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { CurrencyModule } from './modules/currency/currency.module'
 import { FileUploadModule } from './modules/file-upload/file-upload.module'
+import { NoteModule } from './modules/note/note.module'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
 import { PropertyBankDetailsModule } from './modules/property-bank-details/property-bank-details.module'
 import { PropertyCredentialsModule } from './modules/property-credentials/property-credentials.module'
@@ -38,6 +39,7 @@ import { UserModule } from './modules/user/user.module'
     AuditStatusModule,
     CurrencyModule,
     FileUploadModule,
+    NoteModule,
     PortfolioModule,
     PropertyBankDetailsModule,
     PropertyCredentialsModule,
