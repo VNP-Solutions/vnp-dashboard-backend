@@ -23,6 +23,7 @@ import { PropertyBankDetailsModule } from './modules/property-bank-details/prope
 import { PropertyCredentialsModule } from './modules/property-credentials/property-credentials.module'
 import { PropertyModule } from './modules/property/property.module'
 import { ServiceTypeModule } from './modules/service-type/service-type.module'
+import { TaskModule } from './modules/task/task.module'
 import { UserRoleModule } from './modules/user-role/user-role.module'
 import { UserModule } from './modules/user/user.module'
 
@@ -41,6 +42,7 @@ import { UserModule } from './modules/user/user.module'
     FileUploadModule,
     NoteModule,
     PortfolioModule,
+    TaskModule,
     PropertyBankDetailsModule,
     PropertyCredentialsModule,
     PropertyModule,

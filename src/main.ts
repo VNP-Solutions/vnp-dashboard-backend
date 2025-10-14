@@ -8,7 +8,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule)
   app.enableCors()
 
-  app.setGlobalPrefix('api')
+  app.setGlobalPrefix('api', {
+    exclude: ['/']
+  })
 
   app.useGlobalPipes(
     new ValidationPipe({

@@ -22,8 +22,19 @@ export class LoggerMiddleware implements NestMiddleware {
     // Extract module name from URL
     const path = originalUrl || url
 
+    // Skip logging for known harmless browser/tool requests
+    const ignoredPaths = [
+      '/.well-known/appspecific/com.chrome.devtools.json',
+      '/favicon.ico'
+    ]
+
     // Log after response is sent
     res.on('finish', () => {
+      // Skip logging for ignored paths
+      if (ignoredPaths.includes(path)) {
+        return
+      }
+
       const responseTime = Date.now() - startTime
       const { statusCode } = res
 

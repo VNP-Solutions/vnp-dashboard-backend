@@ -233,6 +233,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       exception instanceof Error ? exception.message : 'Unknown error'
     const errorStack = exception instanceof Error ? exception.stack : ''
 
+    // Skip logging for known harmless browser/tool requests
+    const ignoredPaths = [
+      '/.well-known/appspecific/com.chrome.devtools.json',
+      '/favicon.ico'
+    ]
+
+    if (status === 404 && ignoredPaths.includes(request.url)) {
+      return
+    }
+
     this.logger.error(
       `HTTP Status: ${status} | Method: ${request.method} | Path: ${request.url} | Message: ${errorMessage}`,
       errorStack
