@@ -20,6 +20,7 @@ import { FileUploadModule } from './modules/file-upload/file-upload.module'
 import { NoteModule } from './modules/note/note.module'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
 import { PropertyBankDetailsModule } from './modules/property-bank-details/property-bank-details.module'
+import { PropertyBatchModule } from './modules/property-batch/property-batch.module'
 import { PropertyCredentialsModule } from './modules/property-credentials/property-credentials.module'
 import { PropertyModule } from './modules/property/property.module'
 import { ServiceTypeModule } from './modules/service-type/service-type.module'
@@ -44,6 +45,7 @@ import { UserModule } from './modules/user/user.module'
     PortfolioModule,
     TaskModule,
     PropertyBankDetailsModule,
+    PropertyBatchModule,
     PropertyCredentialsModule,
     PropertyModule,
     ServiceTypeModule,
