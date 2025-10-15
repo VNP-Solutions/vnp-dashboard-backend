@@ -78,6 +78,11 @@ export class PropertyRepository implements IPropertyRepository {
             agoda_id: true,
             booking_id: true
           }
+        },
+        bankDetails: {
+          select: {
+            bank_type: true
+          }
         }
       }
     })
