@@ -36,7 +36,8 @@ export class PropertyRepository implements IPropertyRepository {
             id: true,
             batch_no: true
           }
-        }
+        },
+        credentials: true
       }
     })
   }
@@ -69,6 +70,13 @@ export class PropertyRepository implements IPropertyRepository {
           select: {
             id: true,
             batch_no: true
+          }
+        },
+        credentials: {
+          select: {
+            expedia_id: true,
+            agoda_id: true,
+            booking_id: true
           }
         }
       }
