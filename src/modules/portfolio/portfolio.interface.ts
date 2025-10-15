@@ -31,8 +31,6 @@ type PortfolioWithRelations = Prisma.PortfolioGetPayload<{
     properties: {
       select: {
         id: true
-        name: true
-        is_active: true
       }
     }
   }
@@ -50,11 +48,6 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
     properties: {
       select: {
         id: true
-        name: true
-        address: true
-        is_active: true
-        card_descriptor: true
-        next_due_date: true
       }
     }
   }

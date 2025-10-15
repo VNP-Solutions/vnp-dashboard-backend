@@ -40,9 +40,7 @@ export class PortfolioRepository implements IPortfolioRepository {
         },
         properties: {
           select: {
-            id: true,
-            name: true,
-            is_active: true
+            id: true
           }
         }
       }
@@ -68,12 +66,7 @@ export class PortfolioRepository implements IPortfolioRepository {
         },
         properties: {
           select: {
-            id: true,
-            name: true,
-            address: true,
-            is_active: true,
-            card_descriptor: true,
-            next_due_date: true
+            id: true
           }
         }
       }
