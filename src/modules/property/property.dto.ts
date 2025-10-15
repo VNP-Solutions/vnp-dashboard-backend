@@ -50,7 +50,7 @@ export class CreatePropertyDto {
     description: 'Whether property is active'
   })
   @IsBoolean()
-  @IsNotEmpty()
+  @IsOptional()
   is_active: boolean
 
   @ApiPropertyOptional({
