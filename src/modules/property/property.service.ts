@@ -122,8 +122,23 @@ export class PropertyService implements IPropertyService {
 
     // Configuration for query builder
     const queryConfig = {
-      searchFields: ['name', 'address', 'portfolio.name', 'batch.batch_no'],
-      filterableFields: ['batch_id', 'is_active', 'bank_type'],
+      searchFields: [
+        'id',
+        'name',
+        'address',
+        'card_descriptor',
+        'portfolio.name',
+        'batch.batch_no',
+        'currency.code',
+        'currency.name'
+      ],
+      filterableFields: [
+        'batch_id',
+        'is_active',
+        'bank_type',
+        'portfolio_id',
+        'currency_id'
+      ],
       sortableFields: [
         'name',
         'address',
@@ -131,7 +146,10 @@ export class PropertyService implements IPropertyService {
         'next_due_date',
         'created_at',
         'updated_at',
-        'is_active'
+        'is_active',
+        'portfolio.name',
+        'batch.batch_no',
+        'currency.code'
       ],
       defaultSortField: 'created_at',
       defaultSortOrder: 'desc' as const,
@@ -290,8 +308,23 @@ export class PropertyService implements IPropertyService {
 
     // Configuration for query builder
     const queryConfig = {
-      searchFields: ['name', 'address', 'portfolio.name', 'batch.batch_no'],
-      filterableFields: ['batch_id', 'is_active', 'bank_type'],
+      searchFields: [
+        'id',
+        'name',
+        'address',
+        'card_descriptor',
+        'portfolio.name',
+        'batch.batch_no',
+        'currency.code',
+        'currency.name'
+      ],
+      filterableFields: [
+        'batch_id',
+        'is_active',
+        'bank_type',
+        'portfolio_id',
+        'currency_id'
+      ],
       sortableFields: [
         'name',
         'address',
@@ -299,7 +332,10 @@ export class PropertyService implements IPropertyService {
         'next_due_date',
         'created_at',
         'updated_at',
-        'is_active'
+        'is_active',
+        'portfolio.name',
+        'batch.batch_no',
+        'currency.code'
       ],
       defaultSortField: 'created_at',
       defaultSortOrder: 'desc' as const,
