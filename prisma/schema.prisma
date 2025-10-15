@@ -26,6 +26,9 @@ model User {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([user_role_id])
+  @@index([is_verified])
 }
 
 model Portfolio {
@@ -45,6 +48,10 @@ model Portfolio {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([service_type_id])
+  @@index([is_active])
+  @@index([is_commissionable])
 }
 
 model Property {
@@ -70,6 +77,13 @@ model Property {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([portfolio_id])
+  @@index([currency_id])
+  @@index([batch_id])
+  @@index([is_active])
+  @@index([next_due_date])
+  @@index([portfolio_id, is_active])
 }
 
 model Otp {
@@ -82,6 +96,11 @@ model Otp {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([is_used])
+  @@index([expires_at])
+  @@index([user_id, is_used, expires_at])
 }
 
 model Audit {
@@ -101,6 +120,15 @@ model Audit {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([property_id])
+  @@index([audit_status_id])
+  @@index([type_of_ota])
+  @@index([is_archived])
+  @@index([start_date])
+  @@index([end_date])
+  @@index([property_id, is_archived])
+  @@index([property_id, start_date, end_date])
 }
 
 model PropertyCredentials {
@@ -155,6 +183,8 @@ model ServiceType {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([is_active])
 }
 
 model AuditStatus {
@@ -181,6 +211,9 @@ model UserRole {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([is_active])
+  @@index([is_external])
 }
 
 type PortfolioPermission {
@@ -217,6 +250,8 @@ model UserAccessedProperty {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([user_id])
 }
 
 model Currency {
@@ -229,6 +264,8 @@ model Currency {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([is_active])
 }
 
 model Note {
@@ -243,6 +280,12 @@ model Note {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([portfolio_id])
+  @@index([property_id])
+  @@index([is_done])
+  @@index([portfolio_id, is_done])
+  @@index([property_id, is_done])
 }
 
 model Task {
@@ -259,6 +302,14 @@ model Task {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([portfolio_id])
+  @@index([property_id])
+  @@index([is_done])
+  @@index([due_date])
+  @@index([portfolio_id, is_done])
+  @@index([property_id, is_done])
+  @@index([due_date, is_done])
 }
 
 enum OtaType {
