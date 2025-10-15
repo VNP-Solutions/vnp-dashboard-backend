@@ -7,6 +7,27 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model User {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  first_name     String
+  last_name      String
+  email          String   @unique
+  language       String
+  user_role_id   String   @db.ObjectId
+  role           UserRole @relation(fields: [user_role_id], references: [id])
+  password       String
+  display_image  String?
+  contact_number String?
+  is_verified    Boolean
+  temp_password  String?
+
+  otps                   Otp[]
+  userAccessedProperties UserAccessedProperty[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
 model Portfolio {
   id                 String      @id @default(auto()) @map("_id") @db.ObjectId
   name               String      @unique
@@ -36,7 +57,7 @@ model Property {
   is_active         Boolean        @default(true)
   next_due_date     DateTime?
   portfolio_id      String         @db.ObjectId
-  portfolio         Portfolio      @relation(fields: [portfolio_id], references: [id])
+  portfolio         Portfolio      @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
   batch_id          String?        @db.ObjectId
   batch             PropertyBatch? @relation(fields: [batch_id], references: [id])
   show_in_portfolio String[]       @db.ObjectId
@@ -51,31 +72,10 @@ model Property {
   updated_at DateTime @updatedAt
 }
 
-model User {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  first_name     String
-  last_name      String
-  email          String   @unique
-  language       String
-  user_role_id   String   @db.ObjectId
-  role           UserRole @relation(fields: [user_role_id], references: [id])
-  password       String
-  display_image  String?
-  contact_number String?
-  is_verified    Boolean
-  temp_password  String?
-
-  otps                   Otp[]
-  userAccessedProperties UserAccessedProperty[]
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
 model Otp {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   user_id    String   @db.ObjectId
-  user       User     @relation(fields: [user_id], references: [id])
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   otp        Int
   is_used    Boolean
   expires_at DateTime
@@ -96,7 +96,7 @@ model Audit {
   start_date         DateTime
   end_date           DateTime
   property_id        String      @db.ObjectId
-  property           Property    @relation(fields: [property_id], references: [id])
+  property           Property    @relation(fields: [property_id], references: [id], onDelete: Cascade)
   report_url         String
 
   created_at DateTime @default(now())
@@ -115,7 +115,7 @@ model PropertyCredentials {
   booking_username String?
   booking_password String?
   property_id      String   @unique @db.ObjectId
-  property         Property @relation(fields: [property_id], references: [id])
+  property         Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -132,7 +132,7 @@ model PropertyBankDetails {
   routing_number       String?
   stripe_account_email String?
   property_id          String   @unique @db.ObjectId
-  property             Property @relation(fields: [property_id], references: [id])
+  property             Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -211,7 +211,7 @@ type SystemSettingsPermission {
 model UserAccessedProperty {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   user_id      String   @db.ObjectId
-  user         User     @relation(fields: [user_id], references: [id])
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   portfolio_id String[] @db.ObjectId
   property_id  String[] @db.ObjectId
 
@@ -237,9 +237,9 @@ model Note {
   is_done Boolean @default(false)
 
   portfolio_id String?    @db.ObjectId
-  portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id])
+  portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
   property_id  String?    @db.ObjectId
-  property     Property?  @relation(fields: [property_id], references: [id])
+  property     Property?  @relation(fields: [property_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -253,9 +253,9 @@ model Task {
   due_date    DateTime?
 
   portfolio_id String?    @db.ObjectId
-  portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id])
+  portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
   property_id  String?    @db.ObjectId
-  property     Property?  @relation(fields: [property_id], references: [id])
+  property     Property?  @relation(fields: [property_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
