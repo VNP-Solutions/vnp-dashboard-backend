@@ -28,6 +28,32 @@ export class OtaCredentialsDto {
   password?: string
 }
 
+export class ExpediaCredentialsDto {
+  @ApiProperty({
+    example: 'EXP123456',
+    description: 'Expedia ID'
+  })
+  @IsString()
+  @IsNotEmpty()
+  id: string
+
+  @ApiProperty({
+    example: 'hotel_user@example.com',
+    description: 'Expedia username'
+  })
+  @IsString()
+  @IsNotEmpty()
+  username: string
+
+  @ApiProperty({
+    example: 'SecurePassword123!',
+    description: 'Expedia password (will be encrypted)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
 export class CreatePropertyCredentialsDto {
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
@@ -37,12 +63,12 @@ export class CreatePropertyCredentialsDto {
   @IsNotEmpty()
   property_id: string
 
-  @ApiPropertyOptional({
-    description: 'Expedia credentials',
-    type: OtaCredentialsDto
+  @ApiProperty({
+    description: 'Expedia credentials (required)',
+    type: ExpediaCredentialsDto
   })
-  @IsOptional()
-  expedia?: OtaCredentialsDto
+  @IsNotEmpty()
+  expedia: ExpediaCredentialsDto
 
   @ApiPropertyOptional({
     description: 'Agoda credentials',
@@ -70,8 +96,8 @@ export class PropertyCredentialsResponseDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   property_id: string
 
-  @ApiPropertyOptional()
-  expedia?: OtaCredentialsDto
+  @ApiProperty()
+  expedia: ExpediaCredentialsDto
 
   @ApiPropertyOptional()
   agoda?: OtaCredentialsDto

@@ -108,6 +108,14 @@ export class AuditQueryDto extends QueryDto {
   property_id?: string
 
   @ApiPropertyOptional({
+    description: 'Filter by Expedia ID from property credentials',
+    example: 'EXP123456'
+  })
+  @IsOptional()
+  @IsString()
+  expedia_id?: string
+
+  @ApiPropertyOptional({
     description:
       'Filter by archived status (true/false/All/empty string to ignore filter)',
     example: 'false'

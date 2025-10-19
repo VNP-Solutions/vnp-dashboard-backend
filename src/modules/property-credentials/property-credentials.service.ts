@@ -56,15 +56,14 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
     })!
 
     const encryptedData: any = {
-      property_id: data.property_id
-    }
-
-    if (data.expedia) {
-      encryptedData.expedia_id = data.expedia.id || null
-      encryptedData.expedia_username = data.expedia.username || null
-      encryptedData.expedia_password = data.expedia.password
-        ? EncryptionUtil.encrypt(data.expedia.password, encryptionSecret)
-        : null
+      property_id: data.property_id,
+      // Expedia is required
+      expedia_id: data.expedia.id,
+      expedia_username: data.expedia.username,
+      expedia_password: EncryptionUtil.encrypt(
+        data.expedia.password,
+        encryptionSecret
+      )
     }
 
     if (data.agoda) {
@@ -136,29 +135,24 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
 
     const updateData: any = {}
 
-    // Handle Expedia credentials
+    // Handle Expedia credentials (required fields)
     if (data.expedia) {
-      // If username provided but no password, skip this OTA
-      if (data.expedia.username && !data.expedia.password) {
-        // Skip - don't update expedia credentials
-      } else if (data.expedia.username && data.expedia.password) {
-        // Both username and password provided - use new password
-        updateData.expedia_id =
-          data.expedia.id || existingCredentials.expedia_id
+      if (data.expedia.id !== undefined) {
+        updateData.expedia_id = data.expedia.id
+      }
+      if (data.expedia.username !== undefined) {
         updateData.expedia_username = data.expedia.username
+      }
+      if (data.expedia.password !== undefined) {
         updateData.expedia_password = EncryptionUtil.encrypt(
           data.expedia.password,
           encryptionSecret
         )
-      } else if (data.expedia.id !== undefined) {
-        // Only ID provided
-        updateData.expedia_id = data.expedia.id
       }
     }
 
     // Handle Agoda credentials
     if (data.agoda) {
-      // If username provided but no password, skip this OTA
       if (data.agoda.username && !data.agoda.password) {
         // Skip - don't update agoda credentials
       } else if (data.agoda.username && data.agoda.password) {
@@ -177,7 +171,6 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
 
     // Handle Booking credentials
     if (data.booking) {
-      // If username provided but no password, skip this OTA
       if (data.booking.username && !data.booking.password) {
         // Skip - don't update booking credentials
       } else if (data.booking.username && data.booking.password) {
@@ -215,23 +208,16 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
       id: credentials.id,
       property_id: credentials.property_id,
       created_at: credentials.created_at,
-      updated_at: credentials.updated_at
-    }
-
-    // Format Expedia credentials
-    if (
-      credentials.expedia_id ||
-      credentials.expedia_username ||
-      credentials.expedia_password
-    ) {
-      response.expedia = {
+      updated_at: credentials.updated_at,
+      // Expedia is required
+      expedia: {
         id: credentials.expedia_id,
         username: credentials.expedia_username,
         password: hidePasswords ? '********' : credentials.expedia_password
       }
     }
 
-    // Format Agoda credentials
+    // Format Agoda credentials (optional)
     if (
       credentials.agoda_id ||
       credentials.agoda_username ||
@@ -244,7 +230,7 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
       }
     }
 
-    // Format Booking credentials
+    // Format Booking credentials (optional)
     if (
       credentials.booking_id ||
       credentials.booking_username ||

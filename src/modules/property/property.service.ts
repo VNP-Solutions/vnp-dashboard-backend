@@ -1006,21 +1006,25 @@ export class PropertyService implements IPropertyService {
 
             const credentialsData: any = {}
 
-            // Update Expedia credentials only if provided
-            if (expediaId || expediaUsername || expediaPassword) {
-              if (expediaId !== undefined) {
-                credentialsData.expedia_id = expediaId || null
-              }
-              if (expediaUsername !== undefined) {
-                credentialsData.expedia_username = expediaUsername || null
-              }
-              if (expediaPassword) {
-                credentialsData.expedia_password = EncryptionUtil.encrypt(
-                  expediaPassword,
-                  encryptionSecret
-                )
-              }
+            // Validate Expedia credentials (required)
+            if (!expediaId || !expediaUsername || !expediaPassword) {
+              result.errors.push({
+                row: rowNumber,
+                property: propertyName,
+                error: `Property ${existingProperty ? 'updated' : 'created'} but credentials require all Expedia fields (ID, Username, Password)`
+              })
+              result.successCount++
+              result.successfulImports.push(propertyName)
+              continue
             }
+
+            // Set required Expedia credentials
+            credentialsData.expedia_id = expediaId
+            credentialsData.expedia_username = expediaUsername
+            credentialsData.expedia_password = EncryptionUtil.encrypt(
+              expediaPassword,
+              encryptionSecret
+            )
 
             // Update Agoda credentials only if provided
             if (agodaId || agodaUsername || agodaPassword) {

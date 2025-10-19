@@ -88,7 +88,12 @@ export class AuditService implements IAuditService {
 
     // Configuration for query builder
     const queryConfig = {
-      searchFields: ['ota_id', 'property.name', 'id'], // Search by ota_id, property name, mongodb id
+      searchFields: [
+        'ota_id',
+        'property.name',
+        'id',
+        'property.credentials.expedia_id'
+      ], // Added expedia_id to search
       filterableFields: [
         'type_of_ota',
         'audit_status_id',
@@ -109,7 +114,8 @@ export class AuditService implements IAuditService {
       defaultSortOrder: 'desc' as const,
       nestedFieldMap: {
         property_name: 'property.name',
-        audit_status: 'auditStatus.status'
+        audit_status: 'auditStatus.status',
+        expedia_id: 'property.credentials.expedia_id'
       }
     }
 
@@ -130,14 +136,30 @@ export class AuditService implements IAuditService {
       baseWhere
     )
 
+    // Add expedia_id filter if provided
+    let finalWhere = where
+    if (query.expedia_id) {
+      finalWhere = {
+        ...where,
+        property: {
+          credentials: {
+            expedia_id: {
+              contains: query.expedia_id,
+              mode: 'insensitive'
+            }
+          }
+        }
+      }
+    }
+
     // Fetch data and count
     const [data, total] = await Promise.all([
       this.auditRepository.findAll(
-        { where, skip, take, orderBy },
+        { where: finalWhere, skip, take, orderBy },
         Array.isArray(accessiblePropertyIds) ? accessiblePropertyIds : undefined
       ),
       this.auditRepository.count(
-        where,
+        finalWhere,
         Array.isArray(accessiblePropertyIds) ? accessiblePropertyIds : undefined
       )
     ])
@@ -196,7 +218,12 @@ export class AuditService implements IAuditService {
 
     // Configuration for query builder
     const queryConfig = {
-      searchFields: ['ota_id', 'property.name', 'id'], // Search by ota_id, property name, mongodb id
+      searchFields: [
+        'ota_id',
+        'property.name',
+        'id',
+        'property.credentials.expedia_id'
+      ], // Added expedia_id to search
       filterableFields: [
         'type_of_ota',
         'audit_status_id',
@@ -217,7 +244,8 @@ export class AuditService implements IAuditService {
       defaultSortOrder: 'desc' as const,
       nestedFieldMap: {
         property_name: 'property.name',
-        audit_status: 'auditStatus.status'
+        audit_status: 'auditStatus.status',
+        expedia_id: 'property.credentials.expedia_id'
       }
     }
 
@@ -238,9 +266,25 @@ export class AuditService implements IAuditService {
       baseWhere
     )
 
+    // Add expedia_id filter if provided
+    let finalWhere = where
+    if (query.expedia_id) {
+      finalWhere = {
+        ...where,
+        property: {
+          credentials: {
+            expedia_id: {
+              contains: query.expedia_id,
+              mode: 'insensitive'
+            }
+          }
+        }
+      }
+    }
+
     // Fetch all data without pagination
     const data = await this.auditRepository.findAll(
-      { where, orderBy },
+      { where: finalWhere, orderBy },
       Array.isArray(accessiblePropertyIds) ? accessiblePropertyIds : undefined
     )
 
