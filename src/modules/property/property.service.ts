@@ -70,7 +70,7 @@ export class PropertyService implements IPropertyService {
   }
 
   async findAll(query: PropertyQueryDto, user: IUserWithPermissions) {
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PROPERTY
     )
@@ -261,7 +261,7 @@ export class PropertyService implements IPropertyService {
   }
 
   async findAllForExport(query: PropertyQueryDto, user: IUserWithPermissions) {
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PROPERTY
     )
@@ -446,7 +446,7 @@ export class PropertyService implements IPropertyService {
     }
 
     // Determine access type based on user's accessible portfolios
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PROPERTY
     )
@@ -480,7 +480,7 @@ export class PropertyService implements IPropertyService {
     }
 
     // Check ownership: Only the owner portfolio can update the property
-    this.validatePropertyOwnership(property, user)
+    await this.validatePropertyOwnership(property, user)
 
     if (data.name && data.name !== property.name) {
       const existingProperty = await this.propertyRepository.findByName(
@@ -517,7 +517,7 @@ export class PropertyService implements IPropertyService {
     }
 
     // Check ownership: Only the owner portfolio can transfer the property
-    this.validatePropertyOwnership(property, user)
+    await this.validatePropertyOwnership(property, user)
 
     // Validate the new portfolio exists
     const newPortfolio = await this.portfolioRepository.findById(
@@ -622,7 +622,7 @@ export class PropertyService implements IPropertyService {
     }
 
     // Check ownership: Only the owner portfolio can delete the property
-    this.validatePropertyOwnership(property, user)
+    await this.validatePropertyOwnership(property, user)
 
     const auditCount = await this.propertyRepository.countAudits(id)
 
@@ -1229,7 +1229,7 @@ export class PropertyService implements IPropertyService {
     }
 
     // Check ownership: Only the owner portfolio can share the property
-    this.validatePropertyOwnership(property, user)
+    await this.validatePropertyOwnership(property, user)
 
     // Validate all portfolio IDs exist
     for (const portfolioId of data.portfolio_ids) {
@@ -1274,7 +1274,7 @@ export class PropertyService implements IPropertyService {
     }
 
     // Check ownership: Only the owner portfolio can unshare the property
-    this.validatePropertyOwnership(property, user)
+    await this.validatePropertyOwnership(property, user)
 
     // Get current show_in_portfolio array
     const currentSharedPortfolios = (property as any).show_in_portfolio || []
@@ -1294,13 +1294,13 @@ export class PropertyService implements IPropertyService {
    * Validates that the user has ownership rights to the property.
    * Only users with access to the property's owner portfolio can perform ownership actions.
    */
-  private validatePropertyOwnership(
+  private async validatePropertyOwnership(
     property: any,
     user: IUserWithPermissions
-  ): void {
+  ): Promise<void> {
     // Get accessible portfolio IDs for the user
     const accessiblePortfolioIds =
-      this.permissionService.getAccessibleResourceIds(
+      await this.permissionService.getAccessibleResourceIds(
         user,
         ModuleType.PORTFOLIO
       )

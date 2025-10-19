@@ -1,4 +1,5 @@
-import { ForbiddenException, Injectable } from '@nestjs/common'
+import { ForbiddenException, Inject, Injectable } from '@nestjs/common'
+import { PrismaService } from '../../modules/prisma/prisma.service'
 import {
   AccessLevel,
   IPermission,
@@ -30,6 +31,8 @@ import {
  */
 @Injectable()
 export class PermissionService {
+  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
+
   private readonly permissionMatrix: Record<
     PermissionLevel,
     Record<PermissionAction, boolean>
@@ -102,26 +105,19 @@ export class PermissionService {
 
       // For specific resource operations (READ/:id, UPDATE/:id, DELETE/:id)
       // Check if user has access to this specific resource
-      const hasAccess = this.checkPartialAccess(user, module, resourceId)
-      if (!hasAccess) {
-        return {
-          allowed: false,
-          reason: `Access denied: Resource not in user's accessible ${module}s`
-        }
-      }
-
-      return { allowed: true }
+      // Note: This is synchronous, but calls async method - consider making this async
+      return { allowed: true } // Will be checked in async requirePermission
     }
 
     return { allowed: false, reason: 'Unknown permission configuration' }
   }
 
-  requirePermission(
+  async requirePermission(
     user: IUserWithPermissions,
     module: ModuleType,
     action: PermissionAction,
     resourceId?: string
-  ): void {
+  ): Promise<void> {
     const result = this.checkPermission(user, module, action, resourceId)
 
     if (!result.allowed) {
@@ -129,13 +125,28 @@ export class PermissionService {
         result.reason || 'You do not have permission to perform this action'
       )
     }
+
+    // Additional check for partial access with resourceId
+    const permission = this.getModulePermission(user, module)
+    if (
+      permission &&
+      permission.access_level === AccessLevel.partial &&
+      resourceId
+    ) {
+      const hasAccess = await this.checkPartialAccess(user, module, resourceId)
+      if (!hasAccess) {
+        throw new ForbiddenException(
+          `Access denied: Resource not in user's accessible ${module}s`
+        )
+      }
+    }
   }
 
-  canAccessResource(
+  async canAccessResource(
     user: IUserWithPermissions,
     module: ModuleType,
     resourceId: string
-  ): boolean {
+  ): Promise<boolean> {
     const permission = this.getModulePermission(user, module)
 
     if (!permission || permission.access_level === AccessLevel.none) {
@@ -149,10 +160,10 @@ export class PermissionService {
     return this.checkPartialAccess(user, module, resourceId)
   }
 
-  getAccessibleResourceIds(
+  async getAccessibleResourceIds(
     user: IUserWithPermissions,
     module: ModuleType
-  ): string[] | 'all' {
+  ): Promise<string[] | 'all'> {
     const permission = this.getModulePermission(user, module)
 
     if (!permission || permission.access_level === AccessLevel.none) {
@@ -163,19 +174,28 @@ export class PermissionService {
       return 'all'
     }
 
-    // For PARTIAL access, check UserAccessedProperty
+    // For PARTIAL access, check UserAccessedProperty from DB
     if (permission.access_level === AccessLevel.partial) {
-      if (!user.userAccessedProperties) {
+      const userAccessedProperties =
+        await this.prisma.userAccessedProperty.findFirst({
+          where: { user_id: user.id },
+          select: {
+            portfolio_id: true,
+            property_id: true
+          }
+        })
+
+      if (!userAccessedProperties) {
         return []
       }
 
       // Only PORTFOLIO and PROPERTY support partial access via UserAccessedProperty
       if (module === ModuleType.PORTFOLIO) {
-        return user.userAccessedProperties.portfolio_id || []
+        return userAccessedProperties.portfolio_id || []
       }
 
       if (module === ModuleType.PROPERTY) {
-        return user.userAccessedProperties.property_id || []
+        return userAccessedProperties.property_id || []
       }
 
       // Other modules (AUDIT, USER, SYSTEM_SETTINGS) don't support partial access
@@ -273,23 +293,32 @@ export class PermissionService {
     return warnings
   }
 
-  private checkPartialAccess(
+  private async checkPartialAccess(
     user: IUserWithPermissions,
     module: ModuleType,
     resourceId: string
-  ): boolean {
-    if (!user.userAccessedProperties) {
+  ): Promise<boolean> {
+    const userAccessedProperties =
+      await this.prisma.userAccessedProperty.findFirst({
+        where: { user_id: user.id },
+        select: {
+          portfolio_id: true,
+          property_id: true
+        }
+      })
+
+    if (!userAccessedProperties) {
       return false
     }
 
     // Only PORTFOLIO and PROPERTY support resource-level access control
     if (module === ModuleType.PORTFOLIO) {
-      const portfolioIds = user.userAccessedProperties.portfolio_id || []
+      const portfolioIds = userAccessedProperties.portfolio_id || []
       return portfolioIds.includes(resourceId)
     }
 
     if (module === ModuleType.PROPERTY) {
-      const propertyIds = user.userAccessedProperties.property_id || []
+      const propertyIds = userAccessedProperties.property_id || []
       return propertyIds.includes(resourceId)
     }
 

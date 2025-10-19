@@ -16,9 +16,11 @@ import { AuditModule } from './modules/audit/audit.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { CurrencyModule } from './modules/currency/currency.module'
+import { EmailModule } from './modules/email/email.module'
 import { FileUploadModule } from './modules/file-upload/file-upload.module'
 import { NoteModule } from './modules/note/note.module'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
+import { PrismaService } from './modules/prisma/prisma.service'
 import { PropertyBankDetailsModule } from './modules/property-bank-details/property-bank-details.module'
 import { PropertyBatchModule } from './modules/property-batch/property-batch.module'
 import { PropertyCredentialsModule } from './modules/property-credentials/property-credentials.module'
@@ -40,6 +42,7 @@ import { UserModule } from './modules/user/user.module'
     AuditModule,
     AuditStatusModule,
     CurrencyModule,
+    EmailModule,
     FileUploadModule,
     NoteModule,
     PortfolioModule,
@@ -56,6 +59,7 @@ import { UserModule } from './modules/user/user.module'
   providers: [
     AppService,
     ConfigService,
+    PrismaService,
     PermissionService,
     {
       provide: APP_GUARD,

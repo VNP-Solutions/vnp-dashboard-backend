@@ -39,7 +39,10 @@ export class AuditService implements IAuditService {
 
   async findAll(query: AuditQueryDto, user: IUserWithPermissions) {
     const accessiblePropertyIds =
-      this.permissionService.getAccessibleResourceIds(user, ModuleType.AUDIT)
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.AUDIT
+      )
 
     if (
       Array.isArray(accessiblePropertyIds) &&
@@ -149,7 +152,10 @@ export class AuditService implements IAuditService {
 
   async findAllForExport(query: AuditQueryDto, user: IUserWithPermissions) {
     const accessiblePropertyIds =
-      this.permissionService.getAccessibleResourceIds(user, ModuleType.AUDIT)
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.AUDIT
+      )
 
     if (
       Array.isArray(accessiblePropertyIds) &&

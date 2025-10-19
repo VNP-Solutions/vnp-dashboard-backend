@@ -87,12 +87,12 @@ export class NoteService implements INoteService {
     /* COMMENTED OUT - Previous permission checking logic (may revert back later)
     // Get accessible portfolio and property IDs
     const accessiblePortfolioIds =
-      this.permissionService.getAccessibleResourceIds(
+      await this.permissionService.getAccessibleResourceIds(
         user,
         ModuleType.PORTFOLIO
       )
     const accessiblePropertyIds =
-      this.permissionService.getAccessibleResourceIds(user, ModuleType.PROPERTY)
+      await this.permissionService.getAccessibleResourceIds(user, ModuleType.PROPERTY)
 
     // Build OR condition for portfolio and property access
     const orConditions: any[] = []

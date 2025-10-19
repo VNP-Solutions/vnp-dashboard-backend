@@ -49,7 +49,7 @@ export class PortfolioService implements IPortfolioService {
   }
 
   async findAll(query: PortfolioQueryDto, user: IUserWithPermissions) {
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PORTFOLIO
     )
@@ -138,7 +138,7 @@ export class PortfolioService implements IPortfolioService {
   }
 
   async findAllForExport(query: PortfolioQueryDto, user: IUserWithPermissions) {
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PORTFOLIO
     )

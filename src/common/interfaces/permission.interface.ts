@@ -55,10 +55,6 @@ export interface IUserWithPermissions {
     user_permission: IPermission | null
     system_settings_permission: IPermission | null
   }
-  userAccessedProperties?: {
-    portfolio_id: string[]
-    property_id: string[]
-  }
 }
 
 export interface PermissionCheckResult {

@@ -70,7 +70,7 @@ export class UserService implements IUserService {
     }
 
     // Check if user has permission to view this user
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       currentUser,
       ModuleType.USER
     )
@@ -94,7 +94,7 @@ export class UserService implements IUserService {
     }
 
     // Check if user has permission to update this user
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       currentUser,
       ModuleType.USER
     )
@@ -144,7 +144,7 @@ export class UserService implements IUserService {
     }
 
     // Check if user has permission to update this user
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       currentUser,
       ModuleType.USER
     )
@@ -169,7 +169,7 @@ export class UserService implements IUserService {
     }
 
     // Check if user has permission to delete this user
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       currentUser,
       ModuleType.USER
     )
@@ -189,7 +189,7 @@ export class UserService implements IUserService {
   }
 
   async findAll(query: UserQueryDto, user: IUserWithPermissions) {
-    const accessibleIds = this.permissionService.getAccessibleResourceIds(
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.USER
     )
