@@ -24,14 +24,6 @@ export class CreateAuditDto {
 
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
-    description: 'OTA ID'
-  })
-  @IsString()
-  @IsNotEmpty()
-  ota_id: string
-
-  @ApiProperty({
-    example: '507f1f77bcf86cd799439011',
     description: 'Audit status ID'
   })
   @IsString()
@@ -78,13 +70,13 @@ export class CreateAuditDto {
   @IsNotEmpty()
   property_id: string
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'https://example.com/report.pdf',
     description: 'Report URL'
   })
   @IsString()
-  @IsNotEmpty()
-  report_url: string
+  @IsOptional()
+  report_url?: string
 }
 
 export class UpdateAuditDto extends PartialType(CreateAuditDto) {}

@@ -106,7 +106,6 @@ model Otp {
 model Audit {
   id                 String      @id @default(auto()) @map("_id") @db.ObjectId
   type_of_ota        OtaType?
-  ota_id             String      @db.ObjectId
   audit_status_id    String      @db.ObjectId
   auditStatus        AuditStatus @relation(fields: [audit_status_id], references: [id])
   amount_collectable Int?
@@ -116,7 +115,7 @@ model Audit {
   end_date           DateTime
   property_id        String      @db.ObjectId
   property           Property    @relation(fields: [property_id], references: [id], onDelete: Cascade)
-  report_url         String
+  report_url         String?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
