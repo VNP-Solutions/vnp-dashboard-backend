@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common'
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiResponse,
   ApiTags
@@ -168,6 +169,38 @@ export class AuditController {
   @ApiOperation({
     summary:
       'Bulk update multiple audits with same values. Provide an array of audit IDs and the values to update'
+  })
+  @ApiBody({
+    type: BulkUpdateAuditDto,
+    description: 'Bulk update payload with audit IDs and fields to update',
+    examples: {
+      'Full Update': {
+        value: {
+          audit_ids: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+          type_of_ota: 'expedia',
+          audit_status_id: '507f1f77bcf86cd799439013',
+          amount_collectable: 5000,
+          amount_confirmed: 4500,
+          start_date: '2024-01-01T00:00:00Z',
+          end_date: '2024-01-31T23:59:59Z',
+          property_id: '507f1f77bcf86cd799439014',
+          report_url: 'https://example.com/report.pdf'
+        }
+      },
+      'Partial Update': {
+        value: {
+          audit_ids: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+          audit_status_id: '507f1f77bcf86cd799439013',
+          amount_confirmed: 4500
+        }
+      },
+      'Status Only': {
+        value: {
+          audit_ids: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+          audit_status_id: '507f1f77bcf86cd799439013'
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 200,
