@@ -165,12 +165,17 @@ export class QueryBuilder {
   /**
    * Parse string value to appropriate type
    */
-  static parseValue(value: string): any {
+  static parseValue(value: any): any {
     if (this.shouldIgnoreValue(value)) {
       return undefined
     }
 
-    // Boolean values
+    // If value is already a boolean, return it as is
+    if (typeof value === 'boolean') {
+      return value
+    }
+
+    // Boolean string values
     if (value === 'true') return true
     if (value === 'false') return false
 
@@ -179,8 +184,8 @@ export class QueryBuilder {
       return Number(value)
     }
 
-    // Array values (comma-separated)
-    if (value.includes(',')) {
+    // Array values (comma-separated) - only for string values
+    if (typeof value === 'string' && value.includes(',')) {
       return value.split(',').map(v => this.parseValue(v.trim()))
     }
 

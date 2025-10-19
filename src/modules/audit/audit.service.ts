@@ -66,7 +66,8 @@ export class AuditService implements IAuditService {
     }
     // Handle is_archived filter: true/false/All/empty
     if (
-      query.is_archived &&
+      query.is_archived !== undefined &&
+      query.is_archived !== null &&
       query.is_archived !== 'All' &&
       query.is_archived !== ''
     ) {
@@ -170,7 +171,8 @@ export class AuditService implements IAuditService {
     }
     // Handle is_archived filter: true/false/All/empty
     if (
-      query.is_archived &&
+      query.is_archived !== undefined &&
+      query.is_archived !== null &&
       query.is_archived !== 'All' &&
       query.is_archived !== ''
     ) {

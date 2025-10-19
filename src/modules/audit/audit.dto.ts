@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { OtaType } from '@prisma/client'
+import { Transform } from 'class-transformer'
 import {
   IsDateString,
   IsEnum,
@@ -120,7 +121,11 @@ export class AuditQueryDto extends QueryDto {
     example: 'false'
   })
   @IsOptional()
-  @IsString()
+  @Transform(({ value }) => {
+    if (typeof value === 'boolean') return value.toString()
+    if (typeof value === 'string') return value
+    return value
+  })
   is_archived?: string
 }
 
