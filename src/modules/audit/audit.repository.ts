@@ -26,6 +26,13 @@ export class AuditRepository implements IAuditRepository {
             id: true,
             name: true,
             is_active: true,
+            credentials: {
+              select: {
+                expedia_id: true,
+                agoda_id: true,
+                booking_id: true
+              }
+            },
             portfolio: {
               select: {
                 id: true,
@@ -69,6 +76,13 @@ export class AuditRepository implements IAuditRepository {
             id: true,
             name: true,
             is_active: true,
+            credentials: {
+              select: {
+                expedia_id: true,
+                agoda_id: true,
+                booking_id: true
+              }
+            },
             portfolio: {
               select: {
                 id: true,
