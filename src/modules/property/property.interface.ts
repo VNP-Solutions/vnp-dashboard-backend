@@ -4,6 +4,7 @@ import { IUserWithPermissions } from '../../common/interfaces/permission.interfa
 import {
   BulkTransferPropertyDto,
   CreatePropertyDto,
+  GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
@@ -109,6 +110,10 @@ export interface IPropertyService {
   ): Promise<PaginatedResult<PropertyWithRelations>>
   findAllForExport(
     query: PropertyQueryDto,
+    user: IUserWithPermissions
+  ): Promise<PropertyWithRelations[]>
+  getPropertiesByPortfolios(
+    data: GetPropertiesByPortfoliosDto,
     user: IUserWithPermissions
   ): Promise<PropertyWithRelations[]>
   findOne(

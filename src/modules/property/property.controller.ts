@@ -33,6 +33,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   BulkTransferPropertyDto,
   CreatePropertyDto,
+  GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
@@ -99,6 +100,35 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.propertyService.findAllForExport(query, user)
+  }
+
+  @Post('by-portfolios')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
+  @ApiOperation({
+    summary:
+      'Get properties from specific portfolios (used for user invitation flows). If empty array is provided, returns all accessible properties.'
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Properties from specified portfolios retrieved successfully. Returns all properties if empty array provided.'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid portfolio IDs provided'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  getPropertiesByPortfolios(
+    @Body() getPropertiesByPortfoliosDto: GetPropertiesByPortfoliosDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.getPropertiesByPortfolios(
+      getPropertiesByPortfoliosDto,
+      user
+    )
   }
 
   @Get(':id')

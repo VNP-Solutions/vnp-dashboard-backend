@@ -23,6 +23,7 @@ import {
   BulkImportResultDto,
   BulkTransferPropertyDto,
   CreatePropertyDto,
+  GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
@@ -437,6 +438,89 @@ export class PropertyService implements IPropertyService {
     })
 
     return enrichedData
+  }
+
+  async getPropertiesByPortfolios(
+    data: GetPropertiesByPortfoliosDto,
+    user: IUserWithPermissions
+  ) {
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
+      return []
+    }
+
+    // Build base where clause with permission filter
+    const baseWhere: any =
+      accessibleIds === 'all'
+        ? {}
+        : {
+            id: {
+              in: accessibleIds
+            }
+          }
+
+    // If portfolio_ids is empty, return all accessible properties
+    if (data.portfolio_ids.length === 0) {
+      const queryOptions = {
+        where: baseWhere,
+        orderBy: { created_at: 'desc' as const }
+      }
+
+      const properties = await this.propertyRepository.findAll(
+        queryOptions,
+        undefined
+      )
+
+      // Add access_type field to each property
+      return properties.map((property: any) => ({
+        ...property,
+        access_type: 'owned' as const
+      }))
+    }
+
+    // Filter by specific portfolio IDs (include both owned and shared properties)
+    const portfolioFilter = {
+      OR: [
+        // Properties owned by the specified portfolios
+        { portfolio_id: { in: data.portfolio_ids } },
+        // Properties shared with the specified portfolios
+        {
+          show_in_portfolio: {
+            hasSome: data.portfolio_ids
+          }
+        }
+      ]
+    }
+
+    const whereClause = {
+      ...baseWhere,
+      ...portfolioFilter
+    }
+
+    const queryOptions = {
+      where: whereClause,
+      orderBy: { created_at: 'desc' as const }
+    }
+
+    const properties = await this.propertyRepository.findAll(
+      queryOptions,
+      undefined
+    )
+
+    // Add access_type field to each property
+    return properties.map((property: any) => {
+      const accessType = data.portfolio_ids.includes(property.portfolio_id)
+        ? 'owned'
+        : 'shared'
+      return {
+        ...property,
+        access_type: accessType
+      }
+    })
   }
 
   async findOne(id: string, user: IUserWithPermissions) {

@@ -232,3 +232,15 @@ export class PropertyStatsResponseDto {
   })
   total_amount_confirmed: number
 }
+
+export class GetPropertiesByPortfoliosDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439013'],
+    description:
+      'Array of Portfolio IDs to get properties from. If empty array is provided, returns all properties accessible to the user.',
+    type: [String]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  portfolio_ids: string[]
+}
