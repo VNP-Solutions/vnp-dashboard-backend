@@ -8,11 +8,15 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards
+  UploadedFile,
+  UseGuards,
+  UseInterceptors
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiTags
@@ -302,5 +306,76 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.bulkArchive(bulkArchiveDto, user)
+  }
+
+  @Post('bulk-import')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.CREATE)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Bulk import audits from Excel file',
+    description: `
+    Upload an Excel file (.xlsx or .xls) to bulk import audits.
+    
+    Required columns:
+    - Property Name/Property name/Property/Name: Name of the property (must exist)
+    - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
+    - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)  
+    - Audit Status/Audit status/Status: Status name (will be created if doesn't exist)
+    
+    Optional columns:
+    - OTA/OTA Type/Ota Type/Ota type: OTA type (expedia, agoda, booking)
+    - Amount Collectable/Amount collectable/amount_collectable: Collectable amount
+    - Amount Confirmed/Amount confirmed/amount_confirmed: Confirmed amount  
+    - Report URL/Report url/report_url/Report/URL: Report URL
+    `
+  })
+  @ApiBody({
+    description: 'Excel file containing audit data',
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Bulk import completed successfully',
+    schema: {
+      example: {
+        totalRows: 10,
+        successCount: 8,
+        failureCount: 2,
+        errors: [
+          {
+            row: 3,
+            audit: 'Property A',
+            error: 'Property not found'
+          }
+        ],
+        successfulImports: [
+          'Property B - Expedia Audit',
+          'Property C - Agoda Audit'
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid file or file format'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkImport(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.auditService.bulkImport(file, user)
   }
 }

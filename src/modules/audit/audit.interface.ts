@@ -4,6 +4,7 @@ import { IUserWithPermissions } from '../../common/interfaces/permission.interfa
 import {
   AuditQueryDto,
   BulkArchiveAuditDto,
+  BulkImportResultDto,
   BulkUpdateAuditDto,
   CreateAuditDto,
   UpdateAuditDto
@@ -129,4 +130,8 @@ export interface IAuditService {
     failed_to_archive: number
     failed_audits: Array<{ id: string; reason: string }>
   }>
+  bulkImport(
+    file: Express.Multer.File,
+    user: IUserWithPermissions
+  ): Promise<BulkImportResultDto>
 }

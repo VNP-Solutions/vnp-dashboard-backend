@@ -148,3 +148,39 @@ export class BulkArchiveAuditDto {
   @IsNotEmpty()
   audit_ids: string[]
 }
+
+export class BulkImportResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  totalRows: number
+
+  @ApiProperty({
+    example: 8,
+    description: 'Number of audits successfully imported'
+  })
+  successCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of rows that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      {
+        row: 3,
+        audit: 'Property A - Expedia Audit',
+        error: 'Property not found'
+      }
+    ],
+    description: 'List of errors encountered during import'
+  })
+  errors: Array<{
+    row: number
+    audit: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: ['Property A - Expedia Audit', 'Property B - Agoda Audit'],
+    description: 'List of successfully imported audit descriptions'
+  })
+  successfulImports: string[]
+}
