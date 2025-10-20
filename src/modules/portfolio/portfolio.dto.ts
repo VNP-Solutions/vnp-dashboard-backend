@@ -201,6 +201,12 @@ export class PortfolioStatsResponseDto {
   amount_confirmed: PortfolioStatsAmountDto
 
   @ApiProperty({
+    example: 15,
+    description: 'Count of completed audits within the specified duration'
+  })
+  completed_audit_count: number
+
+  @ApiProperty({
     type: [PortfolioStatsAuditDto],
     description: 'Recent 10 audits for the portfolio'
   })

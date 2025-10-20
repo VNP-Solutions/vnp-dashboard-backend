@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { ARCHIVABLE_AUDIT_STATUSES } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import { PrismaService } from '../prisma/prisma.service'
@@ -530,6 +531,7 @@ export class PortfolioService implements IPortfolioService {
           booking: 0,
           agoda: 0
         },
+        completed_audit_count: 0,
         recent_audits: []
       }
     }
@@ -551,6 +553,25 @@ export class PortfolioService implements IPortfolioService {
       _sum: {
         amount_collectable: true,
         amount_confirmed: true
+      }
+    })
+
+    // Get count of completed audits within the duration
+    const completedAuditCount = await this.prisma.audit.count({
+      where: {
+        property_id: {
+          in: propertyIds
+        },
+        is_archived: false,
+        created_at: {
+          gte: startDate,
+          lte: now
+        },
+        auditStatus: {
+          status: {
+            in: ARCHIVABLE_AUDIT_STATUSES
+          }
+        }
       }
     })
 
@@ -630,6 +651,7 @@ export class PortfolioService implements IPortfolioService {
     return {
       amount_collectable: amountCollectable,
       amount_confirmed: amountConfirmed,
+      completed_audit_count: completedAuditCount,
       recent_audits: formattedRecentAudits
     }
   }
