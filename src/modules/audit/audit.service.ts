@@ -20,7 +20,7 @@ import {
   AuditQueryDto,
   BulkArchiveAuditDto,
   BulkImportResultDto,
-  BulkUpdateAuditDto,
+  BulkUpdateResultDto,
   CreateAuditDto,
   UpdateAuditDto
 } from './audit.dto'
@@ -372,32 +372,361 @@ export class AuditService implements IAuditService {
     return this.auditRepository.archive(id)
   }
 
-  async bulkUpdate(data: BulkUpdateAuditDto, _user: IUserWithPermissions) {
-    const { audit_ids, ...updateData } = data
-
-    if (!audit_ids || audit_ids.length === 0) {
-      throw new BadRequestException('No audit IDs provided')
+  async bulkUpdate(
+    file: Express.Multer.File,
+    _user: IUserWithPermissions
+  ): Promise<BulkUpdateResultDto> {
+    if (!file) {
+      throw new BadRequestException('No file provided')
     }
 
-    // Validate date range if dates are being updated
-    if (updateData.start_date || updateData.end_date) {
-      const startDate = new Date(updateData.start_date || new Date())
-      const endDate = new Date(updateData.end_date || new Date())
+    if (
+      !file.originalname.endsWith('.xlsx') &&
+      !file.originalname.endsWith('.xls')
+    ) {
+      throw new BadRequestException(
+        'File must be an Excel file (.xlsx or .xls)'
+      )
+    }
 
-      if (
-        updateData.start_date &&
-        updateData.end_date &&
-        startDate >= endDate
-      ) {
-        throw new BadRequestException('Start date must be before end date')
+    const result: BulkUpdateResultDto = {
+      totalRows: 0,
+      successCount: 0,
+      failureCount: 0,
+      errors: [],
+      successfulUpdates: []
+    }
+
+    try {
+      // Parse Excel file
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const data = XLSX.utils.sheet_to_json(worksheet)
+
+      if (!data || data.length === 0) {
+        throw new BadRequestException('Excel file is empty')
       }
-    }
 
-    const result = await this.auditRepository.bulkUpdate(audit_ids, updateData)
+      result.totalRows = data.length
 
-    return {
-      message: `Successfully updated ${result.count} audit(s)`,
-      updated_count: result.count
+      // Helper function to find header value with flexible naming
+      const findHeaderValue = (
+        row: any,
+        possibleNames: string[]
+      ): string | undefined => {
+        for (const name of possibleNames) {
+          const value = row[name]
+          if (value !== undefined && value !== null && value !== '') {
+            return String(value).trim()
+          }
+        }
+        return undefined
+      }
+
+      // Helper function to parse date in mm/dd/yyyy format
+      const parseDate = (dateString: string): Date | null => {
+        if (!dateString) return null
+
+        try {
+          // Try to parse mm/dd/yyyy format
+          const parts = dateString.trim().split('/')
+          if (parts.length === 3) {
+            const month = parseInt(parts[0], 10)
+            const day = parseInt(parts[1], 10)
+            const year = parseInt(parts[2], 10)
+
+            if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
+              return new Date(year, month - 1, day)
+            }
+          }
+
+          // Try to parse as ISO date
+          const date = new Date(dateString)
+          if (!isNaN(date.getTime())) {
+            return date
+          }
+
+          return null
+        } catch {
+          return null
+        }
+      }
+
+      // Helper function to parse OTA type
+      const parseOtaType = (otaString: string): OtaType | null => {
+        if (!otaString) return null
+
+        const normalized = otaString.toLowerCase().trim()
+        switch (normalized) {
+          case 'expedia':
+          case 'exp':
+            return OtaType.expedia
+          case 'agoda':
+          case 'ago':
+            return OtaType.agoda
+          case 'booking':
+          case 'booking.com':
+          case 'book':
+            return OtaType.booking
+          default:
+            return null
+        }
+      }
+
+      // Process each row
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i] as any
+        const rowNumber = i + 2 // Excel row number (header is row 1)
+
+        try {
+          // Extract audit ID (required)
+          const auditIdValue = findHeaderValue(row, [
+            'Audit ID',
+            'Audit Id',
+            'Audit id',
+            'audit_id',
+            'ID',
+            'Id',
+            'id'
+          ])
+
+          if (!auditIdValue) {
+            result.errors.push({
+              row: rowNumber,
+              auditId: 'Unknown',
+              error: 'Audit ID is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Validate MongoDB ObjectId format
+          if (!QueryBuilder.isValidObjectId(auditIdValue)) {
+            result.errors.push({
+              row: rowNumber,
+              auditId: auditIdValue,
+              error:
+                'Invalid audit ID format (must be a valid MongoDB ObjectId)'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Find existing audit
+          const existingAudit =
+            await this.auditRepository.findById(auditIdValue)
+          if (!existingAudit) {
+            result.errors.push({
+              row: rowNumber,
+              auditId: auditIdValue,
+              error: 'Audit not found'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Prepare update data (only include fields that have values)
+          const updateData: any = {}
+
+          // Extract property name (if provided, find the property)
+          const propertyName = findHeaderValue(row, [
+            'Property Name',
+            'Property name',
+            'Property',
+            'Name'
+          ])
+          if (propertyName) {
+            const property =
+              await this.propertyRepository.findByName(propertyName)
+            if (!property) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error: `Property '${propertyName}' not found`
+              })
+              result.failureCount++
+              continue
+            }
+            updateData.property_id = property.id
+          }
+
+          // Extract OTA type (if provided)
+          const otaTypeValue = findHeaderValue(row, [
+            'OTA',
+            'OTA Type',
+            'Ota Type',
+            'Ota type',
+            'type_of_ota'
+          ])
+          if (otaTypeValue) {
+            const typeOfOta = parseOtaType(otaTypeValue)
+            if (typeOfOta) {
+              updateData.type_of_ota = typeOfOta
+            }
+          }
+
+          // Extract audit status (if provided)
+          const auditStatusValue = findHeaderValue(row, [
+            'Audit Status',
+            'Audit status',
+            'Status',
+            'audit_status_id'
+          ])
+          if (auditStatusValue) {
+            // Find or create audit status
+            let auditStatus =
+              await this.auditStatusRepository.findByStatus(auditStatusValue)
+            if (!auditStatus) {
+              // Create new audit status
+              auditStatus = await this.auditStatusRepository.create({
+                status: auditStatusValue
+              })
+            }
+            updateData.audit_status_id = auditStatus.id
+          }
+
+          // Extract amount collectable (if provided)
+          const amountCollectableValue = findHeaderValue(row, [
+            'Amount Collectable',
+            'Amount collectable',
+            'amount_collectable',
+            'Collectable'
+          ])
+          if (amountCollectableValue) {
+            const amountCollectable = parseFloat(amountCollectableValue)
+            if (!isNaN(amountCollectable)) {
+              updateData.amount_collectable = amountCollectable
+            }
+          }
+
+          // Extract amount confirmed (if provided)
+          const amountConfirmedValue = findHeaderValue(row, [
+            'Amount Confirmed',
+            'Amount confirmed',
+            'amount_confirmed',
+            'Confirmed'
+          ])
+          if (amountConfirmedValue) {
+            const amountConfirmed = parseFloat(amountConfirmedValue)
+            if (!isNaN(amountConfirmed)) {
+              updateData.amount_confirmed = amountConfirmed
+            }
+          }
+
+          // Extract start date (if provided)
+          const startDateValue = findHeaderValue(row, [
+            'Start Date',
+            'Start date',
+            'start_date',
+            'From Date',
+            'From'
+          ])
+          if (startDateValue) {
+            const startDate = parseDate(startDateValue)
+            if (!startDate) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error: 'Invalid start date format (expected mm/dd/yyyy)'
+              })
+              result.failureCount++
+              continue
+            }
+            updateData.start_date = startDate.toISOString()
+          }
+
+          // Extract end date (if provided)
+          const endDateValue = findHeaderValue(row, [
+            'End Date',
+            'End date',
+            'end_date',
+            'To Date',
+            'To'
+          ])
+          if (endDateValue) {
+            const endDate = parseDate(endDateValue)
+            if (!endDate) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error: 'Invalid end date format (expected mm/dd/yyyy)'
+              })
+              result.failureCount++
+              continue
+            }
+            updateData.end_date = endDate.toISOString()
+          }
+
+          // Validate date range if both dates are provided
+          if (updateData.start_date && updateData.end_date) {
+            const startDate = new Date(updateData.start_date)
+            const endDate = new Date(updateData.end_date)
+            if (startDate >= endDate) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error: 'Start date must be before end date'
+              })
+              result.failureCount++
+              continue
+            }
+          }
+
+          // Extract report URL (if provided)
+          const reportUrl = findHeaderValue(row, [
+            'Report URL',
+            'Report url',
+            'report_url',
+            'Report',
+            'URL'
+          ])
+          if (reportUrl) {
+            updateData.report_url = reportUrl
+          }
+
+          // Only update if there's something to update
+          if (Object.keys(updateData).length === 0) {
+            result.errors.push({
+              row: rowNumber,
+              auditId: auditIdValue,
+              error: 'No fields to update (all fields are empty)'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Update the audit
+          await this.auditRepository.update(auditIdValue, updateData)
+
+          result.successCount++
+          result.successfulUpdates.push(auditIdValue)
+        } catch (error) {
+          const auditIdValue =
+            findHeaderValue(row, [
+              'Audit ID',
+              'Audit Id',
+              'Audit id',
+              'audit_id',
+              'ID',
+              'Id',
+              'id'
+            ]) || 'Unknown'
+
+          result.errors.push({
+            row: rowNumber,
+            auditId: auditIdValue,
+            error: error.message || 'Unknown error occurred'
+          })
+          result.failureCount++
+        }
+      }
+
+      return result
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to process Excel file: ${error.message}`
+      )
     }
   }
 

@@ -5,7 +5,7 @@ import {
   AuditQueryDto,
   BulkArchiveAuditDto,
   BulkImportResultDto,
-  BulkUpdateAuditDto,
+  BulkUpdateResultDto,
   CreateAuditDto,
   UpdateAuditDto
 } from './audit.dto'
@@ -118,9 +118,9 @@ export interface IAuditService {
   archive(id: string, user: IUserWithPermissions): Promise<AuditWithRelations>
   unarchive(id: string, user: IUserWithPermissions): Promise<AuditWithRelations>
   bulkUpdate(
-    data: BulkUpdateAuditDto,
+    file: Express.Multer.File,
     user: IUserWithPermissions
-  ): Promise<{ message: string; updated_count: number }>
+  ): Promise<BulkUpdateResultDto>
   bulkArchive(
     data: BulkArchiveAuditDto,
     user: IUserWithPermissions

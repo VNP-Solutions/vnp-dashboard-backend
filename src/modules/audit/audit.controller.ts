@@ -33,7 +33,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   AuditQueryDto,
   BulkArchiveAuditDto,
-  BulkUpdateAuditDto,
   CreateAuditDto,
   UpdateAuditDto
 } from './audit.dto'
@@ -169,61 +168,78 @@ export class AuditController {
     return this.auditService.archive(id, user)
   }
 
-  @Patch('bulk-update')
+  @Post('bulk-update')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary:
-      'Bulk update multiple audits with same values. Provide an array of audit IDs and the values to update'
+    summary: 'Bulk update audits from Excel file',
+    description: `
+    Upload an Excel file (.xlsx or .xls) to bulk update existing audits.
+    
+    Required column:
+    - Audit ID/Audit Id/Audit id/ID/Id/id: ID of the audit to update (must exist)
+    
+    Optional columns (only update if provided):
+    - Property Name/Property name/Property/Name: Name of the property (must exist)
+    - OTA/OTA Type/Ota Type/Ota type: OTA type (expedia, agoda, booking)
+    - Audit Status/Audit status/Status: Status name (will be created if doesn't exist)
+    - Amount Collectable/Amount collectable/amount_collectable: Collectable amount
+    - Amount Confirmed/Amount confirmed/amount_confirmed: Confirmed amount  
+    - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
+    - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)
+    - Report URL/Report url/report_url/Report/URL: Report URL
+    
+    Note: Empty cells will keep existing values unchanged.
+    `
   })
   @ApiBody({
-    type: BulkUpdateAuditDto,
-    description: 'Bulk update payload with audit IDs and fields to update',
-    examples: {
-      'Full Update': {
-        value: {
-          audit_ids: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
-          type_of_ota: 'expedia',
-          audit_status_id: '507f1f77bcf86cd799439013',
-          amount_collectable: 5000,
-          amount_confirmed: 4500,
-          start_date: '2024-01-01T00:00:00Z',
-          end_date: '2024-01-31T23:59:59Z',
-          property_id: '507f1f77bcf86cd799439014',
-          report_url: 'https://example.com/report.pdf'
-        }
-      },
-      'Partial Update': {
-        value: {
-          audit_ids: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
-          audit_status_id: '507f1f77bcf86cd799439013',
-          amount_confirmed: 4500
-        }
-      },
-      'Status Only': {
-        value: {
-          audit_ids: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
-          audit_status_id: '507f1f77bcf86cd799439013'
+    description: 'Excel file containing audit update data',
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary'
         }
       }
     }
   })
   @ApiResponse({
     status: 200,
-    description: 'Audits updated successfully'
+    description: 'Bulk update completed successfully',
+    schema: {
+      example: {
+        totalRows: 10,
+        successCount: 8,
+        failureCount: 2,
+        errors: [
+          {
+            row: 3,
+            auditId: '507f1f77bcf86cd799439011',
+            error: 'Audit not found'
+          }
+        ],
+        successfulUpdates: [
+          '507f1f77bcf86cd799439012',
+          '507f1f77bcf86cd799439013'
+        ]
+      }
+    }
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid data'
+    description: 'Bad Request - Invalid file or file format'
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions'
   })
   bulkUpdate(
-    @Body() bulkUpdateDto: BulkUpdateAuditDto,
+    @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.auditService.bulkUpdate(bulkUpdateDto, user)
+    return this.auditService.bulkUpdate(file, user)
   }
 
   @Patch(':id/unarchive')

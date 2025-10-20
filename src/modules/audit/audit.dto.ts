@@ -130,15 +130,6 @@ export class AuditQueryDto extends QueryDto {
   is_archived?: string
 }
 
-export class BulkUpdateAuditDto extends PartialType(CreateAuditDto) {
-  @ApiProperty({
-    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
-    description: 'Array of audit IDs to update'
-  })
-  @IsNotEmpty()
-  audit_ids: string[]
-}
-
 export class BulkArchiveAuditDto {
   @ApiProperty({
     example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
@@ -183,4 +174,36 @@ export class BulkImportResultDto {
     description: 'List of successfully imported audit descriptions'
   })
   successfulImports: string[]
+}
+
+export class BulkUpdateResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  totalRows: number
+
+  @ApiProperty({
+    example: 8,
+    description: 'Number of audits successfully updated'
+  })
+  successCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of rows that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      { row: 3, auditId: '507f1f77bcf86cd799439011', error: 'Audit not found' }
+    ],
+    description: 'List of errors encountered during update'
+  })
+  errors: Array<{
+    row: number
+    auditId: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'List of successfully updated audit IDs'
+  })
+  successfulUpdates: string[]
 }
