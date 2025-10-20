@@ -486,6 +486,21 @@ export class PortfolioService implements IPortfolioService {
       throw new NotFoundException('Portfolio not found')
     }
 
+    // Check if user has access to this portfolio
+    const accessiblePortfolioIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PORTFOLIO
+      )
+
+    if (
+      accessiblePortfolioIds !== 'all' &&
+      Array.isArray(accessiblePortfolioIds) &&
+      !accessiblePortfolioIds.includes(portfolioId)
+    ) {
+      throw new NotFoundException('Portfolio not found')
+    }
+
     // Calculate date range based on duration
     const now = new Date()
     let startDate: Date
@@ -505,7 +520,7 @@ export class PortfolioService implements IPortfolioService {
     }
 
     // Get all property IDs for this portfolio
-    const properties = await this.prisma.property.findMany({
+    const allPropertiesInPortfolio = await this.prisma.property.findMany({
       where: {
         portfolio_id: portfolioId,
         is_active: true
@@ -515,7 +530,27 @@ export class PortfolioService implements IPortfolioService {
       }
     })
 
-    const propertyIds = properties.map(p => p.id)
+    // Get user's accessible property IDs
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
+    // Filter portfolio properties by user's accessible properties
+    let propertyIds: string[]
+    if (accessiblePropertyIds === 'all') {
+      // User has access to all properties
+      propertyIds = allPropertiesInPortfolio.map(p => p.id)
+    } else if (Array.isArray(accessiblePropertyIds)) {
+      // User has partial access - only include properties they can access
+      propertyIds = allPropertiesInPortfolio
+        .map(p => p.id)
+        .filter(id => accessiblePropertyIds.includes(id))
+    } else {
+      // User has no property access
+      propertyIds = []
+    }
 
     if (propertyIds.length === 0) {
       return {

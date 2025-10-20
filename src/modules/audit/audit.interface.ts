@@ -7,6 +7,7 @@ import {
   BulkImportResultDto,
   BulkUpdateResultDto,
   CreateAuditDto,
+  GlobalStatsResponseDto,
   UpdateAuditDto
 } from './audit.dto'
 
@@ -134,4 +135,5 @@ export interface IAuditService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<BulkImportResultDto>
+  getGlobalStats(user: IUserWithPermissions): Promise<GlobalStatsResponseDto>
 }

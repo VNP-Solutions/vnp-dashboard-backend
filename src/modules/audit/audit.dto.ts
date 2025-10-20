@@ -207,3 +207,31 @@ export class BulkUpdateResultDto {
   })
   successfulUpdates: string[]
 }
+
+export class GlobalStatsAmountDto {
+  @ApiProperty({ example: 150000, description: 'Total amount' })
+  total: number
+
+  @ApiProperty({ example: 50000, description: 'Amount for Expedia' })
+  expedia: number
+
+  @ApiProperty({ example: 60000, description: 'Amount for Booking' })
+  booking: number
+
+  @ApiProperty({ example: 40000, description: 'Amount for Agoda' })
+  agoda: number
+}
+
+export class GlobalStatsResponseDto {
+  @ApiProperty({ description: 'Amount collectable breakdown by platform' })
+  amount_collectable: GlobalStatsAmountDto
+
+  @ApiProperty({ description: 'Amount confirmed breakdown by platform' })
+  amount_confirmed: GlobalStatsAmountDto
+
+  @ApiProperty({
+    example: 25,
+    description: 'Count of completed audits across all accessible properties'
+  })
+  completed_audit_count: number
+}

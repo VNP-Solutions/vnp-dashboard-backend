@@ -34,6 +34,7 @@ import {
   AuditQueryDto,
   BulkArchiveAuditDto,
   CreateAuditDto,
+  GlobalStatsResponseDto,
   UpdateAuditDto
 } from './audit.dto'
 import type { IAuditService } from './audit.interface'
@@ -393,5 +394,23 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.bulkImport(file, user)
+  }
+
+  @Get('global-stats')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Get global audit statistics across all accessible properties'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Global audit statistics retrieved successfully',
+    type: GlobalStatsResponseDto
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  getGlobalStats(@CurrentUser() user: IUserWithPermissions) {
+    return this.auditService.getGlobalStats(user)
   }
 }

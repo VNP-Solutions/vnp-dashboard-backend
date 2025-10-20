@@ -10,11 +10,13 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import {
+  ARCHIVABLE_AUDIT_STATUSES,
   canArchiveAudit,
   getArchiveErrorMessage
 } from '../../common/utils/audit.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IAuditStatusRepository } from '../audit-status/audit-status.interface'
+import { PrismaService } from '../prisma/prisma.service'
 import type { IPropertyRepository } from '../property/property.interface'
 import {
   AuditQueryDto,
@@ -22,6 +24,7 @@ import {
   BulkImportResultDto,
   BulkUpdateResultDto,
   CreateAuditDto,
+  GlobalStatsResponseDto,
   UpdateAuditDto
 } from './audit.dto'
 import type { IAuditRepository, IAuditService } from './audit.interface'
@@ -36,7 +39,9 @@ export class AuditService implements IAuditService {
     @Inject('IAuditStatusRepository')
     private auditStatusRepository: IAuditStatusRepository,
     @Inject('IPropertyRepository')
-    private propertyRepository: IPropertyRepository
+    private propertyRepository: IPropertyRepository,
+    @Inject(PrismaService)
+    private prisma: PrismaService
   ) {}
 
   async create(data: CreateAuditDto, _user: IUserWithPermissions) {
@@ -1128,6 +1133,111 @@ export class AuditService implements IAuditService {
       throw new BadRequestException(
         `Failed to process Excel file: ${error.message}`
       )
+    }
+  }
+
+  async getGlobalStats(
+    user: IUserWithPermissions
+  ): Promise<GlobalStatsResponseDto> {
+    // Get accessible property IDs based on user permissions
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
+    // If user has no access to any properties, return zeros
+    if (
+      Array.isArray(accessiblePropertyIds) &&
+      accessiblePropertyIds.length === 0
+    ) {
+      return {
+        amount_collectable: {
+          total: 0,
+          expedia: 0,
+          booking: 0,
+          agoda: 0
+        },
+        amount_confirmed: {
+          total: 0,
+          expedia: 0,
+          booking: 0,
+          agoda: 0
+        },
+        completed_audit_count: 0
+      }
+    }
+
+    // Build where clause for accessible properties
+    const whereClause =
+      accessiblePropertyIds === 'all'
+        ? { is_archived: false }
+        : {
+            property_id: { in: accessiblePropertyIds },
+            is_archived: false
+          }
+
+    // Get aggregate data for amount collectable and confirmed by OTA type
+    const auditAggregates = await this.prisma.audit.groupBy({
+      by: ['type_of_ota'],
+      where: whereClause,
+      _sum: {
+        amount_collectable: true,
+        amount_confirmed: true
+      }
+    })
+
+    // Get count of completed audits
+    const completedAuditCount = await this.prisma.audit.count({
+      where: {
+        ...whereClause,
+        auditStatus: {
+          status: {
+            in: ARCHIVABLE_AUDIT_STATUSES
+          }
+        }
+      }
+    })
+
+    // Initialize amounts
+    const amountCollectable = {
+      total: 0,
+      expedia: 0,
+      booking: 0,
+      agoda: 0
+    }
+
+    const amountConfirmed = {
+      total: 0,
+      expedia: 0,
+      booking: 0,
+      agoda: 0
+    }
+
+    // Process aggregated data
+    auditAggregates.forEach(aggregate => {
+      const collectableAmount = aggregate._sum.amount_collectable || 0
+      const confirmedAmount = aggregate._sum.amount_confirmed || 0
+
+      amountCollectable.total += collectableAmount
+      amountConfirmed.total += confirmedAmount
+
+      if (aggregate.type_of_ota === 'expedia') {
+        amountCollectable.expedia += collectableAmount
+        amountConfirmed.expedia += confirmedAmount
+      } else if (aggregate.type_of_ota === 'booking') {
+        amountCollectable.booking += collectableAmount
+        amountConfirmed.booking += confirmedAmount
+      } else if (aggregate.type_of_ota === 'agoda') {
+        amountCollectable.agoda += collectableAmount
+        amountConfirmed.agoda += confirmedAmount
+      }
+    })
+
+    return {
+      amount_collectable: amountCollectable,
+      amount_confirmed: amountConfirmed,
+      completed_audit_count: completedAuditCount
     }
   }
 }
