@@ -148,7 +148,7 @@ export class AuditController {
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
   @ApiOperation({
     summary:
-      'Archive an audit (only works for OTA POST with COMPLETE status and invoiced, or MOR with INVOICED status)'
+      'Archive an audit. Allowed statuses: "OTA POST Completed", "VCC Invoiced", "MOR completed and Invoiced", "Direct Bill Invoiced", "Nothing To Report"'
   })
   @ApiResponse({ status: 200, description: 'Audit archived successfully' })
   @ApiResponse({ status: 404, description: 'Audit not found' })

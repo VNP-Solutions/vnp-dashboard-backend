@@ -7,6 +7,10 @@ import {
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import {
+  canArchiveAudit,
+  getArchiveErrorMessage
+} from '../../common/utils/audit.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   AuditQueryDto,
@@ -345,36 +349,13 @@ export class AuditService implements IAuditService {
       throw new BadRequestException('Audit is already archived')
     }
 
-    // Check if audit has report URL (invoiced)
-    if (!audit.report_url || audit.report_url.trim() === '') {
-      throw new BadRequestException(
-        'Cannot archive audit without a report URL (not invoiced)'
-      )
-    }
+    // Get the audit status
+    const auditStatus = audit.auditStatus.status
 
-    // Get the service type from property's portfolio
-    const serviceType = audit.property.portfolio.serviceType.type
-    const auditStatus = audit.auditStatus.status.toUpperCase()
-
-    // Validation logic based on service type
-    if (serviceType === 'OTA POST') {
-      // For OTA POST: must be COMPLETE status
-      if (auditStatus !== 'COMPLETE') {
-        throw new BadRequestException(
-          'Cannot archive OTA POST audit. Status must be COMPLETE and audit must be invoiced'
-        )
-      }
-    } else if (serviceType === 'MOR') {
-      // For MOR: must be INVOICED status
-      if (auditStatus !== 'INVOICED') {
-        throw new BadRequestException(
-          'Cannot archive MOR audit. Status must be INVOICED'
-        )
-      }
-    } else {
-      throw new BadRequestException(
-        `Cannot archive audit with service type: ${serviceType}. Only OTA POST and MOR audits can be archived`
-      )
+    // Check if audit can be archived based on status
+    if (!canArchiveAudit(auditStatus)) {
+      const errorMessage = getArchiveErrorMessage(auditStatus)
+      throw new BadRequestException(errorMessage)
     }
 
     // If all validations pass, archive the audit
