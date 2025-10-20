@@ -141,3 +141,68 @@ export class BulkImportResultDto {
   })
   successfulImports: string[]
 }
+
+export class PortfolioStatsQueryDto {
+  @ApiProperty({
+    enum: ['week', 'month', 'year'],
+    example: 'month',
+    description: 'Time duration for stats calculation'
+  })
+  @IsString()
+  @IsNotEmpty()
+  duration: 'week' | 'month' | 'year'
+}
+
+export class PortfolioStatsAmountDto {
+  @ApiProperty({ example: 150000, description: 'Total amount' })
+  total: number
+
+  @ApiProperty({ example: 50000, description: 'Amount for Expedia' })
+  expedia: number
+
+  @ApiProperty({ example: 60000, description: 'Amount for Booking' })
+  booking: number
+
+  @ApiProperty({ example: 40000, description: 'Amount for Agoda' })
+  agoda: number
+}
+
+export class PortfolioStatsAuditDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Audit ID' })
+  id: string
+
+  @ApiProperty({ example: 'expedia', description: 'OTA type' })
+  type_of_ota: string | null
+
+  @ApiProperty({ example: 25000, description: 'Amount collectable' })
+  amount_collectable: number | null
+
+  @ApiProperty({ example: 20000, description: 'Amount confirmed' })
+  amount_confirmed: number | null
+
+  @ApiProperty({ example: '2024-01-01', description: 'Start date' })
+  start_date: Date
+
+  @ApiProperty({ example: '2024-01-31', description: 'End date' })
+  end_date: Date
+
+  @ApiProperty({ example: 'Hotel ABC', description: 'Property name' })
+  property_name: string
+
+  @ApiProperty({ example: 'Confirmed', description: 'Audit status' })
+  audit_status: string
+}
+
+export class PortfolioStatsResponseDto {
+  @ApiProperty({ description: 'Amount collectable breakdown by platform' })
+  amount_collectable: PortfolioStatsAmountDto
+
+  @ApiProperty({ description: 'Amount confirmed breakdown by platform' })
+  amount_confirmed: PortfolioStatsAmountDto
+
+  @ApiProperty({
+    type: [PortfolioStatsAuditDto],
+    description: 'Recent 10 audits for the portfolio'
+  })
+  recent_audits: PortfolioStatsAuditDto[]
+}

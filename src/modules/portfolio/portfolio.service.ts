@@ -11,11 +11,14 @@ import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import { PrismaService } from '../prisma/prisma.service'
 import type { IServiceTypeRepository } from '../service-type/service-type.interface'
 import {
   BulkImportResultDto,
   CreatePortfolioDto,
   PortfolioQueryDto,
+  PortfolioStatsQueryDto,
+  PortfolioStatsResponseDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 import type {
@@ -33,7 +36,9 @@ export class PortfolioService implements IPortfolioService {
     @Inject(PermissionService)
     private permissionService: PermissionService,
     @Inject(EmailUtil)
-    private emailUtil: EmailUtil
+    private emailUtil: EmailUtil,
+    @Inject(PrismaService)
+    private prisma: PrismaService
   ) {}
 
   async create(data: CreatePortfolioDto, _user: IUserWithPermissions) {
@@ -466,6 +471,166 @@ export class PortfolioService implements IPortfolioService {
       throw new BadRequestException(
         `Failed to process Excel file: ${error.message}`
       )
+    }
+  }
+
+  async getStats(
+    portfolioId: string,
+    query: PortfolioStatsQueryDto,
+    user: IUserWithPermissions
+  ): Promise<PortfolioStatsResponseDto> {
+    // Verify portfolio exists and user has access
+    const portfolio = await this.portfolioRepository.findById(portfolioId)
+    if (!portfolio) {
+      throw new NotFoundException('Portfolio not found')
+    }
+
+    // Calculate date range based on duration
+    const now = new Date()
+    let startDate: Date
+
+    switch (query.duration) {
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        break
+      case 'month':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        break
+      case 'year':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+        break
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    }
+
+    // Get all property IDs for this portfolio
+    const properties = await this.prisma.property.findMany({
+      where: {
+        portfolio_id: portfolioId,
+        is_active: true
+      },
+      select: {
+        id: true
+      }
+    })
+
+    const propertyIds = properties.map(p => p.id)
+
+    if (propertyIds.length === 0) {
+      return {
+        amount_collectable: {
+          total: 0,
+          expedia: 0,
+          booking: 0,
+          agoda: 0
+        },
+        amount_confirmed: {
+          total: 0,
+          expedia: 0,
+          booking: 0,
+          agoda: 0
+        },
+        recent_audits: []
+      }
+    }
+
+    // Get aggregate data for amount collectable and confirmed
+    // Filter by audits that were created within the time period
+    const auditAggregates = await this.prisma.audit.groupBy({
+      by: ['type_of_ota'],
+      where: {
+        property_id: {
+          in: propertyIds
+        },
+        is_archived: false,
+        created_at: {
+          gte: startDate,
+          lte: now
+        }
+      },
+      _sum: {
+        amount_collectable: true,
+        amount_confirmed: true
+      }
+    })
+
+    // Initialize amounts
+    const amountCollectable = {
+      total: 0,
+      expedia: 0,
+      booking: 0,
+      agoda: 0
+    }
+
+    const amountConfirmed = {
+      total: 0,
+      expedia: 0,
+      booking: 0,
+      agoda: 0
+    }
+
+    // Process aggregated data
+    auditAggregates.forEach(aggregate => {
+      const collectableAmount = aggregate._sum.amount_collectable || 0
+      const confirmedAmount = aggregate._sum.amount_confirmed || 0
+
+      amountCollectable.total += collectableAmount
+      amountConfirmed.total += confirmedAmount
+
+      if (aggregate.type_of_ota === 'expedia') {
+        amountCollectable.expedia += collectableAmount
+        amountConfirmed.expedia += confirmedAmount
+      } else if (aggregate.type_of_ota === 'booking') {
+        amountCollectable.booking += collectableAmount
+        amountConfirmed.booking += confirmedAmount
+      } else if (aggregate.type_of_ota === 'agoda') {
+        amountCollectable.agoda += collectableAmount
+        amountConfirmed.agoda += confirmedAmount
+      }
+    })
+
+    // Get recent 10 audits for the portfolio
+    const recentAudits = await this.prisma.audit.findMany({
+      where: {
+        property_id: {
+          in: propertyIds
+        },
+        is_archived: false
+      },
+      orderBy: {
+        created_at: 'desc'
+      },
+      take: 10,
+      include: {
+        property: {
+          select: {
+            name: true
+          }
+        },
+        auditStatus: {
+          select: {
+            status: true
+          }
+        }
+      }
+    })
+
+    // Format recent audits for response
+    const formattedRecentAudits = recentAudits.map(audit => ({
+      id: audit.id,
+      type_of_ota: audit.type_of_ota,
+      amount_collectable: audit.amount_collectable,
+      amount_confirmed: audit.amount_confirmed,
+      start_date: audit.start_date,
+      end_date: audit.end_date,
+      property_name: audit.property.name,
+      audit_status: audit.auditStatus.status
+    }))
+
+    return {
+      amount_collectable: amountCollectable,
+      amount_confirmed: amountConfirmed,
+      recent_audits: formattedRecentAudits
     }
   }
 }

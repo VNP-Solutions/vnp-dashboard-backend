@@ -4,6 +4,8 @@ import { IUserWithPermissions } from '../../common/interfaces/permission.interfa
 import {
   CreatePortfolioDto,
   PortfolioQueryDto,
+  PortfolioStatsQueryDto,
+  PortfolioStatsResponseDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 
@@ -103,4 +105,9 @@ export interface IPortfolioService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<any>
+  getStats(
+    portfolioId: string,
+    query: PortfolioStatsQueryDto,
+    user: IUserWithPermissions
+  ): Promise<PortfolioStatsResponseDto>
 }

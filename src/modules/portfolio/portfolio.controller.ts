@@ -33,6 +33,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   CreatePortfolioDto,
   PortfolioQueryDto,
+  PortfolioStatsQueryDto,
   SendPortfolioEmailDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
@@ -204,5 +205,28 @@ export class PortfolioController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.portfolioService.bulkImport(file, user)
+  }
+
+  @Get(':id/stats')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
+  @ApiOperation({
+    summary:
+      'Get portfolio statistics with amount breakdown by platform and recent audits'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Portfolio statistics retrieved successfully'
+  })
+  @ApiResponse({ status: 404, description: 'Portfolio not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - No access to this portfolio'
+  })
+  getStats(
+    @Param('id') id: string,
+    @Query() query: PortfolioStatsQueryDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.getStats(id, query, user)
   }
 }
