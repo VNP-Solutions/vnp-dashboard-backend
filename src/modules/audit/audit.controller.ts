@@ -28,6 +28,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   AuditQueryDto,
+  BulkArchiveAuditDto,
   BulkUpdateAuditDto,
   CreateAuditDto,
   UpdateAuditDto
@@ -219,5 +220,87 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.bulkUpdate(bulkUpdateDto, user)
+  }
+
+  @Patch(':id/unarchive')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Unarchive an audit (no conditions required)'
+  })
+  @ApiResponse({ status: 200, description: 'Audit unarchived successfully' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Audit is not archived'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  unarchive(
+    @Param('id') id: string,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.auditService.unarchive(id, user)
+  }
+
+  @Patch('bulk-archive')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary:
+      'Bulk archive multiple audits. Checks each audit for archivability and returns success/failure counts'
+  })
+  @ApiBody({
+    type: BulkArchiveAuditDto,
+    description: 'Bulk archive payload with audit IDs',
+    examples: {
+      'Basic Example': {
+        value: {
+          audit_ids: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012']
+        }
+      },
+      'Multiple Audits': {
+        value: {
+          audit_ids: [
+            '507f1f77bcf86cd799439011',
+            '507f1f77bcf86cd799439012',
+            '507f1f77bcf86cd799439013',
+            '507f1f77bcf86cd799439014'
+          ]
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk archive completed with success/failure details',
+    schema: {
+      example: {
+        message: 'Successfully archived 2 audit(s), 1 failed',
+        successfully_archived: 2,
+        failed_to_archive: 1,
+        failed_audits: [
+          {
+            id: '507f1f77bcf86cd799439013',
+            reason:
+              'Cannot archive audit. Current status is "Pending". Audit can only be archived with one of these statuses: OTA POST Completed, VCC Invoiced, MOR completed and Invoiced, Direct Bill Invoiced, Nothing To Report.'
+          }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid data or no audit IDs provided'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkArchive(
+    @Body() bulkArchiveDto: BulkArchiveAuditDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.auditService.bulkArchive(bulkArchiveDto, user)
   }
 }

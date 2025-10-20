@@ -3,6 +3,7 @@ import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AuditQueryDto,
+  BulkArchiveAuditDto,
   BulkUpdateAuditDto,
   CreateAuditDto,
   UpdateAuditDto
@@ -81,13 +82,16 @@ export interface IAuditRepository {
   ): Promise<AuditWithRelations[]>
   count(whereClause: any, propertyIds?: string[]): Promise<number>
   findById(id: string): Promise<AuditWithFullDetails | null>
+  findByIds(ids: string[]): Promise<AuditWithFullDetails[]>
   update(id: string, data: UpdateAuditDto): Promise<AuditWithRelations>
   delete(id: string): Promise<Audit>
   archive(id: string): Promise<AuditWithRelations>
+  unarchive(id: string): Promise<AuditWithRelations>
   bulkUpdate(
     auditIds: string[],
     data: UpdateAuditDto
   ): Promise<{ count: number }>
+  bulkArchive(auditIds: string[]): Promise<{ count: number }>
 }
 
 export interface IAuditService {
@@ -111,8 +115,18 @@ export interface IAuditService {
   ): Promise<AuditWithRelations>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
   archive(id: string, user: IUserWithPermissions): Promise<AuditWithRelations>
+  unarchive(id: string, user: IUserWithPermissions): Promise<AuditWithRelations>
   bulkUpdate(
     data: BulkUpdateAuditDto,
     user: IUserWithPermissions
   ): Promise<{ message: string; updated_count: number }>
+  bulkArchive(
+    data: BulkArchiveAuditDto,
+    user: IUserWithPermissions
+  ): Promise<{
+    message: string
+    successfully_archived: number
+    failed_to_archive: number
+    failed_audits: Array<{ id: string; reason: string }>
+  }>
 }

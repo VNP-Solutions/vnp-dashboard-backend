@@ -14,6 +14,7 @@ import {
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   AuditQueryDto,
+  BulkArchiveAuditDto,
   BulkUpdateAuditDto,
   CreateAuditDto,
   UpdateAuditDto
@@ -388,6 +389,87 @@ export class AuditService implements IAuditService {
     return {
       message: `Successfully updated ${result.count} audit(s)`,
       updated_count: result.count
+    }
+  }
+
+  async unarchive(id: string, _user: IUserWithPermissions) {
+    const audit = await this.auditRepository.findById(id)
+
+    if (!audit) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    // Check if audit is not archived
+    if (!audit.is_archived) {
+      throw new BadRequestException('Audit is not archived')
+    }
+
+    // Unarchive the audit (no conditions to check)
+    return this.auditRepository.unarchive(id)
+  }
+
+  async bulkArchive(data: BulkArchiveAuditDto, _user: IUserWithPermissions) {
+    const { audit_ids } = data
+
+    if (!audit_ids || audit_ids.length === 0) {
+      throw new BadRequestException('No audit IDs provided')
+    }
+
+    // Fetch all audits
+    const audits = await this.auditRepository.findByIds(audit_ids)
+
+    const successfulIds: string[] = []
+    const failedAudits: Array<{ id: string; reason: string }> = []
+
+    // Check each audit individually
+    for (const auditId of audit_ids) {
+      const audit = audits.find(a => a.id === auditId)
+
+      // Audit not found
+      if (!audit) {
+        failedAudits.push({
+          id: auditId,
+          reason: 'Audit not found'
+        })
+        continue
+      }
+
+      // Already archived
+      if (audit.is_archived) {
+        failedAudits.push({
+          id: auditId,
+          reason: 'Audit is already archived'
+        })
+        continue
+      }
+
+      // Check if can be archived based on status
+      const auditStatus = audit.auditStatus.status
+      if (!canArchiveAudit(auditStatus)) {
+        const errorMessage = getArchiveErrorMessage(auditStatus)
+        failedAudits.push({
+          id: auditId,
+          reason: errorMessage
+        })
+        continue
+      }
+
+      // Passed all validations
+      successfulIds.push(auditId)
+    }
+
+    // Archive all successful audits
+    let archivedCount = 0
+    if (successfulIds.length > 0) {
+      const result = await this.auditRepository.bulkArchive(successfulIds)
+      archivedCount = result.count
+    }
+
+    return {
+      message: `Successfully archived ${archivedCount} audit(s), ${failedAudits.length} failed`,
+      successfully_archived: archivedCount,
+      failed_to_archive: failedAudits.length,
+      failed_audits: failedAudits
     }
   }
 }

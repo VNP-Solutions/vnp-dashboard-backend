@@ -3,6 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { OtaType } from '@prisma/client'
 import { Transform } from 'class-transformer'
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -134,6 +135,16 @@ export class BulkUpdateAuditDto extends PartialType(CreateAuditDto) {
     example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
     description: 'Array of audit IDs to update'
   })
+  @IsNotEmpty()
+  audit_ids: string[]
+}
+
+export class BulkArchiveAuditDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of audit IDs to archive'
+  })
+  @IsArray()
   @IsNotEmpty()
   audit_ids: string[]
 }

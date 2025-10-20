@@ -248,4 +248,93 @@ export class AuditRepository implements IAuditRepository {
 
     return { count: result.count }
   }
+
+  async findByIds(ids: string[]) {
+    return this.prisma.audit.findMany({
+      where: {
+        id: {
+          in: ids
+        }
+      },
+      include: {
+        auditStatus: {
+          select: {
+            id: true,
+            status: true
+          }
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            is_active: true,
+            card_descriptor: true,
+            portfolio: {
+              select: {
+                id: true,
+                name: true,
+                is_active: true,
+                serviceType: {
+                  select: {
+                    id: true,
+                    type: true
+                  }
+                }
+              }
+            },
+            credentials: {
+              select: {
+                id: true,
+                expedia_id: true,
+                agoda_id: true,
+                booking_id: true
+              }
+            }
+          }
+        }
+      }
+    })
+  }
+
+  async bulkArchive(auditIds: string[]) {
+    const result = await this.prisma.audit.updateMany({
+      where: {
+        id: {
+          in: auditIds
+        }
+      },
+      data: { is_archived: true }
+    })
+
+    return { count: result.count }
+  }
+
+  async unarchive(id: string) {
+    return this.prisma.audit.update({
+      where: { id },
+      data: { is_archived: false },
+      include: {
+        auditStatus: {
+          select: {
+            id: true,
+            status: true
+          }
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            is_active: true,
+            portfolio: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    })
+  }
 }
