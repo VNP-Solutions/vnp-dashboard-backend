@@ -34,6 +34,7 @@ import {
   BulkTransferPropertyDto,
   CreatePropertyDto,
   PropertyQueryDto,
+  PropertyStatsResponseDto,
   SharePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
@@ -280,5 +281,24 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.propertyService.bulkImport(file, user)
+  }
+
+  @Get(':id/stats')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ, true)
+  @ApiOperation({
+    summary: 'Get property statistics showing total amounts from all audits'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Property statistics retrieved successfully',
+    type: PropertyStatsResponseDto
+  })
+  @ApiResponse({ status: 404, description: 'Property not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - No access to this property'
+  })
+  getStats(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
+    return this.propertyService.getStats(id, user)
   }
 }

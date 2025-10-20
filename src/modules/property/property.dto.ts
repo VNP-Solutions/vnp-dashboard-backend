@@ -218,3 +218,17 @@ export class BulkImportResultDto {
   })
   successfulImports: string[]
 }
+
+export class PropertyStatsResponseDto {
+  @ApiProperty({
+    example: 50000,
+    description: 'Total amount collectable from all audits for this property'
+  })
+  total_amount_collectable: number
+
+  @ApiProperty({
+    example: 45000,
+    description: 'Total amount confirmed from all audits for this property'
+  })
+  total_amount_confirmed: number
+}

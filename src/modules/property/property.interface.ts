@@ -5,6 +5,7 @@ import {
   BulkTransferPropertyDto,
   CreatePropertyDto,
   PropertyQueryDto,
+  PropertyStatsResponseDto,
   SharePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
@@ -151,4 +152,8 @@ export interface IPropertyService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<any>
+  getStats(
+    propertyId: string,
+    user: IUserWithPermissions
+  ): Promise<PropertyStatsResponseDto>
 }

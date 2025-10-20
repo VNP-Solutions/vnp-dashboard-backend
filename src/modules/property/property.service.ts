@@ -24,6 +24,7 @@ import {
   BulkTransferPropertyDto,
   CreatePropertyDto,
   PropertyQueryDto,
+  PropertyStatsResponseDto,
   SharePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
@@ -1322,6 +1323,48 @@ export class PropertyService implements IPropertyService {
       throw new ForbiddenException(
         'You do not have permission to modify this property. This property is shared with you for view-only access.'
       )
+    }
+  }
+
+  async getStats(
+    propertyId: string,
+    user: IUserWithPermissions
+  ): Promise<PropertyStatsResponseDto> {
+    // Verify property exists and user has access
+    const property = await this.propertyRepository.findById(propertyId)
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    // Check if user has access to this property
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    if (
+      accessibleIds !== 'all' &&
+      Array.isArray(accessibleIds) &&
+      !accessibleIds.includes(propertyId)
+    ) {
+      throw new NotFoundException('Property not found')
+    }
+
+    // Aggregate audit amounts for this property
+    const auditAggregates = await this.prisma.audit.aggregate({
+      where: {
+        property_id: propertyId,
+        is_archived: false
+      },
+      _sum: {
+        amount_collectable: true,
+        amount_confirmed: true
+      }
+    })
+
+    return {
+      total_amount_collectable: auditAggregates._sum.amount_collectable || 0,
+      total_amount_confirmed: auditAggregates._sum.amount_confirmed || 0
     }
   }
 
