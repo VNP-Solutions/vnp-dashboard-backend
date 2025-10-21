@@ -429,11 +429,51 @@ export class AuditService implements IAuditService {
         return undefined
       }
 
-      // Helper function to parse date in mm/dd/yyyy format
-      const parseDate = (dateString: string): Date | null => {
-        if (!dateString) return null
+      // Helper function to get raw value (preserves type for dates and numbers)
+      const getRawValue = (row: any, possibleNames: string[]): any => {
+        for (const name of possibleNames) {
+          const value = row[name]
+          if (value !== undefined && value !== null && value !== '') {
+            return value
+          }
+        }
+        return undefined
+      }
+
+      // Helper function to parse date in mm/dd/yyyy format or Excel serial number
+      const parseDate = (dateValue: any): Date | null => {
+        if (!dateValue) return null
 
         try {
+          // If it's already a Date object, return it
+          if (dateValue instanceof Date) {
+            if (!isNaN(dateValue.getTime())) {
+              return dateValue
+            }
+            return null
+          }
+
+          // If it's a number (Excel serial date), convert it
+          if (typeof dateValue === 'number') {
+            // Excel stores dates as days since January 1, 1900
+            // Excel has a bug where it considers 1900 a leap year, so we use December 30, 1899 as epoch
+            const excelEpoch = new Date(1899, 11, 30) // December 30, 1899
+            const date = new Date(
+              excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000
+            )
+            if (
+              !isNaN(date.getTime()) &&
+              date.getFullYear() >= 1900 &&
+              date.getFullYear() <= 2100
+            ) {
+              return date
+            }
+            return null
+          }
+
+          // Convert to string for string parsing
+          const dateString = String(dateValue)
+
           // Try to parse mm/dd/yyyy format
           const parts = dateString.trim().split('/')
           if (parts.length === 3) {
@@ -441,14 +481,24 @@ export class AuditService implements IAuditService {
             const day = parseInt(parts[1], 10)
             const year = parseInt(parts[2], 10)
 
-            if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
+            if (
+              !isNaN(month) &&
+              !isNaN(day) &&
+              !isNaN(year) &&
+              year >= 1900 &&
+              year <= 2100
+            ) {
               return new Date(year, month - 1, day)
             }
           }
 
           // Try to parse as ISO date
           const date = new Date(dateString)
-          if (!isNaN(date.getTime())) {
+          if (
+            !isNaN(date.getTime()) &&
+            date.getFullYear() >= 1900 &&
+            date.getFullYear() <= 2100
+          ) {
             return date
           }
 
@@ -619,8 +669,8 @@ export class AuditService implements IAuditService {
             }
           }
 
-          // Extract start date (if provided)
-          const startDateValue = findHeaderValue(row, [
+          // Extract start date (if provided) - use raw value to preserve Excel date format
+          const startDateValue = getRawValue(row, [
             'Start Date',
             'Start date',
             'start_date',
@@ -641,8 +691,8 @@ export class AuditService implements IAuditService {
             updateData.start_date = startDate.toISOString()
           }
 
-          // Extract end date (if provided)
-          const endDateValue = findHeaderValue(row, [
+          // Extract end date (if provided) - use raw value to preserve Excel date format
+          const endDateValue = getRawValue(row, [
             'End Date',
             'End date',
             'end_date',
@@ -868,11 +918,51 @@ export class AuditService implements IAuditService {
         return undefined
       }
 
-      // Helper function to parse date in mm/dd/yyyy format
-      const parseDate = (dateString: string): Date | null => {
-        if (!dateString) return null
+      // Helper function to get raw value (preserves type for dates and numbers)
+      const getRawValue = (row: any, possibleNames: string[]): any => {
+        for (const name of possibleNames) {
+          const value = row[name]
+          if (value !== undefined && value !== null && value !== '') {
+            return value
+          }
+        }
+        return undefined
+      }
+
+      // Helper function to parse date in mm/dd/yyyy format or Excel serial number
+      const parseDate = (dateValue: any): Date | null => {
+        if (!dateValue) return null
 
         try {
+          // If it's already a Date object, return it
+          if (dateValue instanceof Date) {
+            if (!isNaN(dateValue.getTime())) {
+              return dateValue
+            }
+            return null
+          }
+
+          // If it's a number (Excel serial date), convert it
+          if (typeof dateValue === 'number') {
+            // Excel stores dates as days since January 1, 1900
+            // Excel has a bug where it considers 1900 a leap year, so we use December 30, 1899 as epoch
+            const excelEpoch = new Date(1899, 11, 30) // December 30, 1899
+            const date = new Date(
+              excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000
+            )
+            if (
+              !isNaN(date.getTime()) &&
+              date.getFullYear() >= 1900 &&
+              date.getFullYear() <= 2100
+            ) {
+              return date
+            }
+            return null
+          }
+
+          // Convert to string for string parsing
+          const dateString = String(dateValue)
+
           // Try to parse mm/dd/yyyy format
           const parts = dateString.trim().split('/')
           if (parts.length === 3) {
@@ -880,14 +970,24 @@ export class AuditService implements IAuditService {
             const day = parseInt(parts[1], 10)
             const year = parseInt(parts[2], 10)
 
-            if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
+            if (
+              !isNaN(month) &&
+              !isNaN(day) &&
+              !isNaN(year) &&
+              year >= 1900 &&
+              year <= 2100
+            ) {
               return new Date(year, month - 1, day)
             }
           }
 
           // Try to parse as ISO date
           const date = new Date(dateString)
-          if (!isNaN(date.getTime())) {
+          if (
+            !isNaN(date.getTime()) &&
+            date.getFullYear() >= 1900 &&
+            date.getFullYear() <= 2100
+          ) {
             return date
           }
 
@@ -1014,8 +1114,8 @@ export class AuditService implements IAuditService {
             ? parseFloat(amountConfirmedValue)
             : undefined
 
-          // Extract start date
-          const startDateValue = findHeaderValue(row, [
+          // Extract start date (use raw value to preserve Excel date format)
+          const startDateValue = getRawValue(row, [
             'Start Date',
             'Start date',
             'start_date',
@@ -1043,8 +1143,8 @@ export class AuditService implements IAuditService {
             continue
           }
 
-          // Extract end date
-          const endDateValue = findHeaderValue(row, [
+          // Extract end date (use raw value to preserve Excel date format)
+          const endDateValue = getRawValue(row, [
             'End Date',
             'End date',
             'end_date',
