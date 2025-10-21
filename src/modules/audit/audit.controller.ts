@@ -102,6 +102,24 @@ export class AuditController {
     return this.auditService.findAllForExport(query, user)
   }
 
+  @Get('global-stats')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Get global audit statistics across all accessible properties'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Global audit statistics retrieved successfully',
+    type: GlobalStatsResponseDto
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  getGlobalStats(@CurrentUser() user: IUserWithPermissions) {
+    return this.auditService.getGlobalStats(user)
+  }
+
   @Get(':id')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get an audit by ID' })
@@ -394,23 +412,5 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.bulkImport(file, user)
-  }
-
-  @Get('global-stats')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
-  @ApiOperation({
-    summary: 'Get global audit statistics across all accessible properties'
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Global audit statistics retrieved successfully',
-    type: GlobalStatsResponseDto
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Insufficient permissions'
-  })
-  getGlobalStats(@CurrentUser() user: IUserWithPermissions) {
-    return this.auditService.getGlobalStats(user)
   }
 }
