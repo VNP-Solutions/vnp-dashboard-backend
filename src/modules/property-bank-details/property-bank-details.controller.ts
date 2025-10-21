@@ -6,10 +6,15 @@ import {
   Param,
   Patch,
   Post,
-  UseGuards
+  UploadedFile,
+  UseGuards,
+  UseInterceptors
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiTags
@@ -129,5 +134,47 @@ export class PropertyBankDetailsController {
       updatePropertyBankDetailsDto,
       user
     )
+  }
+
+  @Post('bulk-update')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Bulk update property bank details from Excel file',
+    description:
+      'Updates bank details for multiple properties from an Excel file. The first column must be "Property Name" to identify the property. Other columns include: Stripe Account Email, Account Number, Account Name, Bank Name, Bank Branch, Swift Code, Routing Number. Only provided fields will be updated, keeping existing data intact. If Stripe Account Email is provided, it will be set as stripe type. Otherwise, all bank fields are required for bank type.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description:
+            'Excel file (.xlsx or .xls) containing property bank details. Required columns: Property Name. Optional columns: Stripe Account Email, Account Number, Account Name, Bank Name, Bank Branch, Swift Code, Routing Number'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Bulk update completed. Returns summary with success/failure counts and details.'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid file or file format'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkUpdate(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyBankDetailsService.bulkUpdate(file, user)
   }
 }

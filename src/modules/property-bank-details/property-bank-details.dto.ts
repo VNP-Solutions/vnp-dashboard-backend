@@ -98,3 +98,35 @@ export class UpdatePropertyBankDetailsDto extends PartialType(
   @IsOptional()
   property_id?: string
 }
+
+export class BulkUpdateBankDetailsResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  totalRows: number
+
+  @ApiProperty({
+    example: 8,
+    description: 'Number of bank details successfully updated'
+  })
+  successCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of rows that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      { row: 3, property: 'Test Property', error: 'Property not found' }
+    ],
+    description: 'List of errors encountered during bulk update'
+  })
+  errors: Array<{
+    row: number
+    property: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: ['Property A', 'Property B'],
+    description: 'List of successfully updated property names'
+  })
+  successfulUpdates: string[]
+}

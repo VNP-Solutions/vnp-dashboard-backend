@@ -1,6 +1,7 @@
 import { Prisma, PropertyBankDetails } from '@prisma/client'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
+  BulkUpdateBankDetailsResultDto,
   CreatePropertyBankDetailsDto,
   UpdatePropertyBankDetailsDto
 } from './property-bank-details.dto'
@@ -43,4 +44,8 @@ export interface IPropertyBankDetailsService {
     data: UpdatePropertyBankDetailsDto,
     user: IUserWithPermissions
   ): Promise<PropertyBankDetails>
+  bulkUpdate(
+    file: Express.Multer.File,
+    user: IUserWithPermissions
+  ): Promise<BulkUpdateBankDetailsResultDto>
 }
