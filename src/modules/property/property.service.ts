@@ -1498,7 +1498,26 @@ export class PropertyService implements IPropertyService {
 
     return {
       total_amount_collectable: auditAggregates._sum.amount_collectable || 0,
-      total_amount_confirmed: auditAggregates._sum.amount_confirmed || 0
+      total_amount_confirmed: auditAggregates._sum.amount_confirmed || 0,
+      property: {
+        id: property.id,
+        name: property.name,
+        address: property.address,
+        card_descriptor: property.card_descriptor,
+        is_active: property.is_active,
+        next_due_date: property.next_due_date,
+        portfolio_id: property.portfolio_id,
+        batch_id: property.batch_id,
+        currency_id: property.currency_id,
+        currency: property.currency,
+        credentials: property.credentials
+          ? {
+              expedia_id: property.credentials.expedia_id,
+              agoda_id: property.credentials.agoda_id,
+              booking_id: property.credentials.booking_id
+            }
+          : null
+      }
     }
   }
 

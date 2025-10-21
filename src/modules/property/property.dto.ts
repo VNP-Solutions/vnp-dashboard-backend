@@ -231,6 +231,32 @@ export class PropertyStatsResponseDto {
     description: 'Total amount confirmed from all audits for this property'
   })
   total_amount_confirmed: number
+
+  @ApiProperty({
+    description: 'Property details including credentials and currency'
+  })
+  property: {
+    id: string
+    name: string
+    address: string
+    card_descriptor: string
+    is_active: boolean
+    next_due_date: Date | null
+    portfolio_id: string
+    batch_id: string | null
+    currency_id: string
+    currency: {
+      id: string
+      code: string
+      name: string
+      symbol: string | null
+    }
+    credentials: {
+      expedia_id: string | null
+      agoda_id: string | null
+      booking_id: string | null
+    } | null
+  }
 }
 
 export class GetPropertiesByPortfoliosDto {
