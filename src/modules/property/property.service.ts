@@ -1510,11 +1510,11 @@ export class PropertyService implements IPropertyService {
         batch_id: property.batch_id,
         currency_id: property.currency_id,
         currency: property.currency,
-        credentials: property.credentials
+        credentials: property?.credentials
           ? {
-              expedia_id: property.credentials.expedia_id,
-              agoda_id: property.credentials.agoda_id,
-              booking_id: property.credentials.booking_id
+              expedia_id: property?.credentials?.expedia_id || null,
+              agoda_id: property?.credentials?.agoda_id || null,
+              booking_id: property?.credentials?.booking_id || null
             }
           : null
       }
