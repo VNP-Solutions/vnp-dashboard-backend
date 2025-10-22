@@ -128,6 +128,16 @@ export class AuditQueryDto extends QueryDto {
     return value
   })
   is_archived?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by status category (pending/upcoming/in_progress/completed)',
+    example: 'completed',
+    enum: ['pending', 'upcoming', 'in_progress', 'completed']
+  })
+  @IsOptional()
+  @IsString()
+  status?: 'pending' | 'upcoming' | 'in_progress' | 'completed'
 }
 
 export class BulkArchiveAuditDto {

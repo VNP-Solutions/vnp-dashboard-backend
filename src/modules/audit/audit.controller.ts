@@ -72,7 +72,7 @@ export class AuditController {
   @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get all audits accessible to the user with pagination, search, filter, and sort'
+      'Get all audits accessible to the user with pagination, search, filter, and sort. Filter by status category: pending, upcoming, in_progress, or completed'
   })
   @ApiResponse({
     status: 200,
@@ -89,7 +89,7 @@ export class AuditController {
   @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get all audits without pagination for export purposes (supports search, filter, and sort)'
+      'Get all audits without pagination for export purposes (supports search, filter, and sort). Filter by status category: pending, upcoming, in_progress, or completed'
   })
   @ApiResponse({
     status: 200,

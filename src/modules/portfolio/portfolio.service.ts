@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
-import { ARCHIVABLE_AUDIT_STATUSES } from '../../common/utils/audit.util'
+import { COMPLETED_AUDIT_STATUSES } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import { PrismaService } from '../prisma/prisma.service'
@@ -604,7 +604,7 @@ export class PortfolioService implements IPortfolioService {
         },
         auditStatus: {
           status: {
-            in: ARCHIVABLE_AUDIT_STATUSES
+            in: COMPLETED_AUDIT_STATUSES
           }
         }
       }

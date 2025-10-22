@@ -10,9 +10,10 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import {
-  ARCHIVABLE_AUDIT_STATUSES,
+  COMPLETED_AUDIT_STATUSES,
   canArchiveAudit,
-  getArchiveErrorMessage
+  getArchiveErrorMessage,
+  getStatusesByCategory
 } from '../../common/utils/audit.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IAuditStatusRepository } from '../audit-status/audit-status.interface'
@@ -171,6 +172,19 @@ export class AuditService implements IAuditService {
       }
     }
 
+    // Add status category filter if provided
+    if (query.status) {
+      const statusNames = getStatusesByCategory(query.status)
+      finalWhere = {
+        ...finalWhere,
+        auditStatus: {
+          status: {
+            in: statusNames
+          }
+        }
+      }
+    }
+
     // Fetch data and count
     const [data, total] = await Promise.all([
       this.auditRepository.findAll(
@@ -296,6 +310,19 @@ export class AuditService implements IAuditService {
               contains: query.expedia_id,
               mode: 'insensitive'
             }
+          }
+        }
+      }
+    }
+
+    // Add status category filter if provided
+    if (query.status) {
+      const statusNames = getStatusesByCategory(query.status)
+      finalWhere = {
+        ...finalWhere,
+        auditStatus: {
+          status: {
+            in: statusNames
           }
         }
       }
@@ -1293,7 +1320,7 @@ export class AuditService implements IAuditService {
         ...whereClause,
         auditStatus: {
           status: {
-            in: ARCHIVABLE_AUDIT_STATUSES
+            in: COMPLETED_AUDIT_STATUSES
           }
         }
       }
