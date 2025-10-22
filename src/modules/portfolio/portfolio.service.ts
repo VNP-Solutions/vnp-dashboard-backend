@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { ModuleType } from '../../common/interfaces/permission.interface'
+import {
+  AccessLevel,
+  ModuleType
+} from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { COMPLETED_AUDIT_STATUSES } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
@@ -42,7 +45,7 @@ export class PortfolioService implements IPortfolioService {
     private prisma: PrismaService
   ) {}
 
-  async create(data: CreatePortfolioDto, _user: IUserWithPermissions) {
+  async create(data: CreatePortfolioDto, user: IUserWithPermissions) {
     const existingPortfolio = await this.portfolioRepository.findByName(
       data.name
     )
@@ -51,7 +54,19 @@ export class PortfolioService implements IPortfolioService {
       throw new ConflictException('Portfolio with this name already exists')
     }
 
-    return this.portfolioRepository.create(data)
+    const portfolio = await this.portfolioRepository.create(data)
+
+    // If user has partial access, grant them access to the created portfolio
+    const permission = user.role.portfolio_permission
+    if (permission?.access_level === AccessLevel.partial) {
+      await this.permissionService.grantResourceAccess(
+        user.id,
+        ModuleType.PORTFOLIO,
+        portfolio.id
+      )
+    }
+
+    return portfolio
   }
 
   async findAll(query: PortfolioQueryDto, user: IUserWithPermissions) {

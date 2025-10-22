@@ -10,7 +10,10 @@ import { ConfigService } from '@nestjs/config'
 import { BankType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { ModuleType } from '../../common/interfaces/permission.interface'
+import {
+  AccessLevel,
+  ModuleType
+} from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
@@ -55,7 +58,7 @@ export class PropertyService implements IPropertyService {
     private configService: ConfigService<Configuration>
   ) {}
 
-  async create(data: CreatePropertyDto, _user: IUserWithPermissions) {
+  async create(data: CreatePropertyDto, user: IUserWithPermissions) {
     const existingProperty = await this.propertyRepository.findByName(data.name)
 
     if (existingProperty) {
@@ -68,7 +71,19 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Portfolio not found')
     }
 
-    return this.propertyRepository.create(data)
+    const property = await this.propertyRepository.create(data)
+
+    // If user has partial access, grant them access to the created property
+    const permission = user.role.property_permission
+    if (permission?.access_level === AccessLevel.partial) {
+      await this.permissionService.grantResourceAccess(
+        user.id,
+        ModuleType.PROPERTY,
+        property.id
+      )
+    }
+
+    return property
   }
 
   async findAll(query: PropertyQueryDto, user: IUserWithPermissions) {

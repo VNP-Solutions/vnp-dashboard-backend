@@ -96,10 +96,8 @@ export class PermissionService {
     if (permission.access_level === AccessLevel.partial) {
       // If no resourceId provided, this is likely a CREATE or LIST operation
       if (!resourceId) {
-        // CREATE operations: Allowed, but created resource won't be auto-assigned
+        // CREATE operations: Allowed, and created resource will be auto-assigned to user
         // LIST operations: Allowed, but service layer must filter results
-        // WARNING: For CREATE, the user won't be able to access the created resource
-        // until it's added to their UserAccessedProperty by an admin
         return { allowed: true }
       }
 
@@ -271,7 +269,7 @@ export class PermissionService {
           permission.permission_level === PermissionLevel.update)
       ) {
         warnings.push(
-          `${moduleName}: Users can CREATE resources but won't be able to access them afterwards until added to UserAccessedProperty. Consider using access_level: all if users should access their own created resources.`
+          `${moduleName}: Users can CREATE resources and will automatically gain access to them through UserAccessedProperty.`
         )
       }
     }
@@ -291,6 +289,59 @@ export class PermissionService {
     )
 
     return warnings
+  }
+
+  /**
+   * Grant resource access to a user with partial access level
+   * Automatically adds the resource to the user's UserAccessedProperty record
+   */
+  async grantResourceAccess(
+    userId: string,
+    module: ModuleType,
+    resourceId: string
+  ): Promise<void> {
+    // Only PORTFOLIO and PROPERTY support partial access
+    if (!this.moduleSupportsPartialAccess(module)) {
+      return
+    }
+
+    // Check if user access record exists
+    const existingAccess = await this.prisma.userAccessedProperty.findFirst({
+      where: { user_id: userId }
+    })
+
+    if (existingAccess) {
+      // Update existing record
+      if (module === ModuleType.PORTFOLIO) {
+        const portfolioIds = existingAccess.portfolio_id || []
+        if (!portfolioIds.includes(resourceId)) {
+          await this.prisma.userAccessedProperty.update({
+            where: { id: existingAccess.id },
+            data: {
+              portfolio_id: [...portfolioIds, resourceId]
+            }
+          })
+        }
+      } else if (module === ModuleType.PROPERTY) {
+        const propertyIds = existingAccess.property_id || []
+        if (!propertyIds.includes(resourceId)) {
+          await this.prisma.userAccessedProperty.update({
+            where: { id: existingAccess.id },
+            data: {
+              property_id: [...propertyIds, resourceId]
+            }
+          })
+        }
+      }
+    } else {
+      // Create new record
+      const data: any = {
+        user_id: userId,
+        portfolio_id: module === ModuleType.PORTFOLIO ? [resourceId] : [],
+        property_id: module === ModuleType.PROPERTY ? [resourceId] : []
+      }
+      await this.prisma.userAccessedProperty.create({ data })
+    }
   }
 
   private async checkPartialAccess(
