@@ -106,14 +106,43 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Configuration for query builder
+    // For MongoDB: Handle property name and expedia ID search separately since Prisma MongoDB doesn't support nested relation filters
+    let propertyIdFilter: string[] | undefined = undefined
+    if (query.search && query.search.trim()) {
+      const searchTerm = query.search.trim()
+      // Find properties matching the search term (by name or expedia ID in credentials)
+      const matchingProperties = await this.prisma.property.findMany({
+        where: {
+          OR: [
+            {
+              name: {
+                contains: searchTerm,
+                mode: 'insensitive'
+              }
+            },
+            {
+              credentials: {
+                expedia_id: {
+                  contains: searchTerm,
+                  mode: 'insensitive'
+                }
+              }
+            }
+          ]
+        },
+        select: {
+          id: true
+        }
+      })
+
+      if (matchingProperties.length > 0) {
+        propertyIdFilter = matchingProperties.map(p => p.id)
+      }
+    }
+
+    // Configuration for query builder - remove nested fields for MongoDB compatibility
     const queryConfig = {
-      searchFields: [
-        'ota_id',
-        'property.name',
-        'id',
-        'property.credentials.expedia_id'
-      ], // Added expedia_id to search
+      searchFields: ['id'],
       filterableFields: [
         'type_of_ota',
         'audit_status_id',
@@ -140,7 +169,7 @@ export class AuditService implements IAuditService {
     }
 
     // Build base where clause
-    const baseWhere =
+    const baseWhere: any =
       accessiblePropertyIds === 'all'
         ? {}
         : {
@@ -148,6 +177,21 @@ export class AuditService implements IAuditService {
               in: accessiblePropertyIds
             }
           }
+
+    // Add property ID filter if we found matching properties by name
+    if (propertyIdFilter && propertyIdFilter.length > 0) {
+      if (baseWhere.property_id && baseWhere.property_id.in) {
+        // Intersect with accessible property IDs
+        baseWhere.property_id.in = baseWhere.property_id.in.filter(
+          (id: string) => propertyIdFilter.includes(id)
+        )
+      } else {
+        // Set property ID filter directly
+        baseWhere.property_id = {
+          in: propertyIdFilter
+        }
+      }
+    }
 
     // Build Prisma query options
     const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
@@ -249,14 +293,43 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Configuration for query builder
+    // For MongoDB: Handle property name and expedia ID search separately since Prisma MongoDB doesn't support nested relation filters
+    let propertyIdFilter: string[] | undefined = undefined
+    if (query.search && query.search.trim()) {
+      const searchTerm = query.search.trim()
+      // Find properties matching the search term (by name or expedia ID in credentials)
+      const matchingProperties = await this.prisma.property.findMany({
+        where: {
+          OR: [
+            {
+              name: {
+                contains: searchTerm,
+                mode: 'insensitive'
+              }
+            },
+            {
+              credentials: {
+                expedia_id: {
+                  contains: searchTerm,
+                  mode: 'insensitive'
+                }
+              }
+            }
+          ]
+        },
+        select: {
+          id: true
+        }
+      })
+
+      if (matchingProperties.length > 0) {
+        propertyIdFilter = matchingProperties.map(p => p.id)
+      }
+    }
+
+    // Configuration for query builder - remove nested fields for MongoDB compatibility
     const queryConfig = {
-      searchFields: [
-        'ota_id',
-        'property.name',
-        'id',
-        'property.credentials.expedia_id'
-      ], // Added expedia_id to search
+      searchFields: ['id'],
       filterableFields: [
         'type_of_ota',
         'audit_status_id',
@@ -283,7 +356,7 @@ export class AuditService implements IAuditService {
     }
 
     // Build base where clause
-    const baseWhere =
+    const baseWhere: any =
       accessiblePropertyIds === 'all'
         ? {}
         : {
@@ -291,6 +364,21 @@ export class AuditService implements IAuditService {
               in: accessiblePropertyIds
             }
           }
+
+    // Add property ID filter if we found matching properties by name
+    if (propertyIdFilter && propertyIdFilter.length > 0) {
+      if (baseWhere.property_id && baseWhere.property_id.in) {
+        // Intersect with accessible property IDs
+        baseWhere.property_id.in = baseWhere.property_id.in.filter(
+          (id: string) => propertyIdFilter.includes(id)
+        )
+      } else {
+        // Set property ID filter directly
+        baseWhere.property_id = {
+          in: propertyIdFilter
+        }
+      }
+    }
 
     // Build Prisma query options (without pagination)
     const { where, orderBy } = QueryBuilder.buildPrismaQuery(
