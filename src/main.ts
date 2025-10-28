@@ -47,10 +47,10 @@ async function bootstrap() {
   await app.listen(configService.app.port)
 
   console.log(
-    `Application is running on: https://dashboard-backend.vnpmanage.online:${configService.app.port}`
+    `Application is running on: http://localhost:${configService.app.port}`
   )
   console.log(
-    `Swagger documentation available at: https://dashboard-backend.vnpmanage.online:${configService.app.port}/api/docs`
+    `Swagger documentation available at: http://localhost:${configService.app.port}/api/docs`
   )
   console.log(
     `Deployment running on: ${'https://dashboard-backend.vnpmanage.online'}`
