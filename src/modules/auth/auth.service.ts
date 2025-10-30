@@ -62,7 +62,7 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(email)
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials')
+      throw new BadRequestException('Invalid credentials')
     }
 
     if (user.temp_password) {
@@ -77,7 +77,7 @@ export class AuthService implements IAuthService {
     )
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials')
+      throw new BadRequestException('Invalid credentials')
     }
 
     const otp = EncryptionUtil.generateOtp()
@@ -98,20 +98,20 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(data.email)
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials')
+      throw new BadRequestException('Invalid credentials')
     }
 
     const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
 
     if (!validOtp) {
-      throw new UnauthorizedException('Invalid or expired OTP')
+      throw new BadRequestException('Invalid or expired OTP')
     }
 
     await this.authRepository.markOtpAsUsed(validOtp.id)
 
     const userWithRole = await this.authRepository.findUserByEmail(user.email)
     if (!userWithRole) {
-      throw new UnauthorizedException('User not found')
+      throw new BadRequestException('User not found')
     }
     return this.generateAuthResponse(userWithRole as unknown as UserWithRole)
   }
@@ -167,7 +167,7 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(data.email)
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials')
+      throw new BadRequestException('Invalid credentials')
     }
 
     if (!user.temp_password) {
@@ -175,7 +175,7 @@ export class AuthService implements IAuthService {
     }
 
     if (user.temp_password !== data.temp_password) {
-      throw new UnauthorizedException('Invalid temporary password')
+      throw new BadRequestException('Invalid temporary password')
     }
 
     const hashedNewPassword = await EncryptionUtil.hashPassword(
@@ -186,7 +186,7 @@ export class AuthService implements IAuthService {
 
     const updatedUser = await this.authRepository.findUserByEmail(data.email)
     if (!updatedUser) {
-      throw new UnauthorizedException('User not found')
+      throw new BadRequestException('User not found')
     }
     return this.generateAuthResponse(updatedUser as unknown as UserWithRole)
   }
@@ -218,13 +218,13 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(data.email)
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials')
+      throw new BadRequestException('Invalid credentials')
     }
 
     const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
 
     if (!validOtp) {
-      throw new UnauthorizedException('Invalid or expired OTP')
+      throw new BadRequestException('Invalid or expired OTP')
     }
 
     await this.authRepository.markOtpAsUsed(validOtp.id)

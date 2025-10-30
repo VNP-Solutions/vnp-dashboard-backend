@@ -27,7 +27,7 @@ export class EmailController {
   @ApiResponse({ status: 400, description: 'Invalid request data' })
   @ApiResponse({
     status: 401,
-    description: 'Unauthorized - User not logged in'
+    description: 'Unauthorized - Access token missing, invalid, or expired'
   })
   sendEmail(
     @Body() sendEmailDto: SendEmailDto,
