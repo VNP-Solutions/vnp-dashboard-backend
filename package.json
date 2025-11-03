@@ -13,7 +13,9 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "yarn build && node dist/main",
     "lint": "eslint \"src/**/*.ts\" --fix",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "generate": "prisma generate",
+    "push": "prisma db push"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",
