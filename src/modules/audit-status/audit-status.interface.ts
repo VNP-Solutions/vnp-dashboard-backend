@@ -1,6 +1,6 @@
 import { AuditStatus, Prisma } from '@prisma/client'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { CreateAuditStatusDto, UpdateAuditStatusDto } from './audit-status.dto'
+import { CreateAuditStatusDto, ReorderAuditStatusDto, UpdateAuditStatusDto } from './audit-status.dto'
 
 type AuditStatusWithRelations = Prisma.AuditStatusGetPayload<{
   include: {
@@ -24,6 +24,8 @@ export interface IAuditStatusRepository {
   update(id: string, data: UpdateAuditStatusDto): Promise<AuditStatus>
   delete(id: string): Promise<AuditStatus>
   countAudits(auditStatusId: string): Promise<number>
+  count(): Promise<number>
+  updateMany(data: Array<{ id: string; order: number }>): Promise<void>
 }
 
 export interface IAuditStatusService {
@@ -42,4 +44,5 @@ export interface IAuditStatusService {
     user: IUserWithPermissions
   ): Promise<AuditStatus>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  reorder(id: string, data: ReorderAuditStatusDto, user: IUserWithPermissions): Promise<{ message: string }>
 }

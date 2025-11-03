@@ -24,7 +24,7 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreateServiceTypeDto, UpdateServiceTypeDto } from './service-type.dto'
+import { CreateServiceTypeDto, ReorderServiceTypeDto, UpdateServiceTypeDto } from './service-type.dto'
 import type { IServiceTypeService } from './service-type.interface'
 
 @ApiTags('Service Type')
@@ -116,5 +116,22 @@ export class ServiceTypeController {
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.serviceTypeService.remove(id, user)
+  }
+
+  @Patch(':id/reorder')
+  @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.UPDATE)
+  @ApiOperation({ summary: 'Reorder a service type' })
+  @ApiResponse({ status: 200, description: 'Service type order updated successfully' })
+  @ApiResponse({ status: 404, description: 'Service type not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  reorder(
+    @Param('id') id: string,
+    @Body() reorderServiceTypeDto: ReorderServiceTypeDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.serviceTypeService.reorder(id, reorderServiceTypeDto, user)
   }
 }

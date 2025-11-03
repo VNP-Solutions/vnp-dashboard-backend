@@ -21,3 +21,12 @@ export class CreateServiceTypeDto {
 }
 
 export class UpdateServiceTypeDto extends PartialType(CreateServiceTypeDto) {}
+
+export class ReorderServiceTypeDto {
+  @ApiProperty({
+    example: 2,
+    description: 'New order position for the service type'
+  })
+  @IsNotEmpty()
+  newOrder: number
+}

@@ -9,7 +9,7 @@ import {
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
-import { CreateUserRoleDto, UpdateUserRoleDto } from './user-role.dto'
+import { CreateUserRoleDto, ReorderUserRoleDto, UpdateUserRoleDto } from './user-role.dto'
 import type {
   IUserRoleRepository,
   IUserRoleService
@@ -140,5 +140,50 @@ export class UserRoleService implements IUserRoleService {
     await this.userRoleRepository.delete(id)
 
     return { message: 'Role deleted successfully' }
+  }
+
+  async reorder(id: string, data: ReorderUserRoleDto, _user: IUserWithPermissions) {
+    const userRole = await this.userRoleRepository.findById(id)
+
+    if (!userRole) {
+      throw new NotFoundException('Role not found')
+    }
+
+    const currentOrder = userRole.order
+    const newOrder = data.newOrder
+
+    if (currentOrder === newOrder) {
+      return { message: 'Role order unchanged' }
+    }
+
+    // Get all user roles sorted by order
+    const allRoles = await this.userRoleRepository.findAll()
+
+    // Prepare updates
+    const updates: Array<{ id: string; order: number }> = []
+
+    if (newOrder > currentOrder) {
+      // Moving down: shift items up between currentOrder and newOrder
+      allRoles.forEach(role => {
+        if (role.id === id) {
+          updates.push({ id: role.id, order: newOrder })
+        } else if (role.order > currentOrder && role.order <= newOrder) {
+          updates.push({ id: role.id, order: role.order - 1 })
+        }
+      })
+    } else {
+      // Moving up: shift items down between newOrder and currentOrder
+      allRoles.forEach(role => {
+        if (role.id === id) {
+          updates.push({ id: role.id, order: newOrder })
+        } else if (role.order >= newOrder && role.order < currentOrder) {
+          updates.push({ id: role.id, order: role.order + 1 })
+        }
+      })
+    }
+
+    await this.userRoleRepository.updateMany(updates)
+
+    return { message: 'Role order updated successfully' }
   }
 }

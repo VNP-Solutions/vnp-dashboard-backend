@@ -171,31 +171,39 @@ model PropertyBankDetails {
 model PropertyBatch {
   id         String     @id @default(auto()) @map("_id") @db.ObjectId
   batch_no   String     @unique
+  order      Int        @default(0)
   properties Property[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([order])
 }
 
 model ServiceType {
   id         String      @id @default(auto()) @map("_id") @db.ObjectId
   type       String      @unique
   is_active  Boolean
+  order      Int         @default(0)
   portfolios Portfolio[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
   @@index([is_active])
+  @@index([order])
 }
 
 model AuditStatus {
   id     String  @id @default(auto()) @map("_id") @db.ObjectId
   status String
+  order  Int     @default(0)
   audits Audit[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([order])
 }
 
 model UserRole {
@@ -204,6 +212,7 @@ model UserRole {
   description                String
   is_external                Boolean
   is_active                  Boolean                   @default(true)
+  order                      Int                       @default(0)
   portfolio_permission       PortfolioPermission?
   property_permission        PropertyPermission?
   audit_permission           AuditPermission?
@@ -216,6 +225,7 @@ model UserRole {
 
   @@index([is_active])
   @@index([is_external])
+  @@index([order])
 }
 
 type PortfolioPermission {
@@ -262,12 +272,14 @@ model Currency {
   name       String
   symbol     String?
   is_active  Boolean    @default(true)
+  order      Int        @default(0)
   properties Property[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
   @@index([is_active])
+  @@index([order])
 }
 
 model Note {

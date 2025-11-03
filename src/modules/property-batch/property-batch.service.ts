@@ -9,6 +9,7 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import {
   CreatePropertyBatchDto,
   PropertyBatchQueryDto,
+  ReorderPropertyBatchDto,
   UpdatePropertyBatchDto
 } from './property-batch.dto'
 import type {
@@ -46,17 +47,17 @@ export class PropertyBatchService implements IPropertyBatchService {
     }
 
     // Build orderBy clause for sorting
-    const sortBy = query.sortBy || 'created_at'
-    const sortOrder = query.sortOrder || 'desc'
+    const sortBy = query.sortBy || 'order'
+    const sortOrder = query.sortOrder || 'asc'
 
-    const validSortFields = ['batch_no', 'created_at', 'updated_at']
+    const validSortFields = ['batch_no', 'created_at', 'updated_at', 'order']
     const validSortOrders = ['asc', 'desc']
 
     const orderBy: any = {}
     if (validSortFields.includes(sortBy)) {
-      orderBy[sortBy] = validSortOrders.includes(sortOrder) ? sortOrder : 'desc'
+      orderBy[sortBy] = validSortOrders.includes(sortOrder) ? sortOrder : 'asc'
     } else {
-      orderBy.created_at = 'desc'
+      orderBy.order = 'asc'
     }
 
     return this.propertyBatchRepository.findAll({ where, orderBy })
@@ -114,5 +115,53 @@ export class PropertyBatchService implements IPropertyBatchService {
     await this.propertyBatchRepository.delete(id)
 
     return { message: 'Batch deleted successfully' }
+  }
+
+  async reorder(id: string, data: ReorderPropertyBatchDto, _user: IUserWithPermissions) {
+    const batch = await this.propertyBatchRepository.findById(id)
+
+    if (!batch) {
+      throw new NotFoundException('Batch not found')
+    }
+
+    const currentOrder = batch.order
+    const newOrder = data.newOrder
+
+    if (currentOrder === newOrder) {
+      return { message: 'Batch order unchanged' }
+    }
+
+    // Get all batches sorted by order
+    const allBatches = await this.propertyBatchRepository.findAll({ 
+      where: {}, 
+      orderBy: { order: 'asc' } 
+    })
+
+    // Prepare updates
+    const updates: Array<{ id: string; order: number }> = []
+
+    if (newOrder > currentOrder) {
+      // Moving down: shift items up between currentOrder and newOrder
+      allBatches.forEach(item => {
+        if (item.id === id) {
+          updates.push({ id: item.id, order: newOrder })
+        } else if (item.order > currentOrder && item.order <= newOrder) {
+          updates.push({ id: item.id, order: item.order - 1 })
+        }
+      })
+    } else {
+      // Moving up: shift items down between newOrder and currentOrder
+      allBatches.forEach(item => {
+        if (item.id === id) {
+          updates.push({ id: item.id, order: newOrder })
+        } else if (item.order >= newOrder && item.order < currentOrder) {
+          updates.push({ id: item.id, order: item.order + 1 })
+        }
+      })
+    }
+
+    await this.propertyBatchRepository.updateMany(updates)
+
+    return { message: 'Batch order updated successfully' }
   }
 }

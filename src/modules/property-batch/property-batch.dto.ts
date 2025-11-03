@@ -41,3 +41,12 @@ export class PropertyBatchQueryDto {
   @IsString()
   sortOrder?: string
 }
+
+export class ReorderPropertyBatchDto {
+  @ApiProperty({
+    example: 2,
+    description: 'New order position for the property batch'
+  })
+  @IsNotEmpty()
+  newOrder: number
+}

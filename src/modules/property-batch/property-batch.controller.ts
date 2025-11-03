@@ -28,6 +28,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   CreatePropertyBatchDto,
   PropertyBatchQueryDto,
+  ReorderPropertyBatchDto,
   UpdatePropertyBatchDto
 } from './property-batch.dto'
 import type { IPropertyBatchService } from './property-batch.interface'
@@ -122,5 +123,22 @@ export class PropertyBatchController {
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.propertyBatchService.remove(id, user)
+  }
+
+  @Patch(':id/reorder')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
+  @ApiOperation({ summary: 'Reorder a property batch' })
+  @ApiResponse({ status: 200, description: 'Batch order updated successfully' })
+  @ApiResponse({ status: 404, description: 'Batch not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  reorder(
+    @Param('id') id: string,
+    @Body() reorderPropertyBatchDto: ReorderPropertyBatchDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyBatchService.reorder(id, reorderPropertyBatchDto, user)
   }
 }

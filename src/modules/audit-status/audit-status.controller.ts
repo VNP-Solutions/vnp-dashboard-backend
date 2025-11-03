@@ -24,7 +24,7 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreateAuditStatusDto, UpdateAuditStatusDto } from './audit-status.dto'
+import { CreateAuditStatusDto, ReorderAuditStatusDto, UpdateAuditStatusDto } from './audit-status.dto'
 import type { IAuditStatusService } from './audit-status.interface'
 
 @ApiTags('Audit Status')
@@ -120,5 +120,22 @@ export class AuditStatusController {
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.auditStatusService.remove(id, user)
+  }
+
+  @Patch(':id/reorder')
+  @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.UPDATE)
+  @ApiOperation({ summary: 'Reorder an audit status' })
+  @ApiResponse({ status: 200, description: 'Audit status order updated successfully' })
+  @ApiResponse({ status: 404, description: 'Audit status not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  reorder(
+    @Param('id') id: string,
+    @Body() reorderAuditStatusDto: ReorderAuditStatusDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.auditStatusService.reorder(id, reorderAuditStatusDto, user)
   }
 }

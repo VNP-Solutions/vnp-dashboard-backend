@@ -24,7 +24,7 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreateCurrencyDto, UpdateCurrencyDto } from './currency.dto'
+import { CreateCurrencyDto, ReorderCurrencyDto, UpdateCurrencyDto } from './currency.dto'
 import type { ICurrencyService } from './currency.interface'
 
 @ApiTags('Currency')
@@ -108,5 +108,22 @@ export class CurrencyController {
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.currencyService.remove(id, user)
+  }
+
+  @Patch(':id/reorder')
+  @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.UPDATE)
+  @ApiOperation({ summary: 'Reorder a currency' })
+  @ApiResponse({ status: 200, description: 'Currency order updated successfully' })
+  @ApiResponse({ status: 404, description: 'Currency not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  reorder(
+    @Param('id') id: string,
+    @Body() reorderCurrencyDto: ReorderCurrencyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.currencyService.reorder(id, reorderCurrencyDto, user)
   }
 }

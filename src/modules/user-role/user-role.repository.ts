@@ -8,8 +8,12 @@ export class UserRoleRepository implements IUserRoleRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async create(data: CreateUserRoleDto) {
+    const count = await this.prisma.userRole.count()
     return this.prisma.userRole.create({
-      data
+      data: {
+        ...data,
+        order: count + 1
+      }
     })
   }
 
@@ -27,7 +31,7 @@ export class UserRoleRepository implements IUserRoleRepository {
         }
       },
       orderBy: {
-        created_at: 'desc'
+        order: 'asc'
       }
     })
   }
@@ -72,5 +76,20 @@ export class UserRoleRepository implements IUserRoleRepository {
     return this.prisma.user.count({
       where: { user_role_id: roleId }
     })
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.userRole.count()
+  }
+
+  async updateMany(data: Array<{ id: string; order: number }>): Promise<void> {
+    await this.prisma.$transaction(
+      data.map(item =>
+        this.prisma.userRole.update({
+          where: { id: item.id },
+          data: { order: item.order }
+        })
+      )
+    )
   }
 }

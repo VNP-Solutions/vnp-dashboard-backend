@@ -11,8 +11,12 @@ export class PropertyBatchRepository implements IPropertyBatchRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async create(data: CreatePropertyBatchDto) {
+    const count = await this.prisma.propertyBatch.count()
     return this.prisma.propertyBatch.create({
-      data
+      data: {
+        ...data,
+        order: count + 1
+      }
     })
   }
 
@@ -72,5 +76,20 @@ export class PropertyBatchRepository implements IPropertyBatchRepository {
     return this.prisma.property.count({
       where: { batch_id: batchId }
     })
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.propertyBatch.count()
+  }
+
+  async updateMany(data: Array<{ id: string; order: number }>): Promise<void> {
+    await this.prisma.$transaction(
+      data.map(item =>
+        this.prisma.propertyBatch.update({
+          where: { id: item.id },
+          data: { order: item.order }
+        })
+      )
+    )
   }
 }

@@ -8,8 +8,12 @@ export class CurrencyRepository implements ICurrencyRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async create(data: CreateCurrencyDto) {
+    const count = await this.prisma.currency.count()
     return this.prisma.currency.create({
-      data
+      data: {
+        ...data,
+        order: count + 1
+      }
     })
   }
 
@@ -25,7 +29,7 @@ export class CurrencyRepository implements ICurrencyRepository {
         }
       },
       orderBy: {
-        created_at: 'desc'
+        order: 'asc'
       }
     })
   }
@@ -68,5 +72,20 @@ export class CurrencyRepository implements ICurrencyRepository {
     return this.prisma.property.count({
       where: { currency_id: currencyId }
     })
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.currency.count()
+  }
+
+  async updateMany(data: Array<{ id: string; order: number }>): Promise<void> {
+    await this.prisma.$transaction(
+      data.map(item =>
+        this.prisma.currency.update({
+          where: { id: item.id },
+          data: { order: item.order }
+        })
+      )
+    )
   }
 }

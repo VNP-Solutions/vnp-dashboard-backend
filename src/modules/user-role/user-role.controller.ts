@@ -24,7 +24,7 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreateUserRoleDto, UpdateUserRoleDto } from './user-role.dto'
+import { CreateUserRoleDto, ReorderUserRoleDto, UpdateUserRoleDto } from './user-role.dto'
 import type { IUserRoleService } from './user-role.interface'
 
 @ApiTags('User Role')
@@ -108,5 +108,22 @@ export class UserRoleController {
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.userRoleService.remove(id, user)
+  }
+
+  @Patch(':id/reorder')
+  @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
+  @ApiOperation({ summary: 'Reorder a role' })
+  @ApiResponse({ status: 200, description: 'Role order updated successfully' })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  reorder(
+    @Param('id') id: string,
+    @Body() reorderUserRoleDto: ReorderUserRoleDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.userRoleService.reorder(id, reorderUserRoleDto, user)
   }
 }

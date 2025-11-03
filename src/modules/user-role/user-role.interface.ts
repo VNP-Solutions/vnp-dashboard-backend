@@ -1,6 +1,6 @@
 import { Prisma, UserRole } from '@prisma/client'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { CreateUserRoleDto, UpdateUserRoleDto } from './user-role.dto'
+import { CreateUserRoleDto, ReorderUserRoleDto, UpdateUserRoleDto } from './user-role.dto'
 
 type UserRoleWithUsers = Prisma.UserRoleGetPayload<{
   include: {
@@ -24,6 +24,8 @@ export interface IUserRoleRepository {
   update(id: string, data: UpdateUserRoleDto): Promise<UserRole>
   delete(id: string): Promise<UserRole>
   countUsers(roleId: string): Promise<number>
+  count(): Promise<number>
+  updateMany(data: Array<{ id: string; order: number }>): Promise<void>
 }
 
 export interface IUserRoleService {
@@ -36,4 +38,5 @@ export interface IUserRoleService {
     user: IUserWithPermissions
   ): Promise<UserRole>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  reorder(id: string, data: ReorderUserRoleDto, user: IUserWithPermissions): Promise<{ message: string }>
 }

@@ -121,3 +121,12 @@ export class CreateUserRoleDto {
 }
 
 export class UpdateUserRoleDto extends PartialType(CreateUserRoleDto) {}
+
+export class ReorderUserRoleDto {
+  @ApiProperty({
+    example: 2,
+    description: 'New order position for the role'
+  })
+  @IsNotEmpty()
+  newOrder: number
+}

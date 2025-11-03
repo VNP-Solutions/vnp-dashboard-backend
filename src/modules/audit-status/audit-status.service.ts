@@ -6,7 +6,7 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { CreateAuditStatusDto, UpdateAuditStatusDto } from './audit-status.dto'
+import { CreateAuditStatusDto, ReorderAuditStatusDto, UpdateAuditStatusDto } from './audit-status.dto'
 import type {
   IAuditStatusRepository,
   IAuditStatusService
@@ -89,5 +89,50 @@ export class AuditStatusService implements IAuditStatusService {
     await this.auditStatusRepository.delete(id)
 
     return { message: 'Audit status deleted successfully' }
+  }
+
+  async reorder(id: string, data: ReorderAuditStatusDto, _user: IUserWithPermissions) {
+    const auditStatus = await this.auditStatusRepository.findById(id)
+
+    if (!auditStatus) {
+      throw new NotFoundException('Audit status not found')
+    }
+
+    const currentOrder = auditStatus.order
+    const newOrder = data.newOrder
+
+    if (currentOrder === newOrder) {
+      return { message: 'Audit status order unchanged' }
+    }
+
+    // Get all audit statuses sorted by order
+    const allStatuses = await this.auditStatusRepository.findAll()
+
+    // Prepare updates
+    const updates: Array<{ id: string; order: number }> = []
+
+    if (newOrder > currentOrder) {
+      // Moving down: shift items up between currentOrder and newOrder
+      allStatuses.forEach(item => {
+        if (item.id === id) {
+          updates.push({ id: item.id, order: newOrder })
+        } else if (item.order > currentOrder && item.order <= newOrder) {
+          updates.push({ id: item.id, order: item.order - 1 })
+        }
+      })
+    } else {
+      // Moving up: shift items down between newOrder and currentOrder
+      allStatuses.forEach(item => {
+        if (item.id === id) {
+          updates.push({ id: item.id, order: newOrder })
+        } else if (item.order >= newOrder && item.order < currentOrder) {
+          updates.push({ id: item.id, order: item.order + 1 })
+        }
+      })
+    }
+
+    await this.auditStatusRepository.updateMany(updates)
+
+    return { message: 'Audit status order updated successfully' }
   }
 }

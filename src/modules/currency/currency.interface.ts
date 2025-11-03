@@ -1,6 +1,6 @@
 import { Currency, Prisma } from '@prisma/client'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { CreateCurrencyDto, UpdateCurrencyDto } from './currency.dto'
+import { CreateCurrencyDto, ReorderCurrencyDto, UpdateCurrencyDto } from './currency.dto'
 
 type CurrencyWithProperties = Prisma.CurrencyGetPayload<{
   include: {
@@ -22,6 +22,8 @@ export interface ICurrencyRepository {
   update(id: string, data: UpdateCurrencyDto): Promise<Currency>
   delete(id: string): Promise<Currency>
   countProperties(currencyId: string): Promise<number>
+  count(): Promise<number>
+  updateMany(data: Array<{ id: string; order: number }>): Promise<void>
 }
 
 export interface ICurrencyService {
@@ -37,4 +39,5 @@ export interface ICurrencyService {
     user: IUserWithPermissions
   ): Promise<Currency>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  reorder(id: string, data: ReorderCurrencyDto, user: IUserWithPermissions): Promise<{ message: string }>
 }

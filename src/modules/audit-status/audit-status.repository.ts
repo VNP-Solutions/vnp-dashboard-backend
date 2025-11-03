@@ -8,15 +8,19 @@ export class AuditStatusRepository implements IAuditStatusRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async create(data: CreateAuditStatusDto) {
+    const count = await this.prisma.auditStatus.count()
     return this.prisma.auditStatus.create({
-      data
+      data: {
+        ...data,
+        order: count + 1
+      }
     })
   }
 
   async findAll() {
     return this.prisma.auditStatus.findMany({
       orderBy: {
-        created_at: 'desc'
+        order: 'asc'
       }
     })
   }
@@ -61,5 +65,20 @@ export class AuditStatusRepository implements IAuditStatusRepository {
     return this.prisma.audit.count({
       where: { audit_status_id: auditStatusId }
     })
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.auditStatus.count()
+  }
+
+  async updateMany(data: Array<{ id: string; order: number }>): Promise<void> {
+    await this.prisma.$transaction(
+      data.map(item =>
+        this.prisma.auditStatus.update({
+          where: { id: item.id },
+          data: { order: item.order }
+        })
+      )
+    )
   }
 }

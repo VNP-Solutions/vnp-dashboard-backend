@@ -13,3 +13,12 @@ export class CreateAuditStatusDto {
 }
 
 export class UpdateAuditStatusDto extends PartialType(CreateAuditStatusDto) {}
+
+export class ReorderAuditStatusDto {
+  @ApiProperty({
+    example: 2,
+    description: 'New order position for the audit status'
+  })
+  @IsNotEmpty()
+  newOrder: number
+}

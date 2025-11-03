@@ -3,6 +3,7 @@ import { IUserWithPermissions } from '../../common/interfaces/permission.interfa
 import {
   CreatePropertyBatchDto,
   PropertyBatchQueryDto,
+  ReorderPropertyBatchDto,
   UpdatePropertyBatchDto
 } from './property-batch.dto'
 
@@ -26,6 +27,8 @@ export interface IPropertyBatchRepository {
   update(id: string, data: UpdatePropertyBatchDto): Promise<PropertyBatch>
   delete(id: string): Promise<PropertyBatch>
   countProperties(batchId: string): Promise<number>
+  count(): Promise<number>
+  updateMany(data: Array<{ id: string; order: number }>): Promise<void>
 }
 
 export interface IPropertyBatchService {
@@ -47,4 +50,5 @@ export interface IPropertyBatchService {
     user: IUserWithPermissions
   ): Promise<PropertyBatch>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  reorder(id: string, data: ReorderPropertyBatchDto, user: IUserWithPermissions): Promise<{ message: string }>
 }

@@ -8,8 +8,12 @@ export class ServiceTypeRepository implements IServiceTypeRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async create(data: CreateServiceTypeDto) {
+    const count = await this.prisma.serviceType.count()
     return this.prisma.serviceType.create({
-      data
+      data: {
+        ...data,
+        order: count + 1
+      }
     })
   }
 
@@ -25,7 +29,7 @@ export class ServiceTypeRepository implements IServiceTypeRepository {
         }
       },
       orderBy: {
-        created_at: 'desc'
+        order: 'asc'
       }
     })
   }
@@ -68,5 +72,20 @@ export class ServiceTypeRepository implements IServiceTypeRepository {
     return this.prisma.portfolio.count({
       where: { service_type_id: serviceTypeId }
     })
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.serviceType.count()
+  }
+
+  async updateMany(data: Array<{ id: string; order: number }>): Promise<void> {
+    await this.prisma.$transaction(
+      data.map(item =>
+        this.prisma.serviceType.update({
+          where: { id: item.id },
+          data: { order: item.order }
+        })
+      )
+    )
   }
 }

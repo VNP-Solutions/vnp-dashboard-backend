@@ -34,3 +34,12 @@ export class CreateCurrencyDto {
 }
 
 export class UpdateCurrencyDto extends PartialType(CreateCurrencyDto) {}
+
+export class ReorderCurrencyDto {
+  @ApiProperty({
+    example: 2,
+    description: 'New order position for the currency'
+  })
+  @IsNotEmpty()
+  newOrder: number
+}
