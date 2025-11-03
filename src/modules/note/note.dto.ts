@@ -41,7 +41,7 @@ export class UpdateNoteDto extends PartialType(CreateNoteDto) {}
 
 export class NoteQueryDto {
   @ApiPropertyOptional({
-    description: 'Search by note text',
+    description: 'Search by note text, portfolio name, or property name',
     example: 'credentials'
   })
   @IsOptional()

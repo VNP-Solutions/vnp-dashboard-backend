@@ -55,12 +55,32 @@ export class NoteService implements INoteService {
       where.is_done = query.is_done === 'true'
     }
 
-    // Search by text
+    // Search by text, portfolio name, and property name
     if (query.search) {
-      where.text = {
-        contains: query.search,
-        mode: 'insensitive'
-      }
+      where.OR = [
+        {
+          text: {
+            contains: query.search,
+            mode: 'insensitive'
+          }
+        },
+        {
+          portfolio: {
+            name: {
+              contains: query.search,
+              mode: 'insensitive'
+            }
+          }
+        },
+        {
+          property: {
+            name: {
+              contains: query.search,
+              mode: 'insensitive'
+            }
+          }
+        }
+      ]
     }
 
     // Build orderBy - only sort by created_at
