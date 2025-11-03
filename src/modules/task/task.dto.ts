@@ -63,7 +63,7 @@ export class UpdateTaskDto extends PartialType(CreateTaskDto) {}
 
 export class TaskQueryDto {
   @ApiPropertyOptional({
-    description: 'Search by task title or description',
+    description: 'Search by task title, description, portfolio name, or property name',
     example: 'credentials'
   })
   @IsOptional()

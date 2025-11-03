@@ -60,7 +60,7 @@ export class TaskService implements ITaskService {
       where.due_date = new Date(query.due_date)
     }
 
-    // Search by title or description
+    // Search by title, description, portfolio name, and property name
     if (query.search) {
       where.OR = [
         {
@@ -73,6 +73,22 @@ export class TaskService implements ITaskService {
           description: {
             contains: query.search,
             mode: 'insensitive'
+          }
+        },
+        {
+          portfolio: {
+            name: {
+              contains: query.search,
+              mode: 'insensitive'
+            }
+          }
+        },
+        {
+          property: {
+            name: {
+              contains: query.search,
+              mode: 'insensitive'
+            }
           }
         }
       ]
