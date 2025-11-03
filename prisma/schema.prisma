@@ -41,6 +41,7 @@ model Portfolio {
   is_active          Boolean
   contact_email      String?
   is_commissionable  Boolean
+  sales_agent        String?
 
   properties Property[]
   notes      Note[]
