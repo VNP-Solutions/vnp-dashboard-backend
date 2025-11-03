@@ -9,6 +9,14 @@ import {
 
 type NoteWithRelations = Prisma.NoteGetPayload<{
   include: {
+    user: {
+      select: {
+        id: true
+        email: true
+        first_name: true
+        last_name: true
+      }
+    }
     portfolio: {
       select: {
         id: true
@@ -25,7 +33,7 @@ type NoteWithRelations = Prisma.NoteGetPayload<{
 }>
 
 export interface INoteRepository {
-  create(data: CreateNoteDto): Promise<NoteWithRelations>
+  create(data: CreateNoteDto & { user_id: string }): Promise<NoteWithRelations>
   findAll(queryOptions: any): Promise<NoteWithRelations[]>
   findById(id: string): Promise<NoteWithRelations | null>
   update(id: string, data: UpdateNoteDto): Promise<NoteWithRelations>

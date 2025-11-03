@@ -9,6 +9,14 @@ import {
 
 type TaskWithRelations = Prisma.TaskGetPayload<{
   include: {
+    user: {
+      select: {
+        id: true
+        email: true
+        first_name: true
+        last_name: true
+      }
+    }
     portfolio: {
       select: {
         id: true
@@ -25,7 +33,7 @@ type TaskWithRelations = Prisma.TaskGetPayload<{
 }>
 
 export interface ITaskRepository {
-  create(data: CreateTaskDto): Promise<TaskWithRelations>
+  create(data: CreateTaskDto & { user_id: string }): Promise<TaskWithRelations>
   findAll(queryOptions: any): Promise<TaskWithRelations[]>
   findById(id: string): Promise<TaskWithRelations | null>
   update(id: string, data: UpdateTaskDto): Promise<TaskWithRelations>

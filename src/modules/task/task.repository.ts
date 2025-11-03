@@ -7,10 +7,18 @@ import type { ITaskRepository } from './task.interface'
 export class TaskRepository implements ITaskRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
-  async create(data: CreateTaskDto) {
+  async create(data: CreateTaskDto & { user_id: string }) {
     return this.prisma.task.create({
       data,
       include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true
+          }
+        },
         portfolio: {
           select: {
             id: true,
@@ -34,6 +42,14 @@ export class TaskRepository implements ITaskRepository {
       where,
       orderBy,
       include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true
+          }
+        },
         portfolio: {
           select: {
             id: true,
@@ -54,6 +70,14 @@ export class TaskRepository implements ITaskRepository {
     return this.prisma.task.findUnique({
       where: { id },
       include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true
+          }
+        },
         portfolio: {
           select: {
             id: true,
@@ -75,6 +99,14 @@ export class TaskRepository implements ITaskRepository {
       where: { id },
       data,
       include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true
+          }
+        },
         portfolio: {
           select: {
             id: true,

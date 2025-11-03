@@ -23,6 +23,8 @@ model User {
 
   otps                   Otp[]
   userAccessedProperties UserAccessedProperty[]
+  notes                  Note[]
+  tasks                  Task[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -273,6 +275,9 @@ model Note {
   text    String
   is_done Boolean @default(false)
 
+  user_id String @db.ObjectId
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
   portfolio_id String?    @db.ObjectId
   portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
   property_id  String?    @db.ObjectId
@@ -281,9 +286,11 @@ model Note {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  @@index([user_id])
   @@index([portfolio_id])
   @@index([property_id])
   @@index([is_done])
+  @@index([user_id, is_done])
   @@index([portfolio_id, is_done])
   @@index([property_id, is_done])
 }
@@ -295,6 +302,9 @@ model Task {
   is_done     Boolean   @default(false)
   due_date    DateTime?
 
+  user_id String @db.ObjectId
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
   portfolio_id String?    @db.ObjectId
   portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
   property_id  String?    @db.ObjectId
@@ -303,10 +313,12 @@ model Task {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  @@index([user_id])
   @@index([portfolio_id])
   @@index([property_id])
   @@index([is_done])
   @@index([due_date])
+  @@index([user_id, is_done])
   @@index([portfolio_id, is_done])
   @@index([property_id, is_done])
   @@index([due_date, is_done])

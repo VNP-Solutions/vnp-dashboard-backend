@@ -6,8 +6,6 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { PermissionService } from '../../common/services/permission.service'
-import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import {
   CreateNoteDto,
   DeleteAllNotesDto,
@@ -20,159 +18,27 @@ import type { INoteRepository, INoteService } from './note.interface'
 export class NoteService implements INoteService {
   constructor(
     @Inject('INoteRepository')
-    private noteRepository: INoteRepository,
-    @Inject(PermissionService)
-    private permissionService: PermissionService
+    private noteRepository: INoteRepository
   ) {}
 
   async create(data: CreateNoteDto, user: IUserWithPermissions) {
-    // Only super admin can access notes
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException(
-        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
-      )
-    }
-
     if (!data.portfolio_id && !data.property_id) {
       throw new BadRequestException(
         'Note must be associated with either a portfolio or property'
       )
     }
 
-    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
-    // Check permission based on the entity type
-    if (data.portfolio_id) {
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PORTFOLIO,
-        PermissionAction.CREATE,
-        data.portfolio_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to create portfolio note'
-        )
-      }
-    } else if (data.property_id) {
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PROPERTY,
-        PermissionAction.CREATE,
-        data.property_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to create property note'
-        )
-      }
-    }
-    */
-
-    return this.noteRepository.create(data)
+    return this.noteRepository.create({
+      ...data,
+      user_id: user.id
+    })
   }
 
   async findAll(query: NoteQueryDto, user: IUserWithPermissions) {
-    // Only super admin can access notes
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException(
-        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
-      )
+    // Build where clause - always filter by user_id
+    const where: any = {
+      user_id: user.id
     }
-
-    // Build where clause
-    const where: any = {}
-
-    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
-    // Get accessible portfolio and property IDs
-    const accessiblePortfolioIds =
-      await this.permissionService.getAccessibleResourceIds(
-        user,
-        ModuleType.PORTFOLIO
-      )
-    const accessiblePropertyIds =
-      await this.permissionService.getAccessibleResourceIds(user, ModuleType.PROPERTY)
-
-    // Build OR condition for portfolio and property access
-    const orConditions: any[] = []
-
-    // Add portfolio filter
-    if (query.portfolio_id) {
-      // Check if user has permission for this specific portfolio
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PORTFOLIO,
-        PermissionAction.READ,
-        query.portfolio_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to read portfolio notes'
-        )
-      }
-      where.portfolio_id = query.portfolio_id
-    } else if (
-      accessiblePortfolioIds !== 'all' &&
-      Array.isArray(accessiblePortfolioIds)
-    ) {
-      if (accessiblePortfolioIds.length > 0) {
-        orConditions.push({
-          portfolio_id: { in: accessiblePortfolioIds }
-        })
-      }
-    } else if (accessiblePortfolioIds === 'all') {
-      orConditions.push({
-        portfolio_id: { not: null }
-      })
-    }
-
-    // Add property filter
-    if (query.property_id) {
-      // Check if user has permission for this specific property
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PROPERTY,
-        PermissionAction.READ,
-        query.property_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to read property notes'
-        )
-      }
-      where.property_id = query.property_id
-    } else if (
-      accessiblePropertyIds !== 'all' &&
-      Array.isArray(accessiblePropertyIds)
-    ) {
-      if (accessiblePropertyIds.length > 0) {
-        orConditions.push({
-          property_id: { in: accessiblePropertyIds }
-        })
-      }
-    } else if (accessiblePropertyIds === 'all') {
-      orConditions.push({
-        property_id: { not: null }
-      })
-    }
-
-    // Apply OR conditions only if no specific portfolio_id or property_id is provided
-    if (!query.portfolio_id && !query.property_id && orConditions.length > 0) {
-      where.OR = orConditions
-    }
-
-    // If user has no access to any portfolios or properties, return empty
-    if (
-      orConditions.length === 0 &&
-      !query.portfolio_id &&
-      !query.property_id
-    ) {
-      return []
-    }
-    */
 
     // Add portfolio filter if provided
     if (query.portfolio_id) {
@@ -208,145 +74,46 @@ export class NoteService implements INoteService {
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
-    // Only super admin can access notes
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException(
-        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
-      )
-    }
-
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
       throw new NotFoundException('Note not found')
     }
 
-    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
-    // Check permission based on the entity type
-    if (note.portfolio_id) {
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PORTFOLIO,
-        PermissionAction.READ,
-        note.portfolio_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to read this portfolio note'
-        )
-      }
-    } else if (note.property_id) {
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PROPERTY,
-        PermissionAction.READ,
-        note.property_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to read this property note'
-        )
-      }
+    // Ensure the note belongs to the authenticated user
+    if (note.user_id !== user.id) {
+      throw new ForbiddenException('You do not have access to this note')
     }
-    */
 
     return note
   }
 
   async update(id: string, data: UpdateNoteDto, user: IUserWithPermissions) {
-    // Only super admin can access notes
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException(
-        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
-      )
-    }
-
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
       throw new NotFoundException('Note not found')
     }
 
-    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
-    // Check permission based on the entity type
-    if (note.portfolio_id) {
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PORTFOLIO,
-        PermissionAction.UPDATE,
-        note.portfolio_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to update this portfolio note'
-        )
-      }
-    } else if (note.property_id) {
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PROPERTY,
-        PermissionAction.UPDATE,
-        note.property_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to update this property note'
-        )
-      }
+    // Ensure the note belongs to the authenticated user
+    if (note.user_id !== user.id) {
+      throw new ForbiddenException('You do not have access to this note')
     }
-    */
 
     return this.noteRepository.update(id, data)
   }
 
   async remove(id: string, user: IUserWithPermissions) {
-    // Only super admin can access notes
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException(
-        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
-      )
-    }
-
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
       throw new NotFoundException('Note not found')
     }
 
-    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
-    // Check permission based on the entity type
-    if (note.portfolio_id) {
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PORTFOLIO,
-        PermissionAction.DELETE,
-        note.portfolio_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to delete this portfolio note'
-        )
-      }
-    } else if (note.property_id) {
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PROPERTY,
-        PermissionAction.DELETE,
-        note.property_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to delete this property note'
-        )
-      }
+    // Ensure the note belongs to the authenticated user
+    if (note.user_id !== user.id) {
+      throw new ForbiddenException('You do not have access to this note')
     }
-    */
 
     await this.noteRepository.delete(id)
 
@@ -354,15 +121,10 @@ export class NoteService implements INoteService {
   }
 
   async removeAll(query: DeleteAllNotesDto, user: IUserWithPermissions) {
-    // Only super admin can access notes
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException(
-        'Only super admin can access notes. You must have all permissions set to "all" level with "all" access.'
-      )
+    // Build where clause - always filter by user_id
+    const where: any = {
+      user_id: user.id
     }
-
-    // Build where clause
-    const where: any = {}
 
     // Ensure at least one filter is provided
     if (
@@ -374,41 +136,6 @@ export class NoteService implements INoteService {
         'At least one filter (portfolio_id, property_id, or is_done) must be provided'
       )
     }
-
-    /* COMMENTED OUT - Previous permission checking logic (may revert back later)
-    // Check permissions and build filter
-    if (query.portfolio_id) {
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PORTFOLIO,
-        PermissionAction.DELETE,
-        query.portfolio_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to delete portfolio notes'
-        )
-      }
-      where.portfolio_id = query.portfolio_id
-    }
-
-    if (query.property_id) {
-      const hasPermission = this.permissionService.checkPermission(
-        user,
-        ModuleType.PROPERTY,
-        PermissionAction.DELETE,
-        query.property_id
-      )
-      if (!hasPermission.allowed) {
-        throw new ForbiddenException(
-          hasPermission.reason ||
-            'Insufficient permissions to delete property notes'
-        )
-      }
-      where.property_id = query.property_id
-    }
-    */
 
     // Build filter based on query
     if (query.portfolio_id) {

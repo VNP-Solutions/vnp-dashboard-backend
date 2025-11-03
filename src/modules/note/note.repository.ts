@@ -7,10 +7,18 @@ import type { INoteRepository } from './note.interface'
 export class NoteRepository implements INoteRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
-  async create(data: CreateNoteDto) {
+  async create(data: CreateNoteDto & { user_id: string }) {
     return this.prisma.note.create({
       data,
       include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true
+          }
+        },
         portfolio: {
           select: {
             id: true,
@@ -34,6 +42,14 @@ export class NoteRepository implements INoteRepository {
       where,
       orderBy,
       include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true
+          }
+        },
         portfolio: {
           select: {
             id: true,
@@ -54,6 +70,14 @@ export class NoteRepository implements INoteRepository {
     return this.prisma.note.findUnique({
       where: { id },
       include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true
+          }
+        },
         portfolio: {
           select: {
             id: true,
@@ -75,6 +99,14 @@ export class NoteRepository implements INoteRepository {
       where: { id },
       data,
       include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true
+          }
+        },
         portfolio: {
           select: {
             id: true,
