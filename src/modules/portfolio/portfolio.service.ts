@@ -67,7 +67,10 @@ export class PortfolioService implements IPortfolioService {
     // Extract contract_url from data before creating portfolio
     const { contract_url, ...portfolioData } = data
 
-    const portfolio = await this.portfolioRepository.create(portfolioData, user.id)
+    const portfolio = await this.portfolioRepository.create(
+      portfolioData,
+      user.id
+    )
 
     // If contract_url is provided, create a contract URL entry
     if (contract_url) {
@@ -89,7 +92,13 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
-    return portfolio
+    // Re-fetch the portfolio to include the newly created contract URL
+    const portfolioWithContractUrls = await this.portfolioRepository.findById(
+      portfolio.id,
+      user.id
+    )
+
+    return portfolioWithContractUrls || portfolio
   }
 
   async findAll(query: PortfolioQueryDto, user: IUserWithPermissions) {
@@ -504,7 +513,10 @@ export class PortfolioService implements IPortfolioService {
             sales_agent: salesAgent || undefined
           }
 
-          const newPortfolio = await this.portfolioRepository.create(portfolioData, _user.id)
+          const newPortfolio = await this.portfolioRepository.create(
+            portfolioData,
+            _user.id
+          )
 
           // If contract URL is provided, create a contract URL entry for the user
           if (contractUrl) {
