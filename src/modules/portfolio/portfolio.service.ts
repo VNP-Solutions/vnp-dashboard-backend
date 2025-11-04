@@ -54,6 +54,13 @@ export class PortfolioService implements IPortfolioService {
       throw new ConflictException('Portfolio with this name already exists')
     }
 
+    // Validate sales_agent requirement
+    if (data.is_commissionable && !data.sales_agent) {
+      throw new BadRequestException(
+        'Sales agent is required when portfolio is commissionable'
+      )
+    }
+
     const portfolio = await this.portfolioRepository.create(data)
 
     // If user has partial access, grant them access to the created portfolio
@@ -265,6 +272,21 @@ export class PortfolioService implements IPortfolioService {
       }
     }
 
+    // Validate sales_agent requirement
+    const isCommissionable =
+      data.is_commissionable !== undefined
+        ? data.is_commissionable
+        : portfolio.is_commissionable
+
+    const salesAgent =
+      data.sales_agent !== undefined ? data.sales_agent : portfolio.sales_agent
+
+    if (isCommissionable && !salesAgent) {
+      throw new BadRequestException(
+        'Sales agent is required when portfolio is commissionable'
+      )
+    }
+
     return this.portfolioRepository.update(id, data)
   }
 
@@ -437,17 +459,21 @@ export class PortfolioService implements IPortfolioService {
 
           const isContractSigned = contractUrl ? true : false
 
-          // Extract commissionable status
-          const commissionableValue = findHeaderValue(row, ['Commissionable'])
-          const isCommissionable =
-            commissionableValue?.toLowerCase() === 'yes' ? true : false
-
           // Extract contact email (optional)
           const contactEmail = findHeaderValue(row, [
             'Contact Email',
             'Contact email',
             'Contact'
           ])
+
+          // Extract sales agent (instead of commissionable)
+          const salesAgent = findHeaderValue(row, [
+            'Sales Agent',
+            'Sales agent'
+          ])
+
+          // If sales agent is provided, portfolio is commissionable
+          const isCommissionable = salesAgent ? true : false
 
           // Create portfolio
           const portfolioData: CreatePortfolioDto = {
@@ -457,7 +483,8 @@ export class PortfolioService implements IPortfolioService {
             contract_url: contractUrl || undefined,
             is_active: true,
             contact_email: contactEmail || undefined,
-            is_commissionable: isCommissionable
+            is_commissionable: isCommissionable,
+            sales_agent: salesAgent || undefined
           }
 
           await this.portfolioRepository.create(portfolioData)

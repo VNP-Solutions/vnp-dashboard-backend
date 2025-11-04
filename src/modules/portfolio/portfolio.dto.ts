@@ -5,7 +5,8 @@ import {
   IsEmail,
   IsNotEmpty,
   IsOptional,
-  IsString
+  IsString,
+  ValidateIf
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
 
@@ -60,6 +61,17 @@ export class CreatePortfolioDto {
   @IsBoolean()
   @IsNotEmpty()
   is_commissionable: boolean
+
+  @ApiPropertyOptional({
+    example: 'John Doe',
+    description: 'Sales agent name (required if is_commissionable is true)'
+  })
+  @ValidateIf((o) => o.is_commissionable === true)
+  @IsNotEmpty({ message: 'Sales agent is required when portfolio is commissionable' })
+  @IsString()
+  @ValidateIf((o) => o.is_commissionable === false || o.sales_agent !== undefined)
+  @IsOptional()
+  sales_agent?: string
 }
 
 export class UpdatePortfolioDto extends PartialType(CreatePortfolioDto) {}
