@@ -15,6 +15,7 @@ import { PermissionService } from '../../common/services/permission.service'
 import { COMPLETED_AUDIT_STATUSES } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IServiceTypeRepository } from '../service-type/service-type.interface'
 import {
@@ -37,6 +38,8 @@ export class PortfolioService implements IPortfolioService {
     private portfolioRepository: IPortfolioRepository,
     @Inject('IServiceTypeRepository')
     private serviceTypeRepository: IServiceTypeRepository,
+    @Inject('IContractUrlRepository')
+    private contractUrlRepository: IContractUrlRepository,
     @Inject(PermissionService)
     private permissionService: PermissionService,
     @Inject(EmailUtil)
@@ -61,7 +64,20 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
-    const portfolio = await this.portfolioRepository.create(data)
+    // Extract contract_url from data before creating portfolio
+    const { contract_url, ...portfolioData } = data
+
+    const portfolio = await this.portfolioRepository.create(portfolioData, user.id)
+
+    // If contract_url is provided, create a contract URL entry
+    if (contract_url) {
+      await this.contractUrlRepository.create({
+        url: contract_url,
+        portfolio_id: portfolio.id,
+        user_id: user.id,
+        is_active: true
+      })
+    }
 
     // If user has partial access, grant them access to the created portfolio
     const permission = user.role.portfolio_permission
@@ -152,7 +168,8 @@ export class PortfolioService implements IPortfolioService {
     const [data, total] = await Promise.all([
       this.portfolioRepository.findAll(
         { where, skip, take, orderBy },
-        undefined
+        undefined,
+        user.id
       ),
       this.portfolioRepository.count(where, undefined)
     ])
@@ -235,14 +252,15 @@ export class PortfolioService implements IPortfolioService {
     // Fetch all data without pagination
     const data = await this.portfolioRepository.findAll(
       { where, orderBy },
-      undefined
+      undefined,
+      user.id
     )
 
     return data
   }
 
-  async findOne(id: string, _user: IUserWithPermissions) {
-    const portfolio = await this.portfolioRepository.findById(id)
+  async findOne(id: string, user: IUserWithPermissions) {
+    const portfolio = await this.portfolioRepository.findById(id, user.id)
 
     if (!portfolio) {
       throw new NotFoundException('Portfolio not found')
@@ -254,9 +272,9 @@ export class PortfolioService implements IPortfolioService {
   async update(
     id: string,
     data: UpdatePortfolioDto,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ) {
-    const portfolio = await this.portfolioRepository.findById(id)
+    const portfolio = await this.portfolioRepository.findById(id, user.id)
 
     if (!portfolio) {
       throw new NotFoundException('Portfolio not found')
@@ -287,11 +305,11 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
-    return this.portfolioRepository.update(id, data)
+    return this.portfolioRepository.update(id, data, user.id)
   }
 
-  async remove(id: string, _user: IUserWithPermissions) {
-    const portfolio = await this.portfolioRepository.findById(id)
+  async remove(id: string, user: IUserWithPermissions) {
+    const portfolio = await this.portfolioRepository.findById(id, user.id)
 
     if (!portfolio) {
       throw new NotFoundException('Portfolio not found')
@@ -314,9 +332,9 @@ export class PortfolioService implements IPortfolioService {
     id: string,
     subject: string,
     body: string,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ) {
-    const portfolio = await this.portfolioRepository.findById(id)
+    const portfolio = await this.portfolioRepository.findById(id, user.id)
 
     if (!portfolio) {
       throw new NotFoundException('Portfolio not found')
@@ -450,7 +468,14 @@ export class PortfolioService implements IPortfolioService {
             })
           }
 
-          // Extract contract URL
+          // Extract contact email (optional)
+          const contactEmail = findHeaderValue(row, [
+            'Contact Email',
+            'Contact email',
+            'Contact'
+          ])
+
+          // Extract contract URL (optional)
           const contractUrl = findHeaderValue(row, [
             'Contract URL',
             'Contract Url',
@@ -458,13 +483,6 @@ export class PortfolioService implements IPortfolioService {
           ])
 
           const isContractSigned = contractUrl ? true : false
-
-          // Extract contact email (optional)
-          const contactEmail = findHeaderValue(row, [
-            'Contact Email',
-            'Contact email',
-            'Contact'
-          ])
 
           // Extract sales agent (instead of commissionable)
           const salesAgent = findHeaderValue(row, [
@@ -476,18 +494,27 @@ export class PortfolioService implements IPortfolioService {
           const isCommissionable = salesAgent ? true : false
 
           // Create portfolio
-          const portfolioData: CreatePortfolioDto = {
+          const portfolioData: Omit<CreatePortfolioDto, 'contract_url'> = {
             name: portfolioName,
             service_type_id: serviceType.id,
             is_contract_signed: isContractSigned,
-            contract_url: contractUrl || undefined,
             is_active: true,
             contact_email: contactEmail || undefined,
             is_commissionable: isCommissionable,
             sales_agent: salesAgent || undefined
           }
 
-          await this.portfolioRepository.create(portfolioData)
+          const newPortfolio = await this.portfolioRepository.create(portfolioData, _user.id)
+
+          // If contract URL is provided, create a contract URL entry for the user
+          if (contractUrl) {
+            await this.contractUrlRepository.create({
+              url: contractUrl,
+              portfolio_id: newPortfolio.id,
+              user_id: _user.id,
+              is_active: true
+            })
+          }
 
           result.successCount++
           result.successfulImports.push(portfolioName)

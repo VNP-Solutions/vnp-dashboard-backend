@@ -34,7 +34,7 @@ export class CreatePortfolioDto {
 
   @ApiPropertyOptional({
     example: 'https://example.com/contract.pdf',
-    description: 'Contract document URL'
+    description: 'Contract document URL (will be saved as user-specific contract URL)'
   })
   @IsString()
   @IsOptional()

@@ -15,6 +15,7 @@ import { AuditStatusModule } from './modules/audit-status/audit-status.module'
 import { AuditModule } from './modules/audit/audit.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
+import { ContractUrlModule } from './modules/contract-url/contract-url.module'
 import { CurrencyModule } from './modules/currency/currency.module'
 import { EmailModule } from './modules/email/email.module'
 import { FileUploadModule } from './modules/file-upload/file-upload.module'
@@ -41,6 +42,7 @@ import { UserModule } from './modules/user/user.module'
     AuthModule,
     AuditModule,
     AuditStatusModule,
+    ContractUrlModule,
     CurrencyModule,
     EmailModule,
     FileUploadModule,

@@ -7,7 +7,7 @@ import type { IPortfolioRepository } from './portfolio.interface'
 export class PortfolioRepository implements IPortfolioRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
-  async create(data: CreatePortfolioDto) {
+  async create(data: CreatePortfolioDto, userId?: string) {
     return this.prisma.portfolio.create({
       data,
       include: {
@@ -17,12 +17,25 @@ export class PortfolioRepository implements IPortfolioRepository {
             type: true,
             is_active: true
           }
-        }
+        },
+        contractUrls: userId ? {
+          where: {
+            user_id: userId
+          },
+          select: {
+            id: true,
+            url: true,
+            description: true,
+            is_active: true,
+            created_at: true,
+            updated_at: true
+          }
+        } : false
       }
     })
   }
 
-  async findAll(queryOptions: any, _portfolioIds?: string[]) {
+  async findAll(queryOptions: any, _portfolioIds?: string[], userId?: string) {
     const { where, skip, take, orderBy } = queryOptions
 
     return this.prisma.portfolio.findMany({
@@ -42,6 +55,19 @@ export class PortfolioRepository implements IPortfolioRepository {
           select: {
             id: true
           }
+        },
+        contractUrls: {
+          where: userId ? {
+            user_id: userId
+          } : undefined,
+          select: {
+            id: true,
+            url: true,
+            description: true,
+            is_active: true,
+            created_at: true,
+            updated_at: true
+          }
         }
       }
     })
@@ -53,7 +79,7 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
-  async findById(id: string) {
+  async findById(id: string, userId?: string) {
     return this.prisma.portfolio.findUnique({
       where: { id },
       include: {
@@ -68,7 +94,20 @@ export class PortfolioRepository implements IPortfolioRepository {
           select: {
             id: true
           }
-        }
+        },
+        contractUrls: userId ? {
+          where: {
+            user_id: userId
+          },
+          select: {
+            id: true,
+            url: true,
+            description: true,
+            is_active: true,
+            created_at: true,
+            updated_at: true
+          }
+        } : false
       }
     })
   }
@@ -79,7 +118,7 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
-  async update(id: string, data: UpdatePortfolioDto) {
+  async update(id: string, data: UpdatePortfolioDto, userId?: string) {
     return this.prisma.portfolio.update({
       where: { id },
       data,
@@ -90,7 +129,20 @@ export class PortfolioRepository implements IPortfolioRepository {
             type: true,
             is_active: true
           }
-        }
+        },
+        contractUrls: userId ? {
+          where: {
+            user_id: userId
+          },
+          select: {
+            id: true,
+            url: true,
+            description: true,
+            is_active: true,
+            created_at: true,
+            updated_at: true
+          }
+        } : false
       }
     })
   }

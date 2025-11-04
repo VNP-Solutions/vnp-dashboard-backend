@@ -18,6 +18,16 @@ type PortfolioWithServiceType = Prisma.PortfolioGetPayload<{
         is_active: true
       }
     }
+    contractUrls: {
+      select: {
+        id: true
+        url: true
+        description: true
+        is_active: true
+        created_at: true
+        updated_at: true
+      }
+    }
   }
 }>
 
@@ -33,6 +43,16 @@ type PortfolioWithRelations = Prisma.PortfolioGetPayload<{
     properties: {
       select: {
         id: true
+      }
+    }
+    contractUrls: {
+      select: {
+        id: true
+        url: true
+        description: true
+        is_active: true
+        created_at: true
+        updated_at: true
       }
     }
   }
@@ -52,21 +72,33 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
         id: true
       }
     }
+    contractUrls: {
+      select: {
+        id: true
+        url: true
+        description: true
+        is_active: true
+        created_at: true
+        updated_at: true
+      }
+    }
   }
 }>
 
 export interface IPortfolioRepository {
-  create(data: CreatePortfolioDto): Promise<PortfolioWithServiceType>
+  create(data: CreatePortfolioDto, userId?: string): Promise<PortfolioWithServiceType>
   findAll(
     queryOptions: any,
-    portfolioIds?: string[]
+    portfolioIds?: string[],
+    userId?: string
   ): Promise<PortfolioWithRelations[]>
   count(whereClause: any, portfolioIds?: string[]): Promise<number>
-  findById(id: string): Promise<PortfolioWithFullDetails | null>
+  findById(id: string, userId?: string): Promise<PortfolioWithFullDetails | null>
   findByName(name: string): Promise<Portfolio | null>
   update(
     id: string,
-    data: UpdatePortfolioDto
+    data: UpdatePortfolioDto,
+    userId?: string
   ): Promise<PortfolioWithServiceType>
   delete(id: string): Promise<Portfolio>
   countProperties(portfolioId: string): Promise<number>

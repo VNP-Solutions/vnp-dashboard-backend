@@ -25,6 +25,7 @@ model User {
   userAccessedProperties UserAccessedProperty[]
   notes                  Note[]
   tasks                  Task[]
+  contractUrls           ContractUrl[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -39,15 +40,15 @@ model Portfolio {
   service_type_id    String      @db.ObjectId
   serviceType        ServiceType @relation(fields: [service_type_id], references: [id])
   is_contract_signed Boolean
-  contract_url       String?
   is_active          Boolean
   contact_email      String?
   is_commissionable  Boolean
   sales_agent        String?
 
-  properties Property[]
-  notes      Note[]
-  tasks      Task[]
+  properties   Property[]
+  notes        Note[]
+  tasks        Task[]
+  contractUrls ContractUrl[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -334,6 +335,25 @@ model Task {
   @@index([portfolio_id, is_done])
   @@index([property_id, is_done])
   @@index([due_date, is_done])
+}
+
+model ContractUrl {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  url          String
+  description  String?
+  is_active    Boolean   @default(true)
+  portfolio_id String    @db.ObjectId
+  portfolio    Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  user_id      String    @db.ObjectId
+  user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([portfolio_id])
+  @@index([user_id])
+  @@index([is_active])
+  @@index([portfolio_id, user_id])
 }
 
 enum OtaType {
