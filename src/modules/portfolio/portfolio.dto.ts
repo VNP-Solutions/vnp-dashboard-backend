@@ -72,6 +72,23 @@ export class CreatePortfolioDto {
   @ValidateIf((o) => o.is_commissionable === false || o.sales_agent !== undefined)
   @IsOptional()
   sales_agent?: string
+
+  @ApiPropertyOptional({
+    example: 'access@example.com',
+    description: 'Access email for portfolio'
+  })
+  @IsString()
+  @IsEmail()
+  @IsOptional()
+  access_email?: string
+
+  @ApiPropertyOptional({
+    example: '+1234567890',
+    description: 'Access phone number for portfolio'
+  })
+  @IsString()
+  @IsOptional()
+  access_phone?: string
 }
 
 export class UpdatePortfolioDto extends PartialType(CreatePortfolioDto) {}

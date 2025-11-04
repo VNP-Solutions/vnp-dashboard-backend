@@ -502,6 +502,24 @@ export class PortfolioService implements IPortfolioService {
           // If sales agent is provided, portfolio is commissionable
           const isCommissionable = salesAgent ? true : false
 
+          // Extract access email (optional)
+          const accessEmail = findHeaderValue(row, [
+            'Access Email',
+            'Access email'
+          ])
+
+          // Extract access phone (optional)
+          const accessPhone = findHeaderValue(row, [
+            'Access Phone',
+            'Access phone',
+            'Access Phone NO',
+            'Access Phone No',
+            'Access Phone no',
+            'Access phone no',
+            'Access Contact',
+            'Access contact'
+          ])
+
           // Create portfolio
           const portfolioData: Omit<CreatePortfolioDto, 'contract_url'> = {
             name: portfolioName,
@@ -510,7 +528,9 @@ export class PortfolioService implements IPortfolioService {
             is_active: true,
             contact_email: contactEmail || undefined,
             is_commissionable: isCommissionable,
-            sales_agent: salesAgent || undefined
+            sales_agent: salesAgent || undefined,
+            access_email: accessEmail || undefined,
+            access_phone: accessPhone || undefined
           }
 
           const newPortfolio = await this.portfolioRepository.create(
