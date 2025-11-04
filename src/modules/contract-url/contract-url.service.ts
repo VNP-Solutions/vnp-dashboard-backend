@@ -9,6 +9,8 @@ import {
   ModuleType
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { EmailUtil } from '../../common/utils/email.util'
+import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   CreateContractUrlDto,
@@ -268,8 +270,9 @@ export class ContractUrlService implements IContractUrlService {
       throw new NotFoundException('Portfolio not found')
     }
 
+    const isSuperAdmin = isUserSuperAdmin(user)
     const contractUrls =
-      await this.contractUrlRepository.findByPortfolioId(portfolioId)
+      await this.contractUrlRepository.findByPortfolioId(portfolioId, isSuperAdmin ? undefined : user.id)
 
     return contractUrls
   }

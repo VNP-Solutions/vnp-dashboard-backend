@@ -14,6 +14,7 @@ import {
 import { PermissionService } from '../../common/services/permission.service'
 import { COMPLETED_AUDIT_STATUSES } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
+import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
 import { PrismaService } from '../prisma/prisma.service'
@@ -67,9 +68,11 @@ export class PortfolioService implements IPortfolioService {
     // Extract contract_url from data before creating portfolio
     const { contract_url, ...portfolioData } = data
 
+    const isSuperAdmin = isUserSuperAdmin(user)
     const portfolio = await this.portfolioRepository.create(
       portfolioData,
-      user.id
+      user.id,
+      isSuperAdmin
     )
 
     // If contract_url is provided, create a contract URL entry
@@ -95,7 +98,8 @@ export class PortfolioService implements IPortfolioService {
     // Re-fetch the portfolio to include the newly created contract URL
     const portfolioWithContractUrls = await this.portfolioRepository.findById(
       portfolio.id,
-      user.id
+      user.id,
+      isSuperAdmin
     )
 
     return portfolioWithContractUrls || portfolio
@@ -173,12 +177,15 @@ export class PortfolioService implements IPortfolioService {
       baseWhere
     )
 
+    const isSuperAdmin = isUserSuperAdmin(user)
+
     // Fetch data and count
     const [data, total] = await Promise.all([
       this.portfolioRepository.findAll(
         { where, skip, take, orderBy },
         undefined,
-        user.id
+        user.id,
+        isSuperAdmin
       ),
       this.portfolioRepository.count(where, undefined)
     ])
@@ -258,18 +265,26 @@ export class PortfolioService implements IPortfolioService {
       baseWhere
     )
 
+    const isSuperAdmin = isUserSuperAdmin(user)
+
     // Fetch all data without pagination
     const data = await this.portfolioRepository.findAll(
       { where, orderBy },
       undefined,
-      user.id
+      user.id,
+      isSuperAdmin
     )
 
     return data
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
-    const portfolio = await this.portfolioRepository.findById(id, user.id)
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const portfolio = await this.portfolioRepository.findById(
+      id,
+      user.id,
+      isSuperAdmin
+    )
 
     if (!portfolio) {
       throw new NotFoundException('Portfolio not found')
@@ -283,7 +298,12 @@ export class PortfolioService implements IPortfolioService {
     data: UpdatePortfolioDto,
     user: IUserWithPermissions
   ) {
-    const portfolio = await this.portfolioRepository.findById(id, user.id)
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const portfolio = await this.portfolioRepository.findById(
+      id,
+      user.id,
+      isSuperAdmin
+    )
 
     if (!portfolio) {
       throw new NotFoundException('Portfolio not found')
@@ -314,11 +334,16 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
-    return this.portfolioRepository.update(id, data, user.id)
+    return this.portfolioRepository.update(id, data, user.id, isSuperAdmin)
   }
 
   async remove(id: string, user: IUserWithPermissions) {
-    const portfolio = await this.portfolioRepository.findById(id, user.id)
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const portfolio = await this.portfolioRepository.findById(
+      id,
+      user.id,
+      isSuperAdmin
+    )
 
     if (!portfolio) {
       throw new NotFoundException('Portfolio not found')
@@ -343,7 +368,12 @@ export class PortfolioService implements IPortfolioService {
     body: string,
     user: IUserWithPermissions
   ) {
-    const portfolio = await this.portfolioRepository.findById(id, user.id)
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const portfolio = await this.portfolioRepository.findById(
+      id,
+      user.id,
+      isSuperAdmin
+    )
 
     if (!portfolio) {
       throw new NotFoundException('Portfolio not found')
@@ -538,14 +568,21 @@ export class PortfolioService implements IPortfolioService {
             _user.id
           )
 
-          // If contract URL is provided, create a contract URL entry for the user
+          // If contract URL is provided, create contract URL entries for the user
+          // Handle comma-separated values
           if (contractUrl) {
-            await this.contractUrlRepository.create({
-              url: contractUrl,
-              portfolio_id: newPortfolio.id,
-              user_id: _user.id,
-              is_active: true
-            })
+            const urls = contractUrl
+              .split(',')
+              .map(url => url.trim())
+              .filter(url => url)
+            for (const url of urls) {
+              await this.contractUrlRepository.create({
+                url,
+                portfolio_id: newPortfolio.id,
+                user_id: _user.id,
+                is_active: true
+              })
+            }
           }
 
           result.successCount++

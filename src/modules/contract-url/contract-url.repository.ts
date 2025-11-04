@@ -85,10 +85,11 @@ export class ContractUrlRepository implements IContractUrlRepository {
     })
   }
 
-  async findByPortfolioId(portfolioId: string) {
+  async findByPortfolioId(portfolioId: string, userId?: string) {
     return this.prisma.contractUrl.findMany({
       where: {
-        portfolio_id: portfolioId
+        portfolio_id: portfolioId,
+        ...(userId ? { user_id: userId } : {})
       },
       include: {
         portfolio: {

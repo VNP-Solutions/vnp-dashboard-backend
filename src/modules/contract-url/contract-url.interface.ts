@@ -56,7 +56,10 @@ export interface IContractUrlRepository {
   ): Promise<ContractUrlWithRelations[]>
   count(whereClause: any, portfolioId?: string): Promise<number>
   findById(id: string): Promise<ContractUrlWithFullDetails | null>
-  findByPortfolioId(portfolioId: string): Promise<ContractUrlWithRelations[]>
+  findByPortfolioId(
+    portfolioId: string,
+    userId?: string
+  ): Promise<ContractUrlWithRelations[]>
   findByUserId(userId: string): Promise<ContractUrlWithRelations[]>
   update(
     id: string,

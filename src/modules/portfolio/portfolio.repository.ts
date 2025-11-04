@@ -7,7 +7,7 @@ import type { IPortfolioRepository } from './portfolio.interface'
 export class PortfolioRepository implements IPortfolioRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
-  async create(data: CreatePortfolioDto, userId?: string) {
+  async create(data: CreatePortfolioDto, userId?: string, isSuperAdmin?: boolean) {
     return this.prisma.portfolio.create({
       data,
       include: {
@@ -19,7 +19,7 @@ export class PortfolioRepository implements IPortfolioRepository {
           }
         },
         contractUrls: userId ? {
-          where: {
+          where: isSuperAdmin ? undefined : {
             user_id: userId
           },
           select: {
@@ -35,7 +35,7 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
-  async findAll(queryOptions: any, _portfolioIds?: string[], userId?: string) {
+  async findAll(queryOptions: any, _portfolioIds?: string[], userId?: string, isSuperAdmin?: boolean) {
     const { where, skip, take, orderBy } = queryOptions
 
     return this.prisma.portfolio.findMany({
@@ -57,7 +57,7 @@ export class PortfolioRepository implements IPortfolioRepository {
           }
         },
         contractUrls: {
-          where: userId ? {
+          where: (userId && !isSuperAdmin) ? {
             user_id: userId
           } : undefined,
           select: {
@@ -79,7 +79,7 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
-  async findById(id: string, userId?: string) {
+  async findById(id: string, userId?: string, isSuperAdmin?: boolean) {
     return this.prisma.portfolio.findUnique({
       where: { id },
       include: {
@@ -96,7 +96,7 @@ export class PortfolioRepository implements IPortfolioRepository {
           }
         },
         contractUrls: userId ? {
-          where: {
+          where: isSuperAdmin ? undefined : {
             user_id: userId
           },
           select: {
@@ -118,7 +118,7 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
-  async update(id: string, data: UpdatePortfolioDto, userId?: string) {
+  async update(id: string, data: UpdatePortfolioDto, userId?: string, isSuperAdmin?: boolean) {
     return this.prisma.portfolio.update({
       where: { id },
       data,
@@ -131,7 +131,7 @@ export class PortfolioRepository implements IPortfolioRepository {
           }
         },
         contractUrls: userId ? {
-          where: {
+          where: isSuperAdmin ? undefined : {
             user_id: userId
           },
           select: {

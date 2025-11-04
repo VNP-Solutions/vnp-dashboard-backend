@@ -86,19 +86,21 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
 }>
 
 export interface IPortfolioRepository {
-  create(data: CreatePortfolioDto, userId?: string): Promise<PortfolioWithServiceType>
+  create(data: CreatePortfolioDto, userId?: string, isSuperAdmin?: boolean): Promise<PortfolioWithServiceType>
   findAll(
     queryOptions: any,
     portfolioIds?: string[],
-    userId?: string
+    userId?: string,
+    isSuperAdmin?: boolean
   ): Promise<PortfolioWithRelations[]>
   count(whereClause: any, portfolioIds?: string[]): Promise<number>
-  findById(id: string, userId?: string): Promise<PortfolioWithFullDetails | null>
+  findById(id: string, userId?: string, isSuperAdmin?: boolean): Promise<PortfolioWithFullDetails | null>
   findByName(name: string): Promise<Portfolio | null>
   update(
     id: string,
     data: UpdatePortfolioDto,
-    userId?: string
+    userId?: string,
+    isSuperAdmin?: boolean
   ): Promise<PortfolioWithServiceType>
   delete(id: string): Promise<Portfolio>
   countProperties(portfolioId: string): Promise<number>
