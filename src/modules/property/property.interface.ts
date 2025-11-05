@@ -30,12 +30,6 @@ type PropertyWithRelations = Prisma.PropertyGetPayload<{
         is_active: true
       }
     }
-    batch: {
-      select: {
-        id: true
-        batch_no: true
-      }
-    }
   }
 }>
 
@@ -61,12 +55,6 @@ type PropertyWithFullDetails = Prisma.PropertyGetPayload<{
             type: true
           }
         }
-      }
-    }
-    batch: {
-      select: {
-        id: true
-        batch_no: true
       }
     }
     credentials: true

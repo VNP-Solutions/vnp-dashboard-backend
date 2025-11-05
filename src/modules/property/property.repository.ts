@@ -31,12 +31,6 @@ export class PropertyRepository implements IPropertyRepository {
             is_active: true
           }
         },
-        batch: {
-          select: {
-            id: true,
-            batch_no: true
-          }
-        },
         credentials: true
       }
     })
@@ -64,12 +58,6 @@ export class PropertyRepository implements IPropertyRepository {
             id: true,
             name: true,
             is_active: true
-          }
-        },
-        batch: {
-          select: {
-            id: true,
-            batch_no: true
           }
         },
         credentials: {
@@ -120,12 +108,6 @@ export class PropertyRepository implements IPropertyRepository {
             }
           }
         },
-        batch: {
-          select: {
-            id: true,
-            batch_no: true
-          }
-        },
         credentials: true,
         bankDetails: true,
         audits: {
@@ -172,12 +154,6 @@ export class PropertyRepository implements IPropertyRepository {
             id: true,
             name: true,
             is_active: true
-          }
-        },
-        batch: {
-          select: {
-            id: true,
-            batch_no: true
           }
         }
       }

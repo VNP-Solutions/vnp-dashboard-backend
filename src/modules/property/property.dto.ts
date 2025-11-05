@@ -243,7 +243,6 @@ export class PropertyStatsResponseDto {
     is_active: boolean
     next_due_date: Date | null
     portfolio_id: string
-    batch_id: string | null
     currency_id: string
     currency: {
       id: string

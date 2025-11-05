@@ -1522,7 +1522,6 @@ export class PropertyService implements IPropertyService {
         is_active: property.is_active,
         next_due_date: property.next_due_date,
         portfolio_id: property.portfolio_id,
-        batch_id: property.batch_id,
         currency_id: property.currency_id,
         currency: property.currency,
         credentials: property?.credentials
