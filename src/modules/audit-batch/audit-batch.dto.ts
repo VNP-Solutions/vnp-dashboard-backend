@@ -2,7 +2,7 @@ import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator'
 
-export class CreatePropertyBatchDto {
+export class CreateAuditBatchDto {
   @ApiProperty({
     example: 'BATCH-001',
     description: 'Batch number (must be unique)'
@@ -12,11 +12,11 @@ export class CreatePropertyBatchDto {
   batch_no: string
 }
 
-export class UpdatePropertyBatchDto extends PartialType(
-  CreatePropertyBatchDto
+export class UpdateAuditBatchDto extends PartialType(
+  CreateAuditBatchDto
 ) {}
 
-export class PropertyBatchQueryDto {
+export class AuditBatchQueryDto {
   @ApiPropertyOptional({
     description: 'Search by batch number',
     example: 'BATCH-001'
@@ -42,11 +42,12 @@ export class PropertyBatchQueryDto {
   sortOrder?: string
 }
 
-export class ReorderPropertyBatchDto {
+export class ReorderAuditBatchDto {
   @ApiProperty({
     example: 2,
-    description: 'New order position for the property batch'
+    description: 'New order position for the audit batch'
   })
   @IsNotEmpty()
   newOrder: number
 }
+

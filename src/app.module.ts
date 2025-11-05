@@ -12,6 +12,7 @@ import { ConfigService } from './config/config.service'
 import configuration from './config/configuration'
 import { validate } from './config/validation'
 import { AuditStatusModule } from './modules/audit-status/audit-status.module'
+import { AuditBatchModule } from './modules/audit-batch/audit-batch.module'
 import { AuditModule } from './modules/audit/audit.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
@@ -23,7 +24,6 @@ import { NoteModule } from './modules/note/note.module'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
 import { PrismaService } from './modules/prisma/prisma.service'
 import { PropertyBankDetailsModule } from './modules/property-bank-details/property-bank-details.module'
-import { PropertyBatchModule } from './modules/property-batch/property-batch.module'
 import { PropertyCredentialsModule } from './modules/property-credentials/property-credentials.module'
 import { PropertyModule } from './modules/property/property.module'
 import { ServiceTypeModule } from './modules/service-type/service-type.module'
@@ -41,6 +41,7 @@ import { UserModule } from './modules/user/user.module'
     }),
     AuthModule,
     AuditModule,
+    AuditBatchModule,
     AuditStatusModule,
     ContractUrlModule,
     CurrencyModule,
@@ -50,7 +51,6 @@ import { UserModule } from './modules/user/user.module'
     PortfolioModule,
     TaskModule,
     PropertyBankDetailsModule,
-    PropertyBatchModule,
     PropertyCredentialsModule,
     PropertyModule,
     ServiceTypeModule,

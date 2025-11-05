@@ -26,26 +26,26 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
-  CreatePropertyBatchDto,
-  PropertyBatchQueryDto,
-  ReorderPropertyBatchDto,
-  UpdatePropertyBatchDto
-} from './property-batch.dto'
-import type { IPropertyBatchService } from './property-batch.interface'
+  AuditBatchQueryDto,
+  CreateAuditBatchDto,
+  ReorderAuditBatchDto,
+  UpdateAuditBatchDto
+} from './audit-batch.dto'
+import type { IAuditBatchService } from './audit-batch.interface'
 
-@ApiTags('Property Batch')
+@ApiTags('Audit Batch')
 @ApiBearerAuth('JWT-auth')
-@Controller('property-batch')
+@Controller('audit-batch')
 @UseGuards(JwtAuthGuard, PermissionGuard)
-export class PropertyBatchController {
+export class AuditBatchController {
   constructor(
-    @Inject('IPropertyBatchService')
-    private readonly propertyBatchService: IPropertyBatchService
+    @Inject('IAuditBatchService')
+    private readonly auditBatchService: IAuditBatchService
   ) {}
 
   @Post()
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
-  @ApiOperation({ summary: 'Create a new property batch' })
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.CREATE)
+  @ApiOperation({ summary: 'Create a new audit batch' })
   @ApiResponse({ status: 201, description: 'Batch created successfully' })
   @ApiResponse({
     status: 403,
@@ -56,40 +56,40 @@ export class PropertyBatchController {
     description: 'Conflict - Batch number already exists'
   })
   create(
-    @Body() createPropertyBatchDto: CreatePropertyBatchDto,
+    @Body() createAuditBatchDto: CreateAuditBatchDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.propertyBatchService.create(createPropertyBatchDto, user)
+    return this.auditBatchService.create(createAuditBatchDto, user)
   }
 
   @Get()
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
   @ApiOperation({
-    summary: 'Get all property batches with search and sorting'
+    summary: 'Get all audit batches with search and sorting'
   })
   @ApiResponse({
     status: 200,
     description: 'List of batches retrieved successfully'
   })
   findAll(
-    @Query() query: PropertyBatchQueryDto,
+    @Query() query: AuditBatchQueryDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.propertyBatchService.findAll(query, user)
+    return this.auditBatchService.findAll(query, user)
   }
 
   @Get(':id')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
-  @ApiOperation({ summary: 'Get a property batch by ID' })
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @ApiOperation({ summary: 'Get an audit batch by ID' })
   @ApiResponse({ status: 200, description: 'Batch retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Batch not found' })
   findOne(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.propertyBatchService.findOne(id, user)
+    return this.auditBatchService.findOne(id, user)
   }
 
   @Patch(':id')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
-  @ApiOperation({ summary: 'Update a property batch' })
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({ summary: 'Update an audit batch' })
   @ApiResponse({ status: 200, description: 'Batch updated successfully' })
   @ApiResponse({ status: 404, description: 'Batch not found' })
   @ApiResponse({
@@ -102,32 +102,32 @@ export class PropertyBatchController {
   })
   update(
     @Param('id') id: string,
-    @Body() updatePropertyBatchDto: UpdatePropertyBatchDto,
+    @Body() updateAuditBatchDto: UpdateAuditBatchDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.propertyBatchService.update(id, updatePropertyBatchDto, user)
+    return this.auditBatchService.update(id, updateAuditBatchDto, user)
   }
 
   @Delete(':id')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE)
-  @ApiOperation({ summary: 'Delete a property batch' })
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE)
+  @ApiOperation({ summary: 'Delete an audit batch' })
   @ApiResponse({ status: 200, description: 'Batch deleted successfully' })
   @ApiResponse({ status: 404, description: 'Batch not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete batch with associated properties'
+    description: 'Cannot delete batch with associated audits'
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions'
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.propertyBatchService.remove(id, user)
+    return this.auditBatchService.remove(id, user)
   }
 
   @Patch(':id/reorder')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
-  @ApiOperation({ summary: 'Reorder a property batch' })
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({ summary: 'Reorder an audit batch' })
   @ApiResponse({ status: 200, description: 'Batch order updated successfully' })
   @ApiResponse({ status: 404, description: 'Batch not found' })
   @ApiResponse({
@@ -136,9 +136,9 @@ export class PropertyBatchController {
   })
   reorder(
     @Param('id') id: string,
-    @Body() reorderPropertyBatchDto: ReorderPropertyBatchDto,
+    @Body() reorderAuditBatchDto: ReorderAuditBatchDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.propertyBatchService.reorder(id, reorderPropertyBatchDto, user)
+    return this.auditBatchService.reorder(id, reorderAuditBatchDto, user)
   }
 }

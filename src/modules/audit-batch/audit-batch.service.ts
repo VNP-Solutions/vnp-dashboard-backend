@@ -7,25 +7,25 @@ import {
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
-  CreatePropertyBatchDto,
-  PropertyBatchQueryDto,
-  ReorderPropertyBatchDto,
-  UpdatePropertyBatchDto
-} from './property-batch.dto'
+  CreateAuditBatchDto,
+  AuditBatchQueryDto,
+  ReorderAuditBatchDto,
+  UpdateAuditBatchDto
+} from './audit-batch.dto'
 import type {
-  IPropertyBatchRepository,
-  IPropertyBatchService
-} from './property-batch.interface'
+  IAuditBatchRepository,
+  IAuditBatchService
+} from './audit-batch.interface'
 
 @Injectable()
-export class PropertyBatchService implements IPropertyBatchService {
+export class AuditBatchService implements IAuditBatchService {
   constructor(
-    @Inject('IPropertyBatchRepository')
-    private propertyBatchRepository: IPropertyBatchRepository
+    @Inject('IAuditBatchRepository')
+    private auditBatchRepository: IAuditBatchRepository
   ) {}
 
-  async create(data: CreatePropertyBatchDto, _user: IUserWithPermissions) {
-    const existingBatch = await this.propertyBatchRepository.findByBatchNo(
+  async create(data: CreateAuditBatchDto, _user: IUserWithPermissions) {
+    const existingBatch = await this.auditBatchRepository.findByBatchNo(
       data.batch_no
     )
 
@@ -33,10 +33,10 @@ export class PropertyBatchService implements IPropertyBatchService {
       throw new ConflictException('Batch with this number already exists')
     }
 
-    return this.propertyBatchRepository.create(data)
+    return this.auditBatchRepository.create(data)
   }
 
-  async findAll(query: PropertyBatchQueryDto, _user: IUserWithPermissions) {
+  async findAll(query: AuditBatchQueryDto, _user: IUserWithPermissions) {
     // Build where clause for search
     const where: any = {}
     if (query.search) {
@@ -60,11 +60,11 @@ export class PropertyBatchService implements IPropertyBatchService {
       orderBy.order = 'asc'
     }
 
-    return this.propertyBatchRepository.findAll({ where, orderBy })
+    return this.auditBatchRepository.findAll({ where, orderBy })
   }
 
   async findOne(id: string, _user: IUserWithPermissions) {
-    const batch = await this.propertyBatchRepository.findById(id)
+    const batch = await this.auditBatchRepository.findById(id)
 
     if (!batch) {
       throw new NotFoundException('Batch not found')
@@ -75,17 +75,17 @@ export class PropertyBatchService implements IPropertyBatchService {
 
   async update(
     id: string,
-    data: UpdatePropertyBatchDto,
+    data: UpdateAuditBatchDto,
     _user: IUserWithPermissions
   ) {
-    const batch = await this.propertyBatchRepository.findById(id)
+    const batch = await this.auditBatchRepository.findById(id)
 
     if (!batch) {
       throw new NotFoundException('Batch not found')
     }
 
     if (data.batch_no && data.batch_no !== batch.batch_no) {
-      const existingBatch = await this.propertyBatchRepository.findByBatchNo(
+      const existingBatch = await this.auditBatchRepository.findByBatchNo(
         data.batch_no
       )
 
@@ -94,31 +94,31 @@ export class PropertyBatchService implements IPropertyBatchService {
       }
     }
 
-    return this.propertyBatchRepository.update(id, data)
+    return this.auditBatchRepository.update(id, data)
   }
 
   async remove(id: string, _user: IUserWithPermissions) {
-    const batch = await this.propertyBatchRepository.findById(id)
+    const batch = await this.auditBatchRepository.findById(id)
 
     if (!batch) {
       throw new NotFoundException('Batch not found')
     }
 
-    const propertyCount = await this.propertyBatchRepository.countProperties(id)
+    const auditCount = await this.auditBatchRepository.countAudits(id)
 
-    if (propertyCount > 0) {
+    if (auditCount > 0) {
       throw new BadRequestException(
-        `Cannot delete batch with ${propertyCount} associated properties. Please delete or reassign the properties first.`
+        `Cannot delete batch with ${auditCount} associated audits. Please delete or reassign the audits first.`
       )
     }
 
-    await this.propertyBatchRepository.delete(id)
+    await this.auditBatchRepository.delete(id)
 
     return { message: 'Batch deleted successfully' }
   }
 
-  async reorder(id: string, data: ReorderPropertyBatchDto, _user: IUserWithPermissions) {
-    const batch = await this.propertyBatchRepository.findById(id)
+  async reorder(id: string, data: ReorderAuditBatchDto, _user: IUserWithPermissions) {
+    const batch = await this.auditBatchRepository.findById(id)
 
     if (!batch) {
       throw new NotFoundException('Batch not found')
@@ -132,7 +132,7 @@ export class PropertyBatchService implements IPropertyBatchService {
     }
 
     // Get all batches sorted by order
-    const allBatches = await this.propertyBatchRepository.findAll({ 
+    const allBatches = await this.auditBatchRepository.findAll({ 
       where: {}, 
       orderBy: { order: 'asc' } 
     })
@@ -160,8 +160,9 @@ export class PropertyBatchService implements IPropertyBatchService {
       })
     }
 
-    await this.propertyBatchRepository.updateMany(updates)
+    await this.auditBatchRepository.updateMany(updates)
 
     return { message: 'Batch order updated successfully' }
   }
 }
+

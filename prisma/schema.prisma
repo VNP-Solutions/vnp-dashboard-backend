@@ -61,19 +61,17 @@ model Portfolio {
 }
 
 model Property {
-  id                String         @id @default(auto()) @map("_id") @db.ObjectId
-  name              String         @unique
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  name              String    @unique
   address           String
-  currency_id       String         @db.ObjectId
-  currency          Currency       @relation(fields: [currency_id], references: [id])
+  currency_id       String    @db.ObjectId
+  currency          Currency  @relation(fields: [currency_id], references: [id])
   card_descriptor   String
-  is_active         Boolean        @default(true)
+  is_active         Boolean   @default(true)
   next_due_date     DateTime?
-  portfolio_id      String         @db.ObjectId
-  portfolio         Portfolio      @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
-  batch_id          String?        @db.ObjectId
-  batch             PropertyBatch? @relation(fields: [batch_id], references: [id])
-  show_in_portfolio String[]       @db.ObjectId
+  portfolio_id      String    @db.ObjectId
+  portfolio         Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  show_in_portfolio String[]  @db.ObjectId
 
   audits      Audit[]
   credentials PropertyCredentials?
@@ -86,7 +84,6 @@ model Property {
 
   @@index([portfolio_id])
   @@index([currency_id])
-  @@index([batch_id])
   @@index([is_active])
   @@index([next_due_date])
   @@index([portfolio_id, is_active])
@@ -121,6 +118,8 @@ model Audit {
   end_date           DateTime
   property_id        String      @db.ObjectId
   property           Property    @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  batch_id           String?     @db.ObjectId
+  batch              AuditBatch? @relation(fields: [batch_id], references: [id])
   report_url         String?
 
   created_at DateTime @default(now())
@@ -132,6 +131,7 @@ model Audit {
   @@index([is_archived])
   @@index([start_date])
   @@index([end_date])
+  @@index([batch_id])
   @@index([property_id, is_archived])
   @@index([property_id, start_date, end_date])
 }
@@ -171,11 +171,11 @@ model PropertyBankDetails {
   updated_at DateTime @updatedAt
 }
 
-model PropertyBatch {
-  id         String     @id @default(auto()) @map("_id") @db.ObjectId
-  batch_no   String     @unique
-  order      Int        @default(0)
-  properties Property[]
+model AuditBatch {
+  id       String  @id @default(auto()) @map("_id") @db.ObjectId
+  batch_no String  @unique
+  order    Int     @default(0)
+  audits   Audit[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
