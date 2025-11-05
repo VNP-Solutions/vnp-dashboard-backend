@@ -39,11 +39,11 @@ export class ContractUrlController {
 
   @Post()
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
-  @ApiOperation({ summary: 'Create a new contract URL' })
+  @ApiOperation({ summary: 'Create a new contract URL (Super Admin only)' })
   @ApiResponse({ status: 201, description: 'Contract URL created successfully' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Only Super Admin can upload contracts'
   })
   create(
     @Body() createContractUrlDto: CreateContractUrlDto,
@@ -56,11 +56,15 @@ export class ContractUrlController {
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get all contract URLs accessible to the user with pagination, search, filter, and sort'
+      'Get all contract URLs accessible to the user with pagination, search, filter, and sort (Portfolio Manager only)'
   })
   @ApiResponse({
     status: 200,
     description: 'Paginated list of contract URLs retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only Portfolio Managers can access contracts'
   })
   findAll(
     @Query() query: ContractUrlQueryDto,
@@ -123,7 +127,7 @@ export class ContractUrlController {
 
   @Patch(':id')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
-  @ApiOperation({ summary: 'Update a contract URL' })
+  @ApiOperation({ summary: 'Update a contract URL (Super Admin only)' })
   @ApiResponse({
     status: 200,
     description: 'Contract URL updated successfully'
@@ -131,7 +135,7 @@ export class ContractUrlController {
   @ApiResponse({ status: 404, description: 'Contract URL not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Only Super Admin can update contracts'
   })
   update(
     @Param('id') id: string,
@@ -143,7 +147,7 @@ export class ContractUrlController {
 
   @Delete(':id')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE, true)
-  @ApiOperation({ summary: 'Delete a contract URL' })
+  @ApiOperation({ summary: 'Delete a contract URL (Super Admin only)' })
   @ApiResponse({
     status: 200,
     description: 'Contract URL deleted successfully'
@@ -151,7 +155,7 @@ export class ContractUrlController {
   @ApiResponse({ status: 404, description: 'Contract URL not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Only Super Admin can delete contracts'
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.contractUrlService.remove(id, user)

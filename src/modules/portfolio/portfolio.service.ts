@@ -68,6 +68,13 @@ export class PortfolioService implements IPortfolioService {
     // Extract contract_url from data before creating portfolio
     const { contract_url, ...portfolioData } = data
 
+    // Check if user is trying to create contract URL
+    if (contract_url && !isUserSuperAdmin(user)) {
+      throw new BadRequestException(
+        'Only Super Admin can upload contract URLs. Please remove the contract_url field or contact a Super Admin.'
+      )
+    }
+
     const isSuperAdmin = isUserSuperAdmin(user)
     const portfolio = await this.portfolioRepository.create(
       portfolioData,
@@ -75,8 +82,8 @@ export class PortfolioService implements IPortfolioService {
       isSuperAdmin
     )
 
-    // If contract_url is provided, create a contract URL entry
-    if (contract_url) {
+    // If contract_url is provided and user is super admin, create a contract URL entry
+    if (contract_url && isSuperAdmin) {
       await this.contractUrlRepository.create({
         url: contract_url,
         portfolio_id: portfolio.id,
@@ -570,7 +577,8 @@ export class PortfolioService implements IPortfolioService {
 
           // If contract URL is provided, create contract URL entries for the user
           // Handle comma-separated values
-          if (contractUrl) {
+          // Only super admin can create contract URLs
+          if (contractUrl && isUserSuperAdmin(_user)) {
             const urls = contractUrl
               .split(',')
               .map(url => url.trim())

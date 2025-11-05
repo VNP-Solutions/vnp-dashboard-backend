@@ -1,20 +1,21 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import {
-  ModuleType
-} from '../../common/interfaces/permission.interface'
+import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
-import { EmailUtil } from '../../common/utils/email.util'
-import { isUserSuperAdmin } from '../../common/utils/permission.util'
+import {
+  isPortfolioManager,
+  isUserSuperAdmin
+} from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
-  CreateContractUrlDto,
   ContractUrlQueryDto,
+  CreateContractUrlDto,
   UpdateContractUrlDto
 } from './contract-url.dto'
 import type {
@@ -32,6 +33,11 @@ export class ContractUrlService implements IContractUrlService {
   ) {}
 
   async create(data: CreateContractUrlDto, user: IUserWithPermissions) {
+    // Only super admin can upload/create contract URLs
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only Super Admin can upload contract URLs')
+    }
+
     // Verify user has access to the portfolio
     const accessiblePortfolioIds =
       await this.permissionService.getAccessibleResourceIds(
@@ -44,9 +50,7 @@ export class ContractUrlService implements IContractUrlService {
       Array.isArray(accessiblePortfolioIds) &&
       !accessiblePortfolioIds.includes(data.portfolio_id)
     ) {
-      throw new BadRequestException(
-        'You do not have access to this portfolio'
-      )
+      throw new BadRequestException('You do not have access to this portfolio')
     }
 
     // Create contract URL with the current user's ID
@@ -60,6 +64,13 @@ export class ContractUrlService implements IContractUrlService {
   }
 
   async findAll(query: ContractUrlQueryDto, user: IUserWithPermissions) {
+    // Only portfolio managers can access contract URLs
+    if (!isPortfolioManager(user)) {
+      throw new ForbiddenException(
+        'Only Portfolio Managers can access contract URLs'
+      )
+    }
+
     const accessiblePortfolioIds =
       await this.permissionService.getAccessibleResourceIds(
         user,
@@ -153,6 +164,13 @@ export class ContractUrlService implements IContractUrlService {
     query: ContractUrlQueryDto,
     user: IUserWithPermissions
   ) {
+    // Only portfolio managers can access contract URLs
+    if (!isPortfolioManager(user)) {
+      throw new ForbiddenException(
+        'Only Portfolio Managers can access contract URLs'
+      )
+    }
+
     const accessiblePortfolioIds =
       await this.permissionService.getAccessibleResourceIds(
         user,
@@ -230,6 +248,13 @@ export class ContractUrlService implements IContractUrlService {
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
+    // Only portfolio managers can access contract URLs
+    if (!isPortfolioManager(user)) {
+      throw new ForbiddenException(
+        'Only Portfolio Managers can access contract URLs'
+      )
+    }
+
     const contractUrl = await this.contractUrlRepository.findById(id)
 
     if (!contractUrl) {
@@ -255,6 +280,13 @@ export class ContractUrlService implements IContractUrlService {
   }
 
   async findByPortfolio(portfolioId: string, user: IUserWithPermissions) {
+    // Only portfolio managers can access contract URLs
+    if (!isPortfolioManager(user)) {
+      throw new ForbiddenException(
+        'Only Portfolio Managers can access contract URLs'
+      )
+    }
+
     // Verify user has access to the portfolio
     const accessiblePortfolioIds =
       await this.permissionService.getAccessibleResourceIds(
@@ -271,8 +303,10 @@ export class ContractUrlService implements IContractUrlService {
     }
 
     const isSuperAdmin = isUserSuperAdmin(user)
-    const contractUrls =
-      await this.contractUrlRepository.findByPortfolioId(portfolioId, isSuperAdmin ? undefined : user.id)
+    const contractUrls = await this.contractUrlRepository.findByPortfolioId(
+      portfolioId,
+      isSuperAdmin ? undefined : user.id
+    )
 
     return contractUrls
   }
@@ -282,6 +316,11 @@ export class ContractUrlService implements IContractUrlService {
     data: UpdateContractUrlDto,
     user: IUserWithPermissions
   ) {
+    // Only super admin can update contract URLs
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only Super Admin can update contract URLs')
+    }
+
     const contractUrl = await this.contractUrlRepository.findById(id)
 
     if (!contractUrl) {
@@ -320,6 +359,11 @@ export class ContractUrlService implements IContractUrlService {
   }
 
   async remove(id: string, user: IUserWithPermissions) {
+    // Only super admin can delete contract URLs
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only Super Admin can delete contract URLs')
+    }
+
     const contractUrl = await this.contractUrlRepository.findById(id)
 
     if (!contractUrl) {
@@ -346,4 +390,3 @@ export class ContractUrlService implements IContractUrlService {
     return { message: 'Contract URL deleted successfully' }
   }
 }
-

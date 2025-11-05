@@ -209,3 +209,121 @@ export function isUserSuperAdmin(user: IUserWithPermissions): boolean {
   // User must have all permissions set with 'all' level and 'all' access
   return allPermissions.every(permission => isSuperAdmin(permission))
 }
+
+/**
+ * Check if a user is a portfolio manager
+ * Portfolio manager has 'all' permission level for portfolio permission
+ * Can have either 'all' or 'partial' access level
+ */
+export function isPortfolioManager(user: IUserWithPermissions): boolean {
+  if (!user || !user.role) return false
+
+  const portfolioPermission = user.role.portfolio_permission
+  if (!portfolioPermission) return false
+
+  // Must have 'all' permission level
+  return (
+    portfolioPermission.permission_level === PermissionLevel.all &&
+    (portfolioPermission.access_level === AccessLevel.all ||
+      portfolioPermission.access_level === AccessLevel.partial)
+  )
+}
+
+/**
+ * Check if a user is a portfolio manager for a specific portfolio
+ * Checks if user has 'all' permission level and either:
+ * - Has 'all' access level (can access all portfolios), OR
+ * - Has 'partial' access level AND the portfolio ID is in their accessible list
+ */
+export function isPortfolioManagerFor(
+  user: IUserWithPermissions,
+  portfolioId: string,
+  accessiblePortfolioIds: string[] | 'all'
+): boolean {
+  if (!user || !user.role) return false
+
+  const portfolioPermission = user.role.portfolio_permission
+  if (!portfolioPermission) return false
+
+  // Must have 'all' permission level
+  if (portfolioPermission.permission_level !== PermissionLevel.all) {
+    return false
+  }
+
+  // Check access level
+  if (portfolioPermission.access_level === AccessLevel.all) {
+    return true
+  }
+
+  if (portfolioPermission.access_level === AccessLevel.partial) {
+    // For partial access, check if portfolio ID is in accessible list
+    if (accessiblePortfolioIds === 'all') {
+      return true
+    }
+    return (
+      Array.isArray(accessiblePortfolioIds) &&
+      accessiblePortfolioIds.includes(portfolioId)
+    )
+  }
+
+  return false
+}
+
+/**
+ * Check if a user is a property manager
+ * Property manager has 'all' permission level for property permission
+ * Can have either 'all' or 'partial' access level
+ */
+export function isPropertyManager(user: IUserWithPermissions): boolean {
+  if (!user || !user.role) return false
+
+  const propertyPermission = user.role.property_permission
+  if (!propertyPermission) return false
+
+  // Must have 'all' permission level
+  return (
+    propertyPermission.permission_level === PermissionLevel.all &&
+    (propertyPermission.access_level === AccessLevel.all ||
+      propertyPermission.access_level === AccessLevel.partial)
+  )
+}
+
+/**
+ * Check if a user is a property manager for a specific property
+ * Checks if user has 'all' permission level and either:
+ * - Has 'all' access level (can access all properties), OR
+ * - Has 'partial' access level AND the property ID is in their accessible list
+ */
+export function isPropertyManagerFor(
+  user: IUserWithPermissions,
+  propertyId: string,
+  accessiblePropertyIds: string[] | 'all'
+): boolean {
+  if (!user || !user.role) return false
+
+  const propertyPermission = user.role.property_permission
+  if (!propertyPermission) return false
+
+  // Must have 'all' permission level
+  if (propertyPermission.permission_level !== PermissionLevel.all) {
+    return false
+  }
+
+  // Check access level
+  if (propertyPermission.access_level === AccessLevel.all) {
+    return true
+  }
+
+  if (propertyPermission.access_level === AccessLevel.partial) {
+    // For partial access, check if property ID is in accessible list
+    if (accessiblePropertyIds === 'all') {
+      return true
+    }
+    return (
+      Array.isArray(accessiblePropertyIds) &&
+      accessiblePropertyIds.includes(propertyId)
+    )
+  }
+
+  return false
+}
