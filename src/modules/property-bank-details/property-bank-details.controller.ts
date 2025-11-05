@@ -49,7 +49,12 @@ export class PropertyBankDetailsController {
   @ApiOperation({
     summary: 'Create property bank details',
     description:
-      'Creates bank details for a property. Automatically determines bank_type based on provided fields: If stripe_account_email is provided, sets type to stripe (only stripe_account_email required). Otherwise, sets type to bank (all bank fields required: account_number, account_name, bank_name, bank_branch, swift_code, routing_number).'
+      'Creates bank details for a property. Only super admin, property manager, or portfolio manager can create bank details. ' +
+      'For Stripe: Only stripe_account_email is required. ' +
+      'For Bank: bank_sub_type is required (ach, domestic_wire, or international_wire). ' +
+      'ACH requires: hotel_portfolio_name, beneficiary, bank_name, routing_number, account_number, bank_account_type. ' +
+      'Domestic Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, routing_number, account_number. ' +
+      'International Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, swift_code, iban_number, account_number, currency.'
   })
   @ApiResponse({
     status: 201,
@@ -58,7 +63,7 @@ export class PropertyBankDetailsController {
   @ApiResponse({
     status: 400,
     description:
-      'Bad Request - Missing required fields for the selected bank type'
+      'Bad Request - Missing required fields for the selected bank type or sub-type'
   })
   @ApiResponse({
     status: 409,
@@ -66,7 +71,8 @@ export class PropertyBankDetailsController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description:
+      'Forbidden - Only super admin, property manager, or portfolio manager can edit bank details'
   })
   create(
     @Body() createPropertyBankDetailsDto: CreatePropertyBankDetailsDto,
@@ -105,7 +111,12 @@ export class PropertyBankDetailsController {
   @ApiOperation({
     summary: 'Update bank details by property ID',
     description:
-      'Updates bank details for a property. Automatically determines bank_type based on provided fields: If stripe_account_email is provided, sets type to stripe (only stripe_account_email required). Otherwise, sets type to bank (all bank fields required: account_number, account_name, bank_name, bank_branch, swift_code, routing_number).'
+      'Updates bank details for a property. Only super admin, property manager, or portfolio manager can update bank details. ' +
+      'For Stripe: Only stripe_account_email is required. ' +
+      'For Bank: bank_sub_type is required (ach, domestic_wire, or international_wire). ' +
+      'ACH requires: hotel_portfolio_name, beneficiary, bank_name, routing_number, account_number, bank_account_type. ' +
+      'Domestic Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, routing_number, account_number. ' +
+      'International Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, swift_code, iban_number, account_number, currency.'
   })
   @ApiResponse({
     status: 200,
@@ -114,7 +125,7 @@ export class PropertyBankDetailsController {
   @ApiResponse({
     status: 400,
     description:
-      'Bad Request - Missing required fields for the selected bank type'
+      'Bad Request - Missing required fields for the selected bank type or sub-type'
   })
   @ApiResponse({
     status: 404,
@@ -122,7 +133,8 @@ export class PropertyBankDetailsController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description:
+      'Forbidden - Only super admin, property manager, or portfolio manager can edit bank details'
   })
   update(
     @Param('propertyId') propertyId: string,
@@ -143,7 +155,14 @@ export class PropertyBankDetailsController {
   @ApiOperation({
     summary: 'Bulk update property bank details from Excel file',
     description:
-      'Updates bank details for multiple properties from an Excel file. The first column must be "Property Name" to identify the property. Other columns include: Stripe Account Email, Account Number, Account Name, Bank Name, Bank Branch, Swift Code, Routing Number. Only provided fields will be updated, keeping existing data intact. If Stripe Account Email is provided, it will be set as stripe type. Otherwise, all bank fields are required for bank type.'
+      'Updates bank details for multiple properties from an Excel file. Only super admin, property manager, or portfolio manager can update bank details. ' +
+      'The first column must be "Property Name" to identify the property. ' +
+      'For Stripe: Include "Stripe Account Email" column. ' +
+      'For Bank: Include "Bank Sub Type" column (ach, domestic_wire, or international_wire). ' +
+      'Common columns: Hotel Portfolio Name, Account Number, Bank Name. ' +
+      'ACH: Beneficiary, Routing Number, Bank Account Type (checking/savings). ' +
+      'Domestic Wire: Beneficiary Name, Beneficiary Address, Routing Number. ' +
+      'International Wire: Beneficiary Name, Beneficiary Address, Swift Code, IBAN Number, Currency.'
   })
   @ApiBody({
     schema: {
@@ -153,7 +172,10 @@ export class PropertyBankDetailsController {
           type: 'string',
           format: 'binary',
           description:
-            'Excel file (.xlsx or .xls) containing property bank details. Required columns: Property Name. Optional columns: Stripe Account Email, Account Number, Account Name, Bank Name, Bank Branch, Swift Code, Routing Number'
+            'Excel file (.xlsx or .xls) containing property bank details. ' +
+            'Required columns: Property Name. ' +
+            'Stripe: Stripe Account Email. ' +
+            'Bank: Bank Sub Type, Hotel Portfolio Name, Account Number, Bank Name + sub-type specific fields.'
         }
       }
     }
@@ -169,7 +191,8 @@ export class PropertyBankDetailsController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description:
+      'Forbidden - Only super admin, property manager, or portfolio manager can edit bank details'
   })
   bulkUpdate(
     @UploadedFile() file: Express.Multer.File,
