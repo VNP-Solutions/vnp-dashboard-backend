@@ -1158,6 +1158,20 @@ export class AuditService implements IAuditService {
         }
       }
 
+      // Log available columns for debugging
+      if (data.length > 0) {
+        const firstRow = data[0] as any
+        const availableColumns = Object.keys(firstRow)
+        console.log(
+          'Available Excel columns:',
+          JSON.stringify(availableColumns)
+        )
+        console.log(
+          'Sample first row values:',
+          JSON.stringify(firstRow, null, 2)
+        )
+      }
+
       // Process each row
       for (let i = 0; i < data.length; i++) {
         const row = data[i] as any
@@ -1172,11 +1186,21 @@ export class AuditService implements IAuditService {
             'Name'
           ])
 
+          // Debug log
+          console.log(
+            `Row ${rowNumber}: propertyName =`,
+            propertyName,
+            'from row:',
+            JSON.stringify(row)
+          )
+
           if (!propertyName) {
             result.errors.push({
               row: rowNumber,
               audit: 'Unknown',
-              error: 'Property name is required'
+              error:
+                'Property name is required. Available columns: ' +
+                Object.keys(row).join(', ')
             })
             result.failureCount++
             continue
@@ -1186,6 +1210,10 @@ export class AuditService implements IAuditService {
           const property =
             await this.propertyRepository.findByName(propertyName)
           if (!property) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: Property '${propertyName}' not found in database`
+            )
             result.errors.push({
               row: rowNumber,
               audit: propertyName,
@@ -1213,6 +1241,10 @@ export class AuditService implements IAuditService {
             'audit_status_id'
           ])
           if (!auditStatusValue) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: Audit status is required`
+            )
             result.errors.push({
               row: rowNumber,
               audit: propertyName,
@@ -1263,6 +1295,10 @@ export class AuditService implements IAuditService {
             'From'
           ])
           if (!startDateValue) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: Start date is required`
+            )
             result.errors.push({
               row: rowNumber,
               audit: propertyName,
@@ -1274,6 +1310,10 @@ export class AuditService implements IAuditService {
 
           const startDate = parseDate(startDateValue)
           if (!startDate) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: Invalid start date format`
+            )
             result.errors.push({
               row: rowNumber,
               audit: propertyName,
@@ -1292,6 +1332,10 @@ export class AuditService implements IAuditService {
             'To'
           ])
           if (!endDateValue) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: End date is required`
+            )
             result.errors.push({
               row: rowNumber,
               audit: propertyName,
@@ -1303,6 +1347,10 @@ export class AuditService implements IAuditService {
 
           const endDate = parseDate(endDateValue)
           if (!endDate) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: Invalid end date format`
+            )
             result.errors.push({
               row: rowNumber,
               audit: propertyName,
@@ -1314,6 +1362,10 @@ export class AuditService implements IAuditService {
 
           // Validate date range
           if (startDate >= endDate) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: Start date must be before end date`
+            )
             result.errors.push({
               row: rowNumber,
               audit: propertyName,
@@ -1370,6 +1422,10 @@ export class AuditService implements IAuditService {
           const auditDescription = `${propertyName} - ${typeOfOta ? typeOfOta : 'Unknown OTA'} Audit`
           result.successCount++
           result.successfulImports.push(auditDescription)
+          console.log(
+            '\x1b[32m%s\x1b[0m',
+            `✅ Row ${rowNumber} SUCCESS: Created audit for '${propertyName}' (${typeOfOta || 'Unknown OTA'})`
+          )
         } catch (error) {
           const propertyName =
             findHeaderValue(row, [
@@ -1379,6 +1435,10 @@ export class AuditService implements IAuditService {
               'Name'
             ]) || 'Unknown'
 
+          console.log(
+            '\x1b[31m%s\x1b[0m',
+            `❌ Row ${rowNumber} FAILED: ${error.message || 'Unknown error occurred'}`
+          )
           result.errors.push({
             row: rowNumber,
             audit: propertyName,
@@ -1387,6 +1447,43 @@ export class AuditService implements IAuditService {
           result.failureCount++
         }
       }
+
+      // Final summary report
+      console.log(
+        '\n\x1b[36m%s\x1b[0m',
+        '========================================'
+      )
+      console.log('\x1b[36m%s\x1b[0m', '📊 IMPORT SUMMARY REPORT')
+      console.log(
+        '\x1b[36m%s\x1b[0m',
+        '========================================'
+      )
+      console.log(
+        '\x1b[33m%s\x1b[0m',
+        `📝 Total Rows Processed: ${result.totalRows}`
+      )
+      console.log(
+        '\x1b[32m%s\x1b[0m',
+        `✅ Successfully Imported: ${result.successCount}`
+      )
+      console.log('\x1b[31m%s\x1b[0m', `❌ Failed: ${result.failureCount}`)
+
+      if (result.successCount > 0) {
+        console.log('\n\x1b[32m%s\x1b[0m', '✅ Successful Imports:')
+        result.successfulImports.forEach((audit, idx) => {
+          console.log('\x1b[32m%s\x1b[0m', `   ${idx + 1}. ${audit}`)
+        })
+      }
+
+      if (result.failureCount > 0) {
+        console.log('\n\x1b[31m%s\x1b[0m', '❌ Failed Imports:')
+        console.table(result.errors)
+      }
+
+      console.log(
+        '\x1b[36m%s\x1b[0m',
+        '========================================\n'
+      )
 
       return result
     } catch (error) {
