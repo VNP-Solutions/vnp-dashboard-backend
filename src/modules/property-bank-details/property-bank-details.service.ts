@@ -319,6 +319,20 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         return undefined
       }
 
+      // Log available columns for debugging
+      if (data.length > 0) {
+        const firstRow = data[0] as any
+        const availableColumns = Object.keys(firstRow)
+        console.log(
+          'Available Excel columns:',
+          JSON.stringify(availableColumns)
+        )
+        console.log(
+          'Sample first row values:',
+          JSON.stringify(firstRow, null, 2)
+        )
+      }
+
       // Process each row
       for (let i = 0; i < data.length; i++) {
         const row = data[i] as any
@@ -329,10 +343,25 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           const propertyName = findHeaderValue(row, [
             'Property Name',
             'Property name',
-            'Name'
+            'property_name',
+            'Name',
+            'Property'
           ])
 
+          // Log row data for debugging
+          console.table([{
+            'Row #': rowNumber,
+            'Property Name': propertyName || 'N/A',
+            'Bank Type': findHeaderValue(row, ['Bank Type', 'Bank type', 'bank_type']) || 'N/A',
+            'Bank Sub Type': findHeaderValue(row, ['Bank Sub Type', 'Bank sub type', 'bank_sub_type', 'Sub Type', 'SubType']) || 'N/A',
+            'Stripe Email': findHeaderValue(row, ['Stripe Account Email', 'Stripe Email', 'Stripe account email', 'stripe_account_email']) || 'N/A'
+          }])
+
           if (!propertyName) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: Property name is required. Available columns: ${Object.keys(row).join(', ')}`
+            )
             result.errors.push({
               row: rowNumber,
               property: 'Unknown',
@@ -348,6 +377,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           })
 
           if (!property) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: Property '${propertyName}' not found in database`
+            )
             result.errors.push({
               row: rowNumber,
               property: propertyName,
@@ -361,6 +394,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           try {
             await this.checkEditPermission(user, property.id)
           } catch (error) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: No permission to edit '${propertyName}'`
+            )
             result.errors.push({
               row: rowNumber,
               property: propertyName,
@@ -370,75 +407,118 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             continue
           }
 
-          // Extract bank details fields
+          // Extract bank details fields with comprehensive name matching
           const stripeAccountEmail = findHeaderValue(row, [
             'Stripe Account Email',
+            'Stripe account email',
+            'stripe_account_email',
             'Stripe Email',
-            'Stripe account email'
+            'Stripe email',
+            'stripe_email'
           ])
 
           const bankSubType = findHeaderValue(row, [
             'Bank Sub Type',
             'Bank sub type',
-            'Sub Type'
+            'Bank Sub type',
+            'bank_sub_type',
+            'Sub Type',
+            'SubType',
+            'Subtype',
+            'Bank Subtype'
           ])
           const hotelPortfolioName = findHeaderValue(row, [
             'Hotel Portfolio Name',
+            'Hotel portfolio name',
+            'hotel_portfolio_name',
             'Hotel Name',
-            'Portfolio Name'
+            'Hotel name',
+            'Portfolio Name',
+            'Portfolio name'
           ])
           const beneficiaryName = findHeaderValue(row, [
             'Beneficiary Name',
             'Beneficiary name',
+            'beneficiary_name',
             'Beneficiary',
             'Beneficiary Name (ACH)'
           ])
           const beneficiaryAddress = findHeaderValue(row, [
             'Beneficiary Address',
-            'Beneficiary address'
+            'Beneficiary address',
+            'beneficiary_address',
+            'Address',
+            'Beneficiary addr'
           ])
           const accountNumber = findHeaderValue(row, [
             'Account Number',
             'Account number',
-            'Bank Account'
+            'account_number',
+            'Bank Account',
+            'Bank Account Number',
+            'Account No',
+            'Account #'
           ])
           const accountName = findHeaderValue(row, [
             'Account Name',
             'Account name',
-            'Account Holder'
+            'account_name',
+            'Account Holder',
+            'Account holder',
+            'Account Holder Name'
           ])
           const bankName = findHeaderValue(row, [
             'Bank Name',
             'Bank name',
+            'bank_name',
             'Bank'
           ])
           const bankBranch = findHeaderValue(row, [
             'Bank Branch',
             'Bank branch',
-            'Branch'
+            'bank_branch',
+            'Branch',
+            'Branch Name'
           ])
           const swiftCode = findHeaderValue(row, [
             'Swift Code',
             'Swift code',
-            'SWIFT'
+            'swift_code',
+            'SWIFT',
+            'Swift',
+            'SWIFT Code',
+            'BIC',
+            'SWIFT/BIC'
           ])
           const ibanNumber = findHeaderValue(row, [
             'IBAN Number',
             'IBAN number',
-            'IBAN'
+            'iban_number',
+            'IBAN',
+            'Iban'
           ])
           const routingNumber = findHeaderValue(row, [
             'Routing Number',
             'Routing number',
-            'Routing'
+            'routing_number',
+            'Routing',
+            'Routing No',
+            'ABA Number',
+            'ABA'
           ])
           const bankAccountType = findHeaderValue(row, [
             'Bank Account Type',
-            'Account Type'
+            'Bank account type',
+            'bank_account_type',
+            'Account Type',
+            'Account type',
+            'Type'
           ])
           const currency = findHeaderValue(row, [
             'Currency',
-            'Currency Code'
+            'currency',
+            'Currency Code',
+            'Currency code'
           ])
 
           // Check if any bank details are provided
@@ -458,6 +538,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             !bankAccountType &&
             !currency
           ) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: No bank details provided for '${propertyName}'`
+            )
             result.errors.push({
               row: rowNumber,
               property: propertyName,
@@ -506,6 +590,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               if (['ach', 'domestic_wire', 'international_wire'].includes(normalizedSubType)) {
                 updateData.bank_sub_type = normalizedSubType
               } else {
+                console.log(
+                  '\x1b[31m%s\x1b[0m',
+                  `❌ Row ${rowNumber} FAILED: Invalid bank sub type '${bankSubType}' for '${propertyName}'`
+                )
                 result.errors.push({
                   row: rowNumber,
                   property: propertyName,
@@ -552,6 +640,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               if (['checking', 'savings'].includes(normalizedAccountType)) {
                 updateData.bank_account_type = normalizedAccountType
               } else {
+                console.log(
+                  '\x1b[31m%s\x1b[0m',
+                  `❌ Row ${rowNumber} FAILED: Invalid bank account type '${bankAccountType}' for '${propertyName}'`
+                )
                 result.errors.push({
                   row: rowNumber,
                   property: propertyName,
@@ -571,6 +663,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               : existingBankDetails?.bank_sub_type
 
             if (!finalSubType && !existingBankDetails) {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ Row ${rowNumber} FAILED: bank_sub_type is required for new bank account for '${propertyName}'`
+              )
               result.errors.push({
                 row: rowNumber,
                 property: propertyName,
@@ -685,6 +781,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               }
 
               if (missingFields.length > 0) {
+                console.log(
+                  '\x1b[31m%s\x1b[0m',
+                  `❌ Row ${rowNumber} FAILED: Missing required fields for ${finalSubType}: ${missingFields.join(', ')} for '${propertyName}'`
+                )
                 result.errors.push({
                   row: rowNumber,
                   property: propertyName,
@@ -705,19 +805,31 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               property.id,
               updateData
             )
+            console.log(
+              '\x1b[32m%s\x1b[0m',
+              `✅ Row ${rowNumber} SUCCESS: Updated bank details for '${propertyName}'`
+            )
           } else {
             // Create new bank details
             updateData.property_id = property.id
             await this.propertyBankDetailsRepository.create(updateData)
+            console.log(
+              '\x1b[32m%s\x1b[0m',
+              `✅ Row ${rowNumber} SUCCESS: Created bank details for '${propertyName}'`
+            )
           }
 
           result.successCount++
           result.successfulUpdates.push(propertyName)
         } catch (error) {
           const propertyName =
-            findHeaderValue(row, ['Property Name', 'Property name', 'Name']) ||
+            findHeaderValue(row, ['Property Name', 'Property name', 'property_name', 'Name', 'Property']) ||
             'Unknown'
 
+          console.log(
+            '\x1b[31m%s\x1b[0m',
+            `❌ Row ${rowNumber} FAILED: ${error.message || 'Unknown error occurred'} for '${propertyName}'`
+          )
           result.errors.push({
             row: rowNumber,
             property: propertyName,
@@ -726,6 +838,43 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           result.failureCount++
         }
       }
+
+      // Final summary report
+      console.log(
+        '\n\x1b[36m%s\x1b[0m',
+        '========================================'
+      )
+      console.log('\x1b[36m%s\x1b[0m', '📊 BULK UPDATE SUMMARY REPORT')
+      console.log(
+        '\x1b[36m%s\x1b[0m',
+        '========================================'
+      )
+      console.log(
+        '\x1b[33m%s\x1b[0m',
+        `📝 Total Rows Processed: ${result.totalRows}`
+      )
+      console.log(
+        '\x1b[32m%s\x1b[0m',
+        `✅ Successfully Updated/Created: ${result.successCount}`
+      )
+      console.log('\x1b[31m%s\x1b[0m', `❌ Failed: ${result.failureCount}`)
+
+      if (result.successCount > 0) {
+        console.log('\n\x1b[32m%s\x1b[0m', '✅ Successful Updates:')
+        result.successfulUpdates.forEach((property, idx) => {
+          console.log('\x1b[32m%s\x1b[0m', `   ${idx + 1}. ${property}`)
+        })
+      }
+
+      if (result.failureCount > 0) {
+        console.log('\n\x1b[31m%s\x1b[0m', '❌ Failed Updates:')
+        console.table(result.errors)
+      }
+
+      console.log(
+        '\x1b[36m%s\x1b[0m',
+        '========================================\n'
+      )
 
       return result
     } catch (error) {
