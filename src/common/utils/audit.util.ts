@@ -7,7 +7,7 @@
  * AUDIT STATUS CATEGORIES
  * ============================================================================
  * These are the status names from the AuditStatus collection organized by
- * their stage in the audit workflow (exact match, case-sensitive)
+ * their stage in the audit workflow (case-insensitive comparison)
  */
 
 /**
@@ -61,8 +61,8 @@ export const COMPLETED_AUDIT_STATUSES = [
  * @returns boolean - true if status is pending
  */
 export function isPendingAudit(auditStatus: string): boolean {
-  const trimmedStatus = auditStatus.trim()
-  return PENDING_AUDIT_STATUSES.includes(trimmedStatus)
+  const trimmedStatus = auditStatus.trim().toLowerCase()
+  return PENDING_AUDIT_STATUSES.some(status => status.toLowerCase() === trimmedStatus)
 }
 
 /**
@@ -71,8 +71,8 @@ export function isPendingAudit(auditStatus: string): boolean {
  * @returns boolean - true if status is upcoming
  */
 export function isUpcomingAudit(auditStatus: string): boolean {
-  const trimmedStatus = auditStatus.trim()
-  return UPCOMING_AUDIT_STATUSES.includes(trimmedStatus)
+  const trimmedStatus = auditStatus.trim().toLowerCase()
+  return UPCOMING_AUDIT_STATUSES.some(status => status.toLowerCase() === trimmedStatus)
 }
 
 /**
@@ -81,8 +81,8 @@ export function isUpcomingAudit(auditStatus: string): boolean {
  * @returns boolean - true if status is in progress
  */
 export function isInProgressAudit(auditStatus: string): boolean {
-  const trimmedStatus = auditStatus.trim()
-  return IN_PROGRESS_AUDIT_STATUSES.includes(trimmedStatus)
+  const trimmedStatus = auditStatus.trim().toLowerCase()
+  return IN_PROGRESS_AUDIT_STATUSES.some(status => status.toLowerCase() === trimmedStatus)
 }
 
 /**
@@ -91,8 +91,8 @@ export function isInProgressAudit(auditStatus: string): boolean {
  * @returns boolean - true if status is completed
  */
 export function isCompletedAudit(auditStatus: string): boolean {
-  const trimmedStatus = auditStatus.trim()
-  return COMPLETED_AUDIT_STATUSES.includes(trimmedStatus)
+  const trimmedStatus = auditStatus.trim().toLowerCase()
+  return COMPLETED_AUDIT_STATUSES.some(status => status.toLowerCase() === trimmedStatus)
 }
 
 /**
@@ -112,12 +112,12 @@ export function canArchiveAudit(auditStatus: string): boolean {
 export function getAuditStatusCategory(
   auditStatus: string
 ): 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'unknown' {
-  const trimmedStatus = auditStatus.trim()
+  const trimmedStatus = auditStatus.trim().toLowerCase()
 
-  if (PENDING_AUDIT_STATUSES.includes(trimmedStatus)) return 'pending'
-  if (UPCOMING_AUDIT_STATUSES.includes(trimmedStatus)) return 'upcoming'
-  if (IN_PROGRESS_AUDIT_STATUSES.includes(trimmedStatus)) return 'in_progress'
-  if (COMPLETED_AUDIT_STATUSES.includes(trimmedStatus)) return 'completed'
+  if (PENDING_AUDIT_STATUSES.some(status => status.toLowerCase() === trimmedStatus)) return 'pending'
+  if (UPCOMING_AUDIT_STATUSES.some(status => status.toLowerCase() === trimmedStatus)) return 'upcoming'
+  if (IN_PROGRESS_AUDIT_STATUSES.some(status => status.toLowerCase() === trimmedStatus)) return 'in_progress'
+  if (COMPLETED_AUDIT_STATUSES.some(status => status.toLowerCase() === trimmedStatus)) return 'completed'
 
   return 'unknown'
 }
