@@ -19,6 +19,13 @@ type AuditWithRelations = Prisma.AuditGetPayload<{
         status: true
       }
     }
+    batch: {
+      select: {
+        id: true
+        batch_no: true
+        order: true
+      }
+    }
     property: {
       select: {
         id: true
@@ -41,6 +48,13 @@ type AuditWithFullDetails = Prisma.AuditGetPayload<{
       select: {
         id: true
         status: true
+      }
+    }
+    batch: {
+      select: {
+        id: true
+        batch_no: true
+        order: true
       }
     }
     property: {

@@ -103,9 +103,6 @@ export class PropertyService implements IPropertyService {
 
     // Build additional filters from query params
     const additionalFilters: any = {}
-    if (query.batch_id) {
-      additionalFilters.batch_id = query.batch_id
-    }
     if (query.is_active) {
       additionalFilters.is_active = query.is_active
     }
@@ -145,12 +142,10 @@ export class PropertyService implements IPropertyService {
         'address',
         'card_descriptor',
         'portfolio.name',
-        'batch.batch_no',
         'currency.code',
         'currency.name'
       ],
       filterableFields: [
-        'batch_id',
         'is_active',
         'bank_type',
         'portfolio_id',
@@ -165,14 +160,12 @@ export class PropertyService implements IPropertyService {
         'updated_at',
         'is_active',
         'portfolio.name',
-        'batch.batch_no',
         'currency.code'
       ],
       defaultSortField: 'created_at',
       defaultSortOrder: 'desc' as const,
       nestedFieldMap: {
         portfolio_name: 'portfolio.name',
-        batch_name: 'batch.batch_no',
         currency_code: 'currency.code',
         bank_type: 'bankDetails.bank_type'
       }
@@ -289,9 +282,6 @@ export class PropertyService implements IPropertyService {
 
     // Build additional filters from query params
     const additionalFilters: any = {}
-    if (query.batch_id) {
-      additionalFilters.batch_id = query.batch_id
-    }
     if (query.is_active) {
       additionalFilters.is_active = query.is_active
     }
@@ -331,12 +321,10 @@ export class PropertyService implements IPropertyService {
         'address',
         'card_descriptor',
         'portfolio.name',
-        'batch.batch_no',
         'currency.code',
         'currency.name'
       ],
       filterableFields: [
-        'batch_id',
         'is_active',
         'bank_type',
         'portfolio_id',
@@ -351,14 +339,12 @@ export class PropertyService implements IPropertyService {
         'updated_at',
         'is_active',
         'portfolio.name',
-        'batch.batch_no',
         'currency.code'
       ],
       defaultSortField: 'created_at',
       defaultSortOrder: 'desc' as const,
       nestedFieldMap: {
         portfolio_name: 'portfolio.name',
-        batch_name: 'batch.batch_no',
         currency_code: 'currency.code',
         bank_type: 'bankDetails.bank_type'
       }
@@ -1018,25 +1004,6 @@ export class PropertyService implements IPropertyService {
             })
           }
 
-          // Extract batch (optional)
-          const batchValue = findHeaderValue(row, ['Batch', 'Batch No'])
-          let batchId: string | undefined = undefined
-
-          if (batchValue) {
-            // Find or create batch
-            let batch = await this.prisma.propertyBatch.findFirst({
-              where: { batch_no: batchValue }
-            })
-
-            if (!batch) {
-              batch = await this.prisma.propertyBatch.create({
-                data: { batch_no: batchValue }
-              })
-            }
-
-            batchId = batch.id
-          }
-
           // Create or update property
           let propertyId: string
 
@@ -1050,8 +1017,7 @@ export class PropertyService implements IPropertyService {
               next_due_date: nextDueDate
                 ? nextDueDate.toISOString()
                 : undefined,
-              portfolio_id: portfolio.id,
-              batch_id: batchId
+              portfolio_id: portfolio.id
             }
 
             await this.propertyRepository.update(
@@ -1070,8 +1036,7 @@ export class PropertyService implements IPropertyService {
               next_due_date: nextDueDate
                 ? nextDueDate.toISOString()
                 : undefined,
-              portfolio_id: portfolio.id,
-              batch_id: batchId
+              portfolio_id: portfolio.id
             }
 
             const createdProperty =
@@ -1535,7 +1500,7 @@ export class PropertyService implements IPropertyService {
     }
   }
 
-  // Add prisma service accessor for currency and batch lookups
+  // Add prisma service accessor for currency lookups
   private get prisma() {
     return (this.propertyRepository as any).prisma
   }

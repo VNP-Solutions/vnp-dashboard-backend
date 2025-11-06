@@ -70,14 +70,6 @@ export class CreatePropertyDto {
   portfolio_id: string
 
   @ApiPropertyOptional({
-    example: '507f1f77bcf86cd799439013',
-    description: 'Property Batch ID (optional)'
-  })
-  @IsString()
-  @IsOptional()
-  batch_id?: string
-
-  @ApiPropertyOptional({
     example: ['507f1f77bcf86cd799439014', '507f1f77bcf86cd799439015'],
     description:
       'Array of Portfolio IDs where this property should be visible (optional)',
@@ -122,14 +114,6 @@ export class BulkTransferPropertyDto {
 }
 
 export class PropertyQueryDto extends QueryDto {
-  @ApiPropertyOptional({
-    description: 'Filter by batch ID (can be comma-separated for multiple)',
-    example: '507f1f77bcf86cd799439013'
-  })
-  @IsOptional()
-  @IsString()
-  batch_id?: string
-
   @ApiPropertyOptional({
     description: 'Filter by bank type (bank/stripe/All)',
     example: 'bank'

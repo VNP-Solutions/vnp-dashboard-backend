@@ -21,6 +21,13 @@ export class AuditRepository implements IAuditRepository {
             status: true
           }
         },
+        batch: {
+          select: {
+            id: true,
+            batch_no: true,
+            order: true
+          }
+        },
         property: {
           select: {
             id: true,
@@ -69,6 +76,13 @@ export class AuditRepository implements IAuditRepository {
           select: {
             id: true,
             status: true
+          }
+        },
+        batch: {
+          select: {
+            id: true,
+            batch_no: true,
+            order: true
           }
         },
         property: {
@@ -120,6 +134,13 @@ export class AuditRepository implements IAuditRepository {
           select: {
             id: true,
             status: true
+          }
+        },
+        batch: {
+          select: {
+            id: true,
+            batch_no: true,
+            order: true
           }
         },
         property: {
@@ -176,6 +197,13 @@ export class AuditRepository implements IAuditRepository {
             status: true
           }
         },
+        batch: {
+          select: {
+            id: true,
+            batch_no: true,
+            order: true
+          }
+        },
         property: {
           select: {
             id: true,
@@ -208,6 +236,13 @@ export class AuditRepository implements IAuditRepository {
           select: {
             id: true,
             status: true
+          }
+        },
+        batch: {
+          select: {
+            id: true,
+            batch_no: true,
+            order: true
           }
         },
         property: {
@@ -261,6 +296,13 @@ export class AuditRepository implements IAuditRepository {
           select: {
             id: true,
             status: true
+          }
+        },
+        batch: {
+          select: {
+            id: true,
+            batch_no: true,
+            order: true
           }
         },
         property: {
@@ -319,6 +361,13 @@ export class AuditRepository implements IAuditRepository {
           select: {
             id: true,
             status: true
+          }
+        },
+        batch: {
+          select: {
+            id: true,
+            batch_no: true,
+            order: true
           }
         },
         property: {

@@ -72,6 +72,14 @@ export class CreateAuditDto {
   property_id: string
 
   @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439013',
+    description: 'Audit Batch ID (optional)'
+  })
+  @IsString()
+  @IsOptional()
+  batch_id?: string
+
+  @ApiPropertyOptional({
     example: 'https://example.com/report.pdf',
     description: 'Report URL'
   })
@@ -83,6 +91,14 @@ export class CreateAuditDto {
 export class UpdateAuditDto extends PartialType(CreateAuditDto) {}
 
 export class AuditQueryDto extends QueryDto {
+  @ApiPropertyOptional({
+    description: 'Filter by batch ID',
+    example: '507f1f77bcf86cd799439013'
+  })
+  @IsOptional()
+  @IsString()
+  batch_id?: string
+
   @ApiPropertyOptional({
     enum: OtaType,
     description: 'Filter by OTA type (expedia, agoda, booking)',

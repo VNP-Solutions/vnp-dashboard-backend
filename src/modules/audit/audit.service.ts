@@ -78,6 +78,9 @@ export class AuditService implements IAuditService {
 
     // Build additional filters from query params
     const additionalFilters: any = {}
+    if (query.batch_id) {
+      additionalFilters.batch_id = query.batch_id
+    }
     if (query.type_of_ota) {
       additionalFilters.type_of_ota = query.type_of_ota
     }
@@ -142,8 +145,9 @@ export class AuditService implements IAuditService {
 
     // Configuration for query builder - remove nested fields for MongoDB compatibility
     const queryConfig = {
-      searchFields: ['id'],
+      searchFields: ['id', 'batch.batch_no'],
       filterableFields: [
+        'batch_id',
         'type_of_ota',
         'audit_status_id',
         'property_id',
@@ -265,6 +269,9 @@ export class AuditService implements IAuditService {
 
     // Build additional filters from query params
     const additionalFilters: any = {}
+    if (query.batch_id) {
+      additionalFilters.batch_id = query.batch_id
+    }
     if (query.type_of_ota) {
       additionalFilters.type_of_ota = query.type_of_ota
     }
@@ -329,8 +336,9 @@ export class AuditService implements IAuditService {
 
     // Configuration for query builder - remove nested fields for MongoDB compatibility
     const queryConfig = {
-      searchFields: ['id'],
+      searchFields: ['id', 'batch.batch_no'],
       filterableFields: [
+        'batch_id',
         'type_of_ota',
         'audit_status_id',
         'property_id',
@@ -855,6 +863,23 @@ export class AuditService implements IAuditService {
             updateData.report_url = reportUrl
           }
 
+          // Extract batch (optional)
+          const batchValue = findHeaderValue(row, ['Batch', 'Batch No'])
+          if (batchValue) {
+            // Find or create batch
+            let batch = await this.prisma.auditBatch.findFirst({
+              where: { batch_no: batchValue }
+            })
+
+            if (!batch) {
+              batch = await this.prisma.auditBatch.create({
+                data: { batch_no: batchValue }
+              })
+            }
+
+            updateData.batch_id = batch.id
+          }
+
           // Only update if there's something to update
           if (Object.keys(updateData).length === 0) {
             result.errors.push({
@@ -1307,6 +1332,25 @@ export class AuditService implements IAuditService {
             'URL'
           ])
 
+          // Extract batch (optional)
+          const batchValue = findHeaderValue(row, ['Batch', 'Batch No'])
+          let batchId: string | undefined = undefined
+
+          if (batchValue) {
+            // Find or create batch
+            let batch = await this.prisma.auditBatch.findFirst({
+              where: { batch_no: batchValue }
+            })
+
+            if (!batch) {
+              batch = await this.prisma.auditBatch.create({
+                data: { batch_no: batchValue }
+              })
+            }
+
+            batchId = batch.id
+          }
+
           // Create audit data
           const auditData: CreateAuditDto = {
             property_id: property.id,
@@ -1316,7 +1360,8 @@ export class AuditService implements IAuditService {
             type_of_ota: typeOfOta || undefined,
             amount_collectable: amountCollectable,
             amount_confirmed: amountConfirmed,
-            report_url: reportUrl
+            report_url: reportUrl,
+            batch_id: batchId
           }
 
           // Create the audit

@@ -208,6 +208,7 @@ export class AuditController {
     - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
     - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)
     - Report URL/Report url/report_url/Report/URL: Report URL
+    - Batch/Batch No: Batch number (will be created if doesn't exist)
     
     Note: Empty cells will keep existing values unchanged.
     `
@@ -363,6 +364,7 @@ export class AuditController {
     - Amount Collectable/Amount collectable/amount_collectable: Collectable amount
     - Amount Confirmed/Amount confirmed/amount_confirmed: Confirmed amount  
     - Report URL/Report url/report_url/Report/URL: Report URL
+    - Batch/Batch No: Batch number (will be created if doesn't exist)
     `
   })
   @ApiBody({
