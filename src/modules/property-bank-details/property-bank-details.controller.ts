@@ -52,7 +52,7 @@ export class PropertyBankDetailsController {
       'Creates bank details for a property. Only super admin, property manager, or portfolio manager can create bank details. ' +
       'For Stripe: Only stripe_account_email is required. ' +
       'For Bank: bank_sub_type is required (ach, domestic_wire, or international_wire). ' +
-      'ACH requires: hotel_portfolio_name, beneficiary, bank_name, routing_number, account_number, bank_account_type. ' +
+      'ACH requires: hotel_portfolio_name, beneficiary_name, bank_name, routing_number, account_number, bank_account_type. ' +
       'Domestic Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, routing_number, account_number. ' +
       'International Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, swift_code, iban_number, account_number, currency.'
   })
@@ -114,7 +114,7 @@ export class PropertyBankDetailsController {
       'Updates bank details for a property. Only super admin, property manager, or portfolio manager can update bank details. ' +
       'For Stripe: Only stripe_account_email is required. ' +
       'For Bank: bank_sub_type is required (ach, domestic_wire, or international_wire). ' +
-      'ACH requires: hotel_portfolio_name, beneficiary, bank_name, routing_number, account_number, bank_account_type. ' +
+      'ACH requires: hotel_portfolio_name, beneficiary_name, bank_name, routing_number, account_number, bank_account_type. ' +
       'Domestic Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, routing_number, account_number. ' +
       'International Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, swift_code, iban_number, account_number, currency.'
   })
@@ -160,7 +160,7 @@ export class PropertyBankDetailsController {
       'For Stripe: Include "Stripe Account Email" column. ' +
       'For Bank: Include "Bank Sub Type" column (ach, domestic_wire, or international_wire). ' +
       'Common columns: Hotel Portfolio Name, Account Number, Bank Name. ' +
-      'ACH: Beneficiary, Routing Number, Bank Account Type (checking/savings). ' +
+      'ACH: Beneficiary Name, Routing Number, Bank Account Type (checking/savings). ' +
       'Domestic Wire: Beneficiary Name, Beneficiary Address, Routing Number. ' +
       'International Wire: Beneficiary Name, Beneficiary Address, Swift Code, IBAN Number, Currency.'
   })

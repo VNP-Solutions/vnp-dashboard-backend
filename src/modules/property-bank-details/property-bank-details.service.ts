@@ -45,7 +45,6 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         // Clear bank-specific fields for stripe
         bank_sub_type: undefined,
         hotel_portfolio_name: undefined,
-        beneficiary: undefined,
         beneficiary_name: undefined,
         beneficiary_address: undefined,
         account_number: undefined,
@@ -86,8 +85,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       switch (data.bank_sub_type) {
         case BankSubType.ach:
           // ACH required fields
-          if (!data.beneficiary || !data.beneficiary.trim()) {
-            missingFields.push('beneficiary')
+          if (!data.beneficiary_name || !data.beneficiary_name.trim()) {
+            missingFields.push('beneficiary_name')
           }
           if (!data.routing_number || !data.routing_number.trim()) {
             missingFields.push('routing_number')
@@ -388,13 +387,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Hotel Name',
             'Portfolio Name'
           ])
-          const beneficiary = findHeaderValue(row, [
-            'Beneficiary',
-            'Beneficiary Name (ACH)'
-          ])
           const beneficiaryName = findHeaderValue(row, [
             'Beneficiary Name',
-            'Beneficiary name'
+            'Beneficiary name',
+            'Beneficiary',
+            'Beneficiary Name (ACH)'
           ])
           const beneficiaryAddress = findHeaderValue(row, [
             'Beneficiary Address',
@@ -449,7 +446,6 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             !stripeAccountEmail &&
             !bankSubType &&
             !hotelPortfolioName &&
-            !beneficiary &&
             !beneficiaryName &&
             !beneficiaryAddress &&
             !accountNumber &&
@@ -488,7 +484,6 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             // Clear bank fields for stripe
             updateData.bank_sub_type = null
             updateData.hotel_portfolio_name = null
-            updateData.beneficiary = null
             updateData.beneficiary_name = null
             updateData.beneficiary_address = null
             updateData.account_number = null
@@ -524,9 +519,6 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             // Only add fields that are provided
             if (hotelPortfolioName !== undefined) {
               updateData.hotel_portfolio_name = hotelPortfolioName
-            }
-            if (beneficiary !== undefined) {
-              updateData.beneficiary = beneficiary
             }
             if (beneficiaryName !== undefined) {
               updateData.beneficiary_name = beneficiaryName
@@ -598,10 +590,6 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                   updateData.hotel_portfolio_name !== undefined
                     ? updateData.hotel_portfolio_name
                     : existingBankDetails?.hotel_portfolio_name,
-                beneficiary:
-                  updateData.beneficiary !== undefined
-                    ? updateData.beneficiary
-                    : existingBankDetails?.beneficiary,
                 beneficiary_name:
                   updateData.beneficiary_name !== undefined
                     ? updateData.beneficiary_name
@@ -654,8 +642,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               // Sub-type specific validation
               switch (finalSubType) {
                 case BankSubType.ach:
-                  if (!mergedData.beneficiary || !mergedData.beneficiary.trim()) {
-                    missingFields.push('Beneficiary')
+                  if (!mergedData.beneficiary_name || !mergedData.beneficiary_name.trim()) {
+                    missingFields.push('Beneficiary Name')
                   }
                   if (!mergedData.routing_number || !mergedData.routing_number.trim()) {
                     missingFields.push('Routing Number')

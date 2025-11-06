@@ -45,16 +45,7 @@ export class CreatePropertyBankDetailsDto {
   @ApiPropertyOptional({
     example: 'John Doe',
     description:
-      'Beneficiary name. Required for ACH.'
-  })
-  @IsString()
-  @IsOptional()
-  beneficiary?: string
-
-  @ApiPropertyOptional({
-    example: 'John Doe',
-    description:
-      'Beneficiary name. Required for Domestic US Wire and International Wire.'
+      'Beneficiary name. Required for ACH, Domestic US Wire and International Wire.'
   })
   @IsString()
   @IsOptional()

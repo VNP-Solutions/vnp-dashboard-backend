@@ -159,7 +159,6 @@ model PropertyBankDetails {
   bank_type            BankType         @default(bank)
   bank_sub_type        BankSubType?
   hotel_portfolio_name String?
-  beneficiary          String?
   beneficiary_name     String?
   beneficiary_address  String?
   account_number       String?
