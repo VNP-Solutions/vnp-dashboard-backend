@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator'
+import { Type } from 'class-transformer'
+import { IsArray, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator'
 
 export class OtaCredentialsDto {
   @ApiPropertyOptional({
@@ -110,4 +111,76 @@ export class PropertyCredentialsResponseDto {
 
   @ApiProperty()
   updated_at: Date
+}
+
+export class BulkUpdateCredentialsDto {
+  @ApiPropertyOptional({
+    description: 'Expedia credentials to update',
+    type: OtaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => OtaCredentialsDto)
+  @IsOptional()
+  expedia?: OtaCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Agoda credentials to update',
+    type: OtaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => OtaCredentialsDto)
+  @IsOptional()
+  agoda?: OtaCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Booking.com credentials to update',
+    type: OtaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => OtaCredentialsDto)
+  @IsOptional()
+  booking?: OtaCredentialsDto
+}
+
+export class BulkUpdatePropertyCredentialsDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of property IDs to update'
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  property_ids: string[]
+
+  @ApiProperty({
+    description: 'Credentials to apply to all specified properties',
+    type: BulkUpdateCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => BulkUpdateCredentialsDto)
+  @IsNotEmpty()
+  credentials: BulkUpdateCredentialsDto
+}
+
+export class BulkUpdatePropertyCredentialsResponseDto {
+  @ApiProperty({ example: 5, description: 'Number of properties successfully updated' })
+  updated_count: number
+
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'IDs of properties that were updated'
+  })
+  updated_property_ids: string[]
+
+  @ApiProperty({
+    example: 2,
+    description: 'Number of properties that were skipped (not found or no credentials)'
+  })
+  skipped_count: number
+
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439013'],
+    description: 'IDs of properties that were skipped'
+  })
+  skipped_property_ids: string[]
 }

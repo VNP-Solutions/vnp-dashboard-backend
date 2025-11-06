@@ -125,6 +125,12 @@ export class PropertyRepository implements IPropertyRepository {
     })
   }
 
+  async findByIds(ids: string[]) {
+    return this.prisma.property.findMany({
+      where: { id: { in: ids } }
+    })
+  }
+
   async findByName(name: string) {
     return this.prisma.property.findUnique({
       where: { name }

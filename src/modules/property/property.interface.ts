@@ -81,6 +81,7 @@ export interface IPropertyRepository {
   ): Promise<PropertyWithRelations[]>
   count(whereClause: any, propertyIds?: string[]): Promise<number>
   findById(id: string): Promise<PropertyWithFullDetails | null>
+  findByIds(ids: string[]): Promise<Property[]>
   findByName(name: string): Promise<Property | null>
   update(id: string, data: UpdatePropertyDto): Promise<PropertyWithRelations>
   delete(id: string): Promise<Property>

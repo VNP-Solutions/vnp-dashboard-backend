@@ -24,6 +24,7 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
+  BulkUpdatePropertyCredentialsDto,
   CreatePropertyCredentialsDto,
   UpdatePropertyCredentialsDto
 } from './property-credentials.dto'
@@ -98,5 +99,45 @@ export class PropertyCredentialsController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.credentialsService.update(propertyId, updateDto, user)
+  }
+
+  @Patch('bulk-update')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary: 'Bulk update property credentials',
+    description:
+      'Update the same credentials for multiple properties at once. ' +
+      'Existing credentials will be merged with the new ones. ' +
+      'Username and password must be provided together when updating optional credentials (Agoda/Booking). ' +
+      'Passwords will be encrypted before storage.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk update completed successfully',
+    schema: {
+      example: {
+        updated_count: 5,
+        updated_property_ids: [
+          '507f1f77bcf86cd799439011',
+          '507f1f77bcf86cd799439012'
+        ],
+        skipped_count: 2,
+        skipped_property_ids: ['507f1f77bcf86cd799439013']
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid input data'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkUpdate(
+    @Body() bulkUpdateDto: BulkUpdatePropertyCredentialsDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.credentialsService.bulkUpdate(bulkUpdateDto, user)
   }
 }

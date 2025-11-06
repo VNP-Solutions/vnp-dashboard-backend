@@ -11,6 +11,8 @@ import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { Configuration } from '../../config/configuration'
 import type { IPropertyRepository } from '../property/property.interface'
 import {
+  BulkUpdatePropertyCredentialsDto,
+  BulkUpdatePropertyCredentialsResponseDto,
   CreatePropertyCredentialsDto,
   PropertyCredentialsResponseDto,
   UpdatePropertyCredentialsDto
@@ -244,5 +246,181 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
     }
 
     return response
+  }
+
+  async bulkUpdate(
+    data: BulkUpdatePropertyCredentialsDto,
+    _user: IUserWithPermissions
+  ): Promise<BulkUpdatePropertyCredentialsResponseDto> {
+    const { property_ids, credentials } = data
+
+    if (property_ids.length === 0) {
+      throw new BadRequestException('property_ids array cannot be empty')
+    }
+
+    // Validate that at least one credential field is provided
+    if (!credentials.expedia && !credentials.agoda && !credentials.booking) {
+      throw new BadRequestException(
+        'At least one credential (expedia, agoda, or booking) must be provided'
+      )
+    }
+
+    // Validate properties exist
+    const properties = await this.propertyRepository.findByIds(property_ids)
+    const foundPropertyIds = properties.map(p => p.id)
+
+    // Get existing credentials for all properties
+    const existingCredentials =
+      await this.credentialsRepository.findManyByPropertyIds(foundPropertyIds)
+
+    // Create a map of property_id to existing credentials
+    const existingCredMap = new Map(
+      existingCredentials.map(cred => [cred.property_id, cred])
+    )
+
+    const encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+
+    const updatedPropertyIds: string[] = []
+    const skippedPropertyIds: string[] = []
+
+    // Process each property individually to handle merging logic
+    for (const propertyId of foundPropertyIds) {
+      const existingCred = existingCredMap.get(propertyId)
+
+      if (!existingCred) {
+        // Skip properties without existing credentials
+        skippedPropertyIds.push(propertyId)
+        continue
+      }
+
+      const updateData: any = {}
+
+      // Handle Expedia credentials
+      if (credentials.expedia) {
+        // Update ID if provided
+        if (credentials.expedia.id !== undefined) {
+          updateData.expedia_id = credentials.expedia.id
+        }
+
+        // Handle username and password together
+        const hasUsername = credentials.expedia.username !== undefined
+        const hasPassword = credentials.expedia.password !== undefined
+
+        if (hasUsername && hasPassword) {
+          // Both provided - update both
+          updateData.expedia_username = credentials.expedia.username
+          updateData.expedia_password = EncryptionUtil.encrypt(
+            credentials.expedia.password!,
+            encryptionSecret
+          )
+        } else if (hasPassword && !hasUsername) {
+          // Only password provided - update password, keep existing username
+          updateData.expedia_password = EncryptionUtil.encrypt(
+            credentials.expedia.password!,
+            encryptionSecret
+          )
+        } else if (hasUsername && !hasPassword) {
+          // Only username provided - update username, keep existing password
+          updateData.expedia_username = credentials.expedia.username
+        }
+      }
+
+      // Handle Agoda credentials
+      if (credentials.agoda) {
+        const hasId = credentials.agoda.id !== undefined
+        const hasUsername = credentials.agoda.username !== undefined
+        const hasPassword = credentials.agoda.password !== undefined
+
+        // Update ID independently
+        if (hasId) {
+          updateData.agoda_id = credentials.agoda.id
+        }
+
+        // Username and password must be updated together
+        if (hasUsername && hasPassword) {
+          // Both provided - update both
+          updateData.agoda_username = credentials.agoda.username
+          updateData.agoda_password = EncryptionUtil.encrypt(
+            credentials.agoda.password!,
+            encryptionSecret
+          )
+        } else if (hasPassword && !hasUsername) {
+          // Only password provided - update password if username exists
+          if (existingCred.agoda_username) {
+            updateData.agoda_password = EncryptionUtil.encrypt(
+              credentials.agoda.password!,
+              encryptionSecret
+            )
+          }
+          // Otherwise skip (don't save password without username)
+        } else if (hasUsername && !hasPassword) {
+          // Only username provided - update username if password exists
+          if (existingCred.agoda_password) {
+            updateData.agoda_username = credentials.agoda.username
+          }
+          // Otherwise skip (don't save username without password)
+        }
+      }
+
+      // Handle Booking credentials
+      if (credentials.booking) {
+        const hasId = credentials.booking.id !== undefined
+        const hasUsername = credentials.booking.username !== undefined
+        const hasPassword = credentials.booking.password !== undefined
+
+        // Update ID independently
+        if (hasId) {
+          updateData.booking_id = credentials.booking.id
+        }
+
+        // Username and password must be updated together
+        if (hasUsername && hasPassword) {
+          // Both provided - update both
+          updateData.booking_username = credentials.booking.username
+          updateData.booking_password = EncryptionUtil.encrypt(
+            credentials.booking.password!,
+            encryptionSecret
+          )
+        } else if (hasPassword && !hasUsername) {
+          // Only password provided - update password if username exists
+          if (existingCred.booking_username) {
+            updateData.booking_password = EncryptionUtil.encrypt(
+              credentials.booking.password!,
+              encryptionSecret
+            )
+          }
+          // Otherwise skip (don't save password without username)
+        } else if (hasUsername && !hasPassword) {
+          // Only username provided - update username if password exists
+          if (existingCred.booking_password) {
+            updateData.booking_username = credentials.booking.username
+          }
+          // Otherwise skip (don't save username without password)
+        }
+      }
+
+      // Only update if there are fields to update
+      if (Object.keys(updateData).length > 0) {
+        await this.credentialsRepository.update(propertyId, updateData)
+        updatedPropertyIds.push(propertyId)
+      } else {
+        skippedPropertyIds.push(propertyId)
+      }
+    }
+
+    // Add properties that don't exist or have no credentials to skipped
+    const notFoundPropertyIds = property_ids.filter(
+      id => !foundPropertyIds.includes(id)
+    )
+    skippedPropertyIds.push(...notFoundPropertyIds)
+
+    return {
+      updated_count: updatedPropertyIds.length,
+      updated_property_ids: updatedPropertyIds,
+      skipped_count: skippedPropertyIds.length,
+      skipped_property_ids: skippedPropertyIds
+    }
   }
 }

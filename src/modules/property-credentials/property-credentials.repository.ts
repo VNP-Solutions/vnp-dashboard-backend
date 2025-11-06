@@ -56,4 +56,36 @@ export class PropertyCredentialsRepository
       data
     })
   }
+
+  async findManyByPropertyIds(propertyIds: string[]) {
+    const credentials = await this.prisma.propertyCredentials.findMany({
+      where: { property_id: { in: propertyIds } }
+    })
+
+    const encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+
+    return credentials.map(cred => ({
+      ...cred,
+      expedia_password: EncryptionUtil.decrypt(
+        cred.expedia_password,
+        encryptionSecret
+      ),
+      agoda_password: cred.agoda_password
+        ? EncryptionUtil.decrypt(cred.agoda_password, encryptionSecret)
+        : null,
+      booking_password: cred.booking_password
+        ? EncryptionUtil.decrypt(cred.booking_password, encryptionSecret)
+        : null
+    }))
+  }
+
+  async bulkUpdate(propertyIds: string[], data: any) {
+    const result = await this.prisma.propertyCredentials.updateMany({
+      where: { property_id: { in: propertyIds } },
+      data
+    })
+    return { count: result.count }
+  }
 }

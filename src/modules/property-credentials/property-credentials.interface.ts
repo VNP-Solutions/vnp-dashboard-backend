@@ -1,6 +1,8 @@
 import { PropertyCredentials } from '@prisma/client'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
+  BulkUpdatePropertyCredentialsDto,
+  BulkUpdatePropertyCredentialsResponseDto,
   CreatePropertyCredentialsDto,
   PropertyCredentialsResponseDto,
   UpdatePropertyCredentialsDto
@@ -29,6 +31,13 @@ export interface IPropertyCredentialsRepository {
     propertyId: string
   ): Promise<PropertyCredentialsWithDecrypted | null>
   update(propertyId: string, data: any): Promise<PropertyCredentials>
+  findManyByPropertyIds(
+    propertyIds: string[]
+  ): Promise<PropertyCredentialsWithDecrypted[]>
+  bulkUpdate(
+    propertyIds: string[],
+    data: any
+  ): Promise<{ count: number }>
 }
 
 export interface IPropertyCredentialsService {
@@ -45,4 +54,8 @@ export interface IPropertyCredentialsService {
     data: UpdatePropertyCredentialsDto,
     user: IUserWithPermissions
   ): Promise<PropertyCredentialsResponseDto>
+  bulkUpdate(
+    data: BulkUpdatePropertyCredentialsDto,
+    user: IUserWithPermissions
+  ): Promise<BulkUpdatePropertyCredentialsResponseDto>
 }
