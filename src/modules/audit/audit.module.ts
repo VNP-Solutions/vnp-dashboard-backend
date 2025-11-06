@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { PermissionService } from '../../common/services/permission.service'
+import { AuditBatchRepository } from '../audit-batch/audit-batch.repository'
 import { AuditStatusRepository } from '../audit-status/audit-status.repository'
 import { PrismaService } from '../prisma/prisma.service'
 import { PropertyRepository } from '../property/property.repository'
@@ -25,6 +26,10 @@ import { AuditService } from './audit.service'
     {
       provide: 'IPropertyRepository',
       useClass: PropertyRepository
+    },
+    {
+      provide: 'IAuditBatchRepository',
+      useClass: AuditBatchRepository
     },
     PermissionService,
     PrismaService

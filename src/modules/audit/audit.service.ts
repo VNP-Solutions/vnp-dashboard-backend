@@ -16,6 +16,7 @@ import {
   getStatusesByCategory
 } from '../../common/utils/audit.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import type { IAuditBatchRepository } from '../audit-batch/audit-batch.interface'
 import type { IAuditStatusRepository } from '../audit-status/audit-status.interface'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IPropertyRepository } from '../property/property.interface'
@@ -41,6 +42,8 @@ export class AuditService implements IAuditService {
     private auditStatusRepository: IAuditStatusRepository,
     @Inject('IPropertyRepository')
     private propertyRepository: IPropertyRepository,
+    @Inject('IAuditBatchRepository')
+    private auditBatchRepository: IAuditBatchRepository,
     @Inject(PrismaService)
     private prisma: PrismaService
   ) {}
@@ -448,6 +451,16 @@ export class AuditService implements IAuditService {
 
     if (!audit) {
       throw new NotFoundException('Audit not found')
+    }
+
+    // Validate batch_id if provided
+    if (data.batch_id !== undefined && data.batch_id !== null) {
+      const batch = await this.auditBatchRepository.findById(data.batch_id)
+      if (!batch) {
+        throw new NotFoundException(
+          `Audit batch with ID ${data.batch_id} not found`
+        )
+      }
     }
 
     // Validate date range if dates are being updated
