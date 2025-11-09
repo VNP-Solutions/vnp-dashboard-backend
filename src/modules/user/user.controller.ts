@@ -99,7 +99,8 @@ export class UserController {
   @Patch(':id')
   @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Update a user (admin only, cannot update own role)'
+    summary:
+      'Update a user (super admin only, can update user role via role_id)'
   })
   @ApiResponse({ status: 200, description: 'User updated successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -109,7 +110,7 @@ export class UserController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Only super admins can update users'
   })
   update(
     @Param('id') id: string,

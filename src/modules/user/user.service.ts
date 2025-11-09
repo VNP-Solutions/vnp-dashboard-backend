@@ -8,6 +8,7 @@ import {
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   AssignUserRoleDto,
@@ -87,20 +88,15 @@ export class UserService implements IUserService {
     data: UpdateUserDto,
     currentUser: IUserWithPermissions
   ) {
+    // Only super admins can update users
+    if (!isUserSuperAdmin(currentUser)) {
+      throw new ForbiddenException('Only super admins can update users')
+    }
+
     const user = await this.userRepository.findById(id)
 
     if (!user) {
       throw new NotFoundException('User not found')
-    }
-
-    // Check if user has permission to update this user
-    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
-      currentUser,
-      ModuleType.USER
-    )
-
-    if (accessibleIds !== 'all' && !accessibleIds.includes(id)) {
-      throw new ForbiddenException('You do not have access to update this user')
     }
 
     // Prevent users from updating their own role
