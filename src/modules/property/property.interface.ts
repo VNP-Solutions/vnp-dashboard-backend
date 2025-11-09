@@ -33,6 +33,44 @@ type PropertyWithRelations = Prisma.PropertyGetPayload<{
   }
 }>
 
+type PropertyWithPendingActions = Prisma.PropertyGetPayload<{
+  include: {
+    currency: {
+      select: {
+        id: true
+        code: true
+        name: true
+        symbol: true
+      }
+    }
+    portfolio: {
+      select: {
+        id: true
+        name: true
+        is_active: true
+      }
+    }
+    pendingActions: {
+      select: {
+        id: true
+        action_type: true
+        status: true
+        transfer_data: true
+        requested_user_id: true
+        created_at: true
+        requestedBy: {
+          select: {
+            id: true
+            email: true
+            first_name: true
+            last_name: true
+          }
+        }
+      }
+    }
+  }
+}>
+
 type PropertyWithFullDetails = Prisma.PropertyGetPayload<{
   include: {
     currency: {
@@ -78,7 +116,7 @@ export interface IPropertyRepository {
   findAll(
     queryOptions: any,
     propertyIds?: string[]
-  ): Promise<PropertyWithRelations[]>
+  ): Promise<PropertyWithPendingActions[]>
   count(whereClause: any, propertyIds?: string[]): Promise<number>
   findById(id: string): Promise<PropertyWithFullDetails | null>
   findByIds(ids: string[]): Promise<Property[]>
@@ -96,15 +134,15 @@ export interface IPropertyService {
   findAll(
     query: PropertyQueryDto,
     user: IUserWithPermissions
-  ): Promise<PaginatedResult<PropertyWithRelations>>
+  ): Promise<PaginatedResult<PropertyWithPendingActions>>
   findAllForExport(
     query: PropertyQueryDto,
     user: IUserWithPermissions
-  ): Promise<PropertyWithRelations[]>
+  ): Promise<PropertyWithPendingActions[]>
   getPropertiesByPortfolios(
     data: GetPropertiesByPortfoliosDto,
     user: IUserWithPermissions
-  ): Promise<PropertyWithRelations[]>
+  ): Promise<PropertyWithPendingActions[]>
   findOne(
     id: string,
     user: IUserWithPermissions

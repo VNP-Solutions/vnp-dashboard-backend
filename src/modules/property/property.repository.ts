@@ -71,6 +71,30 @@ export class PropertyRepository implements IPropertyRepository {
           select: {
             bank_type: true
           }
+        },
+        pendingActions: {
+          where: {
+            status: 'PENDING'
+          },
+          select: {
+            id: true,
+            action_type: true,
+            status: true,
+            transfer_data: true,
+            requested_user_id: true,
+            created_at: true,
+            requestedBy: {
+              select: {
+                id: true,
+                email: true,
+                first_name: true,
+                last_name: true
+              }
+            }
+          },
+          orderBy: {
+            created_at: 'desc'
+          }
         }
       }
     })

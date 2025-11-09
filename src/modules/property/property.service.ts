@@ -258,15 +258,25 @@ export class PropertyService implements IPropertyService {
       this.propertyRepository.count(where, undefined)
     ])
 
-    // Add access_type field to each property
+    // Add access_type field and pending action info to each property
     const enrichedData = data.map((property: any) => {
       const accessType =
         query.portfolio_id && property.portfolio_id !== query.portfolio_id
           ? 'shared'
           : 'owned'
+
+      // Add pending action info if exists
+      const hasPendingAction = property.pendingActions && property.pendingActions.length > 0
+      const pendingAction = hasPendingAction ? property.pendingActions[0] : null
+
+      // Remove pendingActions array from response to avoid duplication
+      const { pendingActions, ...propertyWithoutPendingActions } = property
+
       return {
-        ...property,
-        access_type: accessType
+        ...propertyWithoutPendingActions,
+        access_type: accessType,
+        has_pending_action: hasPendingAction,
+        pending_action: pendingAction
       }
     })
 
@@ -434,15 +444,25 @@ export class PropertyService implements IPropertyService {
       undefined
     )
 
-    // Add access_type field to each property
+    // Add access_type field and pending action info to each property
     const enrichedData = data.map((property: any) => {
       const accessType =
         query.portfolio_id && property.portfolio_id !== query.portfolio_id
           ? 'shared'
           : 'owned'
+
+      // Add pending action info if exists
+      const hasPendingAction = property.pendingActions && property.pendingActions.length > 0
+      const pendingAction = hasPendingAction ? property.pendingActions[0] : null
+
+      // Remove pendingActions array from response to avoid duplication
+      const { pendingActions, ...propertyWithoutPendingActions } = property
+
       return {
-        ...property,
-        access_type: accessType
+        ...propertyWithoutPendingActions,
+        access_type: accessType,
+        has_pending_action: hasPendingAction,
+        pending_action: pendingAction
       }
     })
 
