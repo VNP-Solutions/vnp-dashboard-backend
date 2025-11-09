@@ -263,7 +263,7 @@ export class PropertyController {
   @Post('bulk-transfer')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Bulk transfer multiple properties to another portfolio'
+    summary: 'Bulk transfer multiple properties to another portfolio (Super admin or internal property/portfolio manager only)'
   })
   @ApiResponse({
     status: 200,
@@ -276,7 +276,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Only super admins or internal property/portfolio managers can perform bulk transfers'
   })
   async bulkTransfer(
     @Body() bulkTransferPropertyDto: BulkTransferPropertyDto,

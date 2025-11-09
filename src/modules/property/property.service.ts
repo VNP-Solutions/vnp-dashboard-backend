@@ -17,7 +17,10 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
-import { isUserSuperAdmin } from '../../common/utils/permission.util'
+import {
+  canPerformBulkTransfer,
+  isUserSuperAdmin
+} from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import { Configuration } from '../../config/configuration'
 import type { ICurrencyRepository } from '../currency/currency.interface'
@@ -664,10 +667,10 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('At least one property ID is required')
     }
 
-    // Only super admins can perform bulk transfers
-    if (!isUserSuperAdmin(user)) {
+    // Only super admins or internal property/portfolio managers can perform bulk transfers
+    if (!canPerformBulkTransfer(user)) {
       throw new ForbiddenException(
-        'Only super admins can perform bulk transfers. Please transfer properties one at a time or contact a super admin.'
+        'Only super admins or internal property/portfolio managers can perform bulk transfers. Please transfer properties one at a time or contact a super admin.'
       )
     }
 

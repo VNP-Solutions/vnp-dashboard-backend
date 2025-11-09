@@ -345,3 +345,23 @@ export function isInternalUser(user: IUserWithPermissions): boolean {
   if (!user || !user.role) return false
   return user.role.is_external === false
 }
+
+/**
+ * Check if a user can perform bulk transfer operations
+ * Bulk transfer is allowed for:
+ * - Super admins (regardless of internal/external status)
+ * - Internal property managers (permission_level 'all' for property module)
+ * - Internal portfolio managers (permission_level 'all' for portfolio module)
+ */
+export function canPerformBulkTransfer(user: IUserWithPermissions): boolean {
+  if (!user || !user.role) return false
+
+  // Super admin can always perform bulk transfer
+  if (isUserSuperAdmin(user)) return true
+
+  // Must be internal user
+  if (!isInternalUser(user)) return false
+
+  // Check if user is a property manager or portfolio manager
+  return isPropertyManager(user) || isPortfolioManager(user)
+}
