@@ -658,7 +658,6 @@ export class AuditService implements IAuditService {
             return OtaType.agoda
           case 'booking':
           case 'booking.com':
-          case 'book':
             return OtaType.booking
           default:
             return null
@@ -760,9 +759,9 @@ export class AuditService implements IAuditService {
           // Extract audit status (if provided)
           const auditStatusValue = findHeaderValue(row, [
             'Audit Status',
-            'Audit status',
-            'Status',
-            'audit_status_id'
+            'Status To',
+            'Status to',
+            'Status'
           ])
           if (auditStatusValue) {
             // Find or create audit status
