@@ -327,3 +327,21 @@ export function isPropertyManagerFor(
 
   return false
 }
+
+/**
+ * Check if a user has an external role
+ * External users typically have limited access and represent clients or external stakeholders
+ */
+export function isExternalUser(user: IUserWithPermissions): boolean {
+  if (!user || !user.role) return false
+  return user.role.is_external === true
+}
+
+/**
+ * Check if a user has an internal role
+ * Internal users are typically staff members with broader system access
+ */
+export function isInternalUser(user: IUserWithPermissions): boolean {
+  if (!user || !user.role) return false
+  return user.role.is_external === false
+}
