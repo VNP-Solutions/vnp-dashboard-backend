@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -28,6 +29,8 @@ import {
   ModuleType,
   PermissionAction
 } from '../../common/interfaces/permission.interface'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import type { IAuthRepository } from '../auth/auth.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
@@ -50,7 +53,9 @@ import type { IPropertyService } from './property.interface'
 export class PropertyController {
   constructor(
     @Inject('IPropertyService')
-    private readonly propertyService: IPropertyService
+    private readonly propertyService: IPropertyService,
+    @Inject('IAuthRepository')
+    private readonly authRepository: IAuthRepository
   ) {}
 
   @Post()
@@ -171,17 +176,33 @@ export class PropertyController {
   @ApiResponse({ status: 404, description: 'Property or Portfolio not found' })
   @ApiResponse({
     status: 400,
-    description: 'Property is already in the target portfolio'
+    description:
+      'Property is already in the target portfolio or invalid password'
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions'
   })
-  transfer(
+  async transfer(
     @Param('id') id: string,
     @Body() transferPropertyDto: TransferPropertyDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      transferPropertyDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
     return this.propertyService.transfer(id, transferPropertyDto, user)
   }
 
@@ -250,13 +271,32 @@ export class PropertyController {
   })
   @ApiResponse({ status: 404, description: 'Target portfolio not found' })
   @ApiResponse({
+    status: 400,
+    description: 'Invalid password'
+  })
+  @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions'
   })
-  bulkTransfer(
+  async bulkTransfer(
     @Body() bulkTransferPropertyDto: BulkTransferPropertyDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      bulkTransferPropertyDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
     return this.propertyService.bulkTransfer(bulkTransferPropertyDto, user)
   }
 

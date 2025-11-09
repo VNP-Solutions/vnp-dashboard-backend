@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { PermissionService } from '../../common/services/permission.service'
+import { AuthModule } from '../auth/auth.module'
 import { CurrencyRepository } from '../currency/currency.repository'
 import { PortfolioRepository } from '../portfolio/portfolio.repository'
 import { PrismaService } from '../prisma/prisma.service'
@@ -10,6 +11,7 @@ import { PropertyRepository } from './property.repository'
 import { PropertyService } from './property.service'
 
 @Module({
+  imports: [AuthModule],
   controllers: [PropertyController],
   providers: [
     {

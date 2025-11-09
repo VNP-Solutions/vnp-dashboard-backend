@@ -34,6 +34,10 @@ import { JwtStrategy } from './strategies/jwt.strategy'
       provide: 'IAuthService',
       useClass: AuthService
     },
+    {
+      provide: 'IAuthRepository',
+      useClass: AuthRepository
+    },
     JwtStrategy,
     PassportModule
   ]

@@ -91,6 +91,14 @@ export class TransferPropertyDto {
   @IsString()
   @IsNotEmpty()
   new_portfolio_id: string
+
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
 }
 
 export class BulkTransferPropertyDto {
@@ -111,6 +119,14 @@ export class BulkTransferPropertyDto {
   @IsString()
   @IsNotEmpty()
   new_portfolio_id: string
+
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
 }
 
 export class PropertyQueryDto extends QueryDto {
