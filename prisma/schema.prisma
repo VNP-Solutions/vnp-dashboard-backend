@@ -21,11 +21,13 @@ model User {
   is_verified    Boolean
   temp_password  String?
 
-  otps                   Otp[]
-  userAccessedProperties UserAccessedProperty[]
-  notes                  Note[]
-  tasks                  Task[]
-  contractUrls           ContractUrl[]
+  otps                    Otp[]
+  userAccessedProperties  UserAccessedProperty[]
+  notes                   Note[]
+  tasks                   Task[]
+  contractUrls            ContractUrl[]
+  pendingPropertyActions  PropertyPendingAction[] @relation("RequestedBy")
+  approvedPropertyActions PropertyPendingAction[] @relation("ApprovedBy")
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -73,11 +75,12 @@ model Property {
   portfolio         Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
   show_in_portfolio String[]  @db.ObjectId
 
-  audits      Audit[]
-  credentials PropertyCredentials?
-  bankDetails PropertyBankDetails?
-  notes       Note[]
-  tasks       Task[]
+  audits         Audit[]
+  credentials    PropertyCredentials?
+  bankDetails    PropertyBankDetails?
+  notes          Note[]
+  tasks          Task[]
+  pendingActions PropertyPendingAction[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -398,4 +401,44 @@ enum AccessLevel {
   all
   partial
   none
+}
+
+enum PropertyActionType {
+  DELETE
+  TRANSFER
+}
+
+enum PropertyActionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+type PropertyTransferData {
+  new_portfolio_id String
+}
+
+model PropertyPendingAction {
+  id                String                  @id @default(auto()) @map("_id") @db.ObjectId
+  property_id       String                  @db.ObjectId
+  property          Property                @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  action_type       PropertyActionType
+  status            PropertyActionStatus    @default(PENDING)
+  requested_user_id String                  @db.ObjectId
+  requestedBy       User                    @relation("RequestedBy", fields: [requested_user_id], references: [id], onDelete: Cascade)
+  transfer_data     PropertyTransferData? // Stores new_portfolio_id for transfer actions
+  approval_user_id  String?                 @db.ObjectId
+  approvedBy        User?                   @relation("ApprovedBy", fields: [approval_user_id], references: [id], onDelete: SetNull)
+  rejection_reason  String?
+  created_at        DateTime                @default(now())
+  updated_at        DateTime                @updatedAt
+  approved_at       DateTime?
+
+  @@index([property_id])
+  @@index([requested_user_id])
+  @@index([status])
+  @@index([action_type])
+  @@index([status, action_type])
+  @@index([property_id, status])
+  @@index([requested_user_id, status])
 }

@@ -130,7 +130,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
         default:
           throw new BadRequestException(
-            `Invalid bank_sub_type: ${data.bank_sub_type}. Must be one of: ach, domestic_wire, international_wire`
+            `Invalid bank_sub_type: ${String(data.bank_sub_type)}. Must be one of: ach, domestic_wire, international_wire`
           )
       }
 
@@ -393,7 +393,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           // Check permission for this property
           try {
             await this.checkEditPermission(user, property.id)
-          } catch (error) {
+          } catch {
             console.log(
               '\x1b[31m%s\x1b[0m',
               `❌ Row ${rowNumber} FAILED: No permission to edit '${propertyName}'`

@@ -4,10 +4,11 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
-  NotFoundException
+  NotFoundException,
+  forwardRef
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { BankType } from '@prisma/client'
+import { BankType, PropertyActionType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
@@ -16,12 +17,14 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import { Configuration } from '../../config/configuration'
 import type { ICurrencyRepository } from '../currency/currency.interface'
 import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import type { IPropertyBankDetailsRepository } from '../property-bank-details/property-bank-details.interface'
 import type { IPropertyCredentialsRepository } from '../property-credentials/property-credentials.interface'
+import type { IPropertyPendingActionRepository } from '../property-pending-action/property-pending-action.interface'
 import {
   BulkImportResultDto,
   BulkTransferPropertyDto,
@@ -52,6 +55,8 @@ export class PropertyService implements IPropertyService {
     private credentialsRepository: IPropertyCredentialsRepository,
     @Inject('IPropertyBankDetailsRepository')
     private bankDetailsRepository: IPropertyBankDetailsRepository,
+    @Inject(forwardRef(() => 'IPropertyPendingActionRepository'))
+    private pendingActionRepository: IPropertyPendingActionRepository,
     @Inject(PermissionService)
     private permissionService: PermissionService,
     @Inject(ConfigService)
@@ -620,7 +625,23 @@ export class PropertyService implements IPropertyService {
       )
     }
 
-    // Perform the transfer by updating the portfolio_id
+    // If user is not super admin, create a pending action instead
+    if (!isUserSuperAdmin(user)) {
+      const pendingAction = await this.pendingActionRepository.create({
+        property_id: id,
+        action_type: PropertyActionType.TRANSFER,
+        requested_user_id: user.id,
+        transfer_data: { new_portfolio_id: data.new_portfolio_id }
+      })
+
+      return {
+        message:
+          'Transfer request submitted for approval. A super admin will review your request.',
+        pending_action: pendingAction
+      }
+    }
+
+    // Perform the transfer by updating the portfolio_id (super admin only)
     return this.propertyRepository.update(id, {
       portfolio_id: data.new_portfolio_id
     })
@@ -628,7 +649,7 @@ export class PropertyService implements IPropertyService {
 
   async bulkTransfer(
     data: BulkTransferPropertyDto,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ) {
     // Validate the target portfolio exists
     const targetPortfolio = await this.portfolioRepository.findById(
@@ -638,6 +659,19 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Target portfolio not found')
     }
 
+    // Validate properties exist
+    if (!data.property_ids || data.property_ids.length === 0) {
+      throw new BadRequestException('At least one property ID is required')
+    }
+
+    // Only super admins can perform bulk transfers
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admins can perform bulk transfers. Please transfer properties one at a time or contact a super admin.'
+      )
+    }
+
+    // Perform bulk transfer
     const results: Array<{
       property_id: string
       success: boolean
@@ -718,6 +752,22 @@ export class PropertyService implements IPropertyService {
       )
     }
 
+    // If user is not super admin, create a pending action instead
+    if (!isUserSuperAdmin(user)) {
+      const pendingAction = await this.pendingActionRepository.create({
+        property_id: id,
+        action_type: PropertyActionType.DELETE,
+        requested_user_id: user.id
+      })
+
+      return {
+        message:
+          'Delete request submitted for approval. A super admin will review your request.',
+        pending_action: pendingAction
+      }
+    }
+
+    // Super admin: perform delete
     await this.propertyRepository.delete(id)
 
     return { message: 'Property deleted successfully' }

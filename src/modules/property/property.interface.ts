@@ -118,19 +118,22 @@ export interface IPropertyService {
     id: string,
     data: TransferPropertyDto,
     user: IUserWithPermissions
-  ): Promise<PropertyWithRelations>
+  ): Promise<PropertyWithRelations | { message: string; pending_action: any }>
   bulkTransfer(
     data: BulkTransferPropertyDto,
     user: IUserWithPermissions
-  ): Promise<{
-    success: number
-    failed: number
-    results: Array<{
-      property_id: string
-      success: boolean
-      message?: string
-    }>
-  }>
+  ): Promise<
+    | { message: string; pending_action: any }
+    | {
+        success: number
+        failed: number
+        results: Array<{
+          property_id: string
+          success: boolean
+          message?: string
+        }>
+      }
+  >
   share(
     id: string,
     data: SharePropertyDto,
@@ -141,7 +144,10 @@ export interface IPropertyService {
     data: UnsharePropertyDto,
     user: IUserWithPermissions
   ): Promise<PropertyWithRelations>
-  remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  remove(
+    id: string,
+    user: IUserWithPermissions
+  ): Promise<{ message: string; pending_action?: any }>
   bulkImport(
     file: Express.Multer.File,
     user: IUserWithPermissions
