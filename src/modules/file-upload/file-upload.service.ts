@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '../../config/config.service'
 import type {
+  BulkFileUploadResponse,
   FileUploadResponse,
   IFileUploadService
 } from './file-upload.interface'
@@ -68,6 +69,81 @@ export class FileUploadService implements IFileUploadService {
       throw new InternalServerErrorException(
         `Failed to upload file to S3: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
+    }
+  }
+
+  async uploadBulkFiles(
+    files: Express.Multer.File[]
+  ): Promise<BulkFileUploadResponse> {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files provided')
+    }
+
+    const uploadedFiles: FileUploadResponse[] = []
+    const errors: string[] = []
+
+    // Upload files in parallel using Promise.allSettled
+    const uploadPromises = files.map(async (file, index) => {
+      const timestamp = Date.now()
+      const sanitizedFileName = file.originalname.replace(
+        /[^a-zA-Z0-9.-]/g,
+        '_'
+      )
+      const key = `uploads/${timestamp}-${index}-${sanitizedFileName}`
+
+      try {
+        const upload = new Upload({
+          client: this.s3Client,
+          params: {
+            Bucket: this.bucketName,
+            Key: key,
+            Body: file.buffer,
+            ContentType: file.mimetype
+            // ACL: 'public-read'
+          }
+        })
+
+        await upload.done()
+
+        const url = `${this.bucketUrl}/${key}`
+
+        return {
+          success: true,
+          data: {
+            url,
+            key,
+            originalName: file.originalname,
+            size: file.size,
+            mimetype: file.mimetype
+          }
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: `Failed to upload ${file.originalname}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        }
+      }
+    })
+
+    const results = await Promise.allSettled(uploadPromises)
+
+    // Process results
+    results.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value.success && result.value.data) {
+        uploadedFiles.push(result.value.data)
+      } else if (result.status === 'fulfilled' && !result.value.success && result.value.error) {
+        errors.push(result.value.error)
+      } else if (result.status === 'rejected') {
+        errors.push(result.reason?.message || 'Unknown error occurred')
+      }
+    })
+
+    return {
+      files: uploadedFiles,
+      totalFiles: files.length,
+      successfulUploads: uploadedFiles.length,
+      failedUploads: errors.length,
+      errors: errors.length > 0 ? errors : undefined
     }
   }
 }

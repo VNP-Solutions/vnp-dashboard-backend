@@ -3,10 +3,11 @@ import {
   Inject,
   Post,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors
 } from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express'
 import {
   ApiBearerAuth,
   ApiBody,
@@ -16,7 +17,10 @@ import {
   ApiTags
 } from '@nestjs/swagger'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { FileUploadResponseDto } from './file-upload.dto'
+import {
+  BulkFileUploadResponseDto,
+  FileUploadResponseDto
+} from './file-upload.dto'
 import type { IFileUploadService } from './file-upload.interface'
 
 @ApiTags('File Upload')
@@ -59,5 +63,43 @@ export class FileUploadController {
     @UploadedFile() file: Express.Multer.File
   ): Promise<FileUploadResponseDto> {
     return this.fileUploadService.uploadFile(file)
+  }
+
+  @Post('bulk')
+  @UseInterceptors(FilesInterceptor('files', 20))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload multiple files to S3 (max 20 files)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary'
+          },
+          description: 'Files to upload (max 20)'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Files uploaded successfully',
+    type: BulkFileUploadResponseDto
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - No files provided'
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal Server Error - Failed to upload files'
+  })
+  async uploadBulkFiles(
+    @UploadedFiles() files: Express.Multer.File[]
+  ): Promise<BulkFileUploadResponseDto> {
+    return this.fileUploadService.uploadBulkFiles(files)
   }
 }
