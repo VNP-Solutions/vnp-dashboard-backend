@@ -8,7 +8,7 @@ import {
   forwardRef
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { BankType, BankSubType, PropertyActionType } from '@prisma/client'
+import { BankSubType, BankType, PropertyActionType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
@@ -1171,18 +1171,21 @@ export class PropertyService implements IPropertyService {
             'Booking Pass'
           ])
 
-          // Create or update credentials if any OTA credentials are provided
-          if (
-            expediaId ||
-            expediaUsername ||
-            expediaPassword ||
-            agodaId ||
-            agodaUsername ||
-            agodaPassword ||
-            bookingId ||
-            bookingUsername ||
-            bookingPassword
-          ) {
+          // Check if Expedia credentials are complete (required for safety)
+          const hasExpediaCredentials =
+            expediaId && expediaUsername && expediaPassword
+
+          if (!hasExpediaCredentials) {
+            // Add warning to error list but continue processing
+            result.errors.push({
+              row: rowNumber,
+              property: propertyName,
+              error: `Property ${existingProperty ? 'updated' : 'created'} successfully but missing required Expedia credentials (ID, Username, Password)`
+            })
+          }
+
+          // Create or update credentials only if Expedia credentials are complete
+          if (hasExpediaCredentials) {
             // Check if credentials already exist
             const existingCredentials =
               await this.credentialsRepository.findByPropertyId(propertyId)
@@ -1195,18 +1198,6 @@ export class PropertyService implements IPropertyService {
             )!
 
             const credentialsData: any = {}
-
-            // Validate Expedia credentials (required)
-            if (!expediaId || !expediaUsername || !expediaPassword) {
-              result.errors.push({
-                row: rowNumber,
-                property: propertyName,
-                error: `Property ${existingProperty ? 'updated' : 'created'} but credentials require all Expedia fields (ID, Username, Password)`
-              })
-              result.successCount++
-              result.successfulImports.push(propertyName)
-              continue
-            }
 
             // Set required Expedia credentials
             credentialsData.expedia_id = expediaId
