@@ -1477,7 +1477,17 @@ export class PropertyService implements IPropertyService {
                 bankDetailsData.swift_bic_iban = swiftBicIban
               }
               if (routingNumber !== undefined) {
-                bankDetailsData.routing_number = routingNumber
+                // Validate routing number has at least 9 digits
+                if (routingNumber.trim().length < 9) {
+                  result.errors.push({
+                    row: rowNumber,
+                    property: propertyName,
+                    error: `Property ${existingProperty ? 'updated' : 'created'} but routing number '${routingNumber}' has less than 9 digits. Routing number was not saved.`
+                  })
+                  // Don't set routing number, but continue processing other fields
+                } else {
+                  bankDetailsData.routing_number = routingNumber
+                }
               }
               if (bankAccountType !== undefined) {
                 const normalizedAccountType = bankAccountType.toLowerCase()
@@ -1519,6 +1529,10 @@ export class PropertyService implements IPropertyService {
                   }
                   if (!routingNumber || !routingNumber.trim()) {
                     missingFields.push('Routing Number')
+                  } else if (routingNumber.trim().length < 9) {
+                    missingFields.push(
+                      'Routing Number (must be at least 9 digits)'
+                    )
                   }
                   if (!bankAccountType) {
                     missingFields.push('Bank Account Type')
@@ -1534,6 +1548,10 @@ export class PropertyService implements IPropertyService {
                   }
                   if (!routingNumber || !routingNumber.trim()) {
                     missingFields.push('Routing Number')
+                  } else if (routingNumber.trim().length < 9) {
+                    missingFields.push(
+                      'Routing Number (must be at least 9 digits)'
+                    )
                   }
                   break
 

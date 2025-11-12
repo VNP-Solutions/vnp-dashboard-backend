@@ -93,6 +93,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           }
           if (!data.routing_number || !data.routing_number.trim()) {
             missingFields.push('routing_number')
+          } else if (data.routing_number.trim().length < 9) {
+            throw new BadRequestException(
+              'Routing number must be at least 9 digits for ACH'
+            )
           }
           if (!data.bank_account_type) {
             missingFields.push('bank_account_type')
@@ -109,6 +113,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           }
           if (!data.routing_number || !data.routing_number.trim()) {
             missingFields.push('routing_number')
+          } else if (data.routing_number.trim().length < 9) {
+            throw new BadRequestException(
+              'Routing number must be at least 9 digits for Domestic Wire'
+            )
           }
           break
 
@@ -650,7 +658,22 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               updateData.swift_bic_iban = swiftBicIban
             }
             if (routingNumber !== undefined) {
-              updateData.routing_number = routingNumber
+              // Validate routing number has at least 9 digits
+              if (routingNumber.trim().length < 9) {
+                console.log(
+                  '\x1b[33m%s\x1b[0m',
+                  `⚠️  Row ${rowNumber} WARNING: Routing number '${routingNumber}' has less than 9 digits for '${propertyName}'. Skipping routing number update.`
+                )
+                result.errors.push({
+                  row: rowNumber,
+                  property: propertyName,
+                  error:
+                    'Routing number must be at least 9 digits. Routing number was not updated.'
+                })
+                // Don't update routing number, but continue processing other fields
+              } else {
+                updateData.routing_number = routingNumber
+              }
             }
             if (bankAccountType !== undefined) {
               const normalizedAccountType = bankAccountType.toLowerCase()
@@ -769,6 +792,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                     !mergedData.routing_number.trim()
                   ) {
                     missingFields.push('Routing Number')
+                  } else if (mergedData.routing_number.trim().length < 9) {
+                    missingFields.push(
+                      'Routing Number (must be at least 9 digits)'
+                    )
                   }
                   if (!mergedData.bank_account_type) {
                     missingFields.push('Bank Account Type')
@@ -793,6 +820,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                     !mergedData.routing_number.trim()
                   ) {
                     missingFields.push('Routing Number')
+                  } else if (mergedData.routing_number.trim().length < 9) {
+                    missingFields.push(
+                      'Routing Number (must be at least 9 digits)'
+                    )
                   }
                   break
 

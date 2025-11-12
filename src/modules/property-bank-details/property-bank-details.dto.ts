@@ -1,7 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { BankType, BankSubType, BankAccountType } from '@prisma/client'
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator'
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator'
 
 export class CreatePropertyBankDetailsDto {
   @ApiProperty({
@@ -108,10 +108,11 @@ export class CreatePropertyBankDetailsDto {
   @ApiPropertyOptional({
     example: '021000021',
     description:
-      'Routing number. Required for ACH and Domestic US Wire.'
+      'Routing number (minimum 9 digits). Required for ACH and Domestic US Wire.'
   })
   @IsString()
   @IsOptional()
+  @MinLength(9, { message: 'Routing number must be at least 9 digits' })
   routing_number?: string
 
   @ApiPropertyOptional({
