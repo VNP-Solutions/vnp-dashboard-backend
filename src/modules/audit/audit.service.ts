@@ -224,14 +224,26 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Add status category filter if provided
+    // Add status category filter if provided (supports comma-separated values)
     if (query.status) {
-      const statusNames = getStatusesByCategory(query.status)
-      finalWhere = {
-        ...finalWhere,
-        auditStatus: {
-          status: {
-            in: statusNames
+      const statusCategories = query.status.split(',').map(s => s.trim()).filter(s => s)
+      const allStatusNames: string[] = []
+      
+      for (const category of statusCategories) {
+        const statusNames = getStatusesByCategory(category as 'pending' | 'upcoming' | 'in_progress' | 'completed')
+        allStatusNames.push(...statusNames)
+      }
+      
+      // Remove duplicates
+      const uniqueStatusNames = [...new Set(allStatusNames)]
+      
+      if (uniqueStatusNames.length > 0) {
+        finalWhere = {
+          ...finalWhere,
+          auditStatus: {
+            status: {
+              in: uniqueStatusNames
+            }
           }
         }
       }
@@ -415,14 +427,26 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Add status category filter if provided
+    // Add status category filter if provided (supports comma-separated values)
     if (query.status) {
-      const statusNames = getStatusesByCategory(query.status)
-      finalWhere = {
-        ...finalWhere,
-        auditStatus: {
-          status: {
-            in: statusNames
+      const statusCategories = query.status.split(',').map(s => s.trim()).filter(s => s)
+      const allStatusNames: string[] = []
+      
+      for (const category of statusCategories) {
+        const statusNames = getStatusesByCategory(category as 'pending' | 'upcoming' | 'in_progress' | 'completed')
+        allStatusNames.push(...statusNames)
+      }
+      
+      // Remove duplicates
+      const uniqueStatusNames = [...new Set(allStatusNames)]
+      
+      if (uniqueStatusNames.length > 0) {
+        finalWhere = {
+          ...finalWhere,
+          auditStatus: {
+            status: {
+              in: uniqueStatusNames
+            }
           }
         }
       }

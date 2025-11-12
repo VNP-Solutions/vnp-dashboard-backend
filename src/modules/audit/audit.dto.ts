@@ -147,13 +147,12 @@ export class AuditQueryDto extends QueryDto {
 
   @ApiPropertyOptional({
     description:
-      'Filter by status category (pending/upcoming/in_progress/completed)',
-    example: 'completed',
-    enum: ['pending', 'upcoming', 'in_progress', 'completed']
+      'Filter by status category (pending/upcoming/in_progress/completed). Multiple values can be provided as comma-separated string, e.g., "pending,upcoming"',
+    example: 'completed'
   })
   @IsOptional()
   @IsString()
-  status?: 'pending' | 'upcoming' | 'in_progress' | 'completed'
+  status?: string
 }
 
 export class BulkArchiveAuditDto {
