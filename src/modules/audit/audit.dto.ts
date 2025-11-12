@@ -261,3 +261,21 @@ export class GlobalStatsResponseDto {
   })
   completed_audit_count: number
 }
+
+export class BulkUploadReportDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of audit IDs to update'
+  })
+  @IsArray()
+  @IsNotEmpty()
+  audit_ids: string[]
+
+  @ApiProperty({
+    example: 'https://example.com/report.pdf',
+    description: 'Report URL to set for all audits'
+  })
+  @IsString()
+  @IsNotEmpty()
+  report_url: string
+}

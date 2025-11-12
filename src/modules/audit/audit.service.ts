@@ -25,6 +25,7 @@ import {
   BulkArchiveAuditDto,
   BulkImportResultDto,
   BulkUpdateResultDto,
+  BulkUploadReportDto,
   CreateAuditDto,
   GlobalStatsResponseDto,
   UpdateAuditDto
@@ -1607,6 +1608,40 @@ export class AuditService implements IAuditService {
       amount_collectable: amountCollectable,
       amount_confirmed: amountConfirmed,
       completed_audit_count: completedAuditCount
+    }
+  }
+
+  async bulkUploadReport(data: BulkUploadReportDto, _user: IUserWithPermissions) {
+    const { audit_ids, report_url } = data
+
+    if (!audit_ids || audit_ids.length === 0) {
+      throw new BadRequestException('No audit IDs provided')
+    }
+
+    if (!report_url) {
+      throw new BadRequestException('Report URL is required')
+    }
+
+    // Validate all audit IDs exist
+    const audits = await this.auditRepository.findByIds(audit_ids)
+    const foundIds = audits.map(a => a.id)
+    const notFoundIds = audit_ids.filter((id: string) => !foundIds.includes(id))
+
+    if (notFoundIds.length > 0) {
+      throw new NotFoundException(
+        `Audits not found with IDs: ${notFoundIds.join(', ')}`
+      )
+    }
+
+    // Update all audits with the report URL
+    const result = await this.auditRepository.bulkUpdate(audit_ids, {
+      report_url
+    })
+
+    return {
+      message: `Successfully updated ${result.count} audit(s) with report URL`,
+      updated_count: result.count,
+      updated_ids: audit_ids
     }
   }
 }

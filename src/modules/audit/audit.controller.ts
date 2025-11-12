@@ -33,6 +33,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   AuditQueryDto,
   BulkArchiveAuditDto,
+  BulkUploadReportDto,
   CreateAuditDto,
   GlobalStatsResponseDto,
   UpdateAuditDto
@@ -414,5 +415,77 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.bulkImport(file, user)
+  }
+
+  @Patch('bulk-upload-report')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary: 'Bulk upload report URL for multiple audits',
+    description: `
+    Update multiple audits with the same report URL at once.
+    
+    Required fields:
+    - audit_ids: Array of audit IDs to update
+    - report_url: The report URL to set for all audits
+    
+    All audits must exist, otherwise the operation will fail.
+    `
+  })
+  @ApiBody({
+    type: BulkUploadReportDto,
+    description: 'Bulk upload report payload with audit IDs and report URL',
+    examples: {
+      'Basic Example': {
+        value: {
+          audit_ids: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+          report_url: 'https://example.com/report.pdf'
+        }
+      },
+      'Multiple Audits': {
+        value: {
+          audit_ids: [
+            '507f1f77bcf86cd799439011',
+            '507f1f77bcf86cd799439012',
+            '507f1f77bcf86cd799439013',
+            '507f1f77bcf86cd799439014'
+          ],
+          report_url: 'https://storage.example.com/reports/2024/audit-report.pdf'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk upload completed successfully',
+    schema: {
+      example: {
+        message: 'Successfully updated 4 audit(s) with report URL',
+        updated_count: 4,
+        updated_ids: [
+          '507f1f77bcf86cd799439011',
+          '507f1f77bcf86cd799439012',
+          '507f1f77bcf86cd799439013',
+          '507f1f77bcf86cd799439014'
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid data or no audit IDs provided'
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - One or more audits not found'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkUploadReport(
+    @Body() bulkUploadReportDto: BulkUploadReportDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.auditService.bulkUploadReport(bulkUploadReportDto, user)
   }
 }

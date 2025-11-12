@@ -150,4 +150,12 @@ export interface IAuditService {
     user: IUserWithPermissions
   ): Promise<BulkImportResultDto>
   getGlobalStats(user: IUserWithPermissions): Promise<GlobalStatsResponseDto>
+  bulkUploadReport(
+    data: any,
+    user: IUserWithPermissions
+  ): Promise<{
+    message: string
+    updated_count: number
+    updated_ids: string[]
+  }>
 }
