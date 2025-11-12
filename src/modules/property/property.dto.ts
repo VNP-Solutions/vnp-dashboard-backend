@@ -37,13 +37,13 @@ export class CreatePropertyDto {
   @IsNotEmpty()
   currency_id: string
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'GRAND HOTEL NY',
-    description: 'Card descriptor for payment processing'
+    description: 'Card descriptor for payment processing (optional)'
   })
   @IsString()
-  @IsNotEmpty()
-  card_descriptor: string
+  @IsOptional()
+  card_descriptor?: string
 
   @ApiProperty({
     example: true,
@@ -239,7 +239,7 @@ export class PropertyStatsResponseDto {
     id: string
     name: string
     address: string
-    card_descriptor: string
+    card_descriptor: string | null
     is_active: boolean
     next_due_date: Date | null
     portfolio_id: string

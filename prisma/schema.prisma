@@ -68,7 +68,7 @@ model Property {
   address           String
   currency_id       String    @db.ObjectId
   currency          Currency  @relation(fields: [currency_id], references: [id])
-  card_descriptor   String
+  card_descriptor   String?
   is_active         Boolean   @default(true)
   next_due_date     DateTime?
   portfolio_id      String    @db.ObjectId

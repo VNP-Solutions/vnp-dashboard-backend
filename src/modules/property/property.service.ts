@@ -996,21 +996,12 @@ export class PropertyService implements IPropertyService {
             })
           }
 
-          // Extract card descriptor
+          // Extract card descriptor (optional)
           const cardDescriptor = findHeaderValue(row, [
             'Card Descriptor',
             'Card descriptor',
             'Descriptor'
           ])
-          if (!cardDescriptor) {
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'Card descriptor is required'
-            })
-            result.failureCount++
-            continue
-          }
 
           // Extract next due date (optional) - use raw value to preserve Excel date format
           const nextDueDateValue = getRawValue(row, [
@@ -1087,7 +1078,7 @@ export class PropertyService implements IPropertyService {
             const updateData: UpdatePropertyDto = {
               address: address,
               currency_id: currency.id,
-              card_descriptor: cardDescriptor,
+              card_descriptor: cardDescriptor || undefined,
               is_active: true,
               next_due_date: nextDueDate
                 ? nextDueDate.toISOString()
@@ -1106,7 +1097,7 @@ export class PropertyService implements IPropertyService {
               name: propertyName,
               address: address,
               currency_id: currency.id,
-              card_descriptor: cardDescriptor,
+              card_descriptor: cardDescriptor || undefined,
               is_active: true,
               next_due_date: nextDueDate
                 ? nextDueDate.toISOString()
