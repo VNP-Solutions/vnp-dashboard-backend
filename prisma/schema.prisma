@@ -168,8 +168,7 @@ model PropertyBankDetails {
   account_name         String?
   bank_name            String?
   bank_branch          String?
-  swift_code           String?
-  iban_number          String?
+  swift_bic_iban       String?
   routing_number       String?
   bank_account_type    BankAccountType?
   currency             String?
@@ -419,19 +418,19 @@ type PropertyTransferData {
 }
 
 model PropertyPendingAction {
-  id                String                  @id @default(auto()) @map("_id") @db.ObjectId
-  property_id       String                  @db.ObjectId
-  property          Property                @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  id                String                @id @default(auto()) @map("_id") @db.ObjectId
+  property_id       String                @db.ObjectId
+  property          Property              @relation(fields: [property_id], references: [id], onDelete: Cascade)
   action_type       PropertyActionType
-  status            PropertyActionStatus    @default(PENDING)
-  requested_user_id String                  @db.ObjectId
-  requestedBy       User                    @relation("RequestedBy", fields: [requested_user_id], references: [id], onDelete: Cascade)
+  status            PropertyActionStatus  @default(PENDING)
+  requested_user_id String                @db.ObjectId
+  requestedBy       User                  @relation("RequestedBy", fields: [requested_user_id], references: [id], onDelete: Cascade)
   transfer_data     PropertyTransferData? // Stores new_portfolio_id for transfer actions
-  approval_user_id  String?                 @db.ObjectId
-  approvedBy        User?                   @relation("ApprovedBy", fields: [approval_user_id], references: [id], onDelete: SetNull)
+  approval_user_id  String?               @db.ObjectId
+  approvedBy        User?                 @relation("ApprovedBy", fields: [approval_user_id], references: [id], onDelete: SetNull)
   rejection_reason  String?
-  created_at        DateTime                @default(now())
-  updated_at        DateTime                @updatedAt
+  created_at        DateTime              @default(now())
+  updated_at        DateTime              @updatedAt
   approved_at       DateTime?
 
   @@index([property_id])

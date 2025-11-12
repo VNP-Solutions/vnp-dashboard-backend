@@ -6,10 +6,14 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import { BankType, BankSubType } from '@prisma/client'
+import { BankSubType, BankType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { isUserSuperAdmin, isPropertyManagerFor, isPortfolioManagerFor } from '../../common/utils/permission.util'
+import {
+  isPortfolioManagerFor,
+  isPropertyManagerFor,
+  isUserSuperAdmin
+} from '../../common/utils/permission.util'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   BulkUpdateBankDetailsResultDto,
@@ -51,8 +55,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         account_name: undefined,
         bank_name: undefined,
         bank_branch: undefined,
-        swift_code: undefined,
-        iban_number: undefined,
+        swift_bic_iban: undefined,
         routing_number: undefined,
         bank_account_type: undefined,
         currency: undefined
@@ -117,11 +120,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           if (!data.beneficiary_address || !data.beneficiary_address.trim()) {
             missingFields.push('beneficiary_address')
           }
-          if (!data.swift_code || !data.swift_code.trim()) {
-            missingFields.push('swift_code')
-          }
-          if (!data.iban_number || !data.iban_number.trim()) {
-            missingFields.push('iban_number')
+          if (!data.swift_bic_iban || !data.swift_bic_iban.trim()) {
+            missingFields.push('swift_bic_iban')
           }
           if (!data.currency || !data.currency.trim()) {
             missingFields.push('currency')
@@ -191,7 +191,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     }
 
     // Check if user is portfolio manager for the parent portfolio
-    if (isPortfolioManagerFor(user, property.portfolio_id, accessiblePortfolioIds)) {
+    if (
+      isPortfolioManagerFor(user, property.portfolio_id, accessiblePortfolioIds)
+    ) {
       return
     }
 
@@ -201,10 +203,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     )
   }
 
-  async create(
-    data: CreatePropertyBankDetailsDto,
-    user: IUserWithPermissions
-  ) {
+  async create(data: CreatePropertyBankDetailsDto, user: IUserWithPermissions) {
     // Check permission
     await this.checkEditPermission(user, data.property_id)
 
@@ -349,13 +348,30 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           ])
 
           // Log row data for debugging
-          console.table([{
-            'Row #': rowNumber,
-            'Property Name': propertyName || 'N/A',
-            'Bank Type': findHeaderValue(row, ['Bank Type', 'Bank type', 'bank_type']) || 'N/A',
-            'Bank Sub Type': findHeaderValue(row, ['Bank Sub Type', 'Bank sub type', 'bank_sub_type', 'Sub Type', 'SubType']) || 'N/A',
-            'Stripe Email': findHeaderValue(row, ['Stripe Account Email', 'Stripe Email', 'Stripe account email', 'stripe_account_email']) || 'N/A'
-          }])
+          console.table([
+            {
+              'Row #': rowNumber,
+              'Property Name': propertyName || 'N/A',
+              'Bank Type':
+                findHeaderValue(row, ['Bank Type', 'Bank type', 'bank_type']) ||
+                'N/A',
+              'Bank Sub Type':
+                findHeaderValue(row, [
+                  'Bank Sub Type',
+                  'Bank sub type',
+                  'bank_sub_type',
+                  'Sub Type',
+                  'SubType'
+                ]) || 'N/A',
+              'Stripe Email':
+                findHeaderValue(row, [
+                  'Stripe Account Email',
+                  'Stripe Email',
+                  'Stripe account email',
+                  'stripe_account_email'
+                ]) || 'N/A'
+            }
+          ])
 
           if (!propertyName) {
             console.log(
@@ -401,7 +417,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             result.errors.push({
               row: rowNumber,
               property: propertyName,
-              error: 'You do not have permission to edit bank details for this property'
+              error:
+                'You do not have permission to edit bank details for this property'
             })
             result.failureCount++
             continue
@@ -480,20 +497,19 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Branch',
             'Branch Name'
           ])
-          const swiftCode = findHeaderValue(row, [
+          const swiftBicIban = findHeaderValue(row, [
+            'Swift or BIC or IBAN',
+            'Swift or Bic or Iban',
+            'Swift/BIC/IBAN',
+            'Swift/Bic/Iban',
+            'swift_bic_iban',
             'Swift Code',
             'Swift code',
-            'swift_code',
             'SWIFT',
             'Swift',
             'SWIFT Code',
             'BIC',
-            'SWIFT/BIC'
-          ])
-          const ibanNumber = findHeaderValue(row, [
-            'IBAN Number',
-            'IBAN number',
-            'iban_number',
+            'SWIFT/BIC',
             'IBAN',
             'Iban'
           ])
@@ -532,8 +548,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             !accountName &&
             !bankName &&
             !bankBranch &&
-            !swiftCode &&
-            !ibanNumber &&
+            !swiftBicIban &&
             !routingNumber &&
             !bankAccountType &&
             !currency
@@ -574,8 +589,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             updateData.account_name = null
             updateData.bank_name = null
             updateData.bank_branch = null
-            updateData.swift_code = null
-            updateData.iban_number = null
+            updateData.swift_bic_iban = null
             updateData.routing_number = null
             updateData.bank_account_type = null
             updateData.currency = null
@@ -586,8 +600,14 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
             // Set bank sub type if provided
             if (bankSubType !== undefined) {
-              const normalizedSubType = bankSubType.toLowerCase().replace(/\s+/g, '_')
-              if (['ach', 'domestic_wire', 'international_wire'].includes(normalizedSubType)) {
+              const normalizedSubType = bankSubType
+                .toLowerCase()
+                .replace(/\s+/g, '_')
+              if (
+                ['ach', 'domestic_wire', 'international_wire'].includes(
+                  normalizedSubType
+                )
+              ) {
                 updateData.bank_sub_type = normalizedSubType
               } else {
                 console.log(
@@ -626,11 +646,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             if (bankBranch !== undefined) {
               updateData.bank_branch = bankBranch
             }
-            if (swiftCode !== undefined) {
-              updateData.swift_code = swiftCode
-            }
-            if (ibanNumber !== undefined) {
-              updateData.iban_number = ibanNumber
+            if (swiftBicIban !== undefined) {
+              updateData.swift_bic_iban = swiftBicIban
             }
             if (routingNumber !== undefined) {
               updateData.routing_number = routingNumber
@@ -658,9 +675,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             }
 
             // Validate based on bank_sub_type (if updating)
-            const finalSubType = updateData.bank_sub_type !== undefined
-              ? updateData.bank_sub_type
-              : existingBankDetails?.bank_sub_type
+            const finalSubType =
+              updateData.bank_sub_type !== undefined
+                ? updateData.bank_sub_type
+                : existingBankDetails?.bank_sub_type
 
             if (!finalSubType && !existingBankDetails) {
               console.log(
@@ -706,14 +724,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                   updateData.routing_number !== undefined
                     ? updateData.routing_number
                     : existingBankDetails?.routing_number,
-                swift_code:
-                  updateData.swift_code !== undefined
-                    ? updateData.swift_code
-                    : existingBankDetails?.swift_code,
-                iban_number:
-                  updateData.iban_number !== undefined
-                    ? updateData.iban_number
-                    : existingBankDetails?.iban_number,
+                swift_bic_iban:
+                  updateData.swift_bic_iban !== undefined
+                    ? updateData.swift_bic_iban
+                    : existingBankDetails?.swift_bic_iban,
                 bank_account_type:
                   updateData.bank_account_type !== undefined
                     ? updateData.bank_account_type
@@ -725,10 +739,16 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               }
 
               // Common required fields
-              if (!mergedData.hotel_portfolio_name || !mergedData.hotel_portfolio_name.trim()) {
+              if (
+                !mergedData.hotel_portfolio_name ||
+                !mergedData.hotel_portfolio_name.trim()
+              ) {
                 missingFields.push('Hotel Portfolio Name')
               }
-              if (!mergedData.account_number || !mergedData.account_number.trim()) {
+              if (
+                !mergedData.account_number ||
+                !mergedData.account_number.trim()
+              ) {
                 missingFields.push('Account Number')
               }
               if (!mergedData.bank_name || !mergedData.bank_name.trim()) {
@@ -738,10 +758,16 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               // Sub-type specific validation
               switch (finalSubType) {
                 case BankSubType.ach:
-                  if (!mergedData.beneficiary_name || !mergedData.beneficiary_name.trim()) {
+                  if (
+                    !mergedData.beneficiary_name ||
+                    !mergedData.beneficiary_name.trim()
+                  ) {
                     missingFields.push('Beneficiary Name')
                   }
-                  if (!mergedData.routing_number || !mergedData.routing_number.trim()) {
+                  if (
+                    !mergedData.routing_number ||
+                    !mergedData.routing_number.trim()
+                  ) {
                     missingFields.push('Routing Number')
                   }
                   if (!mergedData.bank_account_type) {
@@ -750,29 +776,44 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                   break
 
                 case BankSubType.domestic_wire:
-                  if (!mergedData.beneficiary_name || !mergedData.beneficiary_name.trim()) {
+                  if (
+                    !mergedData.beneficiary_name ||
+                    !mergedData.beneficiary_name.trim()
+                  ) {
                     missingFields.push('Beneficiary Name')
                   }
-                  if (!mergedData.beneficiary_address || !mergedData.beneficiary_address.trim()) {
+                  if (
+                    !mergedData.beneficiary_address ||
+                    !mergedData.beneficiary_address.trim()
+                  ) {
                     missingFields.push('Beneficiary Address')
                   }
-                  if (!mergedData.routing_number || !mergedData.routing_number.trim()) {
+                  if (
+                    !mergedData.routing_number ||
+                    !mergedData.routing_number.trim()
+                  ) {
                     missingFields.push('Routing Number')
                   }
                   break
 
                 case BankSubType.international_wire:
-                  if (!mergedData.beneficiary_name || !mergedData.beneficiary_name.trim()) {
+                  if (
+                    !mergedData.beneficiary_name ||
+                    !mergedData.beneficiary_name.trim()
+                  ) {
                     missingFields.push('Beneficiary Name')
                   }
-                  if (!mergedData.beneficiary_address || !mergedData.beneficiary_address.trim()) {
+                  if (
+                    !mergedData.beneficiary_address ||
+                    !mergedData.beneficiary_address.trim()
+                  ) {
                     missingFields.push('Beneficiary Address')
                   }
-                  if (!mergedData.swift_code || !mergedData.swift_code.trim()) {
-                    missingFields.push('Swift Code')
-                  }
-                  if (!mergedData.iban_number || !mergedData.iban_number.trim()) {
-                    missingFields.push('IBAN Number')
+                  if (
+                    !mergedData.swift_bic_iban ||
+                    !mergedData.swift_bic_iban.trim()
+                  ) {
+                    missingFields.push('Swift or BIC or IBAN')
                   }
                   if (!mergedData.currency || !mergedData.currency.trim()) {
                     missingFields.push('Currency')
@@ -823,8 +864,13 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           result.successfulUpdates.push(propertyName)
         } catch (error) {
           const propertyName =
-            findHeaderValue(row, ['Property Name', 'Property name', 'property_name', 'Name', 'Property']) ||
-            'Unknown'
+            findHeaderValue(row, [
+              'Property Name',
+              'Property name',
+              'property_name',
+              'Name',
+              'Property'
+            ]) || 'Unknown'
 
           console.log(
             '\x1b[31m%s\x1b[0m',

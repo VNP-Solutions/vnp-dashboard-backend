@@ -1330,20 +1330,19 @@ export class PropertyService implements IPropertyService {
             'Branch',
             'Branch Name'
           ])
-          const swiftCode = findHeaderValue(row, [
+          const swiftBicIban = findHeaderValue(row, [
+            'Swift or BIC or IBAN',
+            'Swift or Bic or Iban',
+            'Swift/BIC/IBAN',
+            'Swift/Bic/Iban',
+            'swift_bic_iban',
             'Swift Code',
             'Swift code',
-            'swift_code',
             'SWIFT',
             'Swift',
             'SWIFT Code',
             'BIC',
-            'SWIFT/BIC'
-          ])
-          const ibanNumber = findHeaderValue(row, [
-            'IBAN Number',
-            'IBAN number',
-            'iban_number',
+            'SWIFT/BIC',
             'IBAN',
             'Iban'
           ])
@@ -1382,8 +1381,7 @@ export class PropertyService implements IPropertyService {
             accountName ||
             bankName ||
             bankBranch ||
-            swiftCode ||
-            ibanNumber ||
+            swiftBicIban ||
             routingNumber ||
             bankAccountType ||
             bankCurrency
@@ -1408,8 +1406,7 @@ export class PropertyService implements IPropertyService {
               bankDetailsData.account_name = null
               bankDetailsData.bank_name = null
               bankDetailsData.bank_branch = null
-              bankDetailsData.swift_code = null
-              bankDetailsData.iban_number = null
+              bankDetailsData.swift_bic_iban = null
               bankDetailsData.routing_number = null
               bankDetailsData.bank_account_type = null
               bankDetailsData.currency = null
@@ -1422,8 +1419,7 @@ export class PropertyService implements IPropertyService {
               accountName ||
               bankName ||
               bankBranch ||
-              swiftCode ||
-              ibanNumber ||
+              swiftBicIban ||
               routingNumber ||
               bankAccountType ||
               bankCurrency
@@ -1486,11 +1482,8 @@ export class PropertyService implements IPropertyService {
               if (bankBranch !== undefined) {
                 bankDetailsData.bank_branch = bankBranch
               }
-              if (swiftCode !== undefined) {
-                bankDetailsData.swift_code = swiftCode
-              }
-              if (ibanNumber !== undefined) {
-                bankDetailsData.iban_number = ibanNumber
+              if (swiftBicIban !== undefined) {
+                bankDetailsData.swift_bic_iban = swiftBicIban
               }
               if (routingNumber !== undefined) {
                 bankDetailsData.routing_number = routingNumber
@@ -1560,11 +1553,8 @@ export class PropertyService implements IPropertyService {
                   if (!beneficiaryAddress || !beneficiaryAddress.trim()) {
                     missingFields.push('Beneficiary Address')
                   }
-                  if (!swiftCode || !swiftCode.trim()) {
-                    missingFields.push('Swift Code')
-                  }
-                  if (!ibanNumber || !ibanNumber.trim()) {
-                    missingFields.push('IBAN Number')
+                  if (!swiftBicIban || !swiftBicIban.trim()) {
+                    missingFields.push('Swift or BIC or IBAN')
                   }
                   if (!bankCurrency || !bankCurrency.trim()) {
                     missingFields.push('Currency (Bank)')

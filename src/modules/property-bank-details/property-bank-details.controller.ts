@@ -54,7 +54,7 @@ export class PropertyBankDetailsController {
       'For Bank: bank_sub_type is required (ach, domestic_wire, or international_wire). ' +
       'ACH requires: hotel_portfolio_name, beneficiary_name, bank_name, routing_number, account_number, bank_account_type. ' +
       'Domestic Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, routing_number, account_number. ' +
-      'International Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, swift_code, iban_number, account_number, currency.'
+      'International Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, swift_bic_iban, account_number, currency.'
   })
   @ApiResponse({
     status: 201,
@@ -116,7 +116,7 @@ export class PropertyBankDetailsController {
       'For Bank: bank_sub_type is required (ach, domestic_wire, or international_wire). ' +
       'ACH requires: hotel_portfolio_name, beneficiary_name, bank_name, routing_number, account_number, bank_account_type. ' +
       'Domestic Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, routing_number, account_number. ' +
-      'International Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, swift_code, iban_number, account_number, currency.'
+      'International Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, swift_bic_iban, account_number, currency.'
   })
   @ApiResponse({
     status: 200,
@@ -162,7 +162,7 @@ export class PropertyBankDetailsController {
       'Common columns: Hotel Portfolio Name, Account Number, Bank Name. ' +
       'ACH: Beneficiary Name, Routing Number, Bank Account Type (checking/savings). ' +
       'Domestic Wire: Beneficiary Name, Beneficiary Address, Routing Number. ' +
-      'International Wire: Beneficiary Name, Beneficiary Address, Swift Code, IBAN Number, Currency.'
+      'International Wire: Beneficiary Name, Beneficiary Address, Swift or BIC or IBAN, Currency.'
   })
   @ApiBody({
     schema: {

@@ -99,20 +99,11 @@ export class CreatePropertyBankDetailsDto {
   @ApiPropertyOptional({
     example: 'CHASUS33XXX',
     description:
-      'SWIFT/BIC code. Required for International Wire.'
+      'SWIFT or BIC or IBAN code. Required for International Wire.'
   })
   @IsString()
   @IsOptional()
-  swift_code?: string
-
-  @ApiPropertyOptional({
-    example: 'GB82WEST12345698765432',
-    description:
-      'IBAN number. Required for International Wire.'
-  })
-  @IsString()
-  @IsOptional()
-  iban_number?: string
+  swift_bic_iban?: string
 
   @ApiPropertyOptional({
     example: '021000021',
