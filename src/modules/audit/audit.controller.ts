@@ -134,27 +134,6 @@ export class AuditController {
     return this.auditService.findOne(id, user)
   }
 
-  @Patch(':id')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
-  @ApiOperation({ summary: 'Update an audit' })
-  @ApiResponse({ status: 200, description: 'Audit updated successfully' })
-  @ApiResponse({ status: 404, description: 'Audit not found' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Insufficient permissions'
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad Request - Invalid data'
-  })
-  update(
-    @Param('id') id: string,
-    @Body() updateAuditDto: UpdateAuditDto,
-    @CurrentUser() user: IUserWithPermissions
-  ) {
-    return this.auditService.update(id, updateAuditDto, user)
-  }
-
   @Delete(':id')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE, true)
   @ApiOperation({ summary: 'Delete an audit' })
@@ -449,7 +428,8 @@ export class AuditController {
             '507f1f77bcf86cd799439013',
             '507f1f77bcf86cd799439014'
           ],
-          report_url: 'https://storage.example.com/reports/2024/audit-report.pdf'
+          report_url:
+            'https://storage.example.com/reports/2024/audit-report.pdf'
         }
       }
     }
@@ -487,5 +467,26 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.bulkUploadReport(bulkUploadReportDto, user)
+  }
+
+  @Patch(':id')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
+  @ApiOperation({ summary: 'Update an audit' })
+  @ApiResponse({ status: 200, description: 'Audit updated successfully' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid data'
+  })
+  update(
+    @Param('id') id: string,
+    @Body() updateAuditDto: UpdateAuditDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.auditService.update(id, updateAuditDto, user)
   }
 }

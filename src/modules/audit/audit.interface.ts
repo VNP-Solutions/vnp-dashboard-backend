@@ -6,6 +6,7 @@ import {
   BulkArchiveAuditDto,
   BulkImportResultDto,
   BulkUpdateResultDto,
+  BulkUploadReportDto,
   CreateAuditDto,
   GlobalStatsResponseDto,
   UpdateAuditDto
@@ -151,7 +152,7 @@ export interface IAuditService {
   ): Promise<BulkImportResultDto>
   getGlobalStats(user: IUserWithPermissions): Promise<GlobalStatsResponseDto>
   bulkUploadReport(
-    data: any,
+    data: BulkUploadReportDto,
     user: IUserWithPermissions
   ): Promise<{
     message: string

@@ -267,7 +267,8 @@ export class BulkUploadReportDto {
     description: 'Array of audit IDs to update'
   })
   @IsArray()
-  @IsNotEmpty()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
   audit_ids: string[]
 
   @ApiProperty({
