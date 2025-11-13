@@ -12,8 +12,7 @@ import { PermissionService } from '../../common/services/permission.service'
 import {
   COMPLETED_AUDIT_STATUSES,
   canArchiveAudit,
-  getArchiveErrorMessage,
-  getStatusesByCategory
+  getArchiveErrorMessage
 } from '../../common/utils/audit.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IAuditBatchRepository } from '../audit-batch/audit-batch.interface'
@@ -224,26 +223,18 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Add status category filter if provided (supports comma-separated values)
+    // Add status ID filter if provided (supports comma-separated values)
     if (query.status) {
-      const statusCategories = query.status.split(',').map(s => s.trim()).filter(s => s)
-      const allStatusNames: string[] = []
-      
-      for (const category of statusCategories) {
-        const statusNames = getStatusesByCategory(category as 'pending' | 'upcoming' | 'in_progress' | 'completed')
-        allStatusNames.push(...statusNames)
-      }
-      
-      // Remove duplicates
-      const uniqueStatusNames = [...new Set(allStatusNames)]
-      
-      if (uniqueStatusNames.length > 0) {
+      const statusIds = query.status
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s)
+
+      if (statusIds.length > 0) {
         finalWhere = {
           ...finalWhere,
-          auditStatus: {
-            status: {
-              in: uniqueStatusNames
-            }
+          audit_status_id: {
+            in: statusIds
           }
         }
       }
@@ -427,26 +418,18 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Add status category filter if provided (supports comma-separated values)
+    // Add status ID filter if provided (supports comma-separated values)
     if (query.status) {
-      const statusCategories = query.status.split(',').map(s => s.trim()).filter(s => s)
-      const allStatusNames: string[] = []
-      
-      for (const category of statusCategories) {
-        const statusNames = getStatusesByCategory(category as 'pending' | 'upcoming' | 'in_progress' | 'completed')
-        allStatusNames.push(...statusNames)
-      }
-      
-      // Remove duplicates
-      const uniqueStatusNames = [...new Set(allStatusNames)]
-      
-      if (uniqueStatusNames.length > 0) {
+      const statusIds = query.status
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s)
+
+      if (statusIds.length > 0) {
         finalWhere = {
           ...finalWhere,
-          auditStatus: {
-            status: {
-              in: uniqueStatusNames
-            }
+          audit_status_id: {
+            in: statusIds
           }
         }
       }
@@ -1635,7 +1618,10 @@ export class AuditService implements IAuditService {
     }
   }
 
-  async bulkUploadReport(data: BulkUploadReportDto, _user: IUserWithPermissions) {
+  async bulkUploadReport(
+    data: BulkUploadReportDto,
+    _user: IUserWithPermissions
+  ) {
     const { audit_ids, report_url } = data
 
     if (!audit_ids || audit_ids.length === 0) {
