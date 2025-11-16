@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString
 } from 'class-validator'
+import { QueryDto } from '../../common/dto/query.dto'
 
 export class CreatePropertyPendingActionDto {
   @ApiProperty({
@@ -30,16 +31,18 @@ export class CreatePropertyPendingActionDto {
   transfer_data?: { new_portfolio_id: string }
 }
 
-export class PropertyPendingActionQueryDto {
+export class PropertyPendingActionQueryDto extends QueryDto {
   @ApiPropertyOptional({
-    description: 'Filter by status'
+    description: 'Filter by status',
+    example: 'PENDING'
   })
   @IsOptional()
   @IsString()
   status?: string
 
   @ApiPropertyOptional({
-    description: 'Filter by action type'
+    description: 'Filter by action type',
+    example: 'DELETE'
   })
   @IsOptional()
   @IsString()
@@ -51,6 +54,13 @@ export class PropertyPendingActionQueryDto {
   @IsOptional()
   @IsString()
   requested_user_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by property ID'
+  })
+  @IsOptional()
+  @IsString()
+  property_id?: string
 }
 
 export class ApprovePropertyPendingActionDto {

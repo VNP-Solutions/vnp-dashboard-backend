@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client'
+import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   ApprovePropertyPendingActionDto,
@@ -45,7 +46,10 @@ export interface IPropertyPendingActionRepository {
     where?: any
     include?: any
     orderBy?: any
+    skip?: number
+    take?: number
   }): Promise<PropertyPendingActionWithRelations[]>
+  count(where?: any): Promise<number>
   findById(id: string): Promise<PropertyPendingActionWithRelations | null>
   update(
     id: string,
@@ -68,7 +72,7 @@ export interface IPropertyPendingActionService {
   findAll(
     query: PropertyPendingActionQueryDto,
     user: IUserWithPermissions
-  ): Promise<PropertyPendingActionWithRelations[]>
+  ): Promise<PaginatedResult<PropertyPendingActionWithRelations>>
   findOne(id: string, user: IUserWithPermissions): Promise<PropertyPendingActionWithRelations>
   approve(
     id: string,

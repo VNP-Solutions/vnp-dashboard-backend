@@ -7,8 +7,10 @@ import {
   forwardRef
 } from '@nestjs/common'
 import { PropertyActionStatus, PropertyActionType } from '@prisma/client'
+import type { PaginatedResult } from '../../common/dto/query.dto'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { isUserSuperAdmin } from '../../common/utils/permission.util'
+import { isUserSuperAdmin, isInternalUser } from '../../common/utils/permission.util'
+import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IPropertyService } from '../property/property.interface'
 import {
   ApprovePropertyPendingActionDto,
@@ -35,6 +37,13 @@ export class PropertyPendingActionService
     data: CreatePropertyPendingActionDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can create pending actions
+    if (!isInternalUser(user)) {
+      throw new ForbiddenException(
+        'Only internal users can create property action requests'
+      )
+    }
+
     // Validate transfer data for transfer actions
     if (
       data.action_type === PropertyActionType.TRANSFER &&
@@ -57,44 +66,110 @@ export class PropertyPendingActionService
   async findAll(
     query: PropertyPendingActionQueryDto,
     user: IUserWithPermissions
-  ) {
-    const where: any = {}
-
-    // Non-super admins can only see their own pending actions
+  ): Promise<PaginatedResult<any>> {
+    // Only super admins can access this endpoint
     if (!isUserSuperAdmin(user)) {
-      where.requested_user_id = user.id
+      throw new ForbiddenException(
+        'Only super admins can access all pending actions'
+      )
     }
 
+    // Build additional filters from query params
+    const additionalFilters: any = {}
     if (query.status) {
-      where.status = query.status
+      additionalFilters.status = query.status
     }
-
     if (query.action_type) {
-      where.action_type = query.action_type
+      additionalFilters.action_type = query.action_type
+    }
+    if (query.requested_user_id) {
+      additionalFilters.requested_user_id = query.requested_user_id
+    }
+    if (query.property_id) {
+      additionalFilters.property_id = query.property_id
     }
 
-    if (query.requested_user_id && isUserSuperAdmin(user)) {
-      where.requested_user_id = query.requested_user_id
+    // Merge with existing filters
+    const mergedQuery = {
+      ...query,
+      filters: {
+        ...(typeof query.filters === 'object' ? query.filters : {}),
+        ...additionalFilters
+      }
     }
 
-    return this.repository.findAll({ where })
+    // Configuration for query builder
+    const queryConfig = {
+      searchFields: [
+        'id',
+        'property.name',
+        'requestedBy.email',
+        'requestedBy.first_name',
+        'requestedBy.last_name',
+        'approvedBy.email',
+        'approvedBy.first_name',
+        'approvedBy.last_name',
+        'rejection_reason'
+      ],
+      filterableFields: [
+        'status',
+        'action_type',
+        'requested_user_id',
+        'approval_user_id',
+        'property_id'
+      ],
+      sortableFields: [
+        'created_at',
+        'updated_at',
+        'approved_at',
+        'status',
+        'action_type',
+        'property.name'
+      ],
+      defaultSortField: 'created_at',
+      defaultSortOrder: 'desc' as const,
+      nestedFieldMap: {
+        property_name: 'property.name',
+        requested_by_email: 'requestedBy.email',
+        approved_by_email: 'approvedBy.email'
+      }
+    }
+
+    // Build Prisma query options
+    const baseWhere: any = {}
+
+    const { skip, take, orderBy, where } = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      baseWhere
+    )
+
+    // Fetch data and count
+    const [data, total] = await Promise.all([
+      this.repository.findAll({ where, skip, take, orderBy }),
+      this.repository.count(where)
+    ])
+
+    return QueryBuilder.buildPaginatedResult(
+      data,
+      total,
+      query.page || 1,
+      query.limit || 10
+    )
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
+    // Only super admins can access this endpoint
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admins can access this resource'
+      )
+    }
+
     const pendingAction = await this.repository.findById(id)
 
     if (!pendingAction) {
       throw new NotFoundException('Pending action not found')
-    }
-
-    // Non-super admins can only view their own pending actions
-    if (
-      !isUserSuperAdmin(user) &&
-      pendingAction.requested_user_id !== user.id
-    ) {
-      throw new ForbiddenException(
-        'You do not have permission to view this pending action'
-      )
     }
 
     return pendingAction

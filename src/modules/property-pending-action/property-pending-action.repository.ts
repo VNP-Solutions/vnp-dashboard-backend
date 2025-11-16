@@ -86,6 +86,8 @@ export class PropertyPendingActionRepository
     where?: any
     include?: any
     orderBy?: any
+    skip?: number
+    take?: number
   }): Promise<PropertyPendingActionWithRelations[]> {
     const result = await this.prisma.propertyPendingAction.findMany({
       where: queryOptions.where,
@@ -114,9 +116,15 @@ export class PropertyPendingActionRepository
           }
         }
       },
-      orderBy: queryOptions.orderBy || { created_at: 'desc' }
+      orderBy: queryOptions.orderBy || { created_at: 'desc' },
+      skip: queryOptions.skip,
+      take: queryOptions.take
     })
     return result as unknown as PropertyPendingActionWithRelations[]
+  }
+
+  async count(where?: any): Promise<number> {
+    return this.prisma.propertyPendingAction.count({ where })
   }
 
   findById(id: string): Promise<PropertyPendingActionWithRelations | null> {
