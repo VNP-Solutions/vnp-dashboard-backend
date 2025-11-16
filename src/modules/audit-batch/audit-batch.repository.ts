@@ -1,9 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import {
-  CreateAuditBatchDto,
-  UpdateAuditBatchDto
-} from './audit-batch.dto'
+import { CreateAuditBatchDto, UpdateAuditBatchDto } from './audit-batch.dto'
 import type { IAuditBatchRepository } from './audit-batch.interface'
 
 @Injectable()
@@ -25,35 +22,13 @@ export class AuditBatchRepository implements IAuditBatchRepository {
 
     return this.prisma.auditBatch.findMany({
       where,
-      orderBy,
-      include: {
-        audits: {
-          select: {
-            id: true,
-            property_id: true,
-            start_date: true,
-            end_date: true,
-            is_archived: true
-          }
-        }
-      }
+      orderBy
     })
   }
 
   async findById(id: string) {
     return this.prisma.auditBatch.findUnique({
-      where: { id },
-      include: {
-        audits: {
-          select: {
-            id: true,
-            property_id: true,
-            start_date: true,
-            end_date: true,
-            is_archived: true
-          }
-        }
-      }
+      where: { id }
     })
   }
 
@@ -97,4 +72,3 @@ export class AuditBatchRepository implements IAuditBatchRepository {
     )
   }
 }
-

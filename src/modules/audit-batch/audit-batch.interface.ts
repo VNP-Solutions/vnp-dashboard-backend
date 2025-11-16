@@ -7,19 +7,7 @@ import {
   UpdateAuditBatchDto
 } from './audit-batch.dto'
 
-type AuditBatchWithAudits = Prisma.AuditBatchGetPayload<{
-  include: {
-    audits: {
-      select: {
-        id: true
-        property_id: true
-        start_date: true
-        end_date: true
-        is_archived: true
-      }
-    }
-  }
-}>
+type AuditBatchWithAudits = Prisma.AuditBatchGetPayload<object>
 
 export interface IAuditBatchRepository {
   create(data: CreateAuditBatchDto): Promise<AuditBatch>

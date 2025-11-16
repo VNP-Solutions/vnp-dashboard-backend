@@ -1,18 +1,12 @@
 import { Prisma, ServiceType } from '@prisma/client'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { CreateServiceTypeDto, ReorderServiceTypeDto, UpdateServiceTypeDto } from './service-type.dto'
+import {
+  CreateServiceTypeDto,
+  ReorderServiceTypeDto,
+  UpdateServiceTypeDto
+} from './service-type.dto'
 
-type ServiceTypeWithPortfolios = Prisma.ServiceTypeGetPayload<{
-  include: {
-    portfolios: {
-      select: {
-        id: true
-        name: true
-        is_active: true
-      }
-    }
-  }
-}>
+type ServiceTypeWithPortfolios = Prisma.ServiceTypeGetPayload<object>
 
 export interface IServiceTypeRepository {
   create(data: CreateServiceTypeDto): Promise<ServiceType>
@@ -42,5 +36,9 @@ export interface IServiceTypeService {
     user: IUserWithPermissions
   ): Promise<ServiceType>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
-  reorder(id: string, data: ReorderServiceTypeDto, user: IUserWithPermissions): Promise<{ message: string }>
+  reorder(
+    id: string,
+    data: ReorderServiceTypeDto,
+    user: IUserWithPermissions
+  ): Promise<{ message: string }>
 }

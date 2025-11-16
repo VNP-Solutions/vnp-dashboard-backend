@@ -19,17 +19,6 @@ export class UserRoleRepository implements IUserRoleRepository {
 
   async findAll() {
     return this.prisma.userRole.findMany({
-      include: {
-        users: {
-          select: {
-            id: true,
-            first_name: true,
-            last_name: true,
-            email: true,
-            is_verified: true
-          }
-        }
-      },
       orderBy: {
         order: 'asc'
       }

@@ -19,15 +19,6 @@ export class CurrencyRepository implements ICurrencyRepository {
 
   async findAll() {
     return this.prisma.currency.findMany({
-      include: {
-        properties: {
-          select: {
-            id: true,
-            name: true,
-            is_active: true
-          }
-        }
-      },
       orderBy: {
         order: 'asc'
       }
@@ -36,16 +27,7 @@ export class CurrencyRepository implements ICurrencyRepository {
 
   async findById(id: string) {
     return this.prisma.currency.findUnique({
-      where: { id },
-      include: {
-        properties: {
-          select: {
-            id: true,
-            name: true,
-            is_active: true
-          }
-        }
-      }
+      where: { id }
     })
   }
 

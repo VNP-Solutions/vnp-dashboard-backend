@@ -19,15 +19,6 @@ export class ServiceTypeRepository implements IServiceTypeRepository {
 
   async findAll() {
     return this.prisma.serviceType.findMany({
-      include: {
-        portfolios: {
-          select: {
-            id: true,
-            name: true,
-            is_active: true
-          }
-        }
-      },
       orderBy: {
         order: 'asc'
       }
@@ -36,16 +27,7 @@ export class ServiceTypeRepository implements IServiceTypeRepository {
 
   async findById(id: string) {
     return this.prisma.serviceType.findUnique({
-      where: { id },
-      include: {
-        portfolios: {
-          select: {
-            id: true,
-            name: true,
-            is_active: true
-          }
-        }
-      }
+      where: { id }
     })
   }
 
