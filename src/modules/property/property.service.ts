@@ -769,13 +769,8 @@ export class PropertyService implements IPropertyService {
     // Check ownership: Only the owner portfolio can delete the property
     await this.validatePropertyOwnership(property, user)
 
-    const auditCount = await this.propertyRepository.countAudits(id)
-
-    if (auditCount > 0) {
-      throw new BadRequestException(
-        `Cannot delete property with ${auditCount} associated audits. Please delete or reassign the audits first.`
-      )
-    }
+    // No need to check audit count - cascade delete will handle it automatically
+    // The schema has onDelete: Cascade configured for audits, credentials, bank details, notes, and tasks
 
     // If user is not super admin, create a pending action instead
     if (!isUserSuperAdmin(user)) {
@@ -792,7 +787,7 @@ export class PropertyService implements IPropertyService {
       }
     }
 
-    // Super admin: perform delete
+    // Super admin: perform delete (cascade will automatically delete related records)
     await this.propertyRepository.delete(id)
 
     return { message: 'Property deleted successfully' }
