@@ -2,6 +2,10 @@ import { Portfolio, Prisma } from '@prisma/client'
 import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
+  AttachmentUrlDto,
+  EmailAttachment
+} from '../email/email.dto'
+import {
   CreatePortfolioDto,
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
@@ -133,7 +137,9 @@ export interface IPortfolioService {
     id: string,
     subject: string,
     body: string,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    uploadedAttachments?: EmailAttachment[],
+    attachmentUrls?: AttachmentUrlDto[]
   ): Promise<{ message: string }>
   bulkImport(
     file: Express.Multer.File,

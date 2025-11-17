@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { EmailUtil } from '../../common/utils/email.util'
 import { PrismaService } from '../prisma/prisma.service'
-import { SendEmailDto } from './email.dto'
+import { EmailAttachment, SendEmailDto } from './email.dto'
 import type { IEmailService } from './email.interface'
 
 @Injectable()
@@ -12,7 +12,11 @@ export class EmailService implements IEmailService {
     @Inject(PrismaService) private prisma: PrismaService
   ) {}
 
-  async sendEmail(data: SendEmailDto, user: IUserWithPermissions) {
+  async sendEmail(
+    data: SendEmailDto,
+    user: IUserWithPermissions,
+    uploadedAttachments?: EmailAttachment[]
+  ) {
     // Default send_sender_data to true if not specified
     const shouldSendSenderData = data.send_sender_data !== false
 
@@ -25,8 +29,28 @@ export class EmailService implements IEmailService {
       fullEmailBody = `${data.body}\n\n${senderInfo}`
     }
 
+    // Combine attachments from file uploads and URLs
+    let allAttachments: EmailAttachment[] = []
+
+    // Add uploaded file attachments if provided
+    if (uploadedAttachments && uploadedAttachments.length > 0) {
+      allAttachments = [...uploadedAttachments]
+    }
+
+    // Fetch and add URL-based attachments if provided
+    if (data.attachment_urls && data.attachment_urls.length > 0) {
+      const urlAttachments =
+        await this.emailUtil.fetchAttachmentsFromUrls(data.attachment_urls)
+      allAttachments = [...allAttachments, ...urlAttachments]
+    }
+
     // Send the email
-    await this.emailUtil.sendEmail(data.to, data.subject, fullEmailBody)
+    await this.emailUtil.sendEmail(
+      data.to,
+      data.subject,
+      fullEmailBody,
+      allAttachments.length > 0 ? allAttachments : undefined
+    )
 
     return { message: 'Email sent successfully' }
   }

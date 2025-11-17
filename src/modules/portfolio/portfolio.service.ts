@@ -20,6 +20,10 @@ import type { IContractUrlRepository } from '../contract-url/contract-url.interf
 import { PrismaService } from '../prisma/prisma.service'
 import type { IServiceTypeRepository } from '../service-type/service-type.interface'
 import {
+  AttachmentUrlDto,
+  EmailAttachment
+} from '../email/email.dto'
+import {
   BulkImportResultDto,
   CreatePortfolioDto,
   PortfolioQueryDto,
@@ -384,7 +388,9 @@ export class PortfolioService implements IPortfolioService {
     id: string,
     subject: string,
     body: string,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    uploadedAttachments?: EmailAttachment[],
+    attachmentUrls?: AttachmentUrlDto[]
   ) {
     const isSuperAdmin = isUserSuperAdmin(user)
     const portfolio = await this.portfolioRepository.findById(
@@ -403,7 +409,27 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
-    await this.emailUtil.sendEmail(portfolio.contact_email, subject, body)
+    // Combine attachments from file uploads and URLs
+    let allAttachments: EmailAttachment[] = []
+
+    // Add uploaded file attachments if provided
+    if (uploadedAttachments && uploadedAttachments.length > 0) {
+      allAttachments = [...uploadedAttachments]
+    }
+
+    // Fetch and add URL-based attachments if provided
+    if (attachmentUrls && attachmentUrls.length > 0) {
+      const urlAttachments =
+        await this.emailUtil.fetchAttachmentsFromUrls(attachmentUrls)
+      allAttachments = [...allAttachments, ...urlAttachments]
+    }
+
+    await this.emailUtil.sendEmail(
+      portfolio.contact_email,
+      subject,
+      body,
+      allAttachments.length > 0 ? allAttachments : undefined
+    )
 
     return { message: 'Email sent successfully' }
   }

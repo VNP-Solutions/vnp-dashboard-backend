@@ -1,9 +1,10 @@
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { SendEmailDto } from './email.dto'
+import { EmailAttachment, SendEmailDto } from './email.dto'
 
 export interface IEmailService {
   sendEmail(
     data: SendEmailDto,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    attachments?: EmailAttachment[]
   ): Promise<{ message: string }>
 }

@@ -1,11 +1,34 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsOptional,
-  IsString
+  IsString,
+  IsUrl,
+  ValidateNested
 } from 'class-validator'
+import { Type } from 'class-transformer'
+
+export class AttachmentUrlDto {
+  @ApiProperty({
+    example: 'https://s3.amazonaws.com/bucket/document.pdf',
+    description: 'URL of the file to attach'
+  })
+  @IsUrl()
+  @IsNotEmpty()
+  url: string
+
+  @ApiPropertyOptional({
+    example: 'report.pdf',
+    description:
+      'Optional custom filename for the attachment (if not provided, will extract from URL)'
+  })
+  @IsString()
+  @IsOptional()
+  filename?: string
+}
 
 export class SendEmailDto {
   @ApiProperty({
@@ -40,4 +63,26 @@ export class SendEmailDto {
   @IsBoolean()
   @IsOptional()
   send_sender_data?: boolean
+
+  @ApiPropertyOptional({
+    type: [AttachmentUrlDto],
+    example: [
+      {
+        url: 'https://s3.amazonaws.com/bucket/report.pdf',
+        filename: 'monthly-report.pdf'
+      }
+    ],
+    description: 'Optional array of file URLs to attach to the email'
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttachmentUrlDto)
+  @IsOptional()
+  attachment_urls?: AttachmentUrlDto[]
+}
+
+export interface EmailAttachment {
+  filename: string
+  content: Buffer
+  contentType: string
 }

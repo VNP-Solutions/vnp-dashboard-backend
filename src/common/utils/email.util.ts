@@ -1,7 +1,14 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import * as nodemailer from 'nodemailer'
 import { Configuration } from '../../config/configuration'
+import type {
+  AttachmentUrlDto,
+  EmailAttachment
+} from '../../modules/email/email.dto'
+import * as https from 'https'
+import * as http from 'http'
+import { URL } from 'url'
 
 @Injectable()
 export class EmailUtil {
@@ -97,14 +104,155 @@ export class EmailUtil {
     await this.transporter.sendMail(mailOptions)
   }
 
-  async sendEmail(to: string, subject: string, body: string): Promise<void> {
-    const mailOptions = {
+  async sendEmail(
+    to: string,
+    subject: string,
+    body: string,
+    attachments?: EmailAttachment[]
+  ): Promise<void> {
+    const mailOptions: nodemailer.SendMailOptions = {
       from: this.configService.get('smtp.email', { infer: true }),
       to,
       subject,
       text: body
     }
 
+    // Add attachments if provided
+    if (attachments && attachments.length > 0) {
+      mailOptions.attachments = attachments.map((attachment) => ({
+        filename: attachment.filename,
+        content: attachment.content,
+        contentType: attachment.contentType
+      }))
+    }
+
     await this.transporter.sendMail(mailOptions)
+  }
+
+  /**
+   * Fetch a file from a URL and return it as a buffer
+   */
+  async fetchFileFromUrl(url: string): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const parsedUrl = new URL(url)
+        const protocol = parsedUrl.protocol === 'https:' ? https : http
+
+        protocol
+          .get(url, (response) => {
+            if (
+              response.statusCode &&
+              (response.statusCode < 200 || response.statusCode >= 300)
+            ) {
+              reject(
+                new BadRequestException(
+                  `Failed to fetch file from URL: ${url}. Status: ${response.statusCode}`
+                )
+              )
+              return
+            }
+
+            const chunks: Buffer[] = []
+            response.on('data', (chunk: Buffer) => chunks.push(chunk))
+            response.on('end', () => resolve(Buffer.concat(chunks)))
+            response.on('error', (err) =>
+              reject(
+                new BadRequestException(
+                  `Error downloading file from URL: ${err.message}`
+                )
+              )
+            )
+          })
+          .on('error', (err) =>
+            reject(
+              new BadRequestException(
+                `Error fetching file from URL: ${err.message}`
+              )
+            )
+          )
+      } catch (error) {
+        reject(
+          new BadRequestException(
+            `Invalid URL: ${error instanceof Error ? error.message : 'Unknown error'}`
+          )
+        )
+      }
+    })
+  }
+
+  /**
+   * Extract filename from URL or use provided filename
+   */
+  getFilenameFromUrl(url: string, customFilename?: string): string {
+    if (customFilename) {
+      return customFilename
+    }
+
+    try {
+      const parsedUrl = new URL(url)
+      const pathname = parsedUrl.pathname
+      const filename = pathname.substring(pathname.lastIndexOf('/') + 1)
+      return filename || 'attachment'
+    } catch {
+      return 'attachment'
+    }
+  }
+
+  /**
+   * Fetch attachments from URLs and convert to EmailAttachment format
+   */
+  async fetchAttachmentsFromUrls(
+    attachmentUrls: AttachmentUrlDto[]
+  ): Promise<EmailAttachment[]> {
+    const attachments: EmailAttachment[] = []
+
+    for (const attachmentUrl of attachmentUrls) {
+      try {
+        const buffer = await this.fetchFileFromUrl(attachmentUrl.url)
+        const filename = this.getFilenameFromUrl(
+          attachmentUrl.url,
+          attachmentUrl.filename
+        )
+
+        // Determine content type based on file extension
+        const contentType = this.getContentTypeFromFilename(filename)
+
+        attachments.push({
+          filename,
+          content: buffer,
+          contentType
+        })
+      } catch (error) {
+        throw new BadRequestException(
+          `Failed to fetch attachment from URL ${attachmentUrl.url}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+      }
+    }
+
+    return attachments
+  }
+
+  /**
+   * Get MIME type based on file extension
+   */
+  private getContentTypeFromFilename(filename: string): string {
+    const extension = filename.toLowerCase().split('.').pop()
+    const mimeTypes: Record<string, string> = {
+      pdf: 'application/pdf',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      xls: 'application/vnd.ms-excel',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      txt: 'text/plain',
+      csv: 'text/csv',
+      zip: 'application/zip',
+      json: 'application/json'
+    }
+
+    return mimeTypes[extension || ''] || 'application/octet-stream'
   }
 }

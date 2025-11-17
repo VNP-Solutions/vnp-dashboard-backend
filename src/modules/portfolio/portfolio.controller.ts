@@ -9,10 +9,11 @@ import {
   Post,
   Query,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors
 } from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express'
 import {
   ApiBearerAuth,
   ApiBody,
@@ -30,6 +31,7 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { EmailAttachment } from '../email/email.dto'
 import {
   CreatePortfolioDto,
   PortfolioQueryDto,
@@ -147,12 +149,71 @@ export class PortfolioController {
 
   @Post(':id/send-email')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
-  @ApiOperation({ summary: 'Send email to portfolio contact' })
+  @UseInterceptors(FilesInterceptor('attachments', 5)) // Allow up to 5 file attachments
+  @ApiConsumes('multipart/form-data', 'application/json')
+  @ApiOperation({
+    summary: 'Send email to portfolio contact with optional attachments',
+    description:
+      'Send an email to the portfolio contact email with optional attachments. ' +
+      'Attachments can be provided as direct file uploads or URLs to files.'
+  })
+  @ApiBody({
+    description:
+      'Email data with optional file attachments (upload) or attachment URLs',
+    schema: {
+      type: 'object',
+      properties: {
+        subject: {
+          type: 'string',
+          example: 'Quarterly Review Meeting',
+          description: 'Email subject'
+        },
+        body: {
+          type: 'string',
+          example:
+            'Dear Team,\n\nWe would like to schedule a quarterly review meeting...',
+          description: 'Email body (plain text)'
+        },
+        attachment_urls: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              url: {
+                type: 'string',
+                example: 'https://s3.amazonaws.com/bucket/report.pdf',
+                description: 'URL of the file to attach'
+              },
+              filename: {
+                type: 'string',
+                example: 'quarterly-report.pdf',
+                description:
+                  'Optional custom filename (extracted from URL if not provided)'
+              }
+            },
+            required: ['url']
+          },
+          description:
+            'Optional array of file URLs to attach (downloaded and attached to email)'
+        },
+        attachments: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary'
+          },
+          description: 'Optional direct file uploads (max 5 files)'
+        }
+      },
+      required: ['subject', 'body']
+    }
+  })
   @ApiResponse({ status: 200, description: 'Email sent successfully' })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   @ApiResponse({
     status: 400,
-    description: 'Portfolio does not have a contact email configured'
+    description:
+      'Portfolio does not have a contact email configured or failed to fetch attachment from URL'
   })
   @ApiResponse({
     status: 403,
@@ -161,13 +222,23 @@ export class PortfolioController {
   sendEmail(
     @Param('id') id: string,
     @Body() sendEmailDto: SendPortfolioEmailDto,
-    @CurrentUser() user: IUserWithPermissions
+    @CurrentUser() user: IUserWithPermissions,
+    @UploadedFiles() files?: Express.Multer.File[]
   ) {
+    // Convert uploaded files to EmailAttachment format
+    const attachments: EmailAttachment[] | undefined = files?.map((file) => ({
+      filename: file.originalname,
+      content: file.buffer,
+      contentType: file.mimetype
+    }))
+
     return this.portfolioService.sendEmail(
       id,
       sendEmailDto.subject,
       sendEmailDto.body,
-      user
+      user,
+      attachments,
+      sendEmailDto.attachment_urls
     )
   }
 

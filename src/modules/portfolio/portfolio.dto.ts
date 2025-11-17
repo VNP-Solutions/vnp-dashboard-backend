@@ -1,14 +1,18 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
-  ValidateIf
+  ValidateIf,
+  ValidateNested
 } from 'class-validator'
+import { Type } from 'class-transformer'
 import { QueryDto } from '../../common/dto/query.dto'
+import { AttachmentUrlDto } from '../email/email.dto'
 
 export class CreatePortfolioDto {
   @ApiProperty({
@@ -137,6 +141,22 @@ export class SendPortfolioEmailDto {
   @IsString()
   @IsNotEmpty()
   body: string
+
+  @ApiPropertyOptional({
+    type: [AttachmentUrlDto],
+    example: [
+      {
+        url: 'https://s3.amazonaws.com/bucket/report.pdf',
+        filename: 'quarterly-report.pdf'
+      }
+    ],
+    description: 'Optional array of file URLs to attach to the email'
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttachmentUrlDto)
+  @IsOptional()
+  attachment_urls?: AttachmentUrlDto[]
 }
 
 export class BulkImportResultDto {
