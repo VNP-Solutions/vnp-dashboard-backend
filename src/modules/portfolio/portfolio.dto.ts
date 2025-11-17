@@ -31,11 +31,6 @@ export class CreatePortfolioDto {
   @IsNotEmpty()
   service_type_id: string
 
-  @ApiProperty({ example: true, description: 'Whether contract is signed' })
-  @IsBoolean()
-  @IsNotEmpty()
-  is_contract_signed: boolean
-
   @ApiPropertyOptional({
     example: 'https://example.com/contract.pdf',
     description: 'Contract document URL (will be saved as user-specific contract URL)'
@@ -114,14 +109,6 @@ export class PortfolioQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   is_active?: string
-
-  @ApiPropertyOptional({
-    description: 'Filter by contract signed status (true/false/All)',
-    example: 'true'
-  })
-  @IsOptional()
-  @IsString()
-  is_contract_signed?: string
 }
 
 export class SendPortfolioEmailDto {

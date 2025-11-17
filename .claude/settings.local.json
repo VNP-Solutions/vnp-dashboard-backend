@@ -4,7 +4,8 @@
       "Bash(yarn generate:*)",
       "Bash(yarn build)",
       "Bash(yarn lint)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(yarn push:*)"
     ],
     "deny": [],
     "ask": []

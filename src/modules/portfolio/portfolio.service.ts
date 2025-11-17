@@ -139,9 +139,6 @@ export class PortfolioService implements IPortfolioService {
     if (query.is_active) {
       additionalFilters.is_active = query.is_active
     }
-    if (query.is_contract_signed) {
-      additionalFilters.is_contract_signed = query.is_contract_signed
-    }
 
     // Merge with existing filters
     const mergedQuery = {
@@ -155,13 +152,12 @@ export class PortfolioService implements IPortfolioService {
     // Configuration for query builder
     const queryConfig = {
       searchFields: ['name'], // Search only by portfolio name
-      filterableFields: ['service_type_id', 'is_active', 'is_contract_signed'],
+      filterableFields: ['service_type_id', 'is_active'],
       sortableFields: [
         'name',
         'created_at',
         'updated_at',
         'is_active',
-        'is_contract_signed',
         'is_commissionable'
       ],
       defaultSortField: 'created_at',
@@ -227,9 +223,6 @@ export class PortfolioService implements IPortfolioService {
     if (query.is_active) {
       additionalFilters.is_active = query.is_active
     }
-    if (query.is_contract_signed) {
-      additionalFilters.is_contract_signed = query.is_contract_signed
-    }
 
     // Merge with existing filters
     const mergedQuery = {
@@ -243,13 +236,12 @@ export class PortfolioService implements IPortfolioService {
     // Configuration for query builder
     const queryConfig = {
       searchFields: ['name'], // Search only by portfolio name
-      filterableFields: ['service_type_id', 'is_active', 'is_contract_signed'],
+      filterableFields: ['service_type_id', 'is_active'],
       sortableFields: [
         'name',
         'created_at',
         'updated_at',
         'is_active',
-        'is_contract_signed',
         'is_commissionable'
       ],
       defaultSortField: 'created_at',
@@ -565,8 +557,6 @@ export class PortfolioService implements IPortfolioService {
             'Contract url'
           ])
 
-          const isContractSigned = contractUrl ? true : false
-
           // Extract sales agent (instead of commissionable)
           const salesAgent = findHeaderValue(row, [
             'Sales Agent',
@@ -598,7 +588,6 @@ export class PortfolioService implements IPortfolioService {
           const portfolioData: Omit<CreatePortfolioDto, 'contract_url'> = {
             name: portfolioName,
             service_type_id: serviceType.id,
-            is_contract_signed: isContractSigned,
             is_active: true,
             contact_email: contactEmail || undefined,
             is_commissionable: isCommissionable,

@@ -1058,7 +1058,6 @@ export class PropertyService implements IPropertyService {
             portfolio = await this.portfolioRepository.create({
               name: portfolioName,
               service_type_id: defaultServiceType.id,
-              is_contract_signed: false,
               is_active: true,
               is_commissionable: false
             })
