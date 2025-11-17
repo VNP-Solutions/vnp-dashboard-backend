@@ -1,10 +1,7 @@
 import { Portfolio, Prisma } from '@prisma/client'
 import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import {
-  AttachmentUrlDto,
-  EmailAttachment
-} from '../email/email.dto'
+import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import {
   CreatePortfolioDto,
   PortfolioQueryDto,
@@ -22,16 +19,6 @@ type PortfolioWithServiceType = Prisma.PortfolioGetPayload<{
         is_active: true
       }
     }
-    contractUrls: {
-      select: {
-        id: true
-        url: true
-        description: true
-        is_active: true
-        created_at: true
-        updated_at: true
-      }
-    }
   }
 }>
 
@@ -47,16 +34,6 @@ type PortfolioWithRelations = Prisma.PortfolioGetPayload<{
     properties: {
       select: {
         id: true
-      }
-    }
-    contractUrls: {
-      select: {
-        id: true
-        url: true
-        description: true
-        is_active: true
-        created_at: true
-        updated_at: true
       }
     }
   }
@@ -90,7 +67,11 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
 }>
 
 export interface IPortfolioRepository {
-  create(data: CreatePortfolioDto, userId?: string, isSuperAdmin?: boolean): Promise<PortfolioWithServiceType>
+  create(
+    data: CreatePortfolioDto,
+    userId?: string,
+    isSuperAdmin?: boolean
+  ): Promise<PortfolioWithServiceType>
   findAll(
     queryOptions: any,
     portfolioIds?: string[],
@@ -98,7 +79,11 @@ export interface IPortfolioRepository {
     isSuperAdmin?: boolean
   ): Promise<PortfolioWithRelations[]>
   count(whereClause: any, portfolioIds?: string[]): Promise<number>
-  findById(id: string, userId?: string, isSuperAdmin?: boolean): Promise<PortfolioWithFullDetails | null>
+  findById(
+    id: string,
+    userId?: string,
+    isSuperAdmin?: boolean
+  ): Promise<PortfolioWithFullDetails | null>
   findByName(name: string): Promise<Portfolio | null>
   update(
     id: string,

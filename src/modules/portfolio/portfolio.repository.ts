@@ -7,7 +7,11 @@ import type { IPortfolioRepository } from './portfolio.interface'
 export class PortfolioRepository implements IPortfolioRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
-  async create(data: CreatePortfolioDto, userId?: string, isSuperAdmin?: boolean) {
+  async create(
+    data: CreatePortfolioDto,
+    _userId?: string,
+    _isSuperAdmin?: boolean
+  ) {
     return this.prisma.portfolio.create({
       data,
       include: {
@@ -17,25 +21,17 @@ export class PortfolioRepository implements IPortfolioRepository {
             type: true,
             is_active: true
           }
-        },
-        contractUrls: userId ? {
-          where: isSuperAdmin ? undefined : {
-            user_id: userId
-          },
-          select: {
-            id: true,
-            url: true,
-            description: true,
-            is_active: true,
-            created_at: true,
-            updated_at: true
-          }
-        } : false
+        }
       }
     })
   }
 
-  async findAll(queryOptions: any, _portfolioIds?: string[], userId?: string, isSuperAdmin?: boolean) {
+  async findAll(
+    queryOptions: any,
+    _portfolioIds?: string[],
+    userId?: string,
+    isSuperAdmin?: boolean
+  ) {
     const { where, skip, take, orderBy } = queryOptions
 
     return this.prisma.portfolio.findMany({
@@ -57,9 +53,12 @@ export class PortfolioRepository implements IPortfolioRepository {
           }
         },
         contractUrls: {
-          where: (userId && !isSuperAdmin) ? {
-            user_id: userId
-          } : undefined,
+          where:
+            userId && !isSuperAdmin
+              ? {
+                  user_id: userId
+                }
+              : undefined,
           select: {
             id: true,
             url: true,
@@ -95,19 +94,23 @@ export class PortfolioRepository implements IPortfolioRepository {
             id: true
           }
         },
-        contractUrls: userId ? {
-          where: isSuperAdmin ? undefined : {
-            user_id: userId
-          },
-          select: {
-            id: true,
-            url: true,
-            description: true,
-            is_active: true,
-            created_at: true,
-            updated_at: true
-          }
-        } : false
+        contractUrls: userId
+          ? {
+              where: isSuperAdmin
+                ? undefined
+                : {
+                    user_id: userId
+                  },
+              select: {
+                id: true,
+                url: true,
+                description: true,
+                is_active: true,
+                created_at: true,
+                updated_at: true
+              }
+            }
+          : false
       }
     })
   }
@@ -118,7 +121,12 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
-  async update(id: string, data: UpdatePortfolioDto, userId?: string, isSuperAdmin?: boolean) {
+  async update(
+    id: string,
+    data: UpdatePortfolioDto,
+    userId?: string,
+    isSuperAdmin?: boolean
+  ) {
     return this.prisma.portfolio.update({
       where: { id },
       data,
@@ -130,19 +138,23 @@ export class PortfolioRepository implements IPortfolioRepository {
             is_active: true
           }
         },
-        contractUrls: userId ? {
-          where: isSuperAdmin ? undefined : {
-            user_id: userId
-          },
-          select: {
-            id: true,
-            url: true,
-            description: true,
-            is_active: true,
-            created_at: true,
-            updated_at: true
-          }
-        } : false
+        contractUrls: userId
+          ? {
+              where: isSuperAdmin
+                ? undefined
+                : {
+                    user_id: userId
+                  },
+              select: {
+                id: true,
+                url: true,
+                description: true,
+                is_active: true,
+                created_at: true,
+                updated_at: true
+              }
+            }
+          : false
       }
     })
   }
