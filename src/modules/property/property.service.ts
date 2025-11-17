@@ -650,26 +650,26 @@ export class PropertyService implements IPropertyService {
       )
     }
 
-    // If user is not super admin, create a pending action instead
-    if (!isUserSuperAdmin(user)) {
-      const pendingAction = await this.pendingActionRepository.create({
-        property_id: id,
-        action_type: PropertyActionType.TRANSFER,
-        requested_user_id: user.id,
-        transfer_data: { new_portfolio_id: data.new_portfolio_id }
+    // Super admin can directly transfer
+    if (isUserSuperAdmin(user)) {
+      return this.propertyRepository.update(id, {
+        portfolio_id: data.new_portfolio_id
       })
-
-      return {
-        message:
-          'Transfer request submitted for approval. A super admin will review your request.',
-        pending_action: pendingAction
-      }
     }
 
-    // Perform the transfer by updating the portfolio_id (super admin only)
-    return this.propertyRepository.update(id, {
-      portfolio_id: data.new_portfolio_id
+    // Property manager (with ownership rights) creates pending action for approval
+    const pendingAction = await this.pendingActionRepository.create({
+      property_id: id,
+      action_type: PropertyActionType.TRANSFER,
+      requested_user_id: user.id,
+      transfer_data: { new_portfolio_id: data.new_portfolio_id }
     })
+
+    return {
+      message:
+        'Transfer request submitted for approval. A super admin will review your request.',
+      pending_action: pendingAction
+    }
   }
 
   async bulkTransfer(
@@ -772,25 +772,24 @@ export class PropertyService implements IPropertyService {
     // No need to check audit count - cascade delete will handle it automatically
     // The schema has onDelete: Cascade configured for audits, credentials, bank details, notes, and tasks
 
-    // If user is not super admin, create a pending action instead
-    if (!isUserSuperAdmin(user)) {
-      const pendingAction = await this.pendingActionRepository.create({
-        property_id: id,
-        action_type: PropertyActionType.DELETE,
-        requested_user_id: user.id
-      })
-
-      return {
-        message:
-          'Delete request submitted for approval. A super admin will review your request.',
-        pending_action: pendingAction
-      }
+    // Super admin can directly delete
+    if (isUserSuperAdmin(user)) {
+      await this.propertyRepository.delete(id)
+      return { message: 'Property deleted successfully' }
     }
 
-    // Super admin: perform delete (cascade will automatically delete related records)
-    await this.propertyRepository.delete(id)
+    // Property manager (with ownership rights) creates pending action for approval
+    const pendingAction = await this.pendingActionRepository.create({
+      property_id: id,
+      action_type: PropertyActionType.DELETE,
+      requested_user_id: user.id
+    })
 
-    return { message: 'Property deleted successfully' }
+    return {
+      message:
+        'Delete request submitted for approval. A super admin will review your request.',
+      pending_action: pendingAction
+    }
   }
 
   async bulkImport(

@@ -30,6 +30,7 @@ import {
   PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import type { IAuthRepository } from '../auth/auth.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
@@ -168,10 +169,10 @@ export class PropertyController {
 
   @Patch(':id/transfer')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
-  @ApiOperation({ summary: 'Transfer a property to another portfolio' })
+  @ApiOperation({ summary: 'Transfer a property to another portfolio (Super admin: direct transfer with password, Property manager: creates pending action without password)' })
   @ApiResponse({
     status: 200,
-    description: 'Property transferred successfully'
+    description: 'Property transferred successfully or transfer request submitted for approval'
   })
   @ApiResponse({ status: 404, description: 'Property or Portfolio not found' })
   @ApiResponse({
@@ -188,6 +189,7 @@ export class PropertyController {
     @Body() transferPropertyDto: TransferPropertyDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
+    // Password validation is required for all users during transfer
     const dbUser = await this.authRepository.findUserByEmail(user.email)
 
     if (!dbUser) {
@@ -302,8 +304,8 @@ export class PropertyController {
 
   @Delete(':id')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE, true)
-  @ApiOperation({ summary: 'Delete a property' })
-  @ApiResponse({ status: 200, description: 'Property deleted successfully' })
+  @ApiOperation({ summary: 'Delete a property (Super admin: direct deletion, Property manager: creates pending action for approval)' })
+  @ApiResponse({ status: 200, description: 'Property deleted successfully or delete request submitted for approval' })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
