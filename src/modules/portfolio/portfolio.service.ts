@@ -326,6 +326,17 @@ export class PortfolioService implements IPortfolioService {
       }
     }
 
+    // Validate service_type_id if provided
+    if (data.service_type_id) {
+      const serviceType = await this.serviceTypeRepository.findById(
+        data.service_type_id
+      )
+
+      if (!serviceType) {
+        throw new NotFoundException('Service type not found')
+      }
+    }
+
     // Validate sales_agent requirement
     const isCommissionable =
       data.is_commissionable !== undefined
