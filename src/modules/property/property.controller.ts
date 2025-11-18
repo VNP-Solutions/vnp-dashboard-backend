@@ -36,6 +36,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   BulkTransferPropertyDto,
+  CompleteCreatePropertyDto,
   CreatePropertyDto,
   DeletePropertyDto,
   GetPropertiesByPortfoliosDto,
@@ -73,6 +74,37 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.propertyService.create(createPropertyDto, user)
+  }
+
+  @Post('complete-create')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
+  @ApiOperation({
+    summary: 'Create a property with credentials and bank details in a single transaction',
+    description:
+      'Creates a property along with optional credentials and bank details. All operations are performed in a transaction and will be rolled back if any operation fails. ' +
+      'Property data is required, while credentials and bank details are optional.'
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Property with credentials and bank details created successfully'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid data or validation errors'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - Property name already exists'
+  })
+  completeCreate(
+    @Body() completeCreateDto: CompleteCreatePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.completeCreate(completeCreateDto, user)
   }
 
   @Get()

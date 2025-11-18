@@ -1,14 +1,18 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { Type } from 'class-transformer'
 import {
   IsArray,
   IsBoolean,
   IsDateString,
   IsNotEmpty,
   IsOptional,
-  IsString
+  IsString,
+  ValidateNested
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
+import { ExpediaCredentialsDto, OtaCredentialsDto } from '../property-credentials/property-credentials.dto'
+import { CreatePropertyBankDetailsDto } from '../property-bank-details/property-bank-details.dto'
 
 export type AccessType = 'owned' | 'shared'
 
@@ -278,4 +282,180 @@ export class DeletePropertyDto {
   @IsString()
   @IsNotEmpty()
   password: string
+}
+
+export class CompletePropertyCredentialsDto {
+  @ApiProperty({
+    description: 'Expedia credentials (required)',
+    type: ExpediaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => ExpediaCredentialsDto)
+  @IsNotEmpty()
+  expedia: ExpediaCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Agoda credentials (optional)',
+    type: OtaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => OtaCredentialsDto)
+  @IsOptional()
+  agoda?: OtaCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Booking.com credentials (optional)',
+    type: OtaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => OtaCredentialsDto)
+  @IsOptional()
+  booking?: OtaCredentialsDto
+}
+
+export class CompleteBankDetailsDto {
+  @ApiProperty({
+    enum: ['bank', 'stripe'],
+    example: 'bank',
+    description: 'Type of bank account (bank or stripe)',
+    default: 'bank'
+  })
+  @IsString()
+  @IsNotEmpty()
+  bank_type: string
+
+  @ApiPropertyOptional({
+    enum: ['ach', 'domestic_wire', 'international_wire'],
+    example: 'ach',
+    description: 'Bank sub-type when bank_type is "bank"'
+  })
+  @IsString()
+  @IsOptional()
+  bank_sub_type?: string
+
+  @ApiPropertyOptional({
+    example: 'Grand Hotel',
+    description: 'Hotel or Portfolio name'
+  })
+  @IsString()
+  @IsOptional()
+  hotel_portfolio_name?: string
+
+  @ApiPropertyOptional({
+    example: 'John Doe',
+    description: 'Beneficiary name'
+  })
+  @IsString()
+  @IsOptional()
+  beneficiary_name?: string
+
+  @ApiPropertyOptional({
+    example: '123 Main Street, New York, NY 10001',
+    description: 'Beneficiary address'
+  })
+  @IsString()
+  @IsOptional()
+  beneficiary_address?: string
+
+  @ApiPropertyOptional({
+    example: '1234567890',
+    description: 'Bank account number'
+  })
+  @IsString()
+  @IsOptional()
+  account_number?: string
+
+  @ApiPropertyOptional({
+    example: 'John Doe',
+    description: 'Account holder name'
+  })
+  @IsString()
+  @IsOptional()
+  account_name?: string
+
+  @ApiPropertyOptional({
+    example: 'Chase Bank',
+    description: 'Name of the bank'
+  })
+  @IsString()
+  @IsOptional()
+  bank_name?: string
+
+  @ApiPropertyOptional({
+    example: 'New York Branch',
+    description: 'Bank branch name or location'
+  })
+  @IsString()
+  @IsOptional()
+  bank_branch?: string
+
+  @ApiPropertyOptional({
+    example: 'CHASUS33XXX',
+    description: 'SWIFT or BIC or IBAN code'
+  })
+  @IsString()
+  @IsOptional()
+  swift_bic_iban?: string
+
+  @ApiPropertyOptional({
+    example: '021000021',
+    description: 'Routing number (minimum 9 digits)'
+  })
+  @IsString()
+  @IsOptional()
+  routing_number?: string
+
+  @ApiPropertyOptional({
+    enum: ['checking', 'savings'],
+    example: 'checking',
+    description: 'Bank account type'
+  })
+  @IsString()
+  @IsOptional()
+  bank_account_type?: string
+
+  @ApiPropertyOptional({
+    example: 'USD',
+    description: 'Currency code'
+  })
+  @IsString()
+  @IsOptional()
+  currency?: string
+
+  @ApiPropertyOptional({
+    example: 'stripe@example.com',
+    description: 'Stripe account email'
+  })
+  @IsString()
+  @IsOptional()
+  stripe_account_email?: string
+}
+
+export class CompleteCreatePropertyDto {
+  @ApiProperty({
+    description: 'Property data',
+    type: CreatePropertyDto
+  })
+  @ValidateNested()
+  @Type(() => CreatePropertyDto)
+  @IsNotEmpty()
+  property: CreatePropertyDto
+
+  @ApiPropertyOptional({
+    description: 'Property credentials (optional)',
+    type: CompletePropertyCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => CompletePropertyCredentialsDto)
+  @IsOptional()
+  credentials?: CompletePropertyCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Property bank details (optional)',
+    type: CompleteBankDetailsDto
+  })
+  @ValidateNested()
+  @Type(() => CompleteBankDetailsDto)
+  @IsOptional()
+  bank_details?: CompleteBankDetailsDto
 }

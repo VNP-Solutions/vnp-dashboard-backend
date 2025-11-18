@@ -31,6 +31,7 @@ import type { IPropertyPendingActionRepository } from '../property-pending-actio
 import {
   BulkImportResultDto,
   BulkTransferPropertyDto,
+  CompleteCreatePropertyDto,
   CreatePropertyDto,
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
@@ -80,6 +81,56 @@ export class PropertyService implements IPropertyService {
     }
 
     const property = await this.propertyRepository.create(data)
+
+    // If user has partial access, grant them access to the created property
+    const permission = user.role.property_permission
+    if (permission?.access_level === AccessLevel.partial) {
+      await this.permissionService.grantResourceAccess(
+        user.id,
+        ModuleType.PROPERTY,
+        property.id
+      )
+    }
+
+    return property
+  }
+
+  async completeCreate(
+    data: CompleteCreatePropertyDto,
+    user: IUserWithPermissions
+  ) {
+    // Validate property name is unique
+    const existingProperty = await this.propertyRepository.findByName(
+      data.property.name
+    )
+
+    if (existingProperty) {
+      throw new ConflictException('Property with this name already exists')
+    }
+
+    // Validate portfolio exists
+    const portfolio = await this.portfolioRepository.findById(
+      data.property.portfolio_id
+    )
+    if (!portfolio) {
+      throw new NotFoundException('Portfolio not found')
+    }
+
+    // Validate currency exists
+    const currency = await this.currencyRepository.findById(
+      data.property.currency_id
+    )
+    if (!currency) {
+      throw new NotFoundException('Currency not found')
+    }
+
+    // Create property with credentials and bank details in a transaction
+    const property = await this.propertyRepository.completeCreate(
+      data.property,
+      data.credentials,
+      data.bank_details,
+      user.id
+    )
 
     // If user has partial access, grant them access to the created property
     const permission = user.role.property_permission

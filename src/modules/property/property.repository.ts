@@ -1,6 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { BankType, BankSubType, BankAccountType } from '@prisma/client'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { PrismaService } from '../prisma/prisma.service'
-import { CreatePropertyDto, UpdatePropertyDto } from './property.dto'
+import {
+  CompleteBankDetailsDto,
+  CompletePropertyCredentialsDto,
+  CreatePropertyDto,
+  UpdatePropertyDto
+} from './property.dto'
 import type { IPropertyRepository } from './property.interface'
 
 @Injectable()
@@ -33,6 +40,160 @@ export class PropertyRepository implements IPropertyRepository {
         },
         credentials: true
       }
+    })
+  }
+
+  async completeCreate(
+    propertyData: CreatePropertyDto,
+    credentialsData?: CompletePropertyCredentialsDto,
+    bankDetailsData?: CompleteBankDetailsDto,
+    userId?: string
+  ) {
+    const encryptionSecret = process.env.JWT_ACCESS_SECRET || ''
+
+    return this.prisma.$transaction(async (tx) => {
+      // Create property data
+      const createData: any = { ...propertyData }
+      if (propertyData.next_due_date) {
+        createData.next_due_date = new Date(propertyData.next_due_date)
+      }
+
+      // Create property
+      const property = await tx.property.create({
+        data: createData
+      })
+
+      // Create credentials if provided
+      if (credentialsData) {
+        await tx.propertyCredentials.create({
+          data: {
+            property_id: property.id,
+            expedia_id: credentialsData.expedia.id,
+            expedia_username: credentialsData.expedia.username,
+            expedia_password: EncryptionUtil.encrypt(
+              credentialsData.expedia.password,
+              encryptionSecret
+            ),
+            agoda_id: credentialsData.agoda?.id || '',
+            agoda_username: credentialsData.agoda?.username || '',
+            agoda_password: credentialsData.agoda?.password
+              ? EncryptionUtil.encrypt(credentialsData.agoda.password, encryptionSecret)
+              : '',
+            booking_id: credentialsData.booking?.id || '',
+            booking_username: credentialsData.booking?.username || '',
+            booking_password: credentialsData.booking?.password
+              ? EncryptionUtil.encrypt(credentialsData.booking.password, encryptionSecret)
+              : ''
+          }
+        })
+      }
+
+      // Create bank details if provided
+      if (bankDetailsData) {
+        const bankData: any = {
+          property_id: property.id,
+          bank_type: bankDetailsData.bank_type as BankType
+        }
+
+        // Add optional fields if provided
+        if (bankDetailsData.bank_sub_type) {
+          bankData.bank_sub_type = bankDetailsData.bank_sub_type as BankSubType
+        }
+        if (bankDetailsData.hotel_portfolio_name) {
+          bankData.hotel_portfolio_name = bankDetailsData.hotel_portfolio_name
+        }
+        if (bankDetailsData.beneficiary_name) {
+          bankData.beneficiary_name = bankDetailsData.beneficiary_name
+        }
+        if (bankDetailsData.beneficiary_address) {
+          bankData.beneficiary_address = bankDetailsData.beneficiary_address
+        }
+        if (bankDetailsData.account_number) {
+          bankData.account_number = EncryptionUtil.encrypt(
+            bankDetailsData.account_number,
+            encryptionSecret
+          )
+        }
+        if (bankDetailsData.account_name) {
+          bankData.account_name = bankDetailsData.account_name
+        }
+        if (bankDetailsData.bank_name) {
+          bankData.bank_name = bankDetailsData.bank_name
+        }
+        if (bankDetailsData.bank_branch) {
+          bankData.bank_branch = bankDetailsData.bank_branch
+        }
+        if (bankDetailsData.swift_bic_iban) {
+          bankData.swift_bic_iban = bankDetailsData.swift_bic_iban
+        }
+        if (bankDetailsData.routing_number) {
+          bankData.routing_number = bankDetailsData.routing_number
+        }
+        if (bankDetailsData.bank_account_type) {
+          bankData.bank_account_type = bankDetailsData.bank_account_type as BankAccountType
+        }
+        if (bankDetailsData.currency) {
+          bankData.currency = bankDetailsData.currency
+        }
+        if (bankDetailsData.stripe_account_email) {
+          bankData.stripe_account_email = bankDetailsData.stripe_account_email
+        }
+        if (userId) {
+          bankData.associated_user_id = userId
+        }
+
+        await tx.propertyBankDetails.create({
+          data: bankData
+        })
+      }
+
+      // Fetch and return the complete property with all relations
+      const completeProperty = await tx.property.findUnique({
+        where: { id: property.id },
+        include: {
+          currency: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              symbol: true
+            }
+          },
+          portfolio: {
+            select: {
+              id: true,
+              name: true,
+              is_active: true,
+              service_type_id: true,
+              serviceType: {
+                select: {
+                  id: true,
+                  type: true
+                }
+              }
+            }
+          },
+          credentials: true,
+          bankDetails: true,
+          audits: {
+            select: {
+              id: true,
+              type_of_ota: true,
+              audit_status_id: true,
+              amount_collectable: true,
+              amount_confirmed: true,
+              start_date: true,
+              end_date: true
+            }
+          }
+        }
+      })
+
+      if (!completeProperty) {
+        throw new Error('Failed to retrieve created property')
+      }
+
+      return completeProperty
     })
   }
 

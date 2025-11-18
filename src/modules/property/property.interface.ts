@@ -3,6 +3,9 @@ import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   BulkTransferPropertyDto,
+  CompleteBankDetailsDto,
+  CompleteCreatePropertyDto,
+  CompletePropertyCredentialsDto,
   CreatePropertyDto,
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
@@ -115,6 +118,12 @@ type PropertyWithFullDetails = Prisma.PropertyGetPayload<{
 
 export interface IPropertyRepository {
   create(data: CreatePropertyDto): Promise<PropertyWithRelations>
+  completeCreate(
+    propertyData: CreatePropertyDto,
+    credentialsData?: CompletePropertyCredentialsDto,
+    bankDetailsData?: CompleteBankDetailsDto,
+    userId?: string
+  ): Promise<PropertyWithFullDetails>
   findAll(
     queryOptions: any,
     propertyIds?: string[]
@@ -133,6 +142,10 @@ export interface IPropertyService {
     data: CreatePropertyDto,
     user: IUserWithPermissions
   ): Promise<PropertyWithRelations>
+  completeCreate(
+    data: CompleteCreatePropertyDto,
+    user: IUserWithPermissions
+  ): Promise<PropertyWithFullDetails>
   findAll(
     query: PropertyQueryDto,
     user: IUserWithPermissions
