@@ -135,63 +135,55 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
       infer: true
     })!
 
+    // Replace strategy: Only keep credentials that are provided in the payload
+    // If a credential (agoda/booking) is not in the payload, it will be cleared
     const updateData: any = {}
 
-    // Handle Expedia credentials (required fields)
+    // Handle Expedia credentials
     if (data.expedia) {
-      if (data.expedia.id !== undefined) {
-        updateData.expedia_id = data.expedia.id
-      }
-      if (data.expedia.username !== undefined) {
-        updateData.expedia_username = data.expedia.username
-      }
-      if (data.expedia.password !== undefined) {
-        updateData.expedia_password = EncryptionUtil.encrypt(
-          data.expedia.password,
-          encryptionSecret
-        )
-      }
+      updateData.expedia_id = data.expedia.id
+      updateData.expedia_username = data.expedia.username
+      updateData.expedia_password = EncryptionUtil.encrypt(
+        data.expedia.password,
+        encryptionSecret
+      )
+    } else {
+      // If expedia is not provided, clear it
+      updateData.expedia_id = null
+      updateData.expedia_username = null
+      updateData.expedia_password = null
     }
 
     // Handle Agoda credentials
-    if (data.agoda) {
-      if (data.agoda.username && !data.agoda.password) {
-        // Skip - don't update agoda credentials
-      } else if (data.agoda.username && data.agoda.password) {
-        // Both username and password provided - use new password
-        updateData.agoda_id = data.agoda.id || existingCredentials.agoda_id
-        updateData.agoda_username = data.agoda.username
-        updateData.agoda_password = EncryptionUtil.encrypt(
-          data.agoda.password,
-          encryptionSecret
-        )
-      } else if (data.agoda.id !== undefined) {
-        // Only ID provided
-        updateData.agoda_id = data.agoda.id
-      }
+    if (data.agoda && data.agoda.username && data.agoda.password) {
+      // Agoda credentials provided - update them
+      updateData.agoda_id = data.agoda.id || null
+      updateData.agoda_username = data.agoda.username
+      updateData.agoda_password = EncryptionUtil.encrypt(
+        data.agoda.password,
+        encryptionSecret
+      )
+    } else {
+      // Agoda not provided or incomplete - clear it
+      updateData.agoda_id = null
+      updateData.agoda_username = null
+      updateData.agoda_password = null
     }
 
     // Handle Booking credentials
-    if (data.booking) {
-      if (data.booking.username && !data.booking.password) {
-        // Skip - don't update booking credentials
-      } else if (data.booking.username && data.booking.password) {
-        // Both username and password provided - use new password
-        updateData.booking_id =
-          data.booking.id || existingCredentials.booking_id
-        updateData.booking_username = data.booking.username
-        updateData.booking_password = EncryptionUtil.encrypt(
-          data.booking.password,
-          encryptionSecret
-        )
-      } else if (data.booking.id !== undefined) {
-        // Only ID provided
-        updateData.booking_id = data.booking.id
-      }
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      throw new BadRequestException('No valid fields to update')
+    if (data.booking && data.booking.username && data.booking.password) {
+      // Booking credentials provided - update them
+      updateData.booking_id = data.booking.id || null
+      updateData.booking_username = data.booking.username
+      updateData.booking_password = EncryptionUtil.encrypt(
+        data.booking.password,
+        encryptionSecret
+      )
+    } else {
+      // Booking not provided or incomplete - clear it
+      updateData.booking_id = null
+      updateData.booking_username = null
+      updateData.booking_password = null
     }
 
     const updatedCredentials = await this.credentialsRepository.update(
