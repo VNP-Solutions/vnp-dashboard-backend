@@ -31,13 +31,11 @@ type PortfolioWithRelations = Prisma.PortfolioGetPayload<{
         is_active: true
       }
     }
-    properties: {
-      select: {
-        id: true
-      }
-    }
   }
-}>
+}> & {
+  total_properties: number
+  total_contract_urls: number
+}
 
 type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
   include: {
@@ -48,23 +46,11 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
         is_active: true
       }
     }
-    properties: {
-      select: {
-        id: true
-      }
-    }
-    contractUrls: {
-      select: {
-        id: true
-        url: true
-        description: true
-        is_active: true
-        created_at: true
-        updated_at: true
-      }
-    }
   }
-}>
+}> & {
+  total_properties: number
+  total_contract_urls: number
+}
 
 export interface IPortfolioRepository {
   create(

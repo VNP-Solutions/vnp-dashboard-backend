@@ -39,7 +39,7 @@ export class PropertyRepository implements IPropertyRepository {
   async findAll(queryOptions: any, _propertyIds?: string[]) {
     const { where, skip, take, orderBy } = queryOptions
 
-    return this.prisma.property.findMany({
+    const properties = await this.prisma.property.findMany({
       where,
       skip,
       take,
@@ -98,6 +98,33 @@ export class PropertyRepository implements IPropertyRepository {
         }
       }
     })
+
+    // Get unique property IDs from the results
+    const propertyIds = properties.map(p => p.id)
+
+    // Get audit counts for each property
+    const auditCounts = await Promise.all(
+      propertyIds.map(async (propertyId) => ({
+        propertyId,
+        count: await this.prisma.audit.count({
+          where: {
+            property_id: propertyId,
+            is_archived: false
+          }
+        })
+      }))
+    )
+
+    // Create a map for quick lookup
+    const auditCountMap = new Map(
+      auditCounts.map(ac => [ac.propertyId, ac.count])
+    )
+
+    // Enrich each property with total_audits count
+    return properties.map(property => ({
+      ...property,
+      total_audits: auditCountMap.get(property.id) || 0
+    })) as any
   }
 
   async count(whereClause: any, _propertyIds?: string[]): Promise<number> {

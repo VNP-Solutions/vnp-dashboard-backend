@@ -34,7 +34,7 @@ export class PortfolioRepository implements IPortfolioRepository {
   ) {
     const { where, skip, take, orderBy } = queryOptions
 
-    return this.prisma.portfolio.findMany({
+    const portfolios = await this.prisma.portfolio.findMany({
       where,
       skip,
       take,
@@ -46,30 +46,50 @@ export class PortfolioRepository implements IPortfolioRepository {
             type: true,
             is_active: true
           }
-        },
-        properties: {
-          select: {
-            id: true
-          }
-        },
-        contractUrls: {
-          where:
-            userId && !isSuperAdmin
-              ? {
-                  user_id: userId
-                }
-              : undefined,
-          select: {
-            id: true,
-            url: true,
-            description: true,
-            is_active: true,
-            created_at: true,
-            updated_at: true
-          }
         }
       }
     })
+
+    // Get unique portfolio IDs from the results
+    const portfolioIds = portfolios.map(p => p.id)
+
+    // Get property counts and contract URL counts for each portfolio
+    const [portfolioCounts, contractUrlCounts] = await Promise.all([
+      Promise.all(
+        portfolioIds.map(async (portfolioId) => ({
+          portfolioId,
+          count: await this.prisma.property.count({
+            where: { portfolio_id: portfolioId }
+          })
+        }))
+      ),
+      Promise.all(
+        portfolioIds.map(async (portfolioId) => ({
+          portfolioId,
+          count: await this.prisma.contractUrl.count({
+            where: {
+              portfolio_id: portfolioId,
+              ...(userId && !isSuperAdmin ? { user_id: userId } : {})
+            }
+          })
+        }))
+      )
+    ])
+
+    // Create maps for quick lookup
+    const propertyCountMap = new Map(
+      portfolioCounts.map(pc => [pc.portfolioId, pc.count])
+    )
+    const contractUrlCountMap = new Map(
+      contractUrlCounts.map(cc => [cc.portfolioId, cc.count])
+    )
+
+    // Enrich each portfolio with counts
+    return portfolios.map(portfolio => ({
+      ...portfolio,
+      total_properties: propertyCountMap.get(portfolio.id) || 0,
+      total_contract_urls: contractUrlCountMap.get(portfolio.id) || 0
+    }))
   }
 
   async count(whereClause: any, _portfolioIds?: string[]): Promise<number> {
@@ -79,7 +99,7 @@ export class PortfolioRepository implements IPortfolioRepository {
   }
 
   async findById(id: string, userId?: string, isSuperAdmin?: boolean) {
-    return this.prisma.portfolio.findUnique({
+    const portfolio = await this.prisma.portfolio.findUnique({
       where: { id },
       include: {
         serviceType: {
@@ -88,31 +108,32 @@ export class PortfolioRepository implements IPortfolioRepository {
             type: true,
             is_active: true
           }
-        },
-        properties: {
-          select: {
-            id: true
-          }
-        },
-        contractUrls: userId
-          ? {
-              where: isSuperAdmin
-                ? undefined
-                : {
-                    user_id: userId
-                  },
-              select: {
-                id: true,
-                url: true,
-                description: true,
-                is_active: true,
-                created_at: true,
-                updated_at: true
-              }
-            }
-          : false
+        }
       }
     })
+
+    if (!portfolio) {
+      return null
+    }
+
+    // Get property count and contract URL count for this portfolio
+    const [propertyCount, contractUrlCount] = await Promise.all([
+      this.prisma.property.count({
+        where: { portfolio_id: id }
+      }),
+      this.prisma.contractUrl.count({
+        where: {
+          portfolio_id: id,
+          ...(userId && !isSuperAdmin ? { user_id: userId } : {})
+        }
+      })
+    ])
+
+    return {
+      ...portfolio,
+      total_properties: propertyCount,
+      total_contract_urls: contractUrlCount
+    }
   }
 
   async findByName(name: string) {

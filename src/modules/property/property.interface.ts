@@ -69,7 +69,9 @@ type PropertyWithPendingActions = Prisma.PropertyGetPayload<{
       }
     }
   }
-}>
+}> & {
+  total_audits: number
+}
 
 type PropertyWithFullDetails = Prisma.PropertyGetPayload<{
   include: {
