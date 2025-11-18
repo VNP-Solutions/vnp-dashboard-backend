@@ -37,6 +37,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   BulkTransferPropertyDto,
   CreatePropertyDto,
+  DeletePropertyDto,
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
@@ -304,18 +305,38 @@ export class PropertyController {
 
   @Delete(':id')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE, true)
-  @ApiOperation({ summary: 'Delete a property (Super admin: direct deletion, Property manager: creates pending action for approval)' })
+  @ApiOperation({ summary: 'Delete a property (Super admin: direct deletion with password, Property manager: creates pending action with password)' })
   @ApiResponse({ status: 200, description: 'Property deleted successfully or delete request submitted for approval' })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete property with associated audits'
+    description: 'Invalid password'
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions'
   })
-  remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
+  async remove(
+    @Param('id') id: string,
+    @Body() deletePropertyDto: DeletePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // Password validation is required for all users during deletion
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      deletePropertyDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
     return this.propertyService.remove(id, user)
   }
 

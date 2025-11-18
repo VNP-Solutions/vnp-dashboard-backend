@@ -269,3 +269,13 @@ export class GetPropertiesByPortfoliosDto {
   @IsString({ each: true })
   portfolio_ids: string[]
 }
+
+export class DeletePropertyDto {
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
