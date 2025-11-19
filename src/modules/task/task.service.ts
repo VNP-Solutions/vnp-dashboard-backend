@@ -22,9 +22,9 @@ export class TaskService implements ITaskService {
   ) {}
 
   async create(data: CreateTaskDto, user: IUserWithPermissions) {
-    if (!data.portfolio_id && !data.property_id) {
+    if (!data.portfolio_id && !data.property_id && !data.audit_id) {
       throw new BadRequestException(
-        'Task must be associated with either a portfolio or property'
+        'Task must be associated with either a portfolio, property, or audit'
       )
     }
 
@@ -48,6 +48,11 @@ export class TaskService implements ITaskService {
     // Add property filter if provided
     if (query.property_id) {
       where.property_id = query.property_id
+    }
+
+    // Add audit filter if provided
+    if (query.audit_id) {
+      where.audit_id = query.audit_id
     }
 
     // Filter by is_done
@@ -162,10 +167,11 @@ export class TaskService implements ITaskService {
     if (
       !query.portfolio_id &&
       !query.property_id &&
+      !query.audit_id &&
       query.is_done === undefined
     ) {
       throw new BadRequestException(
-        'At least one filter (portfolio_id, property_id, or is_done) must be provided'
+        'At least one filter (portfolio_id, property_id, audit_id, or is_done) must be provided'
       )
     }
 
@@ -176,6 +182,10 @@ export class TaskService implements ITaskService {
 
     if (query.property_id) {
       where.property_id = query.property_id
+    }
+
+    if (query.audit_id) {
+      where.audit_id = query.audit_id
     }
 
     // Filter by is_done

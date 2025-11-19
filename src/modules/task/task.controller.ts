@@ -43,7 +43,7 @@ export class TaskController {
   @ApiResponse({ status: 201, description: 'Task created successfully' })
   @ApiResponse({
     status: 400,
-    description: 'Task must be associated with either a portfolio or property'
+    description: 'Task must be associated with either a portfolio, property, or audit'
   })
   @ApiResponse({
     status: 403,

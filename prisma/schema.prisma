@@ -124,6 +124,9 @@ model Audit {
   batch              AuditBatch? @relation(fields: [batch_id], references: [id])
   report_url         String?
 
+  notes Note[]
+  tasks Task[]
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -306,6 +309,8 @@ model Note {
   portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
   property_id  String?    @db.ObjectId
   property     Property?  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  audit_id     String?    @db.ObjectId
+  audit        Audit?     @relation(fields: [audit_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -313,10 +318,12 @@ model Note {
   @@index([user_id])
   @@index([portfolio_id])
   @@index([property_id])
+  @@index([audit_id])
   @@index([is_done])
   @@index([user_id, is_done])
   @@index([portfolio_id, is_done])
   @@index([property_id, is_done])
+  @@index([audit_id, is_done])
 }
 
 model Task {
@@ -333,6 +340,8 @@ model Task {
   portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
   property_id  String?    @db.ObjectId
   property     Property?  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  audit_id     String?    @db.ObjectId
+  audit        Audit?     @relation(fields: [audit_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -340,11 +349,13 @@ model Task {
   @@index([user_id])
   @@index([portfolio_id])
   @@index([property_id])
+  @@index([audit_id])
   @@index([is_done])
   @@index([due_date])
   @@index([user_id, is_done])
   @@index([portfolio_id, is_done])
   @@index([property_id, is_done])
+  @@index([audit_id, is_done])
   @@index([due_date, is_done])
 }
 

@@ -30,6 +30,14 @@ export class TaskRepository implements ITaskRepository {
             id: true,
             name: true
           }
+        },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            start_date: true,
+            end_date: true
+          }
         }
       }
     })
@@ -61,6 +69,14 @@ export class TaskRepository implements ITaskRepository {
             id: true,
             name: true
           }
+        },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            start_date: true,
+            end_date: true
+          }
         }
       }
     })
@@ -88,6 +104,14 @@ export class TaskRepository implements ITaskRepository {
           select: {
             id: true,
             name: true
+          }
+        },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            start_date: true,
+            end_date: true
           }
         }
       }
@@ -117,6 +141,14 @@ export class TaskRepository implements ITaskRepository {
           select: {
             id: true,
             name: true
+          }
+        },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            start_date: true,
+            end_date: true
           }
         }
       }
