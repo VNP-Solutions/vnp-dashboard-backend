@@ -5,7 +5,9 @@
       "Bash(yarn build)",
       "Bash(yarn lint)",
       "Bash(npx eslint:*)",
-      "Bash(yarn push:*)"
+      "Bash(yarn push:*)",
+      "Bash(git log:*)",
+      "Bash(yarn eslint:*)"
     ],
     "deny": [],
     "ask": []

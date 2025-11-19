@@ -19,9 +19,29 @@ export class EmailUtil {
       host: 'smtp.gmail.com',
       port: 587,
       secure: false,
+      pool: true, // Use connection pooling
+      maxConnections: 5,
+      maxMessages: 100,
+      rateDelta: 1000,
+      rateLimit: 5,
       auth: {
         user: this.configService.get('smtp.email', { infer: true }),
         pass: this.configService.get('smtp.password', { infer: true })
+      },
+      tls: {
+        rejectUnauthorized: true,
+        minVersion: 'TLSv1.2'
+      },
+      logger: process.env.NODE_ENV === 'development', // Enable logging in dev
+      debug: process.env.NODE_ENV === 'development'
+    })
+
+    // Verify transporter configuration on startup
+    this.transporter.verify((error) => {
+      if (error) {
+        console.error('SMTP configuration error:', error)
+      } else {
+        console.log('SMTP server is ready to send emails')
       }
     })
   }
@@ -45,7 +65,15 @@ export class EmailUtil {
       text: `Your OTP for login is: ${otp}. This OTP is valid for 5 minutes.`
     }
 
-    await this.transporter.sendMail(mailOptions)
+    try {
+      const info = await this.transporter.sendMail(mailOptions)
+      console.log('✓ OTP email sent:', { to: email, messageId: info.messageId })
+    } catch (error) {
+      console.error('✗ Failed to send OTP email:', error)
+      throw new BadRequestException(
+        `Failed to send OTP email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
   }
 
   async sendInvitationEmail(
@@ -79,7 +107,15 @@ export class EmailUtil {
       text: `Welcome to VNP Dashboard! You have been invited to join as ${roleName}. Your temporary password is: ${tempPassword}. This password is valid for 7 days. After logging in, you will be required to set a new password.`
     }
 
-    await this.transporter.sendMail(mailOptions)
+    try {
+      const info = await this.transporter.sendMail(mailOptions)
+      console.log('✓ Invitation email sent:', { to: email, messageId: info.messageId })
+    } catch (error) {
+      console.error('✗ Failed to send invitation email:', error)
+      throw new BadRequestException(
+        `Failed to send invitation email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
   }
 
   async sendPasswordResetOtpEmail(email: string, otp: number): Promise<void> {
@@ -101,7 +137,15 @@ export class EmailUtil {
       text: `You have requested to reset your password. Your OTP is: ${otp}. This OTP is valid for 5 minutes.`
     }
 
-    await this.transporter.sendMail(mailOptions)
+    try {
+      const info = await this.transporter.sendMail(mailOptions)
+      console.log('✓ Password reset OTP email sent:', { to: email, messageId: info.messageId })
+    } catch (error) {
+      console.error('✗ Failed to send password reset OTP email:', error)
+      throw new BadRequestException(
+        `Failed to send password reset OTP email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
   }
 
   async sendEmail(
@@ -119,6 +163,30 @@ export class EmailUtil {
 
     // Add attachments if provided
     if (attachments && attachments.length > 0) {
+      // Calculate total attachment size
+      const totalSize = attachments.reduce(
+        (sum, att) => sum + att.content.length,
+        0
+      )
+      const totalSizeMB = totalSize / (1024 * 1024)
+
+      console.log(
+        `Sending email with ${attachments.length} attachment(s), total size: ${totalSizeMB.toFixed(2)}MB`
+      )
+
+      // Warn if approaching Gmail's 25MB limit
+      if (totalSizeMB > 20) {
+        console.warn(
+          `⚠️ Attachment size (${totalSizeMB.toFixed(2)}MB) is approaching Gmail's 25MB limit`
+        )
+      }
+
+      if (totalSizeMB > 25) {
+        throw new BadRequestException(
+          `Total attachment size (${totalSizeMB.toFixed(2)}MB) exceeds Gmail's 25MB limit`
+        )
+      }
+
       mailOptions.attachments = attachments.map(attachment => ({
         filename: attachment.filename,
         content: attachment.content,
@@ -126,8 +194,26 @@ export class EmailUtil {
       }))
     }
 
-    await this.transporter.sendMail(mailOptions)
-    console.log('Email sent successfully!')
+    try {
+      const info = await this.transporter.sendMail(mailOptions)
+      console.log('✓ Email sent successfully!', {
+        messageId: info.messageId,
+        to,
+        subject,
+        response: info.response,
+        attachmentCount: attachments?.length || 0
+      })
+    } catch (error) {
+      console.error('✗ Failed to send email:', {
+        to,
+        subject,
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined
+      })
+      throw new BadRequestException(
+        `Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
   }
 
   /**
@@ -139,12 +225,22 @@ export class EmailUtil {
         const parsedUrl = new URL(url)
         const protocol = parsedUrl.protocol === 'https:' ? https : http
 
-        protocol
+        // Set timeout for the request (30 seconds)
+        const timeout = setTimeout(() => {
+          reject(
+            new BadRequestException(
+              `Timeout while fetching file from URL: ${url}`
+            )
+          )
+        }, 30000)
+
+        const request = protocol
           .get(url, response => {
             if (
               response.statusCode &&
               (response.statusCode < 200 || response.statusCode >= 300)
             ) {
+              clearTimeout(timeout)
               reject(
                 new BadRequestException(
                   `Failed to fetch file from URL: ${url}. Status: ${response.statusCode}`
@@ -154,23 +250,47 @@ export class EmailUtil {
             }
 
             const chunks: Buffer[] = []
-            response.on('data', (chunk: Buffer) => chunks.push(chunk))
-            response.on('end', () => resolve(Buffer.concat(chunks)))
-            response.on('error', err =>
+            let totalSize = 0
+
+            response.on('data', (chunk: Buffer) => {
+              chunks.push(chunk)
+              totalSize += chunk.length
+
+              // Prevent downloading files larger than 25MB
+              if (totalSize > 25 * 1024 * 1024) {
+                clearTimeout(timeout)
+                request.destroy()
+                reject(
+                  new BadRequestException(
+                    `File from URL is too large (>25MB): ${url}`
+                  )
+                )
+              }
+            })
+
+            response.on('end', () => {
+              clearTimeout(timeout)
+              console.log(`✓ Fetched file from URL: ${url} (${(totalSize / 1024 / 1024).toFixed(2)}MB)`)
+              resolve(Buffer.concat(chunks))
+            })
+
+            response.on('error', err => {
+              clearTimeout(timeout)
               reject(
                 new BadRequestException(
                   `Error downloading file from URL: ${err.message}`
                 )
               )
-            )
+            })
           })
-          .on('error', err =>
+          .on('error', err => {
+            clearTimeout(timeout)
             reject(
               new BadRequestException(
                 `Error fetching file from URL: ${err.message}`
               )
             )
-          )
+          })
       } catch (error) {
         reject(
           new BadRequestException(
