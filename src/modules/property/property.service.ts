@@ -184,7 +184,7 @@ export class PropertyService implements IPropertyService {
       }
     }
 
-    // Merge with existing filters
+    // Merge with existing filters - EXCLUDE portfolio_id as it's handled separately
     const mergedQuery = {
       ...query,
       filters: {
@@ -207,7 +207,7 @@ export class PropertyService implements IPropertyService {
       filterableFields: [
         'is_active',
         'bank_type',
-        'portfolio_id',
+        // 'portfolio_id' removed - handled separately with OR logic for shared properties
         'currency_id'
       ],
       sortableFields: [
@@ -230,35 +230,27 @@ export class PropertyService implements IPropertyService {
       }
     }
 
-    // Build base where clause with permission filter
-    let baseWhere: any =
-      accessibleIds === 'all'
-        ? {}
-        : {
-            id: {
-              in: accessibleIds
-            }
-          }
+    // Build Prisma query options WITHOUT portfolio filter first
+    const queryResult = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      accessibleIds === 'all' ? {} : { id: { in: accessibleIds } }
+    )
+    let where = queryResult.where
+    const { skip, take, orderBy } = queryResult
 
-    // Add portfolio filter if specified
+    // Manually add portfolio filter to ensure it's properly combined with search/filters
     if (Object.keys(portfolioFilter).length > 0) {
-      baseWhere = {
-        ...baseWhere,
-        ...portfolioFilter
+      // If where has conditions (search or filters), wrap everything in AND
+      if (Object.keys(where).length > 0) {
+        where = {
+          AND: [where, portfolioFilter]
+        }
+      } else {
+        // No other conditions, just use portfolio filter
+        where = portfolioFilter
       }
     }
-
-    // Build Prisma query options
-    const { skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
-      mergedQuery,
-      queryConfig,
-      baseWhere
-    )
-    let { where } = QueryBuilder.buildPrismaQuery(
-      mergedQuery,
-      queryConfig,
-      baseWhere
-    )
 
     // Handle access_level filter for credentials
     if (query.access_level && query.access_level.toLowerCase() !== 'all') {
@@ -309,12 +301,11 @@ export class PropertyService implements IPropertyService {
       this.propertyRepository.count(where, undefined)
     ])
 
-    // Add access_type field and pending action info to each property
+    // Add access_type field, viewing context, and pending action info to each property
     const enrichedData = data.map((property: any) => {
-      const accessType =
+      const isShared =
         query.portfolio_id && property.portfolio_id !== query.portfolio_id
-          ? 'shared'
-          : 'owned'
+      const accessType = isShared ? 'shared' : 'owned'
 
       // Add pending action info if exists
       const hasPendingAction =
@@ -327,6 +318,10 @@ export class PropertyService implements IPropertyService {
       return {
         ...propertyWithoutPendingActions,
         access_type: accessType,
+        // Add viewing_portfolio_id for shared properties (the portfolio context user is viewing from)
+        viewing_portfolio_id: isShared
+          ? query.portfolio_id
+          : property.portfolio_id,
         has_pending_action: hasPendingAction,
         pending_action: pendingAction
       }
@@ -374,7 +369,7 @@ export class PropertyService implements IPropertyService {
       }
     }
 
-    // Merge with existing filters
+    // Merge with existing filters - EXCLUDE portfolio_id as it's handled separately
     const mergedQuery = {
       ...query,
       filters: {
@@ -397,7 +392,7 @@ export class PropertyService implements IPropertyService {
       filterableFields: [
         'is_active',
         'bank_type',
-        'portfolio_id',
+        // 'portfolio_id' removed - handled separately with OR logic for shared properties
         'currency_id'
       ],
       sortableFields: [
@@ -420,35 +415,27 @@ export class PropertyService implements IPropertyService {
       }
     }
 
-    // Build base where clause with permission filter
-    let baseWhere: any =
-      accessibleIds === 'all'
-        ? {}
-        : {
-            id: {
-              in: accessibleIds
-            }
-          }
+    // Build Prisma query options WITHOUT portfolio filter first
+    const queryResult = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      accessibleIds === 'all' ? {} : { id: { in: accessibleIds } }
+    )
+    let where = queryResult.where
+    const { orderBy } = queryResult
 
-    // Add portfolio filter if specified
+    // Manually add portfolio filter to ensure it's properly combined with search/filters
     if (Object.keys(portfolioFilter).length > 0) {
-      baseWhere = {
-        ...baseWhere,
-        ...portfolioFilter
+      // If where has conditions (search or filters), wrap everything in AND
+      if (Object.keys(where).length > 0) {
+        where = {
+          AND: [where, portfolioFilter]
+        }
+      } else {
+        // No other conditions, just use portfolio filter
+        where = portfolioFilter
       }
     }
-
-    // Build Prisma query options (without pagination)
-    const { orderBy } = QueryBuilder.buildPrismaQuery(
-      mergedQuery,
-      queryConfig,
-      baseWhere
-    )
-    let { where } = QueryBuilder.buildPrismaQuery(
-      mergedQuery,
-      queryConfig,
-      baseWhere
-    )
 
     // Handle access_level filter for credentials
     if (query.access_level && query.access_level.toLowerCase() !== 'all') {
@@ -498,10 +485,9 @@ export class PropertyService implements IPropertyService {
 
     // Add access_type field and pending action info to each property
     const enrichedData = data.map((property: any) => {
-      const accessType =
+      const isShared =
         query.portfolio_id && property.portfolio_id !== query.portfolio_id
-          ? 'shared'
-          : 'owned'
+      const accessType = isShared ? 'shared' : 'owned'
 
       // Add pending action info if exists
       const hasPendingAction =
@@ -514,6 +500,10 @@ export class PropertyService implements IPropertyService {
       return {
         ...propertyWithoutPendingActions,
         access_type: accessType,
+        // Add viewing_portfolio_id for shared properties (the portfolio context user is viewing from)
+        viewing_portfolio_id: isShared
+          ? query.portfolio_id
+          : property.portfolio_id,
         has_pending_action: hasPendingAction,
         pending_action: pendingAction
       }
