@@ -43,7 +43,7 @@ export class NoteController {
   @ApiResponse({ status: 201, description: 'Note created successfully' })
   @ApiResponse({
     status: 400,
-    description: 'Note must be associated with either a portfolio or property'
+    description: 'Note must be associated with either a portfolio, property, or audit'
   })
   @ApiResponse({
     status: 403,

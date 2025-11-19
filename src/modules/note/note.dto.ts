@@ -35,6 +35,14 @@ export class CreateNoteDto {
   @IsString()
   @IsOptional()
   property_id?: string
+
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439013',
+    description: 'Audit ID this note belongs to'
+  })
+  @IsString()
+  @IsOptional()
+  audit_id?: string
 }
 
 export class UpdateNoteDto extends PartialType(CreateNoteDto) {}
@@ -63,6 +71,14 @@ export class NoteQueryDto {
   @IsOptional()
   @IsString()
   property_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by audit ID',
+    example: '507f1f77bcf86cd799439013'
+  })
+  @IsOptional()
+  @IsString()
+  audit_id?: string
 
   @ApiPropertyOptional({
     description: 'Filter by done status (true/false)',
@@ -98,6 +114,14 @@ export class DeleteAllNotesDto {
   @IsOptional()
   @IsString()
   property_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Audit ID to filter notes for deletion',
+    example: '507f1f77bcf86cd799439013'
+  })
+  @IsOptional()
+  @IsString()
+  audit_id?: string
 
   @ApiPropertyOptional({
     description: 'Done status to filter notes for deletion (true/false)',

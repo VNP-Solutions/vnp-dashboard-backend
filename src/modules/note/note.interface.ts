@@ -29,6 +29,14 @@ type NoteWithRelations = Prisma.NoteGetPayload<{
         name: true
       }
     }
+    audit: {
+      select: {
+        id: true
+        type_of_ota: true
+        start_date: true
+        end_date: true
+      }
+    }
   }
 }>
 

@@ -22,9 +22,9 @@ export class NoteService implements INoteService {
   ) {}
 
   async create(data: CreateNoteDto, user: IUserWithPermissions) {
-    if (!data.portfolio_id && !data.property_id) {
+    if (!data.portfolio_id && !data.property_id && !data.audit_id) {
       throw new BadRequestException(
-        'Note must be associated with either a portfolio or property'
+        'Note must be associated with either a portfolio, property, or audit'
       )
     }
 
@@ -50,12 +50,17 @@ export class NoteService implements INoteService {
       where.property_id = query.property_id
     }
 
+    // Add audit filter if provided
+    if (query.audit_id) {
+      where.audit_id = query.audit_id
+    }
+
     // Filter by is_done
     if (query.is_done !== undefined && query.is_done !== '') {
       where.is_done = query.is_done === 'true'
     }
 
-    // Search by text, portfolio name, and property name
+    // Search by text, portfolio name, property name, and audit details
     if (query.search) {
       where.OR = [
         {
@@ -150,10 +155,11 @@ export class NoteService implements INoteService {
     if (
       !query.portfolio_id &&
       !query.property_id &&
+      !query.audit_id &&
       query.is_done === undefined
     ) {
       throw new BadRequestException(
-        'At least one filter (portfolio_id, property_id, or is_done) must be provided'
+        'At least one filter (portfolio_id, property_id, audit_id, or is_done) must be provided'
       )
     }
 
@@ -164,6 +170,10 @@ export class NoteService implements INoteService {
 
     if (query.property_id) {
       where.property_id = query.property_id
+    }
+
+    if (query.audit_id) {
+      where.audit_id = query.audit_id
     }
 
     // Filter by is_done
