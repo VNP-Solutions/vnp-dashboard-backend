@@ -401,6 +401,18 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
+    // Log email details for debugging
+    console.log('📧 Sending email to portfolio contact:', {
+      requestedPortfolioId: id,
+      portfolioId: portfolio.id,
+      portfolioName: portfolio.name,
+      contact_email: portfolio.contact_email,
+      access_email: portfolio.access_email,
+      sending_to: portfolio.contact_email,
+      subject,
+      hasAttachments: (uploadedAttachments?.length || 0) + (attachmentUrls?.length || 0) > 0
+    })
+
     // Combine attachments from file uploads and URLs
     let allAttachments: EmailAttachment[] = []
 
