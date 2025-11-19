@@ -1,14 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import * as http from 'http'
+import * as https from 'https'
 import * as nodemailer from 'nodemailer'
+import { URL } from 'url'
 import { Configuration } from '../../config/configuration'
 import type {
   AttachmentUrlDto,
   EmailAttachment
 } from '../../modules/email/email.dto'
-import * as https from 'https'
-import * as http from 'http'
-import { URL } from 'url'
 
 @Injectable()
 export class EmailUtil {
@@ -119,7 +119,7 @@ export class EmailUtil {
 
     // Add attachments if provided
     if (attachments && attachments.length > 0) {
-      mailOptions.attachments = attachments.map((attachment) => ({
+      mailOptions.attachments = attachments.map(attachment => ({
         filename: attachment.filename,
         content: attachment.content,
         contentType: attachment.contentType
@@ -127,6 +127,7 @@ export class EmailUtil {
     }
 
     await this.transporter.sendMail(mailOptions)
+    console.log('Email sent successfully!')
   }
 
   /**
@@ -139,7 +140,7 @@ export class EmailUtil {
         const protocol = parsedUrl.protocol === 'https:' ? https : http
 
         protocol
-          .get(url, (response) => {
+          .get(url, response => {
             if (
               response.statusCode &&
               (response.statusCode < 200 || response.statusCode >= 300)
@@ -155,7 +156,7 @@ export class EmailUtil {
             const chunks: Buffer[] = []
             response.on('data', (chunk: Buffer) => chunks.push(chunk))
             response.on('end', () => resolve(Buffer.concat(chunks)))
-            response.on('error', (err) =>
+            response.on('error', err =>
               reject(
                 new BadRequestException(
                   `Error downloading file from URL: ${err.message}`
@@ -163,7 +164,7 @@ export class EmailUtil {
               )
             )
           })
-          .on('error', (err) =>
+          .on('error', err =>
             reject(
               new BadRequestException(
                 `Error fetching file from URL: ${err.message}`
