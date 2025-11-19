@@ -14,6 +14,12 @@ type PropertyPendingActionWithRelations = Prisma.PropertyPendingActionGetPayload
         id: true
         name: true
         portfolio_id: true
+        portfolio: {
+          select: {
+            id: true
+            name: true
+          }
+        }
       }
     }
     requestedBy: {

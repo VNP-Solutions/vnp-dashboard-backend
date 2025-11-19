@@ -11,6 +11,12 @@ type PropertyPendingActionWithRelations =
           id: true
           name: true
           portfolio_id: true
+          portfolio: {
+            select: {
+              id: true
+              name: true
+            }
+          }
         }
       }
       requestedBy: {
@@ -59,7 +65,13 @@ export class PropertyPendingActionRepository
           select: {
             id: true,
             name: true,
-            portfolio_id: true
+            portfolio_id: true,
+            portfolio: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         },
         requestedBy: {
@@ -96,7 +108,13 @@ export class PropertyPendingActionRepository
           select: {
             id: true,
             name: true,
-            portfolio_id: true
+            portfolio_id: true,
+            portfolio: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         },
         requestedBy: {
@@ -135,7 +153,13 @@ export class PropertyPendingActionRepository
           select: {
             id: true,
             name: true,
-            portfolio_id: true
+            portfolio_id: true,
+            portfolio: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         },
         requestedBy: {
@@ -180,7 +204,13 @@ export class PropertyPendingActionRepository
           select: {
             id: true,
             name: true,
-            portfolio_id: true
+            portfolio_id: true,
+            portfolio: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         },
         requestedBy: {
@@ -216,7 +246,13 @@ export class PropertyPendingActionRepository
           select: {
             id: true,
             name: true,
-            portfolio_id: true
+            portfolio_id: true,
+            portfolio: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         },
         requestedBy: {
@@ -252,7 +288,13 @@ export class PropertyPendingActionRepository
           select: {
             id: true,
             name: true,
-            portfolio_id: true
+            portfolio_id: true,
+            portfolio: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         },
         requestedBy: {

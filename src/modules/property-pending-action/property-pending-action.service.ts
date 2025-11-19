@@ -11,6 +11,7 @@ import type { PaginatedResult } from '../../common/dto/query.dto'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { isUserSuperAdmin, isInternalUser } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import type { IPropertyService } from '../property/property.interface'
 import {
   ApprovePropertyPendingActionDto,
@@ -30,7 +31,9 @@ export class PropertyPendingActionService
     @Inject('IPropertyPendingActionRepository')
     private repository: IPropertyPendingActionRepository,
     @Inject(forwardRef(() => 'IPropertyService'))
-    private propertyService: IPropertyService
+    private propertyService: IPropertyService,
+    @Inject('IPortfolioRepository')
+    private portfolioRepository: IPortfolioRepository
   ) {}
 
   async create(
@@ -150,8 +153,11 @@ export class PropertyPendingActionService
       this.repository.count(where)
     ])
 
+    // Enrich transfer actions with target portfolio information
+    const enrichedData = await this.enrichPendingActionsWithPortfolioData(data)
+
     return QueryBuilder.buildPaginatedResult(
-      data,
+      enrichedData,
       total,
       query.page || 1,
       query.limit || 10
@@ -172,7 +178,12 @@ export class PropertyPendingActionService
       throw new NotFoundException('Pending action not found')
     }
 
-    return pendingAction
+    // Enrich with portfolio data
+    const enrichedData = await this.enrichPendingActionsWithPortfolioData([
+      pendingAction
+    ])
+
+    return enrichedData[0]
   }
 
   async approve(
@@ -280,5 +291,69 @@ export class PropertyPendingActionService
           `Unknown action type: ${pendingAction.action_type}`
         )
     }
+  }
+
+  /**
+   * Enrich pending actions with target portfolio information for transfer actions
+   */
+  private async enrichPendingActionsWithPortfolioData(pendingActions: any[]) {
+    // Get all unique target portfolio IDs from transfer actions
+    const targetPortfolioIds = pendingActions
+      .filter(
+        (action) =>
+          action.action_type === PropertyActionType.TRANSFER &&
+          action.transfer_data?.new_portfolio_id
+      )
+      .map((action) => action.transfer_data.new_portfolio_id)
+      .filter((id, index, self) => self.indexOf(id) === index) // Remove duplicates
+
+    // Fetch all target portfolios in one query
+    const targetPortfolios = new Map()
+    if (targetPortfolioIds.length > 0) {
+      const portfolios = await Promise.all(
+        targetPortfolioIds.map((id) => this.portfolioRepository.findById(id))
+      )
+      portfolios.forEach((portfolio) => {
+        if (portfolio) {
+          targetPortfolios.set(portfolio.id, {
+            id: portfolio.id,
+            name: portfolio.name
+          })
+        }
+      })
+    }
+
+    // Enrich the pending actions with portfolio data
+    return pendingActions.map((action) => {
+      // Get current portfolio from property.portfolio relation
+      const currentPortfolio = action.property?.portfolio
+        ? {
+            id: action.property.portfolio.id,
+            name: action.property.portfolio.name
+          }
+        : null
+
+      const enrichedAction: any = {
+        ...action,
+        current_portfolio: currentPortfolio
+      }
+
+      // Add target portfolio info for transfer actions
+      if (
+        action.action_type === PropertyActionType.TRANSFER &&
+        action.transfer_data?.new_portfolio_id
+      ) {
+        const targetPortfolio = targetPortfolios.get(
+          action.transfer_data.new_portfolio_id
+        )
+        enrichedAction.transfer_data = {
+          ...action.transfer_data,
+          current_portfolio: currentPortfolio,
+          target_portfolio: targetPortfolio || null
+        }
+      }
+
+      return enrichedAction
+    })
   }
 }
