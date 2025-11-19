@@ -35,6 +35,10 @@ import { PortfolioService } from './portfolio.service'
     {
       provide: 'IPortfolioService',
       useClass: PortfolioService
+    },
+    {
+      provide: 'IPortfolioRepository',
+      useClass: PortfolioRepository
     }
   ]
 })
