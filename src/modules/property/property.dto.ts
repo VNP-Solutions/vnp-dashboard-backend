@@ -110,6 +110,14 @@ export class TransferPropertyDto {
   @IsString()
   @IsNotEmpty()
   password: string
+
+  @ApiPropertyOptional({
+    example: 'Transferring to consolidate portfolio management',
+    description: 'Reason for transferring the property (optional)'
+  })
+  @IsString()
+  @IsOptional()
+  reason?: string
 }
 
 export class BulkTransferPropertyDto {
@@ -299,6 +307,14 @@ export class DeactivatePropertyDto {
   @IsString()
   @IsNotEmpty()
   password: string
+
+  @ApiPropertyOptional({
+    example: 'Property no longer operational due to renovations',
+    description: 'Reason for deactivating the property (optional)'
+  })
+  @IsString()
+  @IsOptional()
+  reason?: string
 }
 
 export class CompletePropertyCredentialsDto {

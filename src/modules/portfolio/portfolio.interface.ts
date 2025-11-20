@@ -104,7 +104,7 @@ export interface IPortfolioService {
     user: IUserWithPermissions
   ): Promise<PortfolioWithServiceType>
   remove(id: string, password: string, user: IUserWithPermissions): Promise<{ message: string }>
-  deactivate(id: string, password: string, user: IUserWithPermissions): Promise<{ message: string }>
+  deactivate(id: string, password: string, user: IUserWithPermissions, reason?: string): Promise<{ message: string }>
   sendEmail(
     id: string,
     subject: string,

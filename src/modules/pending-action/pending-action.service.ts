@@ -71,7 +71,8 @@ export class PendingActionService
       portfolio_id: data.portfolio_id,
       action_type: data.action_type,
       requested_user_id: user.id,
-      transfer_data: data.transfer_data
+      transfer_data: data.transfer_data,
+      reason: data.reason
     })
   }
 

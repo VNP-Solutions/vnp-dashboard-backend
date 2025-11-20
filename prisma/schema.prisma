@@ -443,6 +443,7 @@ model PendingAction {
   requested_user_id String               @db.ObjectId
   requestedBy       User                 @relation("PendingActionRequestedBy", fields: [requested_user_id], references: [id], onDelete: Cascade)
   transfer_data     TransferData?        // Stores new_portfolio_id for transfer actions
+  reason            String?              // Reason provided by requester for the action
   approval_user_id  String?              @db.ObjectId
   approvedBy        User?                @relation("PendingActionApprovedBy", fields: [approval_user_id], references: [id], onDelete: SetNull)
   rejection_reason  String?

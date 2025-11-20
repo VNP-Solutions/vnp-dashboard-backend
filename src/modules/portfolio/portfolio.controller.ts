@@ -178,7 +178,7 @@ export class PortfolioController {
     @Body() deactivatePortfolioDto: DeactivatePortfolioDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.portfolioService.deactivate(id, deactivatePortfolioDto.password, user)
+    return this.portfolioService.deactivate(id, deactivatePortfolioDto.password, user, deactivatePortfolioDto.reason)
   }
 
   @Post(':id/send-email')

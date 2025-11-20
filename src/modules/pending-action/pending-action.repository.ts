@@ -54,6 +54,7 @@ export class PendingActionRepository implements IPendingActionRepository {
     action_type: string
     requested_user_id: string
     transfer_data?: { new_portfolio_id: string }
+    reason?: string
   }): Promise<PendingActionWithRelations> {
     return this.prisma.pendingAction.create({
       data: {
@@ -65,6 +66,7 @@ export class PendingActionRepository implements IPendingActionRepository {
         transfer_data: data.transfer_data
           ? { new_portfolio_id: data.transfer_data.new_portfolio_id }
           : undefined,
+        reason: data.reason,
         status: 'PENDING'
       },
       include: {

@@ -43,6 +43,13 @@ export class CreatePendingActionDto {
   })
   @IsOptional()
   transfer_data?: { new_portfolio_id: string }
+
+  @ApiPropertyOptional({
+    description: 'Reason for the action request (optional, provided by non-super admin users)'
+  })
+  @IsString()
+  @IsOptional()
+  reason?: string
 }
 
 export class PendingActionQueryDto extends QueryDto {

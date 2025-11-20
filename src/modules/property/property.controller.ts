@@ -456,7 +456,7 @@ export class PropertyController {
       throw new BadRequestException('Invalid password')
     }
 
-    return this.propertyService.deactivate(id, user)
+    return this.propertyService.deactivate(id, user, deactivatePropertyDto.reason)
   }
 
   @Post('bulk-import')

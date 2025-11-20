@@ -55,6 +55,7 @@ export interface IPendingActionRepository {
     action_type: string
     requested_user_id: string
     transfer_data?: { new_portfolio_id: string }
+    reason?: string
   }): Promise<PendingActionWithRelations>
   findAll(queryOptions: {
     where?: any

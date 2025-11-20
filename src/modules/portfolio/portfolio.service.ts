@@ -425,7 +425,7 @@ export class PortfolioService implements IPortfolioService {
     return { message: 'Portfolio deleted successfully' }
   }
 
-  async deactivate(id: string, password: string, user: IUserWithPermissions) {
+  async deactivate(id: string, password: string, user: IUserWithPermissions, reason?: string) {
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
 
@@ -505,7 +505,8 @@ export class PortfolioService implements IPortfolioService {
         portfolio_id: id,
         action_type: 'PORTFOLIO_DEACTIVATE',
         status: 'PENDING',
-        requested_user_id: user.id
+        requested_user_id: user.id,
+        reason: reason
       }
     })
 

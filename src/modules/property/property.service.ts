@@ -721,7 +721,8 @@ export class PropertyService implements IPropertyService {
       property_id: id,
       action_type: 'PROPERTY_TRANSFER',
       requested_user_id: user.id,
-      transfer_data: { new_portfolio_id: data.new_portfolio_id }
+      transfer_data: { new_portfolio_id: data.new_portfolio_id },
+      reason: data.reason
     })
 
     return {
@@ -852,7 +853,7 @@ export class PropertyService implements IPropertyService {
     return { message: 'Property deleted successfully' }
   }
 
-  async deactivate(id: string, user: IUserWithPermissions) {
+  async deactivate(id: string, user: IUserWithPermissions, reason?: string) {
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
@@ -882,7 +883,8 @@ export class PropertyService implements IPropertyService {
       resource_type: 'property',
       property_id: id,
       action_type: 'PROPERTY_DEACTIVATE',
-      requested_user_id: user.id
+      requested_user_id: user.id,
+      reason: reason
     })
 
     return {

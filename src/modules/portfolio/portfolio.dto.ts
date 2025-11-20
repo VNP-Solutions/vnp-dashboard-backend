@@ -267,4 +267,12 @@ export class DeactivatePortfolioDto {
   @IsString()
   @IsNotEmpty()
   password: string
+
+  @ApiPropertyOptional({
+    example: 'Portfolio being consolidated with another portfolio',
+    description: 'Reason for deactivating the portfolio (optional)'
+  })
+  @IsString()
+  @IsOptional()
+  reason?: string
 }
