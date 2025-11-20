@@ -1,4 +1,4 @@
-import { Audit, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
@@ -101,7 +101,6 @@ export interface IAuditRepository {
   findById(id: string): Promise<AuditWithFullDetails | null>
   findByIds(ids: string[]): Promise<AuditWithFullDetails[]>
   update(id: string, data: UpdateAuditDto): Promise<AuditWithRelations>
-  delete(id: string): Promise<Audit>
   archive(id: string): Promise<AuditWithRelations>
   unarchive(id: string): Promise<AuditWithRelations>
   bulkUpdate(
@@ -130,7 +129,6 @@ export interface IAuditService {
     data: UpdateAuditDto,
     user: IUserWithPermissions
   ): Promise<AuditWithRelations>
-  remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
   archive(id: string, user: IUserWithPermissions): Promise<AuditWithRelations>
   unarchive(id: string, user: IUserWithPermissions): Promise<AuditWithRelations>
   bulkUpdate(

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException
@@ -14,6 +15,10 @@ import {
   canArchiveAudit,
   getArchiveErrorMessage
 } from '../../common/utils/audit.util'
+import {
+  isUserSuperAdmin,
+  isInternalUser
+} from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IAuditBatchRepository } from '../audit-batch/audit-batch.interface'
 import type { IAuditStatusRepository } from '../audit-status/audit-status.interface'
@@ -484,23 +489,18 @@ export class AuditService implements IAuditService {
     return this.auditRepository.update(id, data)
   }
 
-  async remove(id: string, _user: IUserWithPermissions) {
+  async archive(id: string, user: IUserWithPermissions) {
     const audit = await this.auditRepository.findById(id)
 
     if (!audit) {
       throw new NotFoundException('Audit not found')
     }
 
-    await this.auditRepository.delete(id)
-
-    return { message: 'Audit deleted successfully' }
-  }
-
-  async archive(id: string, _user: IUserWithPermissions) {
-    const audit = await this.auditRepository.findById(id)
-
-    if (!audit) {
-      throw new NotFoundException('Audit not found')
+    // Only super admins and internal users can archive audits
+    if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
+      throw new ForbiddenException(
+        'External users cannot archive audits'
+      )
     }
 
     // Check if audit is already archived

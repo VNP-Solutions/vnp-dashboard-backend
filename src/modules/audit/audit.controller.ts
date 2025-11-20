@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Inject,
   Param,
@@ -134,34 +133,21 @@ export class AuditController {
     return this.auditService.findOne(id, user)
   }
 
-  @Delete(':id')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE, true)
-  @ApiOperation({ summary: 'Delete an audit' })
-  @ApiResponse({ status: 200, description: 'Audit deleted successfully' })
-  @ApiResponse({ status: 404, description: 'Audit not found' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Insufficient permissions'
-  })
-  remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.auditService.remove(id, user)
-  }
-
   @Patch(':id/archive')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary:
-      'Archive an audit. Allowed statuses: "OTA POST Completed", "VCC Invoiced", "MOR completed and Invoiced", "Direct Bill Invoiced", "Nothing To Report"'
+    summary: 'Archive an audit (Super admins and internal users only, no password required)',
+    description: 'Super admins and internal users can archive audits. Allowed statuses: "OTA POST Completed", "VCC Invoiced", "MOR completed and Invoiced", "Direct Bill Invoiced", "Nothing To Report". External users cannot archive audits.'
   })
   @ApiResponse({ status: 200, description: 'Audit archived successfully' })
   @ApiResponse({ status: 404, description: 'Audit not found' })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Cannot archive audit due to validation failure'
+    description: 'Bad Request - Cannot archive audit due to validation failure or audit already archived'
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - External users cannot archive audits or insufficient permissions'
   })
   archive(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.auditService.archive(id, user)
