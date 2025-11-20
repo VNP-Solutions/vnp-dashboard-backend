@@ -33,6 +33,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { EmailAttachment } from '../email/email.dto'
 import {
   CreatePortfolioDto,
+  DeactivatePortfolioDto,
   DeletePortfolioDto,
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
@@ -149,6 +150,35 @@ export class PortfolioController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.portfolioService.remove(id, deletePortfolioDto.password, user)
+  }
+
+  @Post(':id/deactivate')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Deactivate a portfolio (Super Admin and internal users with password verification)',
+    description:
+      'Super Admin can deactivate directly. Internal users create a pending action for approval.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Portfolio deactivated successfully or deactivation request submitted'
+  })
+  @ApiResponse({ status: 404, description: 'Portfolio not found' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Portfolio already deactivated or pending request exists or only Super Admin and internal users can deactivate or invalid password'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  deactivate(
+    @Param('id') id: string,
+    @Body() deactivatePortfolioDto: DeactivatePortfolioDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.deactivate(id, deactivatePortfolioDto.password, user)
   }
 
   @Post(':id/send-email')

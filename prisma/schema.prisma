@@ -21,13 +21,15 @@ model User {
   is_verified    Boolean
   temp_password  String?
 
-  otps                    Otp[]
-  userAccessedProperties  UserAccessedProperty[]
-  notes                   Note[]
-  tasks                   Task[]
-  contractUrls            ContractUrl[]
-  pendingPropertyActions  PropertyPendingAction[] @relation("RequestedBy")
-  approvedPropertyActions PropertyPendingAction[] @relation("ApprovedBy")
+  otps                      Otp[]
+  userAccessedProperties    UserAccessedProperty[]
+  notes                     Note[]
+  tasks                     Task[]
+  contractUrls              ContractUrl[]
+  pendingPropertyActions    PropertyPendingAction[]    @relation("RequestedBy")
+  approvedPropertyActions   PropertyPendingAction[]    @relation("ApprovedBy")
+  pendingPortfolioActions   PortfolioPendingAction[]   @relation("PortfolioRequestedBy")
+  approvedPortfolioActions  PortfolioPendingAction[]   @relation("PortfolioApprovedBy")
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -48,10 +50,11 @@ model Portfolio {
   access_email      String?
   access_phone      String?
 
-  properties   Property[]
-  notes        Note[]
-  tasks        Task[]
-  contractUrls ContractUrl[]
+  properties     Property[]
+  notes          Note[]
+  tasks          Task[]
+  contractUrls   ContractUrl[]
+  pendingActions PortfolioPendingAction[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -417,6 +420,10 @@ enum PropertyActionType {
   TRANSFER
 }
 
+enum PortfolioActionType {
+  DEACTIVATE
+}
+
 enum PropertyActionStatus {
   PENDING
   APPROVED
@@ -449,5 +456,29 @@ model PropertyPendingAction {
   @@index([action_type])
   @@index([status, action_type])
   @@index([property_id, status])
+  @@index([requested_user_id, status])
+}
+
+model PortfolioPendingAction {
+  id                String                @id @default(auto()) @map("_id") @db.ObjectId
+  portfolio_id      String                @db.ObjectId
+  portfolio         Portfolio             @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  action_type       PortfolioActionType
+  status            PropertyActionStatus  @default(PENDING)
+  requested_user_id String                @db.ObjectId
+  requestedBy       User                  @relation("PortfolioRequestedBy", fields: [requested_user_id], references: [id], onDelete: Cascade)
+  approval_user_id  String?               @db.ObjectId
+  approvedBy        User?                 @relation("PortfolioApprovedBy", fields: [approval_user_id], references: [id], onDelete: SetNull)
+  rejection_reason  String?
+  created_at        DateTime              @default(now())
+  updated_at        DateTime              @updatedAt
+  approved_at       DateTime?
+
+  @@index([portfolio_id])
+  @@index([requested_user_id])
+  @@index([status])
+  @@index([action_type])
+  @@index([status, action_type])
+  @@index([portfolio_id, status])
   @@index([requested_user_id, status])
 }

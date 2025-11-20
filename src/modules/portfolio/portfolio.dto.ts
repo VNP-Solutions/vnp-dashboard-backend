@@ -258,3 +258,13 @@ export class DeletePortfolioDto {
   @IsNotEmpty()
   password: string
 }
+
+export class DeactivatePortfolioDto {
+  @ApiProperty({
+    example: 'MySecureP@ssw0rd',
+    description: 'User password for verification (required for super admin and internal users to deactivate portfolio)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}

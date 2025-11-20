@@ -30,7 +30,6 @@ import {
   PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
-import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import type { IAuthRepository } from '../auth/auth.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'

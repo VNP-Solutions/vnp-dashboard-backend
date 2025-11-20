@@ -15,7 +15,7 @@ import { PermissionService } from '../../common/services/permission.service'
 import { COMPLETED_AUDIT_STATUSES } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
-import { isUserSuperAdmin } from '../../common/utils/permission.util'
+import { isUserSuperAdmin, isInternalUser } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
 import { PrismaService } from '../prisma/prisma.service'
@@ -132,6 +132,9 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
+    const userIsSuperAdmin = isUserSuperAdmin(user)
+    const userIsInternal = isInternalUser(user)
+
     // Build additional filters from query params
     const additionalFilters: any = {}
     if (query.service_type_id) {
@@ -139,6 +142,11 @@ export class PortfolioService implements IPortfolioService {
     }
     if (query.is_active) {
       additionalFilters.is_active = query.is_active
+    }
+
+    // External users can only see active portfolios
+    if (!userIsSuperAdmin && !userIsInternal) {
+      additionalFilters.is_active = true
     }
 
     // Merge with existing filters
@@ -185,7 +193,7 @@ export class PortfolioService implements IPortfolioService {
       baseWhere
     )
 
-    const isSuperAdmin = isUserSuperAdmin(user)
+    const isSuperAdmin = userIsSuperAdmin
 
     // Fetch data and count
     const [data, total] = await Promise.all([
@@ -216,6 +224,9 @@ export class PortfolioService implements IPortfolioService {
       return []
     }
 
+    const userIsSuperAdmin = isUserSuperAdmin(user)
+    const userIsInternal = isInternalUser(user)
+
     // Build additional filters from query params
     const additionalFilters: any = {}
     if (query.service_type_id) {
@@ -223,6 +234,11 @@ export class PortfolioService implements IPortfolioService {
     }
     if (query.is_active) {
       additionalFilters.is_active = query.is_active
+    }
+
+    // External users can only see active portfolios
+    if (!userIsSuperAdmin && !userIsInternal) {
+      additionalFilters.is_active = true
     }
 
     // Merge with existing filters
@@ -269,14 +285,12 @@ export class PortfolioService implements IPortfolioService {
       baseWhere
     )
 
-    const isSuperAdmin = isUserSuperAdmin(user)
-
     // Fetch all data without pagination
     const data = await this.portfolioRepository.findAll(
       { where, orderBy },
       undefined,
       user.id,
-      isSuperAdmin
+      userIsSuperAdmin
     )
 
     return data
@@ -284,6 +298,7 @@ export class PortfolioService implements IPortfolioService {
 
   async findOne(id: string, user: IUserWithPermissions) {
     const isSuperAdmin = isUserSuperAdmin(user)
+    const isInternal = isInternalUser(user)
     const portfolio = await this.portfolioRepository.findById(
       id,
       user.id,
@@ -291,6 +306,11 @@ export class PortfolioService implements IPortfolioService {
     )
 
     if (!portfolio) {
+      throw new NotFoundException('Portfolio not found')
+    }
+
+    // External users cannot see deactivated portfolios
+    if (!isSuperAdmin && !isInternal && !portfolio.is_active) {
       throw new NotFoundException('Portfolio not found')
     }
 
@@ -403,6 +423,95 @@ export class PortfolioService implements IPortfolioService {
     await this.portfolioRepository.delete(id)
 
     return { message: 'Portfolio deleted successfully' }
+  }
+
+  async deactivate(id: string, password: string, user: IUserWithPermissions) {
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const isInternal = isInternalUser(user)
+
+    // Only super admin and internal users can deactivate portfolios
+    if (!isSuperAdmin && !isInternal) {
+      throw new BadRequestException(
+        'Only Super Admin and internal users can deactivate portfolios'
+      )
+    }
+
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    const portfolio = await this.portfolioRepository.findById(
+      id,
+      user.id,
+      isSuperAdmin
+    )
+
+    if (!portfolio) {
+      throw new NotFoundException('Portfolio not found')
+    }
+
+    // Check if portfolio is already deactivated
+    if (!portfolio.is_active) {
+      throw new BadRequestException('Portfolio is already deactivated')
+    }
+
+    // Super admin can deactivate directly
+    if (isSuperAdmin) {
+      await this.portfolioRepository.update(
+        id,
+        { is_active: false },
+        user.id,
+        isSuperAdmin
+      )
+      return { message: 'Portfolio deactivated successfully' }
+    }
+
+    // Internal users (non-super admin) need to create a pending action
+    // Check if there's already a pending deactivation request
+    const existingPendingAction = await this.prisma.portfolioPendingAction.findFirst({
+      where: {
+        portfolio_id: id,
+        action_type: 'DEACTIVATE',
+        status: 'PENDING'
+      }
+    })
+
+    if (existingPendingAction) {
+      throw new BadRequestException(
+        'A deactivation request for this portfolio is already pending approval'
+      )
+    }
+
+    // Create pending action
+    await this.prisma.portfolioPendingAction.create({
+      data: {
+        portfolio_id: id,
+        action_type: 'DEACTIVATE',
+        status: 'PENDING',
+        requested_user_id: user.id
+      }
+    })
+
+    return {
+      message:
+        'Deactivation request submitted successfully and is pending super admin approval'
+    }
   }
 
   async sendEmail(

@@ -12,7 +12,6 @@ import {
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
 import { ExpediaCredentialsDto, OtaCredentialsDto } from '../property-credentials/property-credentials.dto'
-import { CreatePropertyBankDetailsDto } from '../property-bank-details/property-bank-details.dto'
 
 export type AccessType = 'owned' | 'shared'
 
