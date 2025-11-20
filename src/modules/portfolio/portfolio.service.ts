@@ -14,6 +14,7 @@ import {
 import { PermissionService } from '../../common/services/permission.service'
 import { COMPLETED_AUDIT_STATUSES } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
@@ -351,8 +352,36 @@ export class PortfolioService implements IPortfolioService {
     return this.portfolioRepository.update(id, data, user.id, isSuperAdmin)
   }
 
-  async remove(id: string, user: IUserWithPermissions) {
+  async remove(id: string, password: string, user: IUserWithPermissions) {
     const isSuperAdmin = isUserSuperAdmin(user)
+
+    // Only super admin can delete portfolios
+    if (!isSuperAdmin) {
+      throw new BadRequestException(
+        'Only Super Admin can delete portfolios'
+      )
+    }
+
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
     const portfolio = await this.portfolioRepository.findById(
       id,
       user.id,

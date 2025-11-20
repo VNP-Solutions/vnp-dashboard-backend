@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Inject,
   Param,
@@ -34,6 +33,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { EmailAttachment } from '../email/email.dto'
 import {
   CreatePortfolioDto,
+  DeletePortfolioDto,
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
   SendPortfolioEmailDto,
@@ -130,21 +130,25 @@ export class PortfolioController {
     return this.portfolioService.update(id, updatePortfolioDto, user)
   }
 
-  @Delete(':id')
+  @Post(':id/delete')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE, true)
-  @ApiOperation({ summary: 'Delete a portfolio' })
+  @ApiOperation({ summary: 'Delete a portfolio (Super Admin only with password verification)' })
   @ApiResponse({ status: 200, description: 'Portfolio deleted successfully' })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete portfolio with associated properties'
+    description: 'Cannot delete portfolio with associated properties or only Super Admin can delete portfolios or invalid password'
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions'
   })
-  remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.portfolioService.remove(id, user)
+  remove(
+    @Param('id') id: string,
+    @Body() deletePortfolioDto: DeletePortfolioDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.remove(id, deletePortfolioDto.password, user)
   }
 
   @Post(':id/send-email')

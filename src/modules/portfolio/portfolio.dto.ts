@@ -248,3 +248,13 @@ export class PortfolioStatsResponseDto {
   })
   recent_audits: PortfolioStatsAuditDto[]
 }
+
+export class DeletePortfolioDto {
+  @ApiProperty({
+    example: 'MySecureP@ssw0rd',
+    description: 'User password for verification (required for super admin to delete portfolio)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}

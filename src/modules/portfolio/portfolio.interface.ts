@@ -103,7 +103,7 @@ export interface IPortfolioService {
     data: UpdatePortfolioDto,
     user: IUserWithPermissions
   ): Promise<PortfolioWithServiceType>
-  remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  remove(id: string, password: string, user: IUserWithPermissions): Promise<{ message: string }>
   sendEmail(
     id: string,
     subject: string,
