@@ -84,7 +84,15 @@ export class CreatePropertyDto {
   show_in_portfolio?: string[]
 }
 
-export class UpdatePropertyDto extends PartialType(CreatePropertyDto) {}
+export class UpdatePropertyDto extends PartialType(CreatePropertyDto) {
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439013',
+    description: 'Previous Portfolio ID (used for tracking transfer history)'
+  })
+  @IsString()
+  @IsOptional()
+  previous_portfolio_id?: string
+}
 
 export class TransferPropertyDto {
   @ApiProperty({

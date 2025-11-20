@@ -260,8 +260,28 @@ export class PropertyRepository implements IPropertyRepository {
       }
     })
 
-    // Get unique property IDs from the results
+    // Get unique property IDs and previous portfolio IDs
     const propertyIds = properties.map(p => p.id)
+    const previousPortfolioIds = properties
+      .map(p => p.previous_portfolio_id)
+      .filter((id): id is string => id !== null && id !== undefined)
+
+    // Fetch previous portfolios in bulk
+    const previousPortfolios = previousPortfolioIds.length > 0
+      ? await this.prisma.portfolio.findMany({
+          where: { id: { in: previousPortfolioIds } },
+          select: {
+            id: true,
+            name: true,
+            is_active: true
+          }
+        })
+      : []
+
+    // Create a map for quick lookup
+    const previousPortfolioMap = new Map(
+      previousPortfolios.map(p => [p.id, p])
+    )
 
     // Get audit counts for each property
     const auditCounts = await Promise.all(
@@ -281,10 +301,13 @@ export class PropertyRepository implements IPropertyRepository {
       auditCounts.map(ac => [ac.propertyId, ac.count])
     )
 
-    // Enrich each property with total_audits count
+    // Enrich each property with total_audits count and previous_portfolio data
     return properties.map(property => ({
       ...property,
-      total_audits: auditCountMap.get(property.id) || 0
+      total_audits: auditCountMap.get(property.id) || 0,
+      previous_portfolio: property.previous_portfolio_id
+        ? previousPortfolioMap.get(property.previous_portfolio_id) || null
+        : null
     })) as any
   }
 
@@ -295,7 +318,7 @@ export class PropertyRepository implements IPropertyRepository {
   }
 
   async findById(id: string) {
-    return this.prisma.property.findUnique({
+    const property = await this.prisma.property.findUnique({
       where: { id },
       include: {
         currency: {
@@ -335,6 +358,28 @@ export class PropertyRepository implements IPropertyRepository {
         }
       }
     })
+
+    if (!property) {
+      return null
+    }
+
+    // Fetch previous portfolio if exists
+    let previous_portfolio: any = null
+    if (property.previous_portfolio_id) {
+      previous_portfolio = await this.prisma.portfolio.findUnique({
+        where: { id: property.previous_portfolio_id },
+        select: {
+          id: true,
+          name: true,
+          is_active: true
+        }
+      })
+    }
+
+    return {
+      ...property,
+      previous_portfolio
+    } as any
   }
 
   async findByIds(ids: string[]) {

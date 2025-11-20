@@ -710,7 +710,8 @@ export class PropertyService implements IPropertyService {
     // Super admin can directly transfer
     if (isUserSuperAdmin(user)) {
       return this.propertyRepository.update(id, {
-        portfolio_id: data.new_portfolio_id
+        portfolio_id: data.new_portfolio_id,
+        previous_portfolio_id: property.portfolio_id
       })
     }
 
@@ -789,9 +790,10 @@ export class PropertyService implements IPropertyService {
           continue
         }
 
-        // Transfer the property
+        // Transfer the property - preserve old portfolio
         await this.propertyRepository.update(propertyId, {
-          portfolio_id: data.new_portfolio_id
+          portfolio_id: data.new_portfolio_id,
+          previous_portfolio_id: property.portfolio_id
         })
 
         results.push({
