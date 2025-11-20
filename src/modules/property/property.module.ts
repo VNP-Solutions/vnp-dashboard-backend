@@ -6,13 +6,13 @@ import { PortfolioRepository } from '../portfolio/portfolio.repository'
 import { PrismaService } from '../prisma/prisma.service'
 import { PropertyBankDetailsRepository } from '../property-bank-details/property-bank-details.repository'
 import { PropertyCredentialsRepository } from '../property-credentials/property-credentials.repository'
-import { PropertyPendingActionModule } from '../property-pending-action/property-pending-action.module'
+import { PendingActionModule } from '../pending-action/pending-action.module'
 import { PropertyController } from './property.controller'
 import { PropertyRepository } from './property.repository'
 import { PropertyService } from './property.service'
 
 @Module({
-  imports: [AuthModule, forwardRef(() => PropertyPendingActionModule)],
+  imports: [AuthModule, forwardRef(() => PendingActionModule)],
   controllers: [PropertyController],
   providers: [
     {

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { PropertyActionType } from '@prisma/client'
+import { PendingActionType } from '@prisma/client'
 import {
   IsEnum,
   IsNotEmpty,
@@ -8,21 +8,35 @@ import {
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
 
-export class CreatePropertyPendingActionDto {
+export class CreatePendingActionDto {
   @ApiProperty({
-    description: 'Property ID for the pending action'
+    description: 'Resource type (property or portfolio)'
   })
   @IsString()
   @IsNotEmpty()
-  property_id: string
+  resource_type: string
+
+  @ApiPropertyOptional({
+    description: 'Property ID for property-related actions'
+  })
+  @IsString()
+  @IsOptional()
+  property_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Portfolio ID for portfolio-related actions'
+  })
+  @IsString()
+  @IsOptional()
+  portfolio_id?: string
 
   @ApiProperty({
-    enum: PropertyActionType,
-    description: 'Type of action requested (DELETE or TRANSFER)'
+    enum: PendingActionType,
+    description: 'Type of action requested'
   })
-  @IsEnum(PropertyActionType)
+  @IsEnum(PendingActionType)
   @IsNotEmpty()
-  action_type: PropertyActionType
+  action_type: PendingActionType
 
   @ApiPropertyOptional({
     description: 'Transfer data with new_portfolio_id for transfer actions'
@@ -31,7 +45,7 @@ export class CreatePropertyPendingActionDto {
   transfer_data?: { new_portfolio_id: string }
 }
 
-export class PropertyPendingActionQueryDto extends QueryDto {
+export class PendingActionQueryDto extends QueryDto {
   @ApiPropertyOptional({
     description: 'Filter by status',
     example: 'PENDING'
@@ -42,7 +56,7 @@ export class PropertyPendingActionQueryDto extends QueryDto {
 
   @ApiPropertyOptional({
     description: 'Filter by action type',
-    example: 'DELETE'
+    example: 'PROPERTY_TRANSFER'
   })
   @IsOptional()
   @IsString()
@@ -61,9 +75,23 @@ export class PropertyPendingActionQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   property_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by portfolio ID'
+  })
+  @IsOptional()
+  @IsString()
+  portfolio_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by resource type'
+  })
+  @IsOptional()
+  @IsString()
+  resource_type?: string
 }
 
-export class ApprovePropertyPendingActionDto {
+export class ApprovePendingActionDto {
   @ApiPropertyOptional({
     description: 'Rejection reason (required when rejecting)'
   })

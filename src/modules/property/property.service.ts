@@ -8,7 +8,7 @@ import {
   forwardRef
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { BankSubType, BankType, PropertyActionType } from '@prisma/client'
+import { BankSubType, BankType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
@@ -28,7 +28,7 @@ import type { ICurrencyRepository } from '../currency/currency.interface'
 import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import type { IPropertyBankDetailsRepository } from '../property-bank-details/property-bank-details.interface'
 import type { IPropertyCredentialsRepository } from '../property-credentials/property-credentials.interface'
-import type { IPropertyPendingActionRepository } from '../property-pending-action/property-pending-action.interface'
+import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
 import {
   BulkImportResultDto,
   BulkTransferPropertyDto,
@@ -60,8 +60,8 @@ export class PropertyService implements IPropertyService {
     private credentialsRepository: IPropertyCredentialsRepository,
     @Inject('IPropertyBankDetailsRepository')
     private bankDetailsRepository: IPropertyBankDetailsRepository,
-    @Inject(forwardRef(() => 'IPropertyPendingActionRepository'))
-    private pendingActionRepository: IPropertyPendingActionRepository,
+    @Inject(forwardRef(() => 'IPendingActionRepository'))
+    private pendingActionRepository: IPendingActionRepository,
     @Inject(PermissionService)
     private permissionService: PermissionService,
     @Inject(ConfigService)
@@ -717,8 +717,9 @@ export class PropertyService implements IPropertyService {
 
     // Property manager (with ownership rights) creates pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
+      resource_type: 'property',
       property_id: id,
-      action_type: PropertyActionType.TRANSFER,
+      action_type: 'PROPERTY_TRANSFER',
       requested_user_id: user.id,
       transfer_data: { new_portfolio_id: data.new_portfolio_id }
     })
@@ -878,8 +879,9 @@ export class PropertyService implements IPropertyService {
 
     // Internal non-super admin users create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
+      resource_type: 'property',
       property_id: id,
-      action_type: PropertyActionType.DEACTIVATE,
+      action_type: 'PROPERTY_DEACTIVATE',
       requested_user_id: user.id
     })
 

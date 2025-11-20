@@ -6,7 +6,7 @@ import {
   NotFoundException,
   forwardRef
 } from '@nestjs/common'
-import { PropertyActionStatus, PropertyActionType } from '@prisma/client'
+import { PendingActionStatus, PendingActionType } from '@prisma/client'
 import type { PaginatedResult } from '../../common/dto/query.dto'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { isUserSuperAdmin, isInternalUser } from '../../common/utils/permission.util'
@@ -14,22 +14,22 @@ import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import type { IPropertyService } from '../property/property.interface'
 import {
-  ApprovePropertyPendingActionDto,
-  CreatePropertyPendingActionDto,
-  PropertyPendingActionQueryDto
-} from './property-pending-action.dto'
+  ApprovePendingActionDto,
+  CreatePendingActionDto,
+  PendingActionQueryDto
+} from './pending-action.dto'
 import type {
-  IPropertyPendingActionRepository,
-  IPropertyPendingActionService
-} from './property-pending-action.interface'
+  IPendingActionRepository,
+  IPendingActionService
+} from './pending-action.interface'
 
 @Injectable()
-export class PropertyPendingActionService
-  implements IPropertyPendingActionService
+export class PendingActionService
+  implements IPendingActionService
 {
   constructor(
-    @Inject('IPropertyPendingActionRepository')
-    private repository: IPropertyPendingActionRepository,
+    @Inject('IPendingActionRepository')
+    private repository: IPendingActionRepository,
     @Inject(forwardRef(() => 'IPropertyService'))
     private propertyService: IPropertyService,
     @Inject('IPortfolioRepository')
@@ -37,7 +37,7 @@ export class PropertyPendingActionService
   ) {}
 
   async create(
-    data: CreatePropertyPendingActionDto,
+    data: CreatePendingActionDto,
     user: IUserWithPermissions
   ) {
     // Only internal users can create pending actions
@@ -48,7 +48,7 @@ export class PropertyPendingActionService
     }
 
     // DELETE actions are no longer supported via pending actions
-    if (data.action_type === PropertyActionType.DELETE) {
+    if (data.action_type === PendingActionType.PROPERTY_DELETE) {
       throw new BadRequestException(
         'DELETE actions are no longer supported via pending actions. Only super admins can delete properties directly.'
       )
@@ -56,7 +56,7 @@ export class PropertyPendingActionService
 
     // Validate transfer data for transfer actions
     if (
-      data.action_type === PropertyActionType.TRANSFER &&
+      data.action_type === PendingActionType.PROPERTY_TRANSFER &&
       !data.transfer_data?.new_portfolio_id
     ) {
       throw new BadRequestException(
@@ -64,9 +64,11 @@ export class PropertyPendingActionService
       )
     }
 
-    // Create the pending action
+    // Create the pending action with the new unified model
     return this.repository.create({
+      resource_type: data.resource_type,
       property_id: data.property_id,
+      portfolio_id: data.portfolio_id,
       action_type: data.action_type,
       requested_user_id: user.id,
       transfer_data: data.transfer_data
@@ -74,7 +76,7 @@ export class PropertyPendingActionService
   }
 
   async findAll(
-    query: PropertyPendingActionQueryDto,
+    query: PendingActionQueryDto,
     user: IUserWithPermissions
   ): Promise<PaginatedResult<any>> {
     // Only super admins can access this endpoint
@@ -98,6 +100,12 @@ export class PropertyPendingActionService
     if (query.property_id) {
       additionalFilters.property_id = query.property_id
     }
+    if (query.portfolio_id) {
+      additionalFilters.portfolio_id = query.portfolio_id
+    }
+    if (query.resource_type) {
+      additionalFilters.resource_type = query.resource_type
+    }
 
     // Merge with existing filters
     const mergedQuery = {
@@ -113,6 +121,7 @@ export class PropertyPendingActionService
       searchFields: [
         'id',
         'property.name',
+        'portfolio.name',
         'requestedBy.email',
         'requestedBy.first_name',
         'requestedBy.last_name',
@@ -126,7 +135,9 @@ export class PropertyPendingActionService
         'action_type',
         'requested_user_id',
         'approval_user_id',
-        'property_id'
+        'property_id',
+        'portfolio_id',
+        'resource_type'
       ],
       sortableFields: [
         'created_at',
@@ -134,12 +145,14 @@ export class PropertyPendingActionService
         'approved_at',
         'status',
         'action_type',
-        'property.name'
+        'property.name',
+        'portfolio.name'
       ],
       defaultSortField: 'created_at',
       defaultSortOrder: 'desc' as const,
       nestedFieldMap: {
         property_name: 'property.name',
+        portfolio_name: 'portfolio.name',
         requested_by_email: 'requestedBy.email',
         approved_by_email: 'approvedBy.email'
       }
@@ -195,7 +208,7 @@ export class PropertyPendingActionService
 
   async approve(
     id: string,
-    _data: ApprovePropertyPendingActionDto,
+    _data: ApprovePendingActionDto,
     user: IUserWithPermissions
   ) {
     // Only super admins can approve
@@ -209,7 +222,7 @@ export class PropertyPendingActionService
       throw new NotFoundException('Pending action not found')
     }
 
-    if (pendingAction.status !== PropertyActionStatus.PENDING) {
+    if (pendingAction.status !== PendingActionStatus.PENDING) {
       throw new BadRequestException(
         `Cannot approve action with status: ${pendingAction.status}`
       )
@@ -220,7 +233,7 @@ export class PropertyPendingActionService
 
     // Update the pending action status
     return this.repository.update(id, {
-      status: PropertyActionStatus.APPROVED,
+      status: PendingActionStatus.APPROVED,
       approval_user_id: user.id,
       approved_at: new Date()
     })
@@ -228,7 +241,7 @@ export class PropertyPendingActionService
 
   async reject(
     id: string,
-    data: ApprovePropertyPendingActionDto,
+    data: ApprovePendingActionDto,
     user: IUserWithPermissions
   ) {
     // Only super admins can reject
@@ -242,7 +255,7 @@ export class PropertyPendingActionService
       throw new NotFoundException('Pending action not found')
     }
 
-    if (pendingAction.status !== PropertyActionStatus.PENDING) {
+    if (pendingAction.status !== PendingActionStatus.PENDING) {
       throw new BadRequestException(
         `Cannot reject action with status: ${pendingAction.status}`
       )
@@ -254,7 +267,7 @@ export class PropertyPendingActionService
 
     // Update the pending action status
     return this.repository.update(id, {
-      status: PropertyActionStatus.REJECTED,
+      status: PendingActionStatus.REJECTED,
       approval_user_id: user.id,
       rejection_reason: data.rejection_reason,
       approved_at: new Date()
@@ -265,20 +278,24 @@ export class PropertyPendingActionService
     return this.repository.findByPropertyId(propertyId)
   }
 
+  async findByPortfolioId(portfolioId: string) {
+    return this.repository.findByPortfolioId(portfolioId)
+  }
+
   /**
    * Execute the actual property action
    * This method delegates to the property service to perform the actual operation
    */
   private async executeAction(pendingAction: any, user: IUserWithPermissions) {
     switch (pendingAction.action_type) {
-      case PropertyActionType.DELETE:
+      case PendingActionType.PROPERTY_DELETE:
         // DELETE actions are no longer supported
         // This case exists only for legacy pending actions created before the policy change
         throw new BadRequestException(
           'DELETE actions are no longer supported via pending actions. This legacy action cannot be approved. Please reject it and have a super admin delete the property directly.'
         )
 
-      case PropertyActionType.TRANSFER:
+      case PendingActionType.PROPERTY_TRANSFER:
         // Transfer the property
         if (!pendingAction.transfer_data?.new_portfolio_id) {
           throw new BadRequestException(
@@ -295,10 +312,17 @@ export class PropertyPendingActionService
         )
         break
 
-      case PropertyActionType.DEACTIVATE:
+      case PendingActionType.PROPERTY_DEACTIVATE:
         // Deactivate the property
         await this.propertyService.deactivate(pendingAction.property_id, user)
         break
+
+      case PendingActionType.PORTFOLIO_DEACTIVATE:
+        // Deactivate the portfolio
+        // Note: This will be implemented when portfolio deactivation is added
+        throw new BadRequestException(
+          'Portfolio deactivation is not yet implemented'
+        )
 
       default:
         throw new BadRequestException(
@@ -315,7 +339,7 @@ export class PropertyPendingActionService
     const targetPortfolioIds = pendingActions
       .filter(
         (action) =>
-          action.action_type === PropertyActionType.TRANSFER &&
+          action.action_type === PendingActionType.PROPERTY_TRANSFER &&
           action.transfer_data?.new_portfolio_id
       )
       .map((action) => action.transfer_data.new_portfolio_id)
@@ -354,7 +378,7 @@ export class PropertyPendingActionService
 
       // Add target portfolio info for transfer actions
       if (
-        action.action_type === PropertyActionType.TRANSFER &&
+        action.action_type === PendingActionType.PROPERTY_TRANSFER &&
         action.transfer_data?.new_portfolio_id
       ) {
         const targetPortfolio = targetPortfolios.get(

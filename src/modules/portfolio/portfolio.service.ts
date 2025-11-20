@@ -484,10 +484,10 @@ export class PortfolioService implements IPortfolioService {
 
     // Internal users (non-super admin) need to create a pending action
     // Check if there's already a pending deactivation request
-    const existingPendingAction = await this.prisma.portfolioPendingAction.findFirst({
+    const existingPendingAction = await this.prisma.pendingAction.findFirst({
       where: {
         portfolio_id: id,
-        action_type: 'DEACTIVATE',
+        action_type: 'PORTFOLIO_DEACTIVATE',
         status: 'PENDING'
       }
     })
@@ -499,10 +499,11 @@ export class PortfolioService implements IPortfolioService {
     }
 
     // Create pending action
-    await this.prisma.portfolioPendingAction.create({
+    await this.prisma.pendingAction.create({
       data: {
+        resource_type: 'portfolio',
         portfolio_id: id,
-        action_type: 'DEACTIVATE',
+        action_type: 'PORTFOLIO_DEACTIVATE',
         status: 'PENDING',
         requested_user_id: user.id
       }

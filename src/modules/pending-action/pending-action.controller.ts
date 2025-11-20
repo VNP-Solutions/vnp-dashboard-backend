@@ -14,32 +14,32 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import {
-  ApprovePropertyPendingActionDto,
-  CreatePropertyPendingActionDto,
-  PropertyPendingActionQueryDto
-} from './property-pending-action.dto'
-import type { IPropertyPendingActionService } from './property-pending-action.interface'
+  ApprovePendingActionDto,
+  CreatePendingActionDto,
+  PendingActionQueryDto
+} from './pending-action.dto'
+import type { IPendingActionService } from './pending-action.interface'
 
-@ApiTags('Property Pending Actions')
+@ApiTags('Pending Actions')
 @ApiBearerAuth('JWT-auth')
-@Controller('property-pending-actions')
+@Controller('pending-actions')
 @UseGuards(JwtAuthGuard)
-export class PropertyPendingActionController {
+export class PendingActionController {
   constructor(
-    @Inject('IPropertyPendingActionService')
-    private readonly service: IPropertyPendingActionService
+    @Inject('IPendingActionService')
+    private readonly service: IPendingActionService
   ) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a pending property action request (Internal users only)' })
+  @ApiOperation({ summary: 'Create a pending action request (Internal users only)' })
   @ApiResponse({
     status: 201,
     description: 'Pending action created successfully'
   })
   @ApiResponse({ status: 400, description: 'Invalid request data' })
-  @ApiResponse({ status: 403, description: 'Only internal users can create property action requests' })
+  @ApiResponse({ status: 403, description: 'Only internal users can create action requests' })
   async create(
-    @Body() createDto: CreatePropertyPendingActionDto,
+    @Body() createDto: CreatePendingActionDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.service.create(createDto, user)
@@ -53,7 +53,7 @@ export class PropertyPendingActionController {
   })
   @ApiResponse({ status: 403, description: 'Only super admins can access all pending actions' })
   async findAll(
-    @Query() query: PropertyPendingActionQueryDto,
+    @Query() query: PendingActionQueryDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.service.findAll(query, user)
@@ -83,7 +83,7 @@ export class PropertyPendingActionController {
   @ApiResponse({ status: 404, description: 'Pending action not found' })
   async approve(
     @Param('id') id: string,
-    @Body() data: ApprovePropertyPendingActionDto,
+    @Body() data: ApprovePendingActionDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.service.approve(id, data, user)
@@ -102,7 +102,7 @@ export class PropertyPendingActionController {
   })
   async reject(
     @Param('id') id: string,
-    @Body() data: ApprovePropertyPendingActionDto,
+    @Body() data: ApprovePendingActionDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.service.reject(id, data, user)

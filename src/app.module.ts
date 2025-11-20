@@ -25,7 +25,7 @@ import { PortfolioModule } from './modules/portfolio/portfolio.module'
 import { PrismaService } from './modules/prisma/prisma.service'
 import { PropertyBankDetailsModule } from './modules/property-bank-details/property-bank-details.module'
 import { PropertyCredentialsModule } from './modules/property-credentials/property-credentials.module'
-import { PropertyPendingActionModule } from './modules/property-pending-action/property-pending-action.module'
+import { PendingActionModule } from './modules/pending-action/pending-action.module'
 import { PropertyModule } from './modules/property/property.module'
 import { ServiceTypeModule } from './modules/service-type/service-type.module'
 import { TaskModule } from './modules/task/task.module'
@@ -53,7 +53,7 @@ import { UserModule } from './modules/user/user.module'
     TaskModule,
     PropertyBankDetailsModule,
     PropertyCredentialsModule,
-    PropertyPendingActionModule,
+    PendingActionModule,
     PropertyModule,
     ServiceTypeModule,
     UserModule,
