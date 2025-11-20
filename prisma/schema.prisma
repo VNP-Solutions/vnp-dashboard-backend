@@ -418,6 +418,7 @@ enum AccessLevel {
 enum PropertyActionType {
   DELETE
   TRANSFER
+  DEACTIVATE
 }
 
 enum PortfolioActionType {

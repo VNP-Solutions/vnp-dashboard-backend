@@ -283,6 +283,16 @@ export class DeletePropertyDto {
   password: string
 }
 
+export class DeactivatePropertyDto {
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
 export class CompletePropertyCredentialsDto {
   @ApiProperty({
     description: 'Expedia credentials (required)',

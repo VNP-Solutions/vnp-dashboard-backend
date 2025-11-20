@@ -37,6 +37,7 @@ import {
   BulkTransferPropertyDto,
   CompleteCreatePropertyDto,
   CreatePropertyDto,
+  DeactivatePropertyDto,
   DeletePropertyDto,
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
@@ -201,7 +202,10 @@ export class PropertyController {
 
   @Patch(':id/transfer')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
-  @ApiOperation({ summary: 'Transfer a property to another portfolio (Super admin: direct transfer with password, Property manager: creates pending action without password)' })
+  @ApiOperation({
+    summary: 'Transfer a property to another portfolio (requires ownership and password verification)',
+    description: 'Super admins can directly transfer properties. Internal and external users with portfolio ownership can create transfer requests that require super admin approval. Password verification is required for all users.'
+  })
   @ApiResponse({
     status: 200,
     description: 'Property transferred successfully or transfer request submitted for approval'
@@ -214,7 +218,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - User does not have ownership of the property portfolio or insufficient permissions'
   })
   async transfer(
     @Param('id') id: string,
@@ -297,7 +301,8 @@ export class PropertyController {
   @Post('bulk-transfer')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Bulk transfer multiple properties to another portfolio (Super admin or internal property/portfolio manager only)'
+    summary: 'Bulk transfer multiple properties to another portfolio (Super admin or internal property/portfolio manager only, requires password verification)',
+    description: 'Allows bulk transfer of multiple properties to a target portfolio. Only super admins or internal property/portfolio managers can perform this operation. Password verification is required.'
   })
   @ApiResponse({
     status: 200,
@@ -306,7 +311,7 @@ export class PropertyController {
   @ApiResponse({ status: 404, description: 'Target portfolio not found' })
   @ApiResponse({
     status: 400,
-    description: 'Invalid password'
+    description: 'Invalid password or validation errors'
   })
   @ApiResponse({
     status: 403,
@@ -336,16 +341,19 @@ export class PropertyController {
 
   @Delete(':id')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE, true)
-  @ApiOperation({ summary: 'Delete a property (Super admin: direct deletion with password, Property manager: creates pending action with password)' })
-  @ApiResponse({ status: 200, description: 'Property deleted successfully or delete request submitted for approval' })
+  @ApiOperation({
+    summary: 'Delete a property (Super admin only, requires password verification)',
+    description: 'Only super admins can delete properties. The property must not have any unarchived audits. Password verification is required.'
+  })
+  @ApiResponse({ status: 200, description: 'Property deleted successfully' })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
-    description: 'Invalid password'
+    description: 'Invalid password or property has unarchived audits'
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Only super admins can delete properties'
   })
   async remove(
     @Param('id') id: string,
@@ -369,6 +377,86 @@ export class PropertyController {
     }
 
     return this.propertyService.remove(id, user)
+  }
+
+  @Post(':id/delete')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE, true)
+  @ApiOperation({
+    summary: 'Delete a property via POST (Super admin only, requires password verification)',
+    description: 'Alternative endpoint for deletion using POST method. Only super admins can delete properties. The property must not have any unarchived audits. Password verification is required.'
+  })
+  @ApiResponse({ status: 200, description: 'Property deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Property not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid password or property has unarchived audits'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only super admins can delete properties'
+  })
+  async removeViaPost(
+    @Param('id') id: string,
+    @Body() deletePropertyDto: DeletePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // Password validation is required for all users during deletion
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      deletePropertyDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    return this.propertyService.remove(id, user)
+  }
+
+  @Post(':id/deactivate')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Deactivate a property (Internal users only, requires password verification)',
+    description: 'Super admins can directly deactivate. Internal non-admin users create a pending action. External users cannot deactivate. Password verification is required for all.'
+  })
+  @ApiResponse({ status: 200, description: 'Property deactivated successfully or deactivation request submitted for approval' })
+  @ApiResponse({ status: 404, description: 'Property not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid password or property already deactivated'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - External users cannot deactivate properties'
+  })
+  async deactivate(
+    @Param('id') id: string,
+    @Body() deactivatePropertyDto: DeactivatePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // Password validation is required for all users during deactivation
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      deactivatePropertyDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    return this.propertyService.deactivate(id, user)
   }
 
   @Post('bulk-import')

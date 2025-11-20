@@ -19,7 +19,8 @@ import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
   canPerformBulkTransfer,
-  isUserSuperAdmin
+  isUserSuperAdmin,
+  isInternalUser
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import { Configuration } from '../../config/configuration'
@@ -164,6 +165,11 @@ export class PropertyService implements IPropertyService {
     const additionalFilters: any = {}
     if (query.is_active) {
       additionalFilters.is_active = query.is_active
+    } else {
+      // Filter out deactivated properties for non-super-admins and non-internal users
+      if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
+        additionalFilters.is_active = true
+      }
     }
     if (query.bank_type) {
       additionalFilters.bank_type = query.bank_type
@@ -349,6 +355,11 @@ export class PropertyService implements IPropertyService {
     const additionalFilters: any = {}
     if (query.is_active) {
       additionalFilters.is_active = query.is_active
+    } else {
+      // Filter out deactivated properties for non-super-admins and non-internal users
+      if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
+        additionalFilters.is_active = true
+      }
     }
     if (query.bank_type) {
       additionalFilters.bank_type = query.bank_type
@@ -617,6 +628,11 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Property not found')
     }
 
+    // Hide deactivated properties from non-super-admins and non-internal users
+    if (!property.is_active && !isUserSuperAdmin(user) && !isInternalUser(user)) {
+      throw new NotFoundException('Property not found')
+    }
+
     // Add access_type field - for findOne, we consider it owned if it's in user's portfolio
     // This is a simplified approach; you may want to add portfolio context if needed
     return {
@@ -807,28 +823,67 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Property not found')
     }
 
-    // Check ownership: Only the owner portfolio can delete the property
-    await this.validatePropertyOwnership(property, user)
-
-    // No need to check audit count - cascade delete will handle it automatically
-    // The schema has onDelete: Cascade configured for audits, credentials, bank details, notes, and tasks
-
-    // Super admin can directly delete
-    if (isUserSuperAdmin(user)) {
-      await this.propertyRepository.delete(id)
-      return { message: 'Property deleted successfully' }
+    // Only super admins can delete properties
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admins can delete properties'
+      )
     }
 
-    // Property manager (with ownership rights) creates pending action for approval
+    // Check if there are any unarchived audits
+    const unarchivedAuditCount = await this.prisma.audit.count({
+      where: {
+        property_id: id,
+        is_archived: false
+      }
+    })
+
+    if (unarchivedAuditCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete property. It has ${unarchivedAuditCount} unarchived audit${unarchivedAuditCount === 1 ? '' : 's'}. Please archive all audits before deleting the property.`
+      )
+    }
+
+    // Delete the property
+    await this.propertyRepository.delete(id)
+    return { message: 'Property deleted successfully' }
+  }
+
+  async deactivate(id: string, user: IUserWithPermissions) {
+    const property = await this.propertyRepository.findById(id)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    // Check if property is already deactivated
+    if (!property.is_active) {
+      throw new BadRequestException('Property is already deactivated')
+    }
+
+    // External users cannot deactivate properties
+    if (!isInternalUser(user)) {
+      throw new ForbiddenException(
+        'External users cannot deactivate properties'
+      )
+    }
+
+    // Super admins can directly deactivate
+    if (isUserSuperAdmin(user)) {
+      await this.propertyRepository.update(id, { is_active: false })
+      return { message: 'Property deactivated successfully' }
+    }
+
+    // Internal non-super admin users create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
       property_id: id,
-      action_type: PropertyActionType.DELETE,
+      action_type: PropertyActionType.DEACTIVATE,
       requested_user_id: user.id
     })
 
     return {
       message:
-        'Delete request submitted for approval. A super admin will review your request.',
+        'Deactivation request submitted for approval. A super admin will review your request.',
       pending_action: pendingAction
     }
   }

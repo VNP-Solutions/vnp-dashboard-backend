@@ -201,6 +201,10 @@ export interface IPropertyService {
     id: string,
     user: IUserWithPermissions
   ): Promise<{ message: string; pending_action?: any }>
+  deactivate(
+    id: string,
+    user: IUserWithPermissions
+  ): Promise<{ message: string; pending_action?: any }>
   bulkImport(
     file: Express.Multer.File,
     user: IUserWithPermissions

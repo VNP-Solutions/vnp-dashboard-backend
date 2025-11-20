@@ -47,6 +47,13 @@ export class PropertyPendingActionService
       )
     }
 
+    // DELETE actions are no longer supported via pending actions
+    if (data.action_type === PropertyActionType.DELETE) {
+      throw new BadRequestException(
+        'DELETE actions are no longer supported via pending actions. Only super admins can delete properties directly.'
+      )
+    }
+
     // Validate transfer data for transfer actions
     if (
       data.action_type === PropertyActionType.TRANSFER &&
@@ -265,9 +272,11 @@ export class PropertyPendingActionService
   private async executeAction(pendingAction: any, user: IUserWithPermissions) {
     switch (pendingAction.action_type) {
       case PropertyActionType.DELETE:
-        // Delete the property
-        await this.propertyService.remove(pendingAction.property_id, user)
-        break
+        // DELETE actions are no longer supported
+        // This case exists only for legacy pending actions created before the policy change
+        throw new BadRequestException(
+          'DELETE actions are no longer supported via pending actions. This legacy action cannot be approved. Please reject it and have a super admin delete the property directly.'
+        )
 
       case PropertyActionType.TRANSFER:
         // Transfer the property
@@ -284,6 +293,11 @@ export class PropertyPendingActionService
           },
           user
         )
+        break
+
+      case PropertyActionType.DEACTIVATE:
+        // Deactivate the property
+        await this.propertyService.deactivate(pendingAction.property_id, user)
         break
 
       default:
