@@ -99,18 +99,12 @@ export class UserService implements IUserService {
       throw new NotFoundException('User not found')
     }
 
-    // Prevent users from updating their own role
-    if (currentUser.id === id && data.role_id) {
-      throw new BadRequestException('You cannot update your own role')
-    }
-
     // Prepare update data
     const updateData: any = {}
     if (data.first_name) updateData.first_name = data.first_name
     if (data.last_name) updateData.last_name = data.last_name
     if (data.email) updateData.email = data.email
     if (data.language) updateData.language = data.language
-    if (data.role_id) updateData.user_role_id = data.role_id
     if (data.display_image !== undefined)
       updateData.display_image = data.display_image
     if (data.contact_number !== undefined)
@@ -133,20 +127,15 @@ export class UserService implements IUserService {
     data: AssignUserRoleDto,
     currentUser: IUserWithPermissions
   ) {
+    // Only super admins can update user roles
+    if (!isUserSuperAdmin(currentUser)) {
+      throw new ForbiddenException('Only super admins can update user roles')
+    }
+
     const user = await this.userRepository.findById(id)
 
     if (!user) {
       throw new NotFoundException('User not found')
-    }
-
-    // Check if user has permission to update this user
-    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
-      currentUser,
-      ModuleType.USER
-    )
-
-    if (accessibleIds !== 'all' && !accessibleIds.includes(id)) {
-      throw new ForbiddenException('You do not have access to update this user')
     }
 
     // Prevent users from updating their own role
@@ -154,7 +143,237 @@ export class UserService implements IUserService {
       throw new BadRequestException('You cannot update your own role')
     }
 
-    return this.userRepository.updateRole(id, data.role_id)
+    // Fetch old and new roles to compare access levels
+    const oldRole = user.role
+    const newRole = await this.userRepository.findRoleById(data.role_id)
+
+    if (!newRole) {
+      throw new NotFoundException('New role not found')
+    }
+
+    // Validate access list requirements for new role
+    this.validateAccessListForRole(newRole, data)
+
+    // Determine access management strategy
+    const accessStrategy = this.determineAccessStrategy(oldRole, newRole)
+
+    // Update the role
+    const updatedUser = await this.userRepository.updateRole(id, data.role_id)
+
+    // Handle access list based on strategy
+    await this.handleAccessList(id, accessStrategy, data)
+
+    return updatedUser
+  }
+
+  /**
+   * Validate that required access lists are provided when new role needs them
+   */
+  private validateAccessListForRole(
+    newRole: any,
+    data: AssignUserRoleDto
+  ): void {
+    const newPortfolioAccess = newRole.portfolio_permission?.access_level
+    const newPropertyAccess = newRole.property_permission?.access_level
+
+    // Check if new role requires partial access but no IDs provided
+    const portfolioNeedsIds =
+      newPortfolioAccess === 'partial' &&
+      (!data.portfolio_ids || data.portfolio_ids.length === 0)
+
+    const propertyNeedsIds =
+      newPropertyAccess === 'partial' &&
+      (!data.property_ids || data.property_ids.length === 0)
+
+    if (portfolioNeedsIds && propertyNeedsIds) {
+      throw new BadRequestException(
+        'New role requires partial access. Please provide portfolio_ids and property_ids in the request.'
+      )
+    } else if (portfolioNeedsIds) {
+      throw new BadRequestException(
+        'New role requires partial portfolio access. Please provide portfolio_ids in the request.'
+      )
+    } else if (propertyNeedsIds) {
+      throw new BadRequestException(
+        'New role requires partial property access. Please provide property_ids in the request.'
+      )
+    }
+  }
+
+  /**
+   * Determine access management strategy based on role transition
+   */
+  private determineAccessStrategy(
+    oldRole: any,
+    newRole: any
+  ): 'clear' | 'keep' | 'update' {
+    const oldPortfolioAccess = oldRole.portfolio_permission?.access_level
+    const newPortfolioAccess = newRole.portfolio_permission?.access_level
+
+    const oldPropertyAccess = oldRole.property_permission?.access_level
+    const newPropertyAccess = newRole.property_permission?.access_level
+
+    // Check if we need to clear (partial → all/none)
+    const portfolioNeedsClear =
+      oldPortfolioAccess === 'partial' &&
+      (newPortfolioAccess === 'all' || newPortfolioAccess === 'none')
+
+    const propertyNeedsClear =
+      oldPropertyAccess === 'partial' &&
+      (newPropertyAccess === 'all' || newPropertyAccess === 'none')
+
+    if (portfolioNeedsClear || propertyNeedsClear) {
+      return 'clear'
+    }
+
+    // Check if we need to update (any → partial or partial → partial)
+    const portfolioNeedsUpdate = newPortfolioAccess === 'partial'
+    const propertyNeedsUpdate = newPropertyAccess === 'partial'
+
+    if (portfolioNeedsUpdate || propertyNeedsUpdate) {
+      return 'update'
+    }
+
+    // Otherwise keep as is (though likely no access list exists)
+    return 'keep'
+  }
+
+  /**
+   * Handle access list based on determined strategy
+   */
+  private async handleAccessList(
+    userId: string,
+    strategy: 'clear' | 'keep' | 'update',
+    data: AssignUserRoleDto
+  ): Promise<void> {
+    if (strategy === 'clear') {
+      // Delete the access list entirely
+      await this.userRepository.clearUserAccess(userId)
+    } else if (strategy === 'update') {
+      // Update or create access list with provided IDs
+      await this.userRepository.updateUserAccess(
+        userId,
+        data.portfolio_ids || [],
+        data.property_ids || []
+      )
+    }
+    // If 'keep', do nothing - existing access list remains unchanged
+  }
+
+  async addAccess(
+    id: string,
+    data: any,
+    currentUser: IUserWithPermissions
+  ): Promise<{ message: string }> {
+    // Only super admins can manage user access
+    if (!isUserSuperAdmin(currentUser)) {
+      throw new ForbiddenException('Only super admins can manage user access')
+    }
+
+    const user = await this.userRepository.findById(id)
+
+    if (!user) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Validate that at least one array is provided
+    if (
+      (!data.portfolio_ids || data.portfolio_ids.length === 0) &&
+      (!data.property_ids || data.property_ids.length === 0)
+    ) {
+      throw new BadRequestException(
+        'Please provide at least one portfolio_id or property_id to add'
+      )
+    }
+
+    // Check if user's role supports partial access
+    const portfolioAccess = user.role.portfolio_permission?.access_level
+    const propertyAccess = user.role.property_permission?.access_level
+
+    // Validate portfolio access
+    if (data.portfolio_ids && data.portfolio_ids.length > 0) {
+      if (portfolioAccess !== 'partial') {
+        throw new BadRequestException(
+          `Cannot add portfolio access. User's role has '${portfolioAccess}' access level for portfolios. Only 'partial' access level supports access lists.`
+        )
+      }
+    }
+
+    // Validate property access
+    if (data.property_ids && data.property_ids.length > 0) {
+      if (propertyAccess !== 'partial') {
+        throw new BadRequestException(
+          `Cannot add property access. User's role has '${propertyAccess}' access level for properties. Only 'partial' access level supports access lists.`
+        )
+      }
+    }
+
+    // Add access
+    await this.userRepository.addUserAccess(
+      id,
+      data.portfolio_ids || [],
+      data.property_ids || []
+    )
+
+    return { message: 'User access added successfully' }
+  }
+
+  async revokeAccess(
+    id: string,
+    data: any,
+    currentUser: IUserWithPermissions
+  ): Promise<{ message: string }> {
+    // Only super admins can manage user access
+    if (!isUserSuperAdmin(currentUser)) {
+      throw new ForbiddenException('Only super admins can manage user access')
+    }
+
+    const user = await this.userRepository.findById(id)
+
+    if (!user) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Validate that at least one array is provided
+    if (
+      (!data.portfolio_ids || data.portfolio_ids.length === 0) &&
+      (!data.property_ids || data.property_ids.length === 0)
+    ) {
+      throw new BadRequestException(
+        'Please provide at least one portfolio_id or property_id to revoke'
+      )
+    }
+
+    // Check if user's role supports partial access
+    const portfolioAccess = user.role.portfolio_permission?.access_level
+    const propertyAccess = user.role.property_permission?.access_level
+
+    // Validate portfolio access
+    if (data.portfolio_ids && data.portfolio_ids.length > 0) {
+      if (portfolioAccess !== 'partial') {
+        throw new BadRequestException(
+          `Cannot revoke portfolio access. User's role has '${portfolioAccess}' access level for portfolios. Only 'partial' access level uses access lists.`
+        )
+      }
+    }
+
+    // Validate property access
+    if (data.property_ids && data.property_ids.length > 0) {
+      if (propertyAccess !== 'partial') {
+        throw new BadRequestException(
+          `Cannot revoke property access. User's role has '${propertyAccess}' access level for properties. Only 'partial' access level uses access lists.`
+        )
+      }
+    }
+
+    // Revoke access
+    await this.userRepository.revokeUserAccess(
+      id,
+      data.portfolio_ids || [],
+      data.property_ids || []
+    )
+
+    return { message: 'User access revoked successfully' }
   }
 
   async remove(id: string, currentUser: IUserWithPermissions) {

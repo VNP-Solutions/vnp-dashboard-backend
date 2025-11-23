@@ -1,4 +1,3 @@
-import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
   IsArray,
@@ -58,7 +57,33 @@ export class CreateUserDto {
   property_ids?: string[]
 }
 
-export class UpdateUserDto extends PartialType(CreateUserDto) {
+export class UpdateUserDto {
+  @ApiPropertyOptional({
+    example: 'newuser@example.com',
+    description: 'User email address'
+  })
+  @IsEmail()
+  @IsOptional()
+  email?: string
+
+  @ApiPropertyOptional({ example: 'John', description: 'First name' })
+  @IsString()
+  @IsOptional()
+  first_name?: string
+
+  @ApiPropertyOptional({ example: 'Doe', description: 'Last name' })
+  @IsString()
+  @IsOptional()
+  last_name?: string
+
+  @ApiPropertyOptional({
+    example: 'en',
+    description: 'Preferred language code'
+  })
+  @IsString()
+  @IsOptional()
+  language?: string
+
   @ApiPropertyOptional({
     example: 'https://example.com/avatar.jpg',
     description: 'User display image URL'
@@ -74,6 +99,22 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsString()
   @IsOptional()
   contact_number?: string
+
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439011'],
+    description: 'Array of portfolio IDs user can access'
+  })
+  @IsArray()
+  @IsOptional()
+  portfolio_ids?: string[]
+
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439012'],
+    description: 'Array of property IDs user can access'
+  })
+  @IsArray()
+  @IsOptional()
+  property_ids?: string[]
 }
 
 export class UpdateOwnProfileDto {
@@ -120,6 +161,42 @@ export class AssignUserRoleDto {
   @IsString()
   @IsNotEmpty()
   role_id: string
+
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439011'],
+    description:
+      'Array of portfolio IDs user can access (required when new role has partial portfolio access)'
+  })
+  @IsArray()
+  @IsOptional()
+  portfolio_ids?: string[]
+
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439012'],
+    description:
+      'Array of property IDs user can access (required when new role has partial property access)'
+  })
+  @IsArray()
+  @IsOptional()
+  property_ids?: string[]
+}
+
+export class ManageUserAccessDto {
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of portfolio IDs to add/revoke'
+  })
+  @IsArray()
+  @IsOptional()
+  portfolio_ids?: string[]
+
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439013', '507f1f77bcf86cd799439014'],
+    description: 'Array of property IDs to add/revoke'
+  })
+  @IsArray()
+  @IsOptional()
+  property_ids?: string[]
 }
 
 export class UserQueryDto extends QueryDto {
