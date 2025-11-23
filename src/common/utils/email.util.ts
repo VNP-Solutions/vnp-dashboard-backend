@@ -9,12 +9,16 @@ import type {
   AttachmentUrlDto,
   EmailAttachment
 } from '../../modules/email/email.dto'
+import { PrismaService } from '../../modules/prisma/prisma.service'
 
 @Injectable()
 export class EmailUtil {
   private transporter: nodemailer.Transporter
 
-  constructor(private configService: ConfigService<Configuration>) {
+  constructor(
+    private configService: ConfigService<Configuration>,
+    private prisma: PrismaService
+  ) {
     this.transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 587,
@@ -47,22 +51,35 @@ export class EmailUtil {
   }
 
   async sendOtpEmail(email: string, otp: number): Promise<void> {
+    // Fetch user's first name from database
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { first_name: true }
+    })
+
+    const firstName = user?.first_name?.split(' ')[0] || ''
+    const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+
     const mailOptions = {
       from: this.configService.get('smtp.email', { infer: true }),
       to: email,
-      subject: 'Your Login OTP',
+      subject: 'Your VNP Solutions One-Time Password (OTP)',
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Login OTP Verification</h2>
-          <p>Your OTP for login is:</p>
+          <p><strong>${greeting}</strong></p>
+          <p>For your security, please use the following One-Time Password to complete your login or verification process with VNP Solutions:</p>
+          <p><strong>OTP:</strong></p>
           <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0;">
             ${otp}
           </div>
-          <p style="color: #666;">This OTP is valid for 5 minutes.</p>
-          <p style="color: #666;">If you didn't request this OTP, please ignore this email.</p>
+          <p style="color: #666;">This code is valid for 10 minutes. Do not share it with anyone. VNP Solutions will never ask for your password or OTP over phone or email.</p>
+          <p style="color: #666;">If you did not request this, please disregard this message.</p>
+          <div style="margin-top: 30px; color: #666;">
+            <p>Warm regards,<br>VNP Solutions Support Team<br><a href="http://www.vnpsolutions.com" style="color: #007bff;">www.vnpsolutions.com</a></p>
+          </div>
         </div>
       `,
-      text: `Your OTP for login is: ${otp}. This OTP is valid for 5 minutes.`
+      text: `${greeting}\n\nFor your security, please use the following One-Time Password to complete your login or verification process with VNP Solutions:\n\nOTP: ${otp}\n\nThis code is valid for 10 minutes. Do not share it with anyone. VNP Solutions will never ask for your password or OTP over phone or email.\n\nIf you did not request this, please disregard this message.\n\nWarm regards,\nVNP Solutions Support Team\nwww.vnpsolutions.com`
     }
 
     try {
@@ -79,39 +96,90 @@ export class EmailUtil {
   async sendInvitationEmail(
     email: string,
     tempPassword: string,
-    roleName: string
+    roleName: string,
+    firstName: string,
+    isExternal: boolean
   ): Promise<void> {
     const redirectUrl = this.configService.get('invitationRedirectUrl', {
       infer: true
     })
 
+    const firstNameOnly = firstName.split(' ')[0]
+    const greeting = firstNameOnly ? `Hi ${firstNameOnly},` : 'Hi,'
+
+    // Internal member template
+    if (!isExternal) {
+      const mailOptions = {
+        from: this.configService.get('smtp.email', { infer: true }),
+        to: email,
+        subject: "You've been added to the VNP Solutions team",
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+            <p><strong>${greeting}</strong></p>
+            <p>Welcome aboard! You've been invited to join the <strong>VNP Solutions</strong> platform as part of our internal team.</p>
+            <p>Your temporary password is:</p>
+            <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 20px 0;">
+              ${tempPassword}
+            </div>
+            <p>Click the link below to set up your account and get started:</p>
+            ${redirectUrl ? `<p><a href="${redirectUrl}?email=${email}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold;">Accept Invitation →</a></p>` : ''}
+            <p style="color: #666;">If you weren't expecting this invitation, please contact your manager or reply to this email.</p>
+            <div style="margin-top: 30px;">
+              <p>Best regards,<br><strong>VNP Solutions Admin</strong></p>
+            </div>
+          </div>
+        `,
+        text: `${greeting}\n\nWelcome aboard! You've been invited to join the VNP Solutions platform as part of our internal team.\n\nYour temporary password is: ${tempPassword}\n\nClick the link below to set up your account and get started:\n${redirectUrl ? `${redirectUrl}?email=${email}` : ''}\n\nIf you weren't expecting this invitation, please contact your manager or reply to this email.\n\nBest regards,\nVNP Solutions Admin`
+      }
+
+      try {
+        const info = await this.transporter.sendMail(mailOptions)
+        console.log('✓ Internal invitation email sent:', {
+          to: email,
+          messageId: info.messageId
+        })
+      } catch (error) {
+        console.error('✗ Failed to send internal invitation email:', error)
+        throw new BadRequestException(
+          `Failed to send invitation email: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+      }
+      return
+    }
+
+    // External member template
     const mailOptions = {
       from: this.configService.get('smtp.email', { infer: true }),
       to: email,
-      subject: 'You have been invited to join VNP Dashboard',
+      subject: 'Access Invitation – VNP Solutions Audit Dashboard',
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Welcome to VNP Dashboard!</h2>
-          <p>You have been invited to join as <strong>${roleName}</strong>.</p>
-          <p>Your temporary credentials are:</p>
-          <div style="background-color: #f4f4f4; padding: 15px; margin: 20px 0;">
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Temporary Password:</strong> <code style="background-color: #e0e0e0; padding: 5px 10px;">${tempPassword}</code></p>
+          <p><strong>${greeting}</strong></p>
+          <p>We're excited to have you onboard with <strong>VNP Solutions</strong>, your trusted partner for OTA Revenue Recovery and Audit Services.</p>
+          <p>You've been invited to access your property's dashboard to review audit results, payment summaries, and compliance reports.</p>
+          <p>Your temporary password is:</p>
+          <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 20px 0;">
+            ${tempPassword}
           </div>
-          <p style="color: #d9534f; font-weight: bold;">⚠️ This temporary password is valid for 7 days only.</p>
-          <p>After logging in with your temporary password, you will be required to set a new password.</p>
-          ${redirectUrl ? `<p><a href="${redirectUrl}?email=${email}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 10px;">Login Now</a></p>` : ''}
-          <p style="color: #666; margin-top: 30px;">If you didn't expect this invitation, please contact the administrator.</p>
+          <p>Click below to activate your account:</p>
+          ${redirectUrl ? `<p><a href="${redirectUrl}?email=${email}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold;">Activate Account →</a></p>` : ''}
+          <p style="color: #666;">If you need any help during setup, please contact us at support@vnpsolutions.com.</p>
+          <div style="margin-top: 30px;">
+            <p>Warm regards,<br><strong>Client Success Team</strong><br><strong>VNP Solutions</strong></p>
+          </div>
         </div>
       `,
-      text: `Welcome to VNP Dashboard! You have been invited to join as ${roleName}. Your temporary password is: ${tempPassword}. This password is valid for 7 days. After logging in, you will be required to set a new password.`
+      text: `${greeting}\n\nWe're excited to have you onboard with VNP Solutions, your trusted partner for OTA Revenue Recovery and Audit Services.\n\nYou've been invited to access your property's dashboard to review audit results, payment summaries, and compliance reports.\n\nYour temporary password is: ${tempPassword}\n\nClick below to activate your account:\n${redirectUrl ? `${redirectUrl}?email=${email}` : ''}\n\nIf you need any help during setup, please contact us at support@vnpsolutions.com.\n\nWarm regards,\nClient Success Team\nVNP Solutions`
     }
 
     try {
       const info = await this.transporter.sendMail(mailOptions)
-      console.log('✓ Invitation email sent:', { to: email, messageId: info.messageId })
+      console.log('✓ External invitation email sent:', {
+        to: email,
+        messageId: info.messageId
+      })
     } catch (error) {
-      console.error('✗ Failed to send invitation email:', error)
+      console.error('✗ Failed to send external invitation email:', error)
       throw new BadRequestException(
         `Failed to send invitation email: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
@@ -119,22 +187,35 @@ export class EmailUtil {
   }
 
   async sendPasswordResetOtpEmail(email: string, otp: number): Promise<void> {
+    // Fetch user's first name from database
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { first_name: true }
+    })
+
+    const firstName = user?.first_name?.split(' ')[0] || ''
+    const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+
     const mailOptions = {
       from: this.configService.get('smtp.email', { infer: true }),
       to: email,
-      subject: 'Password Reset OTP',
+      subject: 'Reset your VNP Solutions password',
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Password Reset Request</h2>
-          <p>You have requested to reset your password. Your OTP is:</p>
+          <p><strong>${greeting}</strong></p>
+          <p>We received a request to reset your VNP Solutions password. If this was you, use the OTP below to create a new one:</p>
+          <p><strong>Your OTP:</strong></p>
           <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0;">
             ${otp}
           </div>
-          <p style="color: #666;">This OTP is valid for 5 minutes.</p>
-          <p style="color: #d9534f;">If you didn't request a password reset, please ignore this email and contact support immediately.</p>
+          <p>This code will expire in <strong>10 minutes</strong> for your security.</p>
+          <p style="color: #666;">If you didn't request a password reset, no action is required.</p>
+          <div style="margin-top: 30px;">
+            <p>Stay secure,<br><strong>VNP Solutions Support Team</strong></p>
+          </div>
         </div>
       `,
-      text: `You have requested to reset your password. Your OTP is: ${otp}. This OTP is valid for 5 minutes.`
+      text: `${greeting}\n\nWe received a request to reset your VNP Solutions password. If this was you, use the OTP below to create a new one:\n\nYour OTP: ${otp}\n\nThis code will expire in 10 minutes for your security.\n\nIf you didn't request a password reset, no action is required.\n\nStay secure,\nVNP Solutions Support Team`
     }
 
     try {

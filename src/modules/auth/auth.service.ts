@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { Configuration } from '../../config/configuration'
+import { PrismaService } from '../prisma/prisma.service'
 import {
   AuthResponseDto,
   InviteUserDto,
@@ -52,7 +53,9 @@ export class AuthService implements IAuthService {
     @Inject(ConfigService)
     private configService: ConfigService<Configuration>,
     @Inject(EmailUtil)
-    private emailUtil: EmailUtil
+    private emailUtil: EmailUtil,
+    @Inject(PrismaService)
+    private prisma: PrismaService
   ) {}
 
   async requestLoginOtp(
@@ -148,14 +151,22 @@ export class AuthService implements IAuthService {
       )
     }
 
-    const userWithRole = await this.authRepository.findUserByEmail(data.email)
-    if (!userWithRole) {
-      throw new Error('User creation failed')
+    // Fetch role details to get is_external flag
+    const role = await this.prisma.userRole.findUnique({
+      where: { id: data.role_id },
+      select: { name: true, is_external: true }
+    })
+
+    if (!role) {
+      throw new Error('Role not found')
     }
+
     await this.emailUtil.sendInvitationEmail(
       data.email,
       tempPassword,
-      (userWithRole as unknown as { role: { name: string } }).role.name
+      role.name,
+      data.first_name,
+      role.is_external
     )
 
     return {
