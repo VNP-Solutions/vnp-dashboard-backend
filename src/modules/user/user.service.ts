@@ -99,18 +99,12 @@ export class UserService implements IUserService {
       throw new NotFoundException('User not found')
     }
 
-    // Prevent users from updating their own role
-    if (currentUser.id === id && data.role_id) {
-      throw new BadRequestException('You cannot update your own role')
-    }
-
     // Prepare update data
     const updateData: any = {}
     if (data.first_name) updateData.first_name = data.first_name
     if (data.last_name) updateData.last_name = data.last_name
     if (data.email) updateData.email = data.email
     if (data.language) updateData.language = data.language
-    if (data.role_id) updateData.user_role_id = data.role_id
     if (data.display_image !== undefined)
       updateData.display_image = data.display_image
     if (data.contact_number !== undefined)

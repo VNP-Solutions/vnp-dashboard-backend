@@ -99,8 +99,7 @@ export class UserController {
   @Patch(':id')
   @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary:
-      'Update a user (super admin only, can update user role via role_id)'
+    summary: 'Update a user, super admin can do this'
   })
   @ApiResponse({ status: 200, description: 'User updated successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
