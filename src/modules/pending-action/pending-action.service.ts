@@ -11,8 +11,10 @@ import type { PaginatedResult } from '../../common/dto/query.dto'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { isUserSuperAdmin, isInternalUser } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import { EmailUtil } from '../../common/utils/email.util'
 import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import type { IPropertyService } from '../property/property.interface'
+import { PrismaService } from '../prisma/prisma.service'
 import {
   ApprovePendingActionDto,
   CreatePendingActionDto,
@@ -33,7 +35,11 @@ export class PendingActionService
     @Inject(forwardRef(() => 'IPropertyService'))
     private propertyService: IPropertyService,
     @Inject('IPortfolioRepository')
-    private portfolioRepository: IPortfolioRepository
+    private portfolioRepository: IPortfolioRepository,
+    @Inject(EmailUtil)
+    private emailUtil: EmailUtil,
+    @Inject(PrismaService)
+    private prisma: PrismaService
   ) {}
 
   async create(
@@ -232,6 +238,11 @@ export class PendingActionService
     // Execute the actual action based on type
     await this.executeAction(pendingAction, user)
 
+    // Send email notification for transfer actions
+    if (pendingAction.action_type === PendingActionType.PROPERTY_TRANSFER) {
+      await this.sendTransferNotificationEmail(pendingAction)
+    }
+
     // Update the pending action status
     return this.repository.update(id, {
       status: PendingActionStatus.APPROVED,
@@ -415,5 +426,69 @@ export class PendingActionService
 
       return enrichedAction
     })
+  }
+
+  /**
+   * Send email notification for property transfer
+   */
+  private async sendTransferNotificationEmail(pendingAction: any) {
+    try {
+      const recipientEmails: string[] = []
+
+      // Get the requesting user's email
+      const requestingUser = await this.prisma.user.findUnique({
+        where: { id: pendingAction.requested_user_id },
+        select: { email: true }
+      })
+
+      if (requestingUser?.email) {
+        recipientEmails.push(requestingUser.email)
+      }
+
+      // Get property details
+      const property = await this.prisma.property.findUnique({
+        where: { id: pendingAction.property_id },
+        select: { name: true, portfolio_id: true }
+      })
+
+      if (!property) {
+        console.error('Property not found for email notification')
+        return
+      }
+
+      // Get current portfolio contact email
+      const currentPortfolio = await this.portfolioRepository.findById(
+        property.portfolio_id
+      )
+
+      if (currentPortfolio?.contact_email) {
+        recipientEmails.push(currentPortfolio.contact_email)
+      }
+
+      // Get new portfolio details
+      const newPortfolio = await this.portfolioRepository.findById(
+        pendingAction.transfer_data.new_portfolio_id
+      )
+
+      if (!newPortfolio) {
+        console.error('New portfolio not found for email notification')
+        return
+      }
+
+      if (newPortfolio.contact_email) {
+        recipientEmails.push(newPortfolio.contact_email)
+      }
+
+      // Send the email to all recipients (duplicates will be removed by the email utility)
+      await this.emailUtil.sendPropertyTransferEmail(
+        recipientEmails,
+        property.name,
+        newPortfolio.name,
+        new Date()
+      )
+    } catch (error) {
+      // Log the error but don't fail the approval process
+      console.error('Failed to send property transfer notification email:', error)
+    }
   }
 }

@@ -457,4 +457,67 @@ export class EmailUtil {
 
     return mimeTypes[extension || ''] || 'application/octet-stream'
   }
+
+  async sendPropertyTransferEmail(
+    recipientEmails: string[],
+    propertyName: string,
+    newPortfolioName: string,
+    effectiveDate: Date
+  ): Promise<void> {
+    // Remove duplicates and filter out empty emails
+    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+
+    if (uniqueEmails.length === 0) {
+      console.warn('No valid recipient emails provided for property transfer notification')
+      return
+    }
+
+    // Format the effective date
+    const formattedDate = effectiveDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    // Send individual emails to each recipient for personalization
+    for (const userEmail of uniqueEmails) {
+      try {
+        // Fetch user's first name from database
+        const user = await this.prisma.user.findUnique({
+          where: { email: userEmail },
+          select: { first_name: true }
+        })
+
+        const firstName = user?.first_name?.split(' ')[0] || ''
+        const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+
+        const mailOptions = {
+          from: this.configService.get('smtp.email', { infer: true }),
+          to: userEmail,
+          subject: `Property Transfer Notification – ${propertyName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <p><strong>${greeting}</strong></p>
+              <p>We wanted to inform you that <strong>${propertyName}</strong> has been transferred under the management of <strong>${newPortfolioName}</strong> effective <strong>${formattedDate}</strong>.</p>
+              <p>All audit and reporting access have been updated in the <strong>VNP Solutions Dashboard</strong> accordingly.</p>
+              <p>If you believe this transfer was made in error or need additional details, please contact <strong>support@vnpsolutions.com</strong>.</p>
+              <div style="margin-top: 30px; color: #666;">
+                <p>Warm regards,<br><strong>VNP Solutions Support Team</strong></p>
+              </div>
+            </div>
+          `,
+          text: `${greeting}\n\nWe wanted to inform you that ${propertyName} has been transferred under the management of ${newPortfolioName} effective ${formattedDate}.\n\nAll audit and reporting access have been updated in the VNP Solutions Dashboard accordingly.\n\nIf you believe this transfer was made in error or need additional details, please contact support@vnpsolutions.com.\n\nWarm regards,\nVNP Solutions Support Team`
+        }
+
+        const info = await this.transporter.sendMail(mailOptions)
+        console.log('✓ Property transfer email sent:', {
+          to: userEmail,
+          messageId: info.messageId
+        })
+      } catch (error) {
+        console.error(`✗ Failed to send property transfer email to ${userEmail}:`, error)
+        // Continue sending to other recipients even if one fails
+      }
+    }
+  }
 }
