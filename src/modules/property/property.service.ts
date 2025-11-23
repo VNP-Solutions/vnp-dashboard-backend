@@ -710,8 +710,17 @@ export class PropertyService implements IPropertyService {
       )
     }
 
+    const isSuperAdmin = isUserSuperAdmin(user)
+
+    // Non-super admin users must provide a reason
+    if (!isSuperAdmin && !data.reason) {
+      throw new BadRequestException(
+        'Reason is required for non-super admin users to transfer properties'
+      )
+    }
+
     // Super admin can directly transfer
-    if (isUserSuperAdmin(user)) {
+    if (isSuperAdmin) {
       const updatedProperty = await this.propertyRepository.update(id, {
         portfolio_id: data.new_portfolio_id,
         previous_portfolio_id: property.portfolio_id
@@ -922,8 +931,17 @@ export class PropertyService implements IPropertyService {
       )
     }
 
+    const isSuperAdmin = isUserSuperAdmin(user)
+
+    // Internal users (non-super admin) must provide a reason
+    if (!isSuperAdmin && !reason) {
+      throw new BadRequestException(
+        'Reason is required for internal users to deactivate properties'
+      )
+    }
+
     // Super admins can directly deactivate
-    if (isUserSuperAdmin(user)) {
+    if (isSuperAdmin) {
       await this.propertyRepository.update(id, { is_active: false })
       return { message: 'Property deactivated successfully' }
     }

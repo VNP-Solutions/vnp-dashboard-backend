@@ -113,7 +113,7 @@ export class TransferPropertyDto {
 
   @ApiPropertyOptional({
     example: 'Transferring to consolidate portfolio management',
-    description: 'Reason for transferring the property (optional)'
+    description: 'Reason for transferring the property (required for non-super admin users, optional for super admin)'
   })
   @IsString()
   @IsOptional()
@@ -310,7 +310,7 @@ export class DeactivatePropertyDto {
 
   @ApiPropertyOptional({
     example: 'Property no longer operational due to renovations',
-    description: 'Reason for deactivating the property (optional)'
+    description: 'Reason for deactivating the property (required for internal users, optional for super admin)'
   })
   @IsString()
   @IsOptional()

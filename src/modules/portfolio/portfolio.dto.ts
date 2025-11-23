@@ -270,7 +270,7 @@ export class DeactivatePortfolioDto {
 
   @ApiPropertyOptional({
     example: 'Portfolio being consolidated with another portfolio',
-    description: 'Reason for deactivating the portfolio (optional)'
+    description: 'Reason for deactivating the portfolio (required for internal users, optional for super admin)'
   })
   @IsString()
   @IsOptional()

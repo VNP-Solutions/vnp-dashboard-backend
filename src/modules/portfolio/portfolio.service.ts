@@ -436,6 +436,13 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
+    // Internal users (non-super admin) must provide a reason
+    if (!isSuperAdmin && isInternal && !reason) {
+      throw new BadRequestException(
+        'Reason is required for internal users to deactivate portfolios'
+      )
+    }
+
     // Fetch user with password from database for verification
     const userFromDb = await this.prisma.user.findUnique({
       where: { id: user.id },
