@@ -520,4 +520,77 @@ export class EmailUtil {
       }
     }
   }
+
+  async sendAuditStatusChangeEmail(
+    recipientEmails: string[],
+    auditName: string,
+    oldStatus: string,
+    newStatus: string,
+    effectiveDate: Date
+  ): Promise<void> {
+    // Remove duplicates and filter out empty emails
+    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+
+    if (uniqueEmails.length === 0) {
+      console.warn('No valid recipient emails provided for audit status change notification')
+      return
+    }
+
+    // Format the effective date
+    const formattedDate = effectiveDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    // Get dashboard URL from config
+    const dashboardUrl = String(this.configService.get('dashboardUrl', { infer: true }) || 'https://new.dashboardvnps.com/')
+
+    // Send individual emails to each recipient for personalization
+    for (const userEmail of uniqueEmails) {
+      try {
+        // Fetch user's first name from database
+        const user = await this.prisma.user.findUnique({
+          where: { email: userEmail },
+          select: { first_name: true }
+        })
+
+        const firstName = user?.first_name?.split(' ')[0] || ''
+        const greeting = firstName ? `Hi ${firstName},` : 'Dear user,'
+
+        const mailOptions = {
+          from: this.configService.get('smtp.email', { infer: true }),
+          to: userEmail,
+          subject: 'Update on Your Audit Status – VNP Solutions',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <p><strong>${greeting}</strong></p>
+              <p>A status update has been recorded for your <strong>${auditName}</strong> audit.</p>
+              <p>📊 <strong>Previous Status:</strong> ${oldStatus}</p>
+              <p>🔄 <strong>New Status:</strong> ${newStatus}</p>
+              <p>🕒 <strong>Effective Date:</strong> ${formattedDate}</p>
+              <p>You can log in to your dashboard at any time to view the details of this change and associated reports.</p>
+              <div style="margin: 30px 0;">
+                <a href="${dashboardUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Access Dashboard →</a>
+              </div>
+              <p>Thank you for your continued partnership with <strong>VNP Solutions</strong>.</p>
+              <div style="margin-top: 30px; color: #666;">
+                <p>Warm regards,<br><strong>VNP Solutions Team</strong></p>
+              </div>
+            </div>
+          `,
+          text: `${greeting}\n\nA status update has been recorded for your ${auditName} audit.\n\n📊 Previous Status: ${oldStatus}\n🔄 New Status: ${newStatus}\n🕒 Effective Date: ${formattedDate}\n\nYou can log in to your dashboard at any time to view the details of this change and associated reports.\n\nAccess Dashboard: ${dashboardUrl}\n\nThank you for your continued partnership with VNP Solutions.\n\nWarm regards,\nVNP Solutions Team`
+        }
+
+        const info = await this.transporter.sendMail(mailOptions)
+        console.log('✓ Audit status change email sent:', {
+          to: userEmail,
+          messageId: info.messageId
+        })
+      } catch (error) {
+        console.error(`✗ Failed to send audit status change email to ${userEmail}:`, error)
+        // Continue sending to other recipients even if one fails
+      }
+    }
+  }
 }

@@ -15,6 +15,7 @@ import {
   canArchiveAudit,
   getArchiveErrorMessage
 } from '../../common/utils/audit.util'
+import { EmailUtil } from '../../common/utils/email.util'
 import {
   isUserSuperAdmin,
   isInternalUser
@@ -50,7 +51,9 @@ export class AuditService implements IAuditService {
     @Inject('IAuditBatchRepository')
     private auditBatchRepository: IAuditBatchRepository,
     @Inject(PrismaService)
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    @Inject(EmailUtil)
+    private emailUtil: EmailUtil
   ) {}
 
   async create(data: CreateAuditDto, _user: IUserWithPermissions) {
@@ -484,6 +487,11 @@ export class AuditService implements IAuditService {
       if (startDate >= endDate) {
         throw new BadRequestException('Start date must be before end date')
       }
+    }
+
+    // Check if status is changing and send email notification
+    if (data.audit_status_id && data.audit_status_id !== audit.audit_status_id) {
+      await this.sendAuditStatusChangeNotification(audit, data.audit_status_id)
     }
 
     return this.auditRepository.update(id, data)
@@ -1652,6 +1660,65 @@ export class AuditService implements IAuditService {
       message: `Successfully updated ${result.count} audit(s) with report URL`,
       updated_count: result.count,
       updated_ids: audit_ids
+    }
+  }
+
+  /**
+   * Send email notification when audit status changes
+   */
+  private async sendAuditStatusChangeNotification(
+    audit: any,
+    newStatusId: string
+  ) {
+    try {
+      // Get old and new status details
+      const oldStatus = await this.auditStatusRepository.findById(
+        audit.audit_status_id
+      )
+      const newStatus = await this.auditStatusRepository.findById(newStatusId)
+
+      if (!oldStatus || !newStatus) {
+        console.error('Could not find audit status for email notification')
+        return
+      }
+
+      // Get property details
+      const property = await this.propertyRepository.findById(audit.property_id)
+
+      if (!property) {
+        console.error('Property not found for audit status change notification')
+        return
+      }
+
+      const recipientEmails: string[] = []
+
+      // Get portfolio details with contact_email
+      const portfolio = await this.prisma.portfolio.findUnique({
+        where: { id: property.portfolio_id },
+        select: { contact_email: true }
+      })
+
+      // Add portfolio contact email if exists
+      if (portfolio?.contact_email) {
+        recipientEmails.push(portfolio.contact_email)
+      }
+
+      // Generate audit name (type_of_ota + " Audit")
+      const auditName = audit.type_of_ota
+        ? `${audit.type_of_ota.charAt(0).toUpperCase() + audit.type_of_ota.slice(1)} Audit`
+        : 'Audit'
+
+      // Send the email
+      await this.emailUtil.sendAuditStatusChangeEmail(
+        recipientEmails,
+        auditName,
+        oldStatus.status,
+        newStatus.status,
+        new Date()
+      )
+    } catch (error) {
+      // Log the error but don't fail the status update
+      console.error('Failed to send audit status change notification:', error)
     }
   }
 }
