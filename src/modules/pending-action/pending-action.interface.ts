@@ -54,7 +54,17 @@ export interface IPendingActionRepository {
     portfolio_id?: string
     action_type: string
     requested_user_id: string
-    transfer_data?: { new_portfolio_id: string }
+    transfer_data?: {
+      new_portfolio_id: string
+      portfolio_from?: {
+        id: string
+        name: string
+      }
+      portfolio_to?: {
+        id: string
+        name: string
+      }
+    }
     reason?: string
   }): Promise<PendingActionWithRelations>
   findAll(queryOptions: {

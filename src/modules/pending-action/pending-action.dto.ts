@@ -39,10 +39,20 @@ export class CreatePendingActionDto {
   action_type: PendingActionType
 
   @ApiPropertyOptional({
-    description: 'Transfer data with new_portfolio_id for transfer actions'
+    description: 'Transfer data with portfolio information for transfer actions'
   })
   @IsOptional()
-  transfer_data?: { new_portfolio_id: string }
+  transfer_data?: {
+    new_portfolio_id: string
+    portfolio_from?: {
+      id: string
+      name: string
+    }
+    portfolio_to?: {
+      id: string
+      name: string
+    }
+  }
 
   @ApiPropertyOptional({
     description: 'Reason for the action request (optional, provided by non-super admin users)'

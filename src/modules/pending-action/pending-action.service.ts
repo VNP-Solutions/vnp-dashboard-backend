@@ -336,12 +336,13 @@ export class PendingActionService
    * Enrich pending actions with target portfolio information for transfer actions
    */
   private async enrichPendingActionsWithPortfolioData(pendingActions: any[]) {
-    // Get all unique target portfolio IDs from transfer actions
+    // Get all unique target portfolio IDs from transfer actions that don't have stored portfolio data
     const targetPortfolioIds = pendingActions
       .filter(
         (action) =>
           action.action_type === PendingActionType.PROPERTY_TRANSFER &&
-          action.transfer_data?.new_portfolio_id
+          action.transfer_data?.new_portfolio_id &&
+          !action.transfer_data?.portfolio_to // Only fetch if not already stored
       )
       .map((action) => action.transfer_data.new_portfolio_id)
       .filter((id, index, self) => self.indexOf(id) === index) // Remove duplicates
@@ -364,32 +365,52 @@ export class PendingActionService
 
     // Enrich the pending actions with portfolio data
     return pendingActions.map((action) => {
-      // Get current portfolio from property.portfolio relation
-      const currentPortfolio = action.property?.portfolio
-        ? {
-            id: action.property.portfolio.id,
-            name: action.property.portfolio.name
-          }
-        : null
-
       const enrichedAction: any = {
-        ...action,
-        current_portfolio: currentPortfolio
+        ...action
       }
 
-      // Add target portfolio info for transfer actions
+      // Add portfolio info for transfer actions
       if (
         action.action_type === PendingActionType.PROPERTY_TRANSFER &&
         action.transfer_data?.new_portfolio_id
       ) {
-        const targetPortfolio = targetPortfolios.get(
-          action.transfer_data.new_portfolio_id
-        )
-        enrichedAction.transfer_data = {
-          ...action.transfer_data,
-          current_portfolio: currentPortfolio,
-          target_portfolio: targetPortfolio || null
+        // Use stored portfolio_from and portfolio_to if available (for approved/rejected actions)
+        // Otherwise, use current property.portfolio and fetch target portfolio (for pending actions)
+        if (action.transfer_data.portfolio_from && action.transfer_data.portfolio_to) {
+          // Already have stored history, just use it
+          enrichedAction.transfer_data = {
+            ...action.transfer_data
+          }
+        } else {
+          // For pending actions, dynamically get current and target portfolios
+          const currentPortfolio = action.property?.portfolio
+            ? {
+                id: action.property.portfolio.id,
+                name: action.property.portfolio.name
+              }
+            : null
+
+          const targetPortfolio = targetPortfolios.get(
+            action.transfer_data.new_portfolio_id
+          )
+
+          enrichedAction.transfer_data = {
+            ...action.transfer_data,
+            portfolio_from: currentPortfolio,
+            portfolio_to: targetPortfolio || null
+          }
         }
+
+        // Also add current_portfolio for backward compatibility
+        enrichedAction.current_portfolio = enrichedAction.transfer_data.portfolio_from
+      } else {
+        // For non-transfer actions, add current_portfolio from property relation
+        enrichedAction.current_portfolio = action.property?.portfolio
+          ? {
+              id: action.property.portfolio.id,
+              name: action.property.portfolio.name
+            }
+          : null
       }
 
       return enrichedAction
