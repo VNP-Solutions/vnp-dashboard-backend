@@ -26,6 +26,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   AssignUserRoleDto,
+  ManageUserAccessDto,
   UpdateOwnProfileDto,
   UpdateUserDto,
   UserQueryDto
@@ -122,7 +123,7 @@ export class UserController {
   @Patch(':id/role')
   @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Update user role (admin only, cannot update own role)'
+    summary: 'Update user role (super admin only, cannot update own role)'
   })
   @ApiResponse({ status: 200, description: 'User role updated successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -132,7 +133,7 @@ export class UserController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Only super admins can update user roles'
   })
   updateRole(
     @Param('id') id: string,
@@ -140,6 +141,62 @@ export class UserController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.userService.updateRole(id, assignUserRoleDto, user)
+  }
+
+  @Patch(':id/access/add')
+  @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary:
+      'Add portfolio/property access to user (super admin only, requires partial access role)'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User access added successfully'
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - User role does not support partial access or no IDs provided'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only super admins can manage user access'
+  })
+  addAccess(
+    @Param('id') id: string,
+    @Body() manageUserAccessDto: ManageUserAccessDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.userService.addAccess(id, manageUserAccessDto, user)
+  }
+
+  @Patch(':id/access/revoke')
+  @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary:
+      'Revoke portfolio/property access from user (super admin only, requires partial access role)'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User access revoked successfully'
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - User role does not support partial access or no IDs provided'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only super admins can manage user access'
+  })
+  revokeAccess(
+    @Param('id') id: string,
+    @Body() manageUserAccessDto: ManageUserAccessDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.userService.revokeAccess(id, manageUserAccessDto, user)
   }
 
   @Delete(':id')

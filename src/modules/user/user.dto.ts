@@ -161,6 +161,42 @@ export class AssignUserRoleDto {
   @IsString()
   @IsNotEmpty()
   role_id: string
+
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439011'],
+    description:
+      'Array of portfolio IDs user can access (required when new role has partial portfolio access)'
+  })
+  @IsArray()
+  @IsOptional()
+  portfolio_ids?: string[]
+
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439012'],
+    description:
+      'Array of property IDs user can access (required when new role has partial property access)'
+  })
+  @IsArray()
+  @IsOptional()
+  property_ids?: string[]
+}
+
+export class ManageUserAccessDto {
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of portfolio IDs to add/revoke'
+  })
+  @IsArray()
+  @IsOptional()
+  portfolio_ids?: string[]
+
+  @ApiPropertyOptional({
+    example: ['507f1f77bcf86cd799439013', '507f1f77bcf86cd799439014'],
+    description: 'Array of property IDs to add/revoke'
+  })
+  @IsArray()
+  @IsOptional()
+  property_ids?: string[]
 }
 
 export class UserQueryDto extends QueryDto {

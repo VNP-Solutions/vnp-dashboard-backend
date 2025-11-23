@@ -50,6 +50,11 @@ export type UserWithDetails = Prisma.UserGetPayload<{
         name: true
         description: true
         is_external: true
+        portfolio_permission: true
+        property_permission: true
+        audit_permission: true
+        user_permission: true
+        system_settings_permission: true
       }
     }
     userAccessedProperties: {
@@ -69,6 +74,18 @@ export interface IUserRepository {
   updateRole(id: string, roleId: string): Promise<UserWithRole>
   delete(id: string): Promise<User>
   updateUserAccess(
+    userId: string,
+    portfolioIds: string[],
+    propertyIds: string[]
+  ): Promise<void>
+  clearUserAccess(userId: string): Promise<void>
+  findRoleById(roleId: string): Promise<any>
+  addUserAccess(
+    userId: string,
+    portfolioIds: string[],
+    propertyIds: string[]
+  ): Promise<void>
+  revokeUserAccess(
     userId: string,
     portfolioIds: string[],
     propertyIds: string[]
@@ -96,5 +113,15 @@ export interface IUserService {
     data: AssignUserRoleDto,
     user: IUserWithPermissions
   ): Promise<UserWithRole>
+  addAccess(
+    id: string,
+    data: any,
+    user: IUserWithPermissions
+  ): Promise<{ message: string }>
+  revokeAccess(
+    id: string,
+    data: any,
+    user: IUserWithPermissions
+  ): Promise<{ message: string }>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
 }

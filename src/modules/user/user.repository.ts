@@ -71,7 +71,12 @@ export class UserRepository implements IUserRepository {
             id: true,
             name: true,
             description: true,
-            is_external: true
+            is_external: true,
+            portfolio_permission: true,
+            property_permission: true,
+            audit_permission: true,
+            user_permission: true,
+            system_settings_permission: true
           }
         },
         userAccessedProperties: {
@@ -150,5 +155,88 @@ export class UserRepository implements IUserRepository {
         }
       })
     }
+  }
+
+  async clearUserAccess(userId: string): Promise<void> {
+    // Delete user access record if it exists
+    await this.prisma.userAccessedProperty.deleteMany({
+      where: { user_id: userId }
+    })
+  }
+
+  async findRoleById(roleId: string) {
+    return this.prisma.userRole.findUnique({
+      where: { id: roleId }
+    })
+  }
+
+  async addUserAccess(
+    userId: string,
+    portfolioIds: string[],
+    propertyIds: string[]
+  ): Promise<void> {
+    // Check if user access record exists
+    const existingAccess = await this.prisma.userAccessedProperty.findFirst({
+      where: { user_id: userId }
+    })
+
+    if (existingAccess) {
+      // Merge new IDs with existing ones (avoid duplicates)
+      const mergedPortfolioIds = [
+        ...new Set([...(existingAccess.portfolio_id || []), ...portfolioIds])
+      ]
+      const mergedPropertyIds = [
+        ...new Set([...(existingAccess.property_id || []), ...propertyIds])
+      ]
+
+      await this.prisma.userAccessedProperty.update({
+        where: { id: existingAccess.id },
+        data: {
+          portfolio_id: mergedPortfolioIds,
+          property_id: mergedPropertyIds
+        }
+      })
+    } else {
+      // Create new record
+      await this.prisma.userAccessedProperty.create({
+        data: {
+          user_id: userId,
+          portfolio_id: portfolioIds,
+          property_id: propertyIds
+        }
+      })
+    }
+  }
+
+  async revokeUserAccess(
+    userId: string,
+    portfolioIds: string[],
+    propertyIds: string[]
+  ): Promise<void> {
+    // Check if user access record exists
+    const existingAccess = await this.prisma.userAccessedProperty.findFirst({
+      where: { user_id: userId }
+    })
+
+    if (!existingAccess) {
+      // Nothing to revoke
+      return
+    }
+
+    // Remove specified IDs from existing arrays
+    const updatedPortfolioIds = (existingAccess.portfolio_id || []).filter(
+      id => !portfolioIds.includes(id)
+    )
+    const updatedPropertyIds = (existingAccess.property_id || []).filter(
+      id => !propertyIds.includes(id)
+    )
+
+    await this.prisma.userAccessedProperty.update({
+      where: { id: existingAccess.id },
+      data: {
+        portfolio_id: updatedPortfolioIds,
+        property_id: updatedPropertyIds
+      }
+    })
   }
 }
