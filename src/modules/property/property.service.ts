@@ -716,12 +716,27 @@ export class PropertyService implements IPropertyService {
     }
 
     // Property manager (with ownership rights) creates pending action for approval
+    // Get current portfolio details for history
+    const currentPortfolio = property.portfolio
+      ? {
+          id: property.portfolio.id,
+          name: property.portfolio.name
+        }
+      : undefined
+
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'property',
       property_id: id,
       action_type: 'PROPERTY_TRANSFER',
       requested_user_id: user.id,
-      transfer_data: { new_portfolio_id: data.new_portfolio_id },
+      transfer_data: {
+        new_portfolio_id: data.new_portfolio_id,
+        portfolio_from: currentPortfolio,
+        portfolio_to: {
+          id: newPortfolio.id,
+          name: newPortfolio.name
+        }
+      },
       reason: data.reason
     })
 

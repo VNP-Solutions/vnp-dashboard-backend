@@ -428,7 +428,14 @@ enum PendingActionStatus {
 }
 
 type TransferData {
-  new_portfolio_id String
+  new_portfolio_id   String
+  portfolio_from     PortfolioInfo?
+  portfolio_to       PortfolioInfo?
+}
+
+type PortfolioInfo {
+  id   String
+  name String
 }
 
 model PendingAction {
