@@ -133,12 +133,15 @@ export class PortfolioController {
 
   @Post(':id/delete')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE, true)
-  @ApiOperation({ summary: 'Delete a portfolio (Super Admin only with password verification)' })
+  @ApiOperation({
+    summary: 'Delete a portfolio (Super Admin only with password verification)'
+  })
   @ApiResponse({ status: 200, description: 'Portfolio deleted successfully' })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete portfolio with associated properties or only Super Admin can delete portfolios or invalid password'
+    description:
+      'Cannot delete portfolio with associated properties or only Super Admin can delete portfolios or invalid password'
   })
   @ApiResponse({
     status: 403,
@@ -155,13 +158,15 @@ export class PortfolioController {
   @Post(':id/deactivate')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Deactivate a portfolio (Super Admin and internal users with password verification)',
+    summary:
+      'Deactivate a portfolio (Super Admin and internal users with password verification)',
     description:
       'Super Admin can deactivate directly. Internal users create a pending action for approval.'
   })
   @ApiResponse({
     status: 200,
-    description: 'Portfolio deactivated successfully or deactivation request submitted'
+    description:
+      'Portfolio deactivated successfully or deactivation request submitted'
   })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   @ApiResponse({
@@ -178,7 +183,12 @@ export class PortfolioController {
     @Body() deactivatePortfolioDto: DeactivatePortfolioDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.portfolioService.deactivate(id, deactivatePortfolioDto.password, user, deactivatePortfolioDto.reason)
+    return this.portfolioService.deactivate(
+      id,
+      deactivatePortfolioDto.password,
+      user,
+      deactivatePortfolioDto.reason
+    )
   }
 
   @Post(':id/send-email')
@@ -260,7 +270,7 @@ export class PortfolioController {
     @UploadedFiles() files?: Express.Multer.File[]
   ) {
     // Convert uploaded files to EmailAttachment format
-    const attachments: EmailAttachment[] | undefined = files?.map((file) => ({
+    const attachments: EmailAttachment[] | undefined = files?.map(file => ({
       filename: file.originalname,
       content: file.buffer,
       contentType: file.mimetype
