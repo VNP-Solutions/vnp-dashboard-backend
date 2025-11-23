@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common'
+import { EmailUtil } from '../../common/utils/email.util'
 import { PortfolioModule } from '../portfolio/portfolio.module'
 import { PrismaService } from '../prisma/prisma.service'
 import { PropertyModule } from '../property/property.module'
@@ -18,7 +19,8 @@ import { PendingActionService } from './pending-action.service'
       provide: 'IPendingActionService',
       useClass: PendingActionService
     },
-    PrismaService
+    PrismaService,
+    EmailUtil
   ],
   exports: ['IPendingActionService', 'IPendingActionRepository']
 })

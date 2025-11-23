@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { PermissionService } from '../../common/services/permission.service'
+import { EmailUtil } from '../../common/utils/email.util'
 import { AuditBatchRepository } from '../audit-batch/audit-batch.repository'
 import { AuditStatusRepository } from '../audit-status/audit-status.repository'
 import { PrismaService } from '../prisma/prisma.service'
@@ -32,7 +33,8 @@ import { AuditService } from './audit.service'
       useClass: AuditBatchRepository
     },
     PermissionService,
-    PrismaService
+    PrismaService,
+    EmailUtil
   ],
   exports: [
     {

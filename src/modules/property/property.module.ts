@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common'
 import { PermissionService } from '../../common/services/permission.service'
+import { EmailUtil } from '../../common/utils/email.util'
 import { AuthModule } from '../auth/auth.module'
 import { CurrencyRepository } from '../currency/currency.repository'
 import { PortfolioRepository } from '../portfolio/portfolio.repository'
@@ -40,7 +41,8 @@ import { PropertyService } from './property.service'
       useClass: PropertyBankDetailsRepository
     },
     PermissionService,
-    PrismaService
+    PrismaService,
+    EmailUtil
   ],
   exports: ['IPropertyService', 'IPropertyRepository']
 })

@@ -16,6 +16,7 @@ import {
   ModuleType
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
   canPerformBulkTransfer,
@@ -65,7 +66,9 @@ export class PropertyService implements IPropertyService {
     @Inject(PermissionService)
     private permissionService: PermissionService,
     @Inject(ConfigService)
-    private configService: ConfigService<Configuration>
+    private configService: ConfigService<Configuration>,
+    @Inject(EmailUtil)
+    private emailUtil: EmailUtil
   ) {}
 
   async create(data: CreatePropertyDto, user: IUserWithPermissions) {
@@ -709,10 +712,42 @@ export class PropertyService implements IPropertyService {
 
     // Super admin can directly transfer
     if (isUserSuperAdmin(user)) {
-      return this.propertyRepository.update(id, {
+      const updatedProperty = await this.propertyRepository.update(id, {
         portfolio_id: data.new_portfolio_id,
         previous_portfolio_id: property.portfolio_id
       })
+
+      // Send transfer notification email to both portfolio contact emails
+      try {
+        // Get current portfolio details
+        const currentPortfolio = await this.portfolioRepository.findById(
+          property.portfolio_id
+        )
+
+        const recipientEmails: string[] = []
+
+        // Add current portfolio contact email if exists
+        if (currentPortfolio?.contact_email) {
+          recipientEmails.push(currentPortfolio.contact_email)
+        }
+
+        // Add new portfolio contact email if exists
+        if (newPortfolio.contact_email) {
+          recipientEmails.push(newPortfolio.contact_email)
+        }
+
+        await this.emailUtil.sendPropertyTransferEmail(
+          recipientEmails,
+          property.name,
+          newPortfolio.name,
+          new Date()
+        )
+      } catch (emailError) {
+        // Log the error but don't fail the transfer
+        console.error('Failed to send property transfer email:', emailError)
+      }
+
+      return updatedProperty
     }
 
     // Property manager (with ownership rights) creates pending action for approval
