@@ -32,7 +32,7 @@ export interface ICurrencyService {
     data: UpdateCurrencyDto,
     user: IUserWithPermissions
   ): Promise<Currency>
-  remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  remove(id: string, password: string, user: IUserWithPermissions): Promise<{ message: string }>
   reorder(
     id: string,
     data: ReorderCurrencyDto,

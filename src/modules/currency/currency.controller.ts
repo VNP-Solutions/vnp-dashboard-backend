@@ -24,7 +24,7 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreateCurrencyDto, ReorderCurrencyDto, UpdateCurrencyDto } from './currency.dto'
+import { CreateCurrencyDto, DeleteCurrencyDto, ReorderCurrencyDto, UpdateCurrencyDto } from './currency.dto'
 import type { ICurrencyService } from './currency.interface'
 
 @ApiTags('Currency')
@@ -93,21 +93,25 @@ export class CurrencyController {
     return this.currencyService.update(id, updateCurrencyDto, user)
   }
 
-  @Delete(':id')
+  @Post(':id/delete')
   @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.DELETE)
-  @ApiOperation({ summary: 'Delete a currency' })
+  @ApiOperation({ summary: 'Delete a currency (requires password verification)' })
   @ApiResponse({ status: 200, description: 'Currency deleted successfully' })
   @ApiResponse({ status: 404, description: 'Currency not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete currency with associated properties'
+    description: 'Cannot delete currency with associated properties or invalid password'
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions'
   })
-  remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.currencyService.remove(id, user)
+  remove(
+    @Param('id') id: string,
+    @Body() deleteCurrencyDto: DeleteCurrencyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.currencyService.remove(id, deleteCurrencyDto.password, user)
   }
 
   @Patch(':id/reorder')

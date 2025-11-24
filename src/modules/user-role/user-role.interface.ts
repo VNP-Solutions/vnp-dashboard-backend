@@ -29,7 +29,7 @@ export interface IUserRoleService {
     data: UpdateUserRoleDto,
     user: IUserWithPermissions
   ): Promise<UserRole>
-  remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  remove(id: string, password: string, user: IUserWithPermissions): Promise<{ message: string }>
   reorder(
     id: string,
     data: ReorderUserRoleDto,

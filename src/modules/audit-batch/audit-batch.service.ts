@@ -6,6 +6,8 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { PrismaService } from '../prisma/prisma.service'
 import {
   CreateAuditBatchDto,
   AuditBatchQueryDto,
@@ -21,7 +23,9 @@ import type {
 export class AuditBatchService implements IAuditBatchService {
   constructor(
     @Inject('IAuditBatchRepository')
-    private auditBatchRepository: IAuditBatchRepository
+    private auditBatchRepository: IAuditBatchRepository,
+    @Inject(PrismaService)
+    private prisma: PrismaService
   ) {}
 
   async create(data: CreateAuditBatchDto, _user: IUserWithPermissions) {
@@ -97,7 +101,27 @@ export class AuditBatchService implements IAuditBatchService {
     return this.auditBatchRepository.update(id, data)
   }
 
-  async remove(id: string, _user: IUserWithPermissions) {
+  async remove(id: string, password: string, user: IUserWithPermissions) {
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
     const batch = await this.auditBatchRepository.findById(id)
 
     if (!batch) {

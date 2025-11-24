@@ -6,6 +6,8 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { PrismaService } from '../prisma/prisma.service'
 import { CreateServiceTypeDto, ReorderServiceTypeDto, UpdateServiceTypeDto } from './service-type.dto'
 import type {
   IServiceTypeRepository,
@@ -16,7 +18,9 @@ import type {
 export class ServiceTypeService implements IServiceTypeService {
   constructor(
     @Inject('IServiceTypeRepository')
-    private serviceTypeRepository: IServiceTypeRepository
+    private serviceTypeRepository: IServiceTypeRepository,
+    @Inject(PrismaService)
+    private prisma: PrismaService
   ) {}
 
   async create(data: CreateServiceTypeDto, _user: IUserWithPermissions) {
@@ -71,7 +75,27 @@ export class ServiceTypeService implements IServiceTypeService {
     return this.serviceTypeRepository.update(id, data)
   }
 
-  async remove(id: string, _user: IUserWithPermissions) {
+  async remove(id: string, password: string, user: IUserWithPermissions) {
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
     const serviceType = await this.serviceTypeRepository.findById(id)
 
     if (!serviceType) {

@@ -6,6 +6,8 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { PrismaService } from '../prisma/prisma.service'
 import { CreateAuditStatusDto, ReorderAuditStatusDto, UpdateAuditStatusDto } from './audit-status.dto'
 import type {
   IAuditStatusRepository,
@@ -16,7 +18,9 @@ import type {
 export class AuditStatusService implements IAuditStatusService {
   constructor(
     @Inject('IAuditStatusRepository')
-    private auditStatusRepository: IAuditStatusRepository
+    private auditStatusRepository: IAuditStatusRepository,
+    @Inject(PrismaService)
+    private prisma: PrismaService
   ) {}
 
   async create(data: CreateAuditStatusDto, _user: IUserWithPermissions) {
@@ -71,7 +75,27 @@ export class AuditStatusService implements IAuditStatusService {
     return this.auditStatusRepository.update(id, data)
   }
 
-  async remove(id: string, _user: IUserWithPermissions) {
+  async remove(id: string, password: string, user: IUserWithPermissions) {
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
     const auditStatus = await this.auditStatusRepository.findById(id)
 
     if (!auditStatus) {

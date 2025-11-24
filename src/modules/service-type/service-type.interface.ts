@@ -35,7 +35,7 @@ export interface IServiceTypeService {
     data: UpdateServiceTypeDto,
     user: IUserWithPermissions
   ): Promise<ServiceType>
-  remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  remove(id: string, password: string, user: IUserWithPermissions): Promise<{ message: string }>
   reorder(
     id: string,
     data: ReorderServiceTypeDto,

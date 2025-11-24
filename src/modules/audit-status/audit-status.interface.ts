@@ -43,6 +43,6 @@ export interface IAuditStatusService {
     data: UpdateAuditStatusDto,
     user: IUserWithPermissions
   ): Promise<AuditStatus>
-  remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  remove(id: string, password: string, user: IUserWithPermissions): Promise<{ message: string }>
   reorder(id: string, data: ReorderAuditStatusDto, user: IUserWithPermissions): Promise<{ message: string }>
 }
