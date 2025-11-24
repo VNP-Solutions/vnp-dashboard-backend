@@ -628,16 +628,34 @@ export class PortfolioService implements IPortfolioService {
       result.totalRows = data.length
 
       // Helper function to find header value with flexible naming
+      // Handles column names with asterisks (e.g., "Portfolio Name*")
       const findHeaderValue = (
         row: any,
         possibleNames: string[]
       ): string | undefined => {
+        // First, try to find exact matches
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
             return String(value).trim()
           }
         }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return String(value).trim()
+              }
+            }
+          }
+        }
+
         return undefined
       }
 
@@ -647,7 +665,7 @@ export class PortfolioService implements IPortfolioService {
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
-          // Extract portfolio name
+          // Extract portfolio name (REQUIRED)
           const portfolioName = findHeaderValue(row, [
             'Portfolio Name',
             'Portofolio',
@@ -659,7 +677,7 @@ export class PortfolioService implements IPortfolioService {
             result.errors.push({
               row: rowNumber,
               portfolio: 'Unknown',
-              error: 'Portfolio name is required'
+              error: 'Portfolio Name is required'
             })
             result.failureCount++
             continue
@@ -678,7 +696,7 @@ export class PortfolioService implements IPortfolioService {
             continue
           }
 
-          // Extract service type name
+          // Extract service type name (REQUIRED)
           const serviceTypeName = findHeaderValue(row, [
             'Service Type',
             'Service type'
@@ -688,7 +706,7 @@ export class PortfolioService implements IPortfolioService {
             result.errors.push({
               row: rowNumber,
               portfolio: portfolioName,
-              error: 'Service type is required'
+              error: 'Service Type is required'
             })
             result.failureCount++
             continue
@@ -706,37 +724,54 @@ export class PortfolioService implements IPortfolioService {
             })
           }
 
-          // Extract contact email (optional)
+          // Extract active status (REQUIRED) - map "Active"/"Inactive" to true/false
+          const activeStatusRaw = findHeaderValue(row, [
+            'Active status',
+            'Active Status',
+            'Status',
+            'Is Active'
+          ])
+
+          if (!activeStatusRaw) {
+            result.errors.push({
+              row: rowNumber,
+              portfolio: portfolioName,
+              error: 'Active status is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          const activeStatusNormalized = activeStatusRaw.toLowerCase().trim()
+          let isActive: boolean
+          if (activeStatusNormalized === 'active') {
+            isActive = true
+          } else if (activeStatusNormalized === 'inactive') {
+            isActive = false
+          } else {
+            result.errors.push({
+              row: rowNumber,
+              portfolio: portfolioName,
+              error: `Invalid Active status value: "${activeStatusRaw}". Expected "Active" or "Inactive"`
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Extract contact email (OPTIONAL)
           const contactEmail = findHeaderValue(row, [
             'Contact Email',
             'Contact email',
             'Contact'
           ])
 
-          // Extract contract URL (optional)
-          const contractUrl = findHeaderValue(row, [
-            'Documents',
-            'Contract URL',
-            'Contract Url',
-            'Contract url'
-          ])
-
-          // Extract sales agent (instead of commissionable)
-          const salesAgent = findHeaderValue(row, [
-            'Sales Agent',
-            'Sales agent'
-          ])
-
-          // If sales agent is provided, portfolio is commissionable
-          const isCommissionable = salesAgent ? true : false
-
-          // Extract access email (optional)
+          // Extract access email (OPTIONAL)
           const accessEmail = findHeaderValue(row, [
             'Access Email',
             'Access email'
           ])
 
-          // Extract access phone (optional)
+          // Extract access phone (OPTIONAL)
           const accessPhone = findHeaderValue(row, [
             'Access Phone',
             'Access phone',
@@ -748,11 +783,61 @@ export class PortfolioService implements IPortfolioService {
             'Access contact'
           ])
 
+          // Extract contract URL/Documents (OPTIONAL)
+          const contractUrl = findHeaderValue(row, [
+            'Documents',
+            'Contract URL',
+            'Contract Url',
+            'Contract url'
+          ])
+
+          // Extract commissionable (OPTIONAL) - map "Yes"/"No" to true/false
+          const commissionableRaw = findHeaderValue(row, [
+            'Commissionable',
+            'Is Commissionable',
+            'is_commissionable'
+          ])
+
+          let isCommissionable = false
+          if (commissionableRaw) {
+            const commissionableNormalized = commissionableRaw.toLowerCase().trim()
+            if (commissionableNormalized === 'yes') {
+              isCommissionable = true
+            } else if (commissionableNormalized === 'no') {
+              isCommissionable = false
+            } else {
+              result.errors.push({
+                row: rowNumber,
+                portfolio: portfolioName,
+                error: `Invalid Commissionable value: "${commissionableRaw}". Expected "Yes" or "No"`
+              })
+              result.failureCount++
+              continue
+            }
+          }
+
+          // Extract sales agent (OPTIONAL)
+          const salesAgent = findHeaderValue(row, [
+            'Sales Agent',
+            'Sales agent'
+          ])
+
+          // Validate: If commissionable is true, sales_agent is required
+          if (isCommissionable && !salesAgent) {
+            result.errors.push({
+              row: rowNumber,
+              portfolio: portfolioName,
+              error: 'Sales Agent is required when portfolio is commissionable'
+            })
+            result.failureCount++
+            continue
+          }
+
           // Create portfolio
           const portfolioData: Omit<CreatePortfolioDto, 'contract_url'> = {
             name: portfolioName,
             service_type_id: serviceType.id,
-            is_active: true,
+            is_active: isActive,
             contact_email: contactEmail || undefined,
             is_commissionable: isCommissionable,
             sales_agent: salesAgent || undefined,

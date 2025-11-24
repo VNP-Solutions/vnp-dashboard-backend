@@ -8,7 +8,7 @@ import {
   forwardRef
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { BankSubType, BankType } from '@prisma/client'
+import { BankType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
@@ -20,16 +20,16 @@ import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
   canPerformBulkTransfer,
-  isUserSuperAdmin,
-  isInternalUser
+  isInternalUser,
+  isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import { Configuration } from '../../config/configuration'
 import type { ICurrencyRepository } from '../currency/currency.interface'
+import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
 import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import type { IPropertyBankDetailsRepository } from '../property-bank-details/property-bank-details.interface'
 import type { IPropertyCredentialsRepository } from '../property-credentials/property-credentials.interface'
-import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
 import {
   BulkImportResultDto,
   BulkTransferPropertyDto,
@@ -632,7 +632,11 @@ export class PropertyService implements IPropertyService {
     }
 
     // Hide deactivated properties from non-super-admins and non-internal users
-    if (!property.is_active && !isUserSuperAdmin(user) && !isInternalUser(user)) {
+    if (
+      !property.is_active &&
+      !isUserSuperAdmin(user) &&
+      !isInternalUser(user)
+    ) {
       throw new NotFoundException('Property not found')
     }
 
@@ -888,9 +892,7 @@ export class PropertyService implements IPropertyService {
 
     // Only super admins can delete properties
     if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException(
-        'Only super admins can delete properties'
-      )
+      throw new ForbiddenException('Only super admins can delete properties')
     }
 
     // Check if there are any unarchived audits
@@ -1001,27 +1003,63 @@ export class PropertyService implements IPropertyService {
       result.totalRows = data.length
 
       // Helper function to find header value with flexible naming
+      // Handles column names with asterisks (e.g., "Property Name*")
       const findHeaderValue = (
         row: any,
         possibleNames: string[]
       ): string | undefined => {
+        // First, try to find exact matches
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
             return String(value).trim()
           }
         }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return String(value).trim()
+              }
+            }
+          }
+        }
+
         return undefined
       }
 
       // Helper function to get raw value (preserves type for dates and numbers)
+      // Handles column names with asterisks (e.g., "Property Name*")
       const getRawValue = (row: any, possibleNames: string[]): any => {
+        // First, try to find exact matches
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
             return value
           }
         }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return value
+              }
+            }
+          }
+        }
+
         return undefined
       }
 
@@ -1099,7 +1137,7 @@ export class PropertyService implements IPropertyService {
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
-          // Extract property name
+          // Extract property name (REQUIRED)
           const propertyName = findHeaderValue(row, [
             'Property Name',
             'Property name',
@@ -1110,7 +1148,7 @@ export class PropertyService implements IPropertyService {
             result.errors.push({
               row: rowNumber,
               property: 'Unknown',
-              error: 'Property name is required'
+              error: 'Property Name is required'
             })
             result.failureCount++
             continue
@@ -1120,20 +1158,13 @@ export class PropertyService implements IPropertyService {
           const existingProperty =
             await this.propertyRepository.findByName(propertyName)
 
-          // Extract property address
-          const address = findHeaderValue(row, ['Address', 'Property Address'])
-          if (!address) {
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'Address is required'
-            })
-            result.failureCount++
-            continue
-          }
+          // Extract property address (OPTIONAL, will use empty string if not provided)
+          const address =
+            findHeaderValue(row, ['Address', 'Property Address']) || ''
 
-          // Extract currency code
+          // Extract currency code (REQUIRED) - now called "Property Currency"
           const currencyCode = findHeaderValue(row, [
+            'Property Currency',
             'Currency',
             'Currency Code'
           ])
@@ -1141,7 +1172,7 @@ export class PropertyService implements IPropertyService {
             result.errors.push({
               row: rowNumber,
               property: propertyName,
-              error: 'Currency is required'
+              error: 'Property Currency is required'
             })
             result.failureCount++
             continue
@@ -1189,17 +1220,17 @@ export class PropertyService implements IPropertyService {
             }
           }
 
-          // Extract portfolio name
+          // Extract portfolio name (REQUIRED)
           const portfolioName = findHeaderValue(row, [
-            'Portfolio Name',
             'Portfolio',
+            'Portfolio Name',
             'Portfolio name'
           ])
           if (!portfolioName) {
             result.errors.push({
               row: rowNumber,
               property: propertyName,
-              error: 'Portfolio name is required'
+              error: 'Portfolio is required'
             })
             result.failureCount++
             continue
@@ -1273,13 +1304,25 @@ export class PropertyService implements IPropertyService {
             propertyId = createdProperty.id
           }
 
-          // Extract and create credentials if provided
+          // Extract and create credentials
+          // Expedia ID is REQUIRED
           const expediaId = findHeaderValue(row, [
             'Expedia ID',
             'Expedia Id',
             'Expedia id',
             'ExpediaID'
           ])
+
+          if (!expediaId) {
+            result.errors.push({
+              row: rowNumber,
+              property: propertyName,
+              error: 'Expedia ID is required'
+            })
+            result.failureCount++
+            continue
+          }
+
           const expediaUsername = findHeaderValue(row, [
             'Expedia Username',
             'Expedia username',
@@ -1325,7 +1368,7 @@ export class PropertyService implements IPropertyService {
             'Booking Pass'
           ])
 
-          // Check if Expedia credentials are complete (required for safety)
+          // Check if Expedia credentials are complete (username and password required for safety)
           const hasExpediaCredentials =
             expediaId && expediaUsername && expediaPassword
 
@@ -1334,7 +1377,7 @@ export class PropertyService implements IPropertyService {
             result.errors.push({
               row: rowNumber,
               property: propertyName,
-              error: `Property ${existingProperty ? 'updated' : 'created'} successfully but missing required Expedia credentials (ID, Username, Password)`
+              error: `Property ${existingProperty ? 'updated' : 'created'} successfully but missing Expedia Username or Password`
             })
           }
 
@@ -1407,6 +1450,34 @@ export class PropertyService implements IPropertyService {
           }
 
           // Extract and create bank details if provided
+          // Bank Type is REQUIRED - can be "None", "Stripe", or "Bank"
+          const bankTypeRaw = findHeaderValue(row, [
+            'Bank Type (None / Stripe / Bank)',
+            'Bank Type',
+            'Bank type',
+            'bank_type'
+          ])
+
+          if (!bankTypeRaw) {
+            result.errors.push({
+              row: rowNumber,
+              property: propertyName,
+              error: 'Bank Type is required (None / Stripe / Bank)'
+            })
+            result.failureCount++
+            continue
+          }
+
+          const bankTypeNormalized = bankTypeRaw.toLowerCase().trim()
+
+          // If bank type is "None", skip bank details processing
+          if (bankTypeNormalized === 'none') {
+            // Successfully created property without bank details
+            result.successCount++
+            result.successfulImports.push(propertyName)
+            continue
+          }
+
           const stripeAccountEmail = findHeaderValue(row, [
             'Stripe Account Email',
             'Stripe Email',
@@ -1414,7 +1485,8 @@ export class PropertyService implements IPropertyService {
             'stripe_account_email'
           ])
 
-          const bankSubType = findHeaderValue(row, [
+          const bankSubTypeRaw = findHeaderValue(row, [
+            'Bank Sub Type (ACH / Domestic US Wire / International Wire)',
             'Bank Sub Type',
             'Bank sub type',
             'Bank Sub type',
@@ -1515,239 +1587,165 @@ export class PropertyService implements IPropertyService {
             'Currency Code (Bank)'
           ])
 
-          // Create or update bank details if any banking information is provided
-          if (
-            stripeAccountEmail ||
-            bankSubType ||
-            hotelPortfolioName ||
-            beneficiaryName ||
-            beneficiaryAddress ||
-            accountNumber ||
-            accountName ||
-            bankName ||
-            bankBranch ||
-            swiftBicIban ||
-            routingNumber ||
-            bankAccountType ||
-            bankCurrency
-          ) {
-            // Check if bank details already exist
-            const existingBankDetails =
-              await this.bankDetailsRepository.findByPropertyId(propertyId)
+          // Process bank details based on Bank Type
+          // Check if bank details already exist
+          const existingBankDetails =
+            await this.bankDetailsRepository.findByPropertyId(propertyId)
 
-            const bankDetailsData: any = {}
+          const bankDetailsData: any = {}
 
-            // Determine bank type and validate based on the same rules as the bulk update API
-            if (stripeAccountEmail && stripeAccountEmail.trim()) {
-              // Stripe account
-              bankDetailsData.bank_type = BankType.stripe
-              bankDetailsData.stripe_account_email = stripeAccountEmail.trim()
-              // Clear bank fields for stripe
-              bankDetailsData.bank_sub_type = null
-              bankDetailsData.hotel_portfolio_name = null
-              bankDetailsData.beneficiary_name = null
-              bankDetailsData.beneficiary_address = null
-              bankDetailsData.account_number = null
-              bankDetailsData.account_name = null
-              bankDetailsData.bank_name = null
-              bankDetailsData.bank_branch = null
-              bankDetailsData.swift_bic_iban = null
-              bankDetailsData.routing_number = null
-              bankDetailsData.bank_account_type = null
-              bankDetailsData.currency = null
+          // Determine bank type based on the Bank Type column value
+          if (bankTypeNormalized === 'stripe') {
+            // Validate Stripe Account Email is provided
+            if (!stripeAccountEmail || !stripeAccountEmail.trim()) {
+              result.errors.push({
+                row: rowNumber,
+                property: propertyName,
+                error:
+                  'Stripe Account Email is required when Bank Type is Stripe'
+              })
+              result.failureCount++
+              continue
+            }
+
+            // Stripe account
+            bankDetailsData.bank_type = BankType.stripe
+            bankDetailsData.stripe_account_email = stripeAccountEmail.trim()
+            // Clear bank fields for stripe
+            bankDetailsData.bank_sub_type = null
+            bankDetailsData.hotel_portfolio_name = null
+            bankDetailsData.beneficiary_name = null
+            bankDetailsData.beneficiary_address = null
+            bankDetailsData.account_number = null
+            bankDetailsData.account_name = null
+            bankDetailsData.bank_name = null
+            bankDetailsData.bank_branch = null
+            bankDetailsData.swift_bic_iban = null
+            bankDetailsData.routing_number = null
+            bankDetailsData.bank_account_type = null
+            bankDetailsData.currency = null
+          } else if (bankTypeNormalized === 'bank') {
+            // Bank account - validate bank_sub_type is provided
+            if (!bankSubTypeRaw) {
+              result.errors.push({
+                row: rowNumber,
+                property: propertyName,
+                error:
+                  'Bank Sub Type is required when Bank Type is Bank (ACH / Domestic US Wire / International Wire)'
+              })
+              result.failureCount++
+              continue
+            }
+
+            bankDetailsData.bank_type = BankType.bank
+            bankDetailsData.stripe_account_email = null
+
+            // Map bank sub type from Excel values to enum values
+            // "ACH" -> "ach"
+            // "Domestic US Wire" -> "domestic_wire"
+            // "International Wire" -> "international_wire"
+            const bankSubTypeNormalized = bankSubTypeRaw.toLowerCase().trim()
+            let mappedBankSubType: string
+
+            if (bankSubTypeNormalized === 'ach') {
+              mappedBankSubType = 'ach'
             } else if (
-              bankSubType ||
-              hotelPortfolioName ||
-              beneficiaryName ||
-              beneficiaryAddress ||
-              accountNumber ||
-              accountName ||
-              bankName ||
-              bankBranch ||
-              swiftBicIban ||
-              routingNumber ||
-              bankAccountType ||
-              bankCurrency
+              bankSubTypeNormalized === 'domestic us wire' ||
+              bankSubTypeNormalized === 'domestic_us_wire' ||
+              bankSubTypeNormalized === 'domestic wire'
             ) {
-              // Bank account - validate bank_sub_type is provided
-              bankDetailsData.bank_type = BankType.bank
-              bankDetailsData.stripe_account_email = null
-
-              // Validate and normalize bank_sub_type
-              if (!bankSubType) {
-                result.errors.push({
-                  row: rowNumber,
-                  property: propertyName,
-                  error: `Property ${existingProperty ? 'updated' : 'created'} but bank details require Bank Sub Type (ach, domestic_wire, or international_wire)`
-                })
-                result.successCount++
-                result.successfulImports.push(propertyName)
-                continue
-              }
-
-              const normalizedSubType = bankSubType
-                .toLowerCase()
-                .replace(/\s+/g, '_')
-              if (
-                !['ach', 'domestic_wire', 'international_wire'].includes(
-                  normalizedSubType
-                )
-              ) {
-                result.errors.push({
-                  row: rowNumber,
-                  property: propertyName,
-                  error: `Property ${existingProperty ? 'updated' : 'created'} but invalid bank sub type '${bankSubType}'. Must be one of: ach, domestic_wire, international_wire`
-                })
-                result.successCount++
-                result.successfulImports.push(propertyName)
-                continue
-              }
-
-              bankDetailsData.bank_sub_type = normalizedSubType
-
-              // Set all provided fields
-              if (hotelPortfolioName !== undefined) {
-                bankDetailsData.hotel_portfolio_name = hotelPortfolioName
-              }
-              if (beneficiaryName !== undefined) {
-                bankDetailsData.beneficiary_name = beneficiaryName
-              }
-              if (beneficiaryAddress !== undefined) {
-                bankDetailsData.beneficiary_address = beneficiaryAddress
-              }
-              if (accountNumber !== undefined) {
-                bankDetailsData.account_number = accountNumber
-              }
-              if (accountName !== undefined) {
-                bankDetailsData.account_name = accountName
-              }
-              if (bankName !== undefined) {
-                bankDetailsData.bank_name = bankName
-              }
-              if (bankBranch !== undefined) {
-                bankDetailsData.bank_branch = bankBranch
-              }
-              if (swiftBicIban !== undefined) {
-                bankDetailsData.swift_bic_iban = swiftBicIban
-              }
-              if (routingNumber !== undefined) {
-                // Validate routing number has at least 9 digits
-                if (routingNumber.trim().length < 9) {
-                  result.errors.push({
-                    row: rowNumber,
-                    property: propertyName,
-                    error: `Property ${existingProperty ? 'updated' : 'created'} but routing number '${routingNumber}' has less than 9 digits. Routing number was not saved.`
-                  })
-                  // Don't set routing number, but continue processing other fields
-                } else {
-                  bankDetailsData.routing_number = routingNumber
-                }
-              }
-              if (bankAccountType !== undefined) {
-                const normalizedAccountType = bankAccountType.toLowerCase()
-                if (!['checking', 'savings'].includes(normalizedAccountType)) {
-                  result.errors.push({
-                    row: rowNumber,
-                    property: propertyName,
-                    error: `Property ${existingProperty ? 'updated' : 'created'} but invalid bank account type '${bankAccountType}'. Must be one of: checking, savings`
-                  })
-                  result.successCount++
-                  result.successfulImports.push(propertyName)
-                  continue
-                }
-                bankDetailsData.bank_account_type = normalizedAccountType
-              }
-              if (bankCurrency !== undefined) {
-                bankDetailsData.currency = bankCurrency
-              }
-
-              // Validate required fields based on bank_sub_type
-              const missingFields: string[] = []
-
-              // Common required fields for all bank types
-              if (!hotelPortfolioName || !hotelPortfolioName.trim()) {
-                missingFields.push('Hotel Portfolio Name')
-              }
-              if (!accountNumber || !accountNumber.trim()) {
-                missingFields.push('Account Number')
-              }
-              if (!bankName || !bankName.trim()) {
-                missingFields.push('Bank Name')
-              }
-
-              // Sub-type specific validation
-              switch (normalizedSubType) {
-                case BankSubType.ach:
-                  if (!beneficiaryName || !beneficiaryName.trim()) {
-                    missingFields.push('Beneficiary Name')
-                  }
-                  if (!routingNumber || !routingNumber.trim()) {
-                    missingFields.push('Routing Number')
-                  } else if (routingNumber.trim().length < 9) {
-                    missingFields.push(
-                      'Routing Number (must be at least 9 digits)'
-                    )
-                  }
-                  if (!bankAccountType) {
-                    missingFields.push('Bank Account Type')
-                  }
-                  break
-
-                case BankSubType.domestic_wire:
-                  if (!beneficiaryName || !beneficiaryName.trim()) {
-                    missingFields.push('Beneficiary Name')
-                  }
-                  if (!beneficiaryAddress || !beneficiaryAddress.trim()) {
-                    missingFields.push('Beneficiary Address')
-                  }
-                  if (!routingNumber || !routingNumber.trim()) {
-                    missingFields.push('Routing Number')
-                  } else if (routingNumber.trim().length < 9) {
-                    missingFields.push(
-                      'Routing Number (must be at least 9 digits)'
-                    )
-                  }
-                  break
-
-                case BankSubType.international_wire:
-                  if (!beneficiaryName || !beneficiaryName.trim()) {
-                    missingFields.push('Beneficiary Name')
-                  }
-                  if (!beneficiaryAddress || !beneficiaryAddress.trim()) {
-                    missingFields.push('Beneficiary Address')
-                  }
-                  if (!swiftBicIban || !swiftBicIban.trim()) {
-                    missingFields.push('Swift or BIC or IBAN')
-                  }
-                  if (!bankCurrency || !bankCurrency.trim()) {
-                    missingFields.push('Currency (Bank)')
-                  }
-                  break
-              }
-
-              if (missingFields.length > 0) {
-                result.errors.push({
-                  row: rowNumber,
-                  property: propertyName,
-                  error: `Property ${existingProperty ? 'updated' : 'created'} but bank details missing required fields for ${normalizedSubType}: ${missingFields.join(', ')}`
-                })
-                result.successCount++
-                result.successfulImports.push(propertyName)
-                continue
-              }
-            }
-
-            if (existingBankDetails) {
-              // Update existing bank details
-              await this.bankDetailsRepository.update(
-                propertyId,
-                bankDetailsData
-              )
+              mappedBankSubType = 'domestic_wire'
+            } else if (
+              bankSubTypeNormalized === 'international wire' ||
+              bankSubTypeNormalized === 'international_wire'
+            ) {
+              mappedBankSubType = 'international_wire'
             } else {
-              // Create new bank details
-              bankDetailsData.property_id = propertyId
-              await this.bankDetailsRepository.create(bankDetailsData)
+              result.errors.push({
+                row: rowNumber,
+                property: propertyName,
+                error: `Invalid Bank Sub Type '${bankSubTypeRaw}'. Must be one of: ACH, Domestic US Wire, International Wire`
+              })
+              result.failureCount++
+              continue
             }
+
+            bankDetailsData.bank_sub_type = mappedBankSubType
+
+            // Set all provided fields
+            if (hotelPortfolioName !== undefined) {
+              bankDetailsData.hotel_portfolio_name = hotelPortfolioName
+            }
+            if (beneficiaryName !== undefined) {
+              bankDetailsData.beneficiary_name = beneficiaryName
+            }
+            if (beneficiaryAddress !== undefined) {
+              bankDetailsData.beneficiary_address = beneficiaryAddress
+            }
+            if (accountNumber !== undefined) {
+              bankDetailsData.account_number = accountNumber
+            }
+            if (accountName !== undefined) {
+              bankDetailsData.account_name = accountName
+            }
+            if (bankName !== undefined) {
+              bankDetailsData.bank_name = bankName
+            }
+            if (bankBranch !== undefined) {
+              bankDetailsData.bank_branch = bankBranch
+            }
+            if (swiftBicIban !== undefined) {
+              bankDetailsData.swift_bic_iban = swiftBicIban
+            }
+            if (routingNumber !== undefined) {
+              // Validate routing number has at least 9 digits
+              if (routingNumber.trim().length < 9) {
+                result.errors.push({
+                  row: rowNumber,
+                  property: propertyName,
+                  error: `Property ${existingProperty ? 'updated' : 'created'} but routing number '${routingNumber}' has less than 9 digits. Routing number was not saved.`
+                })
+                // Don't set routing number, but continue processing other fields
+              } else {
+                bankDetailsData.routing_number = routingNumber
+              }
+            }
+            if (bankAccountType !== undefined) {
+              const normalizedAccountType = bankAccountType.toLowerCase()
+              if (!['checking', 'savings'].includes(normalizedAccountType)) {
+                result.errors.push({
+                  row: rowNumber,
+                  property: propertyName,
+                  error: `Property ${existingProperty ? 'updated' : 'created'} but invalid bank account type '${bankAccountType}'. Must be one of: checking, savings`
+                })
+                result.successCount++
+                result.successfulImports.push(propertyName)
+                continue
+              }
+              bankDetailsData.bank_account_type = normalizedAccountType
+            }
+            if (bankCurrency !== undefined) {
+              bankDetailsData.currency = bankCurrency
+            }
+          } else {
+            // Invalid bank type
+            result.errors.push({
+              row: rowNumber,
+              property: propertyName,
+              error: `Invalid Bank Type '${bankTypeRaw}'. Must be one of: None, Stripe, Bank`
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Create or update bank details
+          if (existingBankDetails) {
+            // Update existing bank details
+            await this.bankDetailsRepository.update(propertyId, bankDetailsData)
+          } else {
+            // Create new bank details
+            bankDetailsData.property_id = propertyId
+            await this.bankDetailsRepository.create(bankDetailsData)
           }
 
           result.successCount++

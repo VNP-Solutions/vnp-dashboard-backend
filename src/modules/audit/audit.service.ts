@@ -568,27 +568,63 @@ export class AuditService implements IAuditService {
       result.totalRows = data.length
 
       // Helper function to find header value with flexible naming
+      // Handles column names with asterisks (e.g., "Property*")
       const findHeaderValue = (
         row: any,
         possibleNames: string[]
       ): string | undefined => {
+        // First, try to find exact matches
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
             return String(value).trim()
           }
         }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return String(value).trim()
+              }
+            }
+          }
+        }
+
         return undefined
       }
 
       // Helper function to get raw value (preserves type for dates and numbers)
+      // Handles column names with asterisks (e.g., "Property*")
       const getRawValue = (row: any, possibleNames: string[]): any => {
+        // First, try to find exact matches
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
             return value
           }
         }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return value
+              }
+            }
+          }
+        }
+
         return undefined
       }
 
@@ -1073,27 +1109,63 @@ export class AuditService implements IAuditService {
       result.totalRows = data.length
 
       // Helper function to find header value with flexible naming
+      // Handles column names with asterisks (e.g., "Property*")
       const findHeaderValue = (
         row: any,
         possibleNames: string[]
       ): string | undefined => {
+        // First, try to find exact matches
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
             return String(value).trim()
           }
         }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return String(value).trim()
+              }
+            }
+          }
+        }
+
         return undefined
       }
 
       // Helper function to get raw value (preserves type for dates and numbers)
+      // Handles column names with asterisks (e.g., "Property*")
       const getRawValue = (row: any, possibleNames: string[]): any => {
+        // First, try to find exact matches
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
             return value
           }
         }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return value
+              }
+            }
+          }
+        }
+
         return undefined
       }
 

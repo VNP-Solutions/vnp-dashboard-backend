@@ -313,16 +313,34 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       result.totalRows = data.length
 
       // Helper function to find header value with flexible naming
+      // Handles column names with asterisks (e.g., "Bank Type*")
       const findHeaderValue = (
         row: any,
         possibleNames: string[]
       ): string | undefined => {
+        // First, try to find exact matches
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
             return String(value).trim()
           }
         }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return String(value).trim()
+              }
+            }
+          }
+        }
+
         return undefined
       }
 
@@ -432,6 +450,58 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             continue
           }
 
+          // Extract Bank Type (REQUIRED) - can be "None", "Stripe", or "Bank"
+          const bankTypeRaw = findHeaderValue(row, [
+            'Bank Type (None / Stripe / Bank)',
+            'Bank Type',
+            'Bank type',
+            'bank_type'
+          ])
+
+          if (!bankTypeRaw) {
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: Bank Type is required for '${propertyName}'`
+            )
+            result.errors.push({
+              row: rowNumber,
+              property: propertyName,
+              error: 'Bank Type is required (None / Stripe / Bank)'
+            })
+            result.failureCount++
+            continue
+          }
+
+          const bankTypeNormalized = bankTypeRaw.toLowerCase().trim()
+
+          // If bank type is "None", delete existing bank details if any
+          if (bankTypeNormalized === 'none') {
+            const existingBankDetails =
+              await this.propertyBankDetailsRepository.findByPropertyId(
+                property.id
+              )
+
+            if (existingBankDetails) {
+              await this.prisma.propertyBankDetails.delete({
+                where: { property_id: property.id }
+              })
+              console.log(
+                '\x1b[32m%s\x1b[0m',
+                `✅ Row ${rowNumber} SUCCESS: Deleted bank details for '${propertyName}' (Bank Type = None)`
+              )
+              result.successCount++
+              result.successfulUpdates.push(propertyName)
+            } else {
+              console.log(
+                '\x1b[32m%s\x1b[0m',
+                `✅ Row ${rowNumber} SUCCESS: No bank details to delete for '${propertyName}' (Bank Type = None)`
+              )
+              result.successCount++
+              result.successfulUpdates.push(propertyName)
+            }
+            continue
+          }
+
           // Extract bank details fields with comprehensive name matching
           const stripeAccountEmail = findHeaderValue(row, [
             'Stripe Account Email',
@@ -442,7 +512,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'stripe_email'
           ])
 
-          const bankSubType = findHeaderValue(row, [
+          const bankSubTypeRaw = findHeaderValue(row, [
+            'Bank Sub Type (ACH / Domestic US Wire / International Wire)',
             'Bank Sub Type',
             'Bank sub type',
             'Bank Sub type',
@@ -545,35 +616,6 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Currency code'
           ])
 
-          // Check if any bank details are provided
-          if (
-            !stripeAccountEmail &&
-            !bankSubType &&
-            !hotelPortfolioName &&
-            !beneficiaryName &&
-            !beneficiaryAddress &&
-            !accountNumber &&
-            !accountName &&
-            !bankName &&
-            !bankBranch &&
-            !swiftBicIban &&
-            !routingNumber &&
-            !bankAccountType &&
-            !currency
-          ) {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: No bank details provided for '${propertyName}'`
-            )
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'No bank details provided to update'
-            })
-            result.failureCount++
-            continue
-          }
-
           // Check if bank details already exist
           const existingBankDetails =
             await this.propertyBankDetailsRepository.findByPropertyId(
@@ -583,8 +625,23 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           // Prepare update data
           const updateData: any = {}
 
-          // Determine bank type and set fields accordingly
-          if (stripeAccountEmail && stripeAccountEmail.trim()) {
+          // Process based on Bank Type
+          if (bankTypeNormalized === 'stripe') {
+            // Validate Stripe Account Email is provided
+            if (!stripeAccountEmail || !stripeAccountEmail.trim()) {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ Row ${rowNumber} FAILED: Stripe Account Email is required when Bank Type is Stripe for '${propertyName}'`
+              )
+              result.errors.push({
+                row: rowNumber,
+                property: propertyName,
+                error: 'Stripe Account Email is required when Bank Type is Stripe'
+              })
+              result.failureCount++
+              continue
+            }
+
             // Stripe account
             updateData.bank_type = BankType.stripe
             updateData.stripe_account_email = stripeAccountEmail.trim()
@@ -601,36 +658,58 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             updateData.routing_number = null
             updateData.bank_account_type = null
             updateData.currency = null
-          } else {
-            // Bank account - update provided fields
+          } else if (bankTypeNormalized === 'bank') {
+            // Bank account - validate bank_sub_type is provided
+            if (!bankSubTypeRaw) {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ Row ${rowNumber} FAILED: Bank Sub Type is required when Bank Type is Bank for '${propertyName}'`
+              )
+              result.errors.push({
+                row: rowNumber,
+                property: propertyName,
+                error:
+                  'Bank Sub Type is required when Bank Type is Bank (ACH / Domestic US Wire / International Wire)'
+              })
+              result.failureCount++
+              continue
+            }
+
             updateData.bank_type = BankType.bank
             updateData.stripe_account_email = null
 
-            // Set bank sub type if provided
-            if (bankSubType !== undefined) {
-              const normalizedSubType = bankSubType
-                .toLowerCase()
-                .replace(/\s+/g, '_')
-              if (
-                ['ach', 'domestic_wire', 'international_wire'].includes(
-                  normalizedSubType
-                )
-              ) {
-                updateData.bank_sub_type = normalizedSubType
-              } else {
-                console.log(
-                  '\x1b[31m%s\x1b[0m',
-                  `❌ Row ${rowNumber} FAILED: Invalid bank sub type '${bankSubType}' for '${propertyName}'`
-                )
-                result.errors.push({
-                  row: rowNumber,
-                  property: propertyName,
-                  error: `Invalid bank sub type: ${bankSubType}. Must be one of: ach, domestic_wire, international_wire`
-                })
-                result.failureCount++
-                continue
-              }
+            // Map bank sub type from Excel values to enum values
+            const bankSubTypeNormalized = bankSubTypeRaw.toLowerCase().trim()
+            let mappedBankSubType: string
+
+            if (bankSubTypeNormalized === 'ach') {
+              mappedBankSubType = 'ach'
+            } else if (
+              bankSubTypeNormalized === 'domestic us wire' ||
+              bankSubTypeNormalized === 'domestic_us_wire' ||
+              bankSubTypeNormalized === 'domestic wire'
+            ) {
+              mappedBankSubType = 'domestic_wire'
+            } else if (
+              bankSubTypeNormalized === 'international wire' ||
+              bankSubTypeNormalized === 'international_wire'
+            ) {
+              mappedBankSubType = 'international_wire'
+            } else {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ Row ${rowNumber} FAILED: Invalid Bank Sub Type '${bankSubTypeRaw}' for '${propertyName}'`
+              )
+              result.errors.push({
+                row: rowNumber,
+                property: propertyName,
+                error: `Invalid Bank Sub Type '${bankSubTypeRaw}'. Must be one of: ACH, Domestic US Wire, International Wire`
+              })
+              result.failureCount++
+              continue
             }
+
+            updateData.bank_sub_type = mappedBankSubType
 
             // Only add fields that are provided
             if (hotelPortfolioName !== undefined) {
@@ -696,91 +775,87 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             if (currency !== undefined) {
               updateData.currency = currency
             }
+          } else {
+            // Invalid bank type
+            console.log(
+              '\x1b[31m%s\x1b[0m',
+              `❌ Row ${rowNumber} FAILED: Invalid Bank Type '${bankTypeRaw}' for '${propertyName}'`
+            )
+            result.errors.push({
+              row: rowNumber,
+              property: propertyName,
+              error: `Invalid Bank Type '${bankTypeRaw}'. Must be one of: None, Stripe, Bank`
+            })
+            result.failureCount++
+            continue
+          }
 
-            // Validate based on bank_sub_type (if updating)
-            const finalSubType =
-              updateData.bank_sub_type !== undefined
-                ? updateData.bank_sub_type
-                : existingBankDetails?.bank_sub_type
+          // For Bank type, validate required fields based on sub-type
+          if (bankTypeNormalized === 'bank') {
+            const finalSubType = updateData.bank_sub_type
 
-            if (!finalSubType && !existingBankDetails) {
-              console.log(
-                '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: bank_sub_type is required for new bank account for '${propertyName}'`
-              )
-              result.errors.push({
-                row: rowNumber,
-                property: propertyName,
-                error: 'bank_sub_type is required for new bank account'
-              })
-              result.failureCount++
-              continue
+            const missingFields: string[] = []
+
+            // Merge with existing data for validation
+            const mergedData = {
+              hotel_portfolio_name:
+                updateData.hotel_portfolio_name !== undefined
+                  ? updateData.hotel_portfolio_name
+                  : existingBankDetails?.hotel_portfolio_name,
+              beneficiary_name:
+                updateData.beneficiary_name !== undefined
+                  ? updateData.beneficiary_name
+                  : existingBankDetails?.beneficiary_name,
+              beneficiary_address:
+                updateData.beneficiary_address !== undefined
+                  ? updateData.beneficiary_address
+                  : existingBankDetails?.beneficiary_address,
+              account_number:
+                updateData.account_number !== undefined
+                  ? updateData.account_number
+                  : existingBankDetails?.account_number,
+              bank_name:
+                updateData.bank_name !== undefined
+                  ? updateData.bank_name
+                  : existingBankDetails?.bank_name,
+              routing_number:
+                updateData.routing_number !== undefined
+                  ? updateData.routing_number
+                  : existingBankDetails?.routing_number,
+              swift_bic_iban:
+                updateData.swift_bic_iban !== undefined
+                  ? updateData.swift_bic_iban
+                  : existingBankDetails?.swift_bic_iban,
+              bank_account_type:
+                updateData.bank_account_type !== undefined
+                  ? updateData.bank_account_type
+                  : existingBankDetails?.bank_account_type,
+              currency:
+                updateData.currency !== undefined
+                  ? updateData.currency
+                  : existingBankDetails?.currency
             }
 
-            // Validate required fields based on sub-type
-            if (finalSubType) {
-              const missingFields: string[] = []
+            // Common required fields
+            if (
+              !mergedData.hotel_portfolio_name ||
+              !mergedData.hotel_portfolio_name.trim()
+            ) {
+              missingFields.push('Hotel Portfolio Name')
+            }
+            if (
+              !mergedData.account_number ||
+              !mergedData.account_number.trim()
+            ) {
+              missingFields.push('Account Number')
+            }
+            if (!mergedData.bank_name || !mergedData.bank_name.trim()) {
+              missingFields.push('Bank Name')
+            }
 
-              // Merge with existing data for validation
-              const mergedData = {
-                hotel_portfolio_name:
-                  updateData.hotel_portfolio_name !== undefined
-                    ? updateData.hotel_portfolio_name
-                    : existingBankDetails?.hotel_portfolio_name,
-                beneficiary_name:
-                  updateData.beneficiary_name !== undefined
-                    ? updateData.beneficiary_name
-                    : existingBankDetails?.beneficiary_name,
-                beneficiary_address:
-                  updateData.beneficiary_address !== undefined
-                    ? updateData.beneficiary_address
-                    : existingBankDetails?.beneficiary_address,
-                account_number:
-                  updateData.account_number !== undefined
-                    ? updateData.account_number
-                    : existingBankDetails?.account_number,
-                bank_name:
-                  updateData.bank_name !== undefined
-                    ? updateData.bank_name
-                    : existingBankDetails?.bank_name,
-                routing_number:
-                  updateData.routing_number !== undefined
-                    ? updateData.routing_number
-                    : existingBankDetails?.routing_number,
-                swift_bic_iban:
-                  updateData.swift_bic_iban !== undefined
-                    ? updateData.swift_bic_iban
-                    : existingBankDetails?.swift_bic_iban,
-                bank_account_type:
-                  updateData.bank_account_type !== undefined
-                    ? updateData.bank_account_type
-                    : existingBankDetails?.bank_account_type,
-                currency:
-                  updateData.currency !== undefined
-                    ? updateData.currency
-                    : existingBankDetails?.currency
-              }
-
-              // Common required fields
-              if (
-                !mergedData.hotel_portfolio_name ||
-                !mergedData.hotel_portfolio_name.trim()
-              ) {
-                missingFields.push('Hotel Portfolio Name')
-              }
-              if (
-                !mergedData.account_number ||
-                !mergedData.account_number.trim()
-              ) {
-                missingFields.push('Account Number')
-              }
-              if (!mergedData.bank_name || !mergedData.bank_name.trim()) {
-                missingFields.push('Bank Name')
-              }
-
-              // Sub-type specific validation
-              switch (finalSubType) {
-                case BankSubType.ach:
+            // Sub-type specific validation
+            switch (finalSubType) {
+              case BankSubType.ach:
                   if (
                     !mergedData.beneficiary_name ||
                     !mergedData.beneficiary_name.trim()
@@ -852,19 +927,18 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                   break
               }
 
-              if (missingFields.length > 0) {
-                console.log(
-                  '\x1b[31m%s\x1b[0m',
-                  `❌ Row ${rowNumber} FAILED: Missing required fields for ${finalSubType}: ${missingFields.join(', ')} for '${propertyName}'`
-                )
-                result.errors.push({
-                  row: rowNumber,
-                  property: propertyName,
-                  error: `Missing required fields for ${finalSubType}: ${missingFields.join(', ')}`
-                })
-                result.failureCount++
-                continue
-              }
+            if (missingFields.length > 0) {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ Row ${rowNumber} FAILED: Missing required fields for ${finalSubType}: ${missingFields.join(', ')} for '${propertyName}'`
+              )
+              result.errors.push({
+                row: rowNumber,
+                property: propertyName,
+                error: `Missing required fields for ${finalSubType}: ${missingFields.join(', ')}`
+              })
+              result.failureCount++
+              continue
             }
           }
 
