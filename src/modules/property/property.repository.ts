@@ -218,21 +218,18 @@ export class PropertyRepository implements IPropertyRepository {
           select: {
             id: true,
             name: true,
-            is_active: true
+            is_active: true,
+            service_type_id: true,
+            serviceType: {
+              select: {
+                id: true,
+                type: true
+              }
+            }
           }
         },
-        credentials: {
-          select: {
-            expedia_id: true,
-            agoda_id: true,
-            booking_id: true
-          }
-        },
-        bankDetails: {
-          select: {
-            bank_type: true
-          }
-        },
+        credentials: true,
+        bankDetails: true,
         pendingActions: {
           where: {
             status: 'PENDING'

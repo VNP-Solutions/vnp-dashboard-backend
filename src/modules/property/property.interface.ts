@@ -51,8 +51,17 @@ type PropertyWithPendingActions = Prisma.PropertyGetPayload<{
         id: true
         name: true
         is_active: true
+        service_type_id: true
+        serviceType: {
+          select: {
+            id: true
+            type: true
+          }
+        }
       }
     }
+    credentials: true
+    bankDetails: true
     pendingActions: {
       select: {
         id: true
