@@ -6,6 +6,8 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { PrismaService } from '../prisma/prisma.service'
 import { CreateCurrencyDto, ReorderCurrencyDto, UpdateCurrencyDto } from './currency.dto'
 import type {
   ICurrencyRepository,
@@ -16,7 +18,9 @@ import type {
 export class CurrencyService implements ICurrencyService {
   constructor(
     @Inject('ICurrencyRepository')
-    private currencyRepository: ICurrencyRepository
+    private currencyRepository: ICurrencyRepository,
+    @Inject(PrismaService)
+    private prisma: PrismaService
   ) {}
 
   async create(data: CreateCurrencyDto, _user: IUserWithPermissions) {
@@ -67,7 +71,27 @@ export class CurrencyService implements ICurrencyService {
     return this.currencyRepository.update(id, data)
   }
 
-  async remove(id: string, _user: IUserWithPermissions) {
+  async remove(id: string, password: string, user: IUserWithPermissions) {
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
     const currency = await this.currencyRepository.findById(id)
 
     if (!currency) {

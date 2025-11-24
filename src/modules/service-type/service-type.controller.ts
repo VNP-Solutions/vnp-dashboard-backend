@@ -24,7 +24,7 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreateServiceTypeDto, ReorderServiceTypeDto, UpdateServiceTypeDto } from './service-type.dto'
+import { CreateServiceTypeDto, DeleteServiceTypeDto, ReorderServiceTypeDto, UpdateServiceTypeDto } from './service-type.dto'
 import type { IServiceTypeService } from './service-type.interface'
 
 @ApiTags('Service Type')
@@ -98,9 +98,9 @@ export class ServiceTypeController {
     return this.serviceTypeService.update(id, updateServiceTypeDto, user)
   }
 
-  @Delete(':id')
+  @Post(':id/delete')
   @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.DELETE)
-  @ApiOperation({ summary: 'Delete a service type' })
+  @ApiOperation({ summary: 'Delete a service type (requires password verification)' })
   @ApiResponse({
     status: 200,
     description: 'Service type deleted successfully'
@@ -108,14 +108,18 @@ export class ServiceTypeController {
   @ApiResponse({ status: 404, description: 'Service type not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete service type with associated portfolios'
+    description: 'Cannot delete service type with associated portfolios or invalid password'
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions'
   })
-  remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.serviceTypeService.remove(id, user)
+  remove(
+    @Param('id') id: string,
+    @Body() deleteServiceTypeDto: DeleteServiceTypeDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.serviceTypeService.remove(id, deleteServiceTypeDto.password, user)
   }
 
   @Patch(':id/reorder')

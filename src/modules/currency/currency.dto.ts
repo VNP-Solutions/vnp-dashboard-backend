@@ -43,3 +43,13 @@ export class ReorderCurrencyDto {
   @IsNotEmpty()
   newOrder: number
 }
+
+export class DeleteCurrencyDto {
+  @ApiProperty({
+    example: 'MySecureP@ssw0rd',
+    description: 'User password for verification (required for deletion)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}

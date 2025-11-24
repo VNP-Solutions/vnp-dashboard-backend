@@ -36,7 +36,7 @@ export interface IAuditBatchService {
     data: UpdateAuditBatchDto,
     user: IUserWithPermissions
   ): Promise<AuditBatch>
-  remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  remove(id: string, password: string, user: IUserWithPermissions): Promise<{ message: string }>
   reorder(
     id: string,
     data: ReorderAuditBatchDto,

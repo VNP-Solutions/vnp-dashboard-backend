@@ -28,6 +28,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   AuditBatchQueryDto,
   CreateAuditBatchDto,
+  DeleteAuditBatchDto,
   ReorderAuditBatchDto,
   UpdateAuditBatchDto
 } from './audit-batch.dto'
@@ -108,21 +109,25 @@ export class AuditBatchController {
     return this.auditBatchService.update(id, updateAuditBatchDto, user)
   }
 
-  @Delete(':id')
+  @Post(':id/delete')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE)
-  @ApiOperation({ summary: 'Delete an audit batch' })
+  @ApiOperation({ summary: 'Delete an audit batch (requires password verification)' })
   @ApiResponse({ status: 200, description: 'Batch deleted successfully' })
   @ApiResponse({ status: 404, description: 'Batch not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete batch with associated audits'
+    description: 'Cannot delete batch with associated audits or invalid password'
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions'
   })
-  remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.auditBatchService.remove(id, user)
+  remove(
+    @Param('id') id: string,
+    @Body() deleteAuditBatchDto: DeleteAuditBatchDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.auditBatchService.remove(id, deleteAuditBatchDto.password, user)
   }
 
   @Patch(':id/reorder')
