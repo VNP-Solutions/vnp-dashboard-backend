@@ -15,15 +15,15 @@ import { PermissionService } from '../../common/services/permission.service'
 import { COMPLETED_AUDIT_STATUSES } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
-import { isUserSuperAdmin, isInternalUser } from '../../common/utils/permission.util'
+import {
+  isInternalUser,
+  isUserSuperAdmin
+} from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
+import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IServiceTypeRepository } from '../service-type/service-type.interface'
-import {
-  AttachmentUrlDto,
-  EmailAttachment
-} from '../email/email.dto'
 import {
   BulkImportResultDto,
   CreatePortfolioDto,
@@ -377,9 +377,7 @@ export class PortfolioService implements IPortfolioService {
 
     // Only super admin can delete portfolios
     if (!isSuperAdmin) {
-      throw new BadRequestException(
-        'Only Super Admin can delete portfolios'
-      )
+      throw new BadRequestException('Only Super Admin can delete portfolios')
     }
 
     // Fetch user with password from database for verification
@@ -425,7 +423,12 @@ export class PortfolioService implements IPortfolioService {
     return { message: 'Portfolio deleted successfully' }
   }
 
-  async deactivate(id: string, password: string, user: IUserWithPermissions, reason?: string) {
+  async deactivate(
+    id: string,
+    password: string,
+    user: IUserWithPermissions,
+    reason?: string
+  ) {
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
 
@@ -557,7 +560,8 @@ export class PortfolioService implements IPortfolioService {
       access_email: portfolio.access_email,
       sending_to: portfolio.contact_email,
       subject,
-      hasAttachments: (uploadedAttachments?.length || 0) + (attachmentUrls?.length || 0) > 0
+      hasAttachments:
+        (uploadedAttachments?.length || 0) + (attachmentUrls?.length || 0) > 0
     })
 
     // Combine attachments from file uploads and URLs
@@ -711,6 +715,7 @@ export class PortfolioService implements IPortfolioService {
 
           // Extract contract URL (optional)
           const contractUrl = findHeaderValue(row, [
+            'Documents',
             'Contract URL',
             'Contract Url',
             'Contract url'
