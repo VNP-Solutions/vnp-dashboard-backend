@@ -320,6 +320,24 @@ export class DeactivatePropertyDto {
   reason?: string
 }
 
+export class ActivatePropertyDto {
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+
+  @ApiPropertyOptional({
+    example: 'Property is ready for operations again',
+    description: 'Reason for activating the property (required for internal users, optional for super admin)'
+  })
+  @IsString()
+  @IsOptional()
+  reason?: string
+}
+
 export class CompletePropertyCredentialsDto {
   @ApiProperty({
     description: 'Expedia credentials (required)',

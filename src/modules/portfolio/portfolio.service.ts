@@ -524,6 +524,107 @@ export class PortfolioService implements IPortfolioService {
     }
   }
 
+  async activate(
+    id: string,
+    password: string,
+    user: IUserWithPermissions,
+    reason?: string
+  ) {
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const isInternal = isInternalUser(user)
+
+    // Only super admin and internal users can activate portfolios
+    if (!isSuperAdmin && !isInternal) {
+      throw new BadRequestException(
+        'Only Super Admin and internal users can activate portfolios'
+      )
+    }
+
+    // Internal users (non-super admin) must provide a reason
+    if (!isSuperAdmin && isInternal && !reason) {
+      throw new BadRequestException(
+        'Reason is required for internal users to activate portfolios'
+      )
+    }
+
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    const portfolio = await this.portfolioRepository.findById(
+      id,
+      user.id,
+      isSuperAdmin
+    )
+
+    if (!portfolio) {
+      throw new NotFoundException('Portfolio not found')
+    }
+
+    // Check if portfolio is already active
+    if (portfolio.is_active) {
+      throw new BadRequestException('Portfolio is already active')
+    }
+
+    // Super admin can activate directly
+    if (isSuperAdmin) {
+      await this.prisma.portfolio.update({
+        where: { id },
+        data: { is_active: true }
+      })
+      return { message: 'Portfolio activated successfully' }
+    }
+
+    // Internal users (non-super admin) need to create a pending action
+    // Check if there's already a pending activation request
+    const existingPendingAction = await this.prisma.pendingAction.findFirst({
+      where: {
+        portfolio_id: id,
+        action_type: 'PORTFOLIO_ACTIVATE',
+        status: 'PENDING'
+      }
+    })
+
+    if (existingPendingAction) {
+      throw new BadRequestException(
+        'An activation request for this portfolio is already pending approval'
+      )
+    }
+
+    // Create pending action
+    await this.prisma.pendingAction.create({
+      data: {
+        resource_type: 'portfolio',
+        portfolio_id: id,
+        action_type: 'PORTFOLIO_ACTIVATE',
+        status: 'PENDING',
+        requested_user_id: user.id,
+        reason: reason
+      }
+    })
+
+    return {
+      message:
+        'Activation request submitted successfully and is pending super admin approval'
+    }
+  }
+
   async sendEmail(
     id: string,
     subject: string,

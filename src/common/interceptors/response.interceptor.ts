@@ -41,6 +41,21 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, Response<T>> {
           }
         }
 
+        // Handle responses that only contain a message (e.g., delete, activate, deactivate operations)
+        if (
+          data &&
+          typeof data === 'object' &&
+          'message' in data &&
+          Object.keys(data).length <= 2
+        ) {
+          const messageData = data as { message: string; pending_action?: unknown }
+          return {
+            success: true,
+            message: messageData.message,
+            data: messageData.pending_action ? data as T : undefined
+          }
+        }
+
         return {
           success: true,
           message: 'Operation successful',

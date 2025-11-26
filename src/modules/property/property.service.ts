@@ -976,6 +976,59 @@ export class PropertyService implements IPropertyService {
     }
   }
 
+  async activate(id: string, user: IUserWithPermissions, reason?: string) {
+    const property = await this.propertyRepository.findById(id)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    // Check if property is already active
+    if (property.is_active) {
+      throw new BadRequestException('Property is already active')
+    }
+
+    // External users cannot activate properties
+    if (!isInternalUser(user)) {
+      throw new ForbiddenException(
+        'External users cannot activate properties'
+      )
+    }
+
+    const isSuperAdmin = isUserSuperAdmin(user)
+
+    // Internal users (non-super admin) must provide a reason
+    if (!isSuperAdmin && !reason) {
+      throw new BadRequestException(
+        'Reason is required for internal users to activate properties'
+      )
+    }
+
+    // Super admins can directly activate
+    if (isSuperAdmin) {
+      await this.prisma.property.update({
+        where: { id },
+        data: { is_active: true }
+      })
+      return { message: 'Property activated successfully' }
+    }
+
+    // Internal non-super admin users create pending action for approval
+    const pendingAction = await this.pendingActionRepository.create({
+      resource_type: 'property',
+      property_id: id,
+      action_type: 'PROPERTY_ACTIVATE',
+      requested_user_id: user.id,
+      reason: reason
+    })
+
+    return {
+      message:
+        'Activation request submitted for approval. A super admin will review your request.',
+      pending_action: pendingAction
+    }
+  }
+
   async bulkImport(
     file: Express.Multer.File,
     _user: IUserWithPermissions
