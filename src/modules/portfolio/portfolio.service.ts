@@ -483,12 +483,10 @@ export class PortfolioService implements IPortfolioService {
 
     // Super admin can deactivate directly
     if (isSuperAdmin) {
-      await this.portfolioRepository.update(
-        id,
-        { is_active: false },
-        user.id,
-        isSuperAdmin
-      )
+      await this.prisma.portfolio.update({
+        where: { id },
+        data: { is_active: false }
+      })
       return { message: 'Portfolio deactivated successfully' }
     }
 
