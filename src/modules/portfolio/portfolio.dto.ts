@@ -279,3 +279,21 @@ export class DeactivatePortfolioDto {
   @IsOptional()
   reason?: string
 }
+
+export class ActivatePortfolioDto {
+  @ApiProperty({
+    example: 'MySecureP@ssw0rd',
+    description: 'User password for verification (required for super admin and internal users to activate portfolio)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+
+  @ApiPropertyOptional({
+    example: 'Portfolio is ready for operations again',
+    description: 'Reason for activating the portfolio (required for internal users, optional for super admin)'
+  })
+  @IsString()
+  @IsOptional()
+  reason?: string
+}

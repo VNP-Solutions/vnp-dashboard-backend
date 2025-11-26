@@ -32,6 +32,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { EmailAttachment } from '../email/email.dto'
 import {
+  ActivatePortfolioDto,
   CreatePortfolioDto,
   DeactivatePortfolioDto,
   DeletePortfolioDto,
@@ -188,6 +189,42 @@ export class PortfolioController {
       deactivatePortfolioDto.password,
       user,
       deactivatePortfolioDto.reason
+    )
+  }
+
+  @Post(':id/activate')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary:
+      'Activate a portfolio (Super Admin and internal users with password verification)',
+    description:
+      'Super Admin can activate directly. Internal users create a pending action for approval.'
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Portfolio activated successfully or activation request submitted'
+  })
+  @ApiResponse({ status: 404, description: 'Portfolio not found' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Portfolio already active or pending request exists or only Super Admin and internal users can activate or invalid password'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  activate(
+    @Param('id') id: string,
+    @Body() activatePortfolioDto: ActivatePortfolioDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.activate(
+      id,
+      activatePortfolioDto.password,
+      user,
+      activatePortfolioDto.reason
     )
   }
 

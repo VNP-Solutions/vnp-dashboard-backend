@@ -34,6 +34,7 @@ import type { IAuthRepository } from '../auth/auth.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
+  ActivatePropertyDto,
   BulkTransferPropertyDto,
   CompleteCreatePropertyDto,
   CreatePropertyDto,
@@ -457,6 +458,46 @@ export class PropertyController {
     }
 
     return this.propertyService.deactivate(id, user, deactivatePropertyDto.reason)
+  }
+
+  @Post(':id/activate')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Activate a property (Internal users only, requires password verification)',
+    description: 'Super admins can directly activate. Internal non-admin users create a pending action. External users cannot activate. Password verification is required for all.'
+  })
+  @ApiResponse({ status: 200, description: 'Property activated successfully or activation request submitted for approval' })
+  @ApiResponse({ status: 404, description: 'Property not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid password or property already active'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - External users cannot activate properties'
+  })
+  async activate(
+    @Param('id') id: string,
+    @Body() activatePropertyDto: ActivatePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // Password validation is required for all users during activation
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      activatePropertyDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    return this.propertyService.activate(id, user, activatePropertyDto.reason)
   }
 
   @Post('bulk-import')
