@@ -34,6 +34,7 @@ import {
   BulkImportResultDto,
   BulkTransferPropertyDto,
   CompleteCreatePropertyDto,
+  CompleteUpdatePropertyDto,
   CreatePropertyDto,
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
@@ -147,6 +148,66 @@ export class PropertyService implements IPropertyService {
     }
 
     return property
+  }
+
+  async completeUpdate(
+    id: string,
+    data: CompleteUpdatePropertyDto,
+    user: IUserWithPermissions
+  ) {
+    // Validate property exists
+    const property = await this.propertyRepository.findById(id)
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    // Check ownership: Only the owner portfolio can update the property
+    await this.validatePropertyOwnership(property, user)
+
+    // Validate property name uniqueness if being updated
+    if (data.property?.name && data.property.name !== property.name) {
+      const existingProperty = await this.propertyRepository.findByName(
+        data.property.name
+      )
+      if (existingProperty) {
+        throw new ConflictException('Property with this name already exists')
+      }
+    }
+
+    // Validate portfolio exists if being updated
+    if (
+      data.property?.portfolio_id &&
+      data.property.portfolio_id !== property.portfolio_id
+    ) {
+      const portfolio = await this.portfolioRepository.findById(
+        data.property.portfolio_id
+      )
+      if (!portfolio) {
+        throw new NotFoundException('Portfolio not found')
+      }
+    }
+
+    // Validate currency exists if being updated
+    if (
+      data.property?.currency_id &&
+      data.property.currency_id !== property.currency_id
+    ) {
+      const currency = await this.currencyRepository.findById(
+        data.property.currency_id
+      )
+      if (!currency) {
+        throw new NotFoundException('Currency not found')
+      }
+    }
+
+    // Update property with credentials and bank details in a transaction
+    return this.propertyRepository.completeUpdate(
+      id,
+      data.property,
+      data.credentials,
+      data.bank_details,
+      user.id
+    )
   }
 
   async findAll(query: PropertyQueryDto, user: IUserWithPermissions) {

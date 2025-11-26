@@ -37,6 +37,7 @@ import {
   ActivatePropertyDto,
   BulkTransferPropertyDto,
   CompleteCreatePropertyDto,
+  CompleteUpdatePropertyDto,
   CreatePropertyDto,
   DeactivatePropertyDto,
   DeletePropertyDto,
@@ -106,6 +107,42 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.propertyService.completeCreate(completeCreateDto, user)
+  }
+
+  @Patch(':id/complete-update')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Update a property with credentials and bank details in a single transaction',
+    description:
+      'Updates a property along with optional credentials and bank details. All operations are performed in a transaction and will be rolled back if any operation fails. ' +
+      'All fields are optional - only provided fields will be updated.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Property with credentials and bank details updated successfully'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid data or validation errors'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions or not property owner'
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Property not found'
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - Property name already exists'
+  })
+  completeUpdate(
+    @Param('id') id: string,
+    @Body() completeUpdateDto: CompleteUpdatePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.completeUpdate(id, completeUpdateDto, user)
   }
 
   @Get()

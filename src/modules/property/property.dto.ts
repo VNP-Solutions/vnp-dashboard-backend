@@ -513,3 +513,32 @@ export class CompleteCreatePropertyDto {
   @IsOptional()
   bank_details?: CompleteBankDetailsDto
 }
+
+export class CompleteUpdatePropertyDto {
+  @ApiPropertyOptional({
+    description: 'Property data to update',
+    type: UpdatePropertyDto
+  })
+  @ValidateNested()
+  @Type(() => UpdatePropertyDto)
+  @IsOptional()
+  property?: UpdatePropertyDto
+
+  @ApiPropertyOptional({
+    description: 'Property credentials to update (optional)',
+    type: CompletePropertyCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => CompletePropertyCredentialsDto)
+  @IsOptional()
+  credentials?: CompletePropertyCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Property bank details to update (optional)',
+    type: CompleteBankDetailsDto
+  })
+  @ValidateNested()
+  @Type(() => CompleteBankDetailsDto)
+  @IsOptional()
+  bank_details?: CompleteBankDetailsDto
+}
