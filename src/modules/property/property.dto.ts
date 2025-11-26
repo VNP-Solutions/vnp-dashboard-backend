@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/mapped-types'
+import { OmitType, PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
@@ -84,7 +84,10 @@ export class CreatePropertyDto {
   show_in_portfolio?: string[]
 }
 
-export class UpdatePropertyDto extends PartialType(CreatePropertyDto) {
+// Exclude is_active from UpdatePropertyDto - use dedicated deactivate API instead
+export class UpdatePropertyDto extends PartialType(
+  OmitType(CreatePropertyDto, ['is_active'] as const)
+) {
   @ApiPropertyOptional({
     example: '507f1f77bcf86cd799439013',
     description: 'Previous Portfolio ID (used for tracking transfer history)'

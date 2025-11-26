@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/mapped-types'
+import { OmitType, PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
   IsArray,
@@ -90,7 +90,10 @@ export class CreatePortfolioDto {
   access_phone?: string
 }
 
-export class UpdatePortfolioDto extends PartialType(CreatePortfolioDto) {}
+// Exclude is_active from UpdatePortfolioDto - use dedicated deactivate API instead
+export class UpdatePortfolioDto extends PartialType(
+  OmitType(CreatePortfolioDto, ['is_active'] as const)
+) {}
 
 export class PortfolioQueryDto extends QueryDto {
   @ApiPropertyOptional({

@@ -944,7 +944,10 @@ export class PropertyService implements IPropertyService {
 
     // Super admins can directly deactivate
     if (isSuperAdmin) {
-      await this.propertyRepository.update(id, { is_active: false })
+      await this.prisma.property.update({
+        where: { id },
+        data: { is_active: false }
+      })
       return { message: 'Property deactivated successfully' }
     }
 
@@ -1268,22 +1271,19 @@ export class PropertyService implements IPropertyService {
           let propertyId: string
 
           if (existingProperty) {
-            // Update existing property
-            const updateData: UpdatePropertyDto = {
-              address: address,
-              currency_id: currency.id,
-              card_descriptor: cardDescriptor || undefined,
-              is_active: true,
-              next_due_date: nextDueDate
-                ? nextDueDate.toISOString()
-                : undefined,
-              portfolio_id: portfolio.id
-            }
-
-            await this.propertyRepository.update(
-              existingProperty.id,
-              updateData
-            )
+            // Update existing property - use Prisma directly since bulk import
+            // needs to set is_active which is excluded from UpdatePropertyDto
+            await this.prisma.property.update({
+              where: { id: existingProperty.id },
+              data: {
+                address: address,
+                currency_id: currency.id,
+                card_descriptor: cardDescriptor || undefined,
+                is_active: true,
+                next_due_date: nextDueDate || undefined,
+                portfolio_id: portfolio.id
+              }
+            })
             propertyId = existingProperty.id
           } else {
             // Create new property
