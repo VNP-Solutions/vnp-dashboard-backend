@@ -6,6 +6,7 @@ import {
   CompleteBankDetailsDto,
   CompleteCreatePropertyDto,
   CompletePropertyCredentialsDto,
+  CompleteUpdatePropertyDto,
   CreatePropertyDto,
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
@@ -133,6 +134,13 @@ export interface IPropertyRepository {
     bankDetailsData?: CompleteBankDetailsDto,
     userId?: string
   ): Promise<PropertyWithFullDetails>
+  completeUpdate(
+    propertyId: string,
+    propertyData?: UpdatePropertyDto,
+    credentialsData?: CompletePropertyCredentialsDto,
+    bankDetailsData?: CompleteBankDetailsDto,
+    userId?: string
+  ): Promise<PropertyWithFullDetails>
   findAll(
     queryOptions: any,
     propertyIds?: string[]
@@ -153,6 +161,11 @@ export interface IPropertyService {
   ): Promise<PropertyWithRelations>
   completeCreate(
     data: CompleteCreatePropertyDto,
+    user: IUserWithPermissions
+  ): Promise<PropertyWithFullDetails>
+  completeUpdate(
+    id: string,
+    data: CompleteUpdatePropertyDto,
     user: IUserWithPermissions
   ): Promise<PropertyWithFullDetails>
   findAll(
