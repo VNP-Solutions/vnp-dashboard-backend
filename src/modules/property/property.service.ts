@@ -314,7 +314,13 @@ export class PropertyService implements IPropertyService {
       this.propertyRepository.count(where, undefined)
     ])
 
+    // Get encryption secret for decrypting passwords
+    const encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+
     // Add access_type field, viewing context, and pending action info to each property
+    // Also decrypt credential passwords
     const enrichedData = data.map((property: any) => {
       const isShared =
         query.portfolio_id && property.portfolio_id !== query.portfolio_id
@@ -328,8 +334,51 @@ export class PropertyService implements IPropertyService {
       // Remove pendingActions array from response to avoid duplication
       const { _pendingActions, ...propertyWithoutPendingActions } = property
 
+      // Decrypt credential passwords if credentials exist
+      let decryptedCredentials = propertyWithoutPendingActions.credentials
+      if (decryptedCredentials) {
+        decryptedCredentials = { ...decryptedCredentials }
+
+        // Decrypt Expedia password
+        if (decryptedCredentials.expedia_password) {
+          try {
+            decryptedCredentials.expedia_password = EncryptionUtil.decrypt(
+              decryptedCredentials.expedia_password,
+              encryptionSecret
+            )
+          } catch {
+            // If decryption fails, keep the original value
+          }
+        }
+
+        // Decrypt Agoda password
+        if (decryptedCredentials.agoda_password) {
+          try {
+            decryptedCredentials.agoda_password = EncryptionUtil.decrypt(
+              decryptedCredentials.agoda_password,
+              encryptionSecret
+            )
+          } catch {
+            // If decryption fails, keep the original value
+          }
+        }
+
+        // Decrypt Booking password
+        if (decryptedCredentials.booking_password) {
+          try {
+            decryptedCredentials.booking_password = EncryptionUtil.decrypt(
+              decryptedCredentials.booking_password,
+              encryptionSecret
+            )
+          } catch {
+            // If decryption fails, keep the original value
+          }
+        }
+      }
+
       return {
         ...propertyWithoutPendingActions,
+        credentials: decryptedCredentials,
         access_type: accessType,
         // Add viewing_portfolio_id for shared properties (the portfolio context user is viewing from)
         viewing_portfolio_id: isShared
@@ -506,7 +555,13 @@ export class PropertyService implements IPropertyService {
       undefined
     )
 
+    // Get encryption secret for decrypting passwords
+    const encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+
     // Add access_type field and pending action info to each property
+    // Also decrypt credential passwords for export
     const enrichedData = data.map((property: any) => {
       const isShared =
         query.portfolio_id && property.portfolio_id !== query.portfolio_id
@@ -520,8 +575,51 @@ export class PropertyService implements IPropertyService {
       // Remove pendingActions array from response to avoid duplication
       const { _pendingActions, ...propertyWithoutPendingActions } = property
 
+      // Decrypt credential passwords if credentials exist
+      let decryptedCredentials = propertyWithoutPendingActions.credentials
+      if (decryptedCredentials) {
+        decryptedCredentials = { ...decryptedCredentials }
+
+        // Decrypt Expedia password
+        if (decryptedCredentials.expedia_password) {
+          try {
+            decryptedCredentials.expedia_password = EncryptionUtil.decrypt(
+              decryptedCredentials.expedia_password,
+              encryptionSecret
+            )
+          } catch {
+            // If decryption fails, keep the original value
+          }
+        }
+
+        // Decrypt Agoda password
+        if (decryptedCredentials.agoda_password) {
+          try {
+            decryptedCredentials.agoda_password = EncryptionUtil.decrypt(
+              decryptedCredentials.agoda_password,
+              encryptionSecret
+            )
+          } catch {
+            // If decryption fails, keep the original value
+          }
+        }
+
+        // Decrypt Booking password
+        if (decryptedCredentials.booking_password) {
+          try {
+            decryptedCredentials.booking_password = EncryptionUtil.decrypt(
+              decryptedCredentials.booking_password,
+              encryptionSecret
+            )
+          } catch {
+            // If decryption fails, keep the original value
+          }
+        }
+      }
+
       return {
         ...propertyWithoutPendingActions,
+        credentials: decryptedCredentials,
         access_type: accessType,
         // Add viewing_portfolio_id for shared properties (the portfolio context user is viewing from)
         viewing_portfolio_id: isShared
