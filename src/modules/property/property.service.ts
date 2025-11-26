@@ -177,10 +177,6 @@ export class PropertyService implements IPropertyService {
     if (query.bank_type) {
       additionalFilters.bank_type = query.bank_type
     }
-    if (query.access_level) {
-      additionalFilters.access_level = query.access_level
-    }
-
     // Handle portfolio_id filter with shared properties support
     let portfolioFilter: any = {}
     if (query.portfolio_id) {
@@ -261,41 +257,52 @@ export class PropertyService implements IPropertyService {
       }
     }
 
-    // Handle access_level filter for credentials
-    if (query.access_level && query.access_level.toLowerCase() !== 'all') {
-      const accessLevel = query.access_level.toLowerCase()
+    // Handle credential_type filter for credentials
+    if (query.credential_type && query.credential_type.toLowerCase() !== 'all') {
+      const credentialType = query.credential_type.toLowerCase()
 
-      if (accessLevel === 'full') {
-        // All three IDs must exist
+      // Helper to create filter for non-null and non-empty credential field
+      const credentialNotEmpty = (field: string) => ({
+        AND: [{ [field]: { not: null } }, { [field]: { not: '' } }]
+      })
+
+      if (credentialType === 'full') {
+        // All three IDs must exist and be non-empty
         where = {
           ...where,
           credentials: {
-            AND: [
-              { expedia_id: { not: null } },
-              { agoda_id: { not: null } },
-              { booking_id: { not: null } }
-            ]
+            isNot: null,
+            is: {
+              AND: [
+                ...credentialNotEmpty('expedia_id').AND,
+                ...credentialNotEmpty('agoda_id').AND,
+                ...credentialNotEmpty('booking_id').AND
+              ]
+            }
           }
         }
-      } else if (accessLevel === 'expedia') {
+      } else if (credentialType === 'expedia') {
         where = {
           ...where,
           credentials: {
-            expedia_id: { not: null }
+            isNot: null,
+            is: credentialNotEmpty('expedia_id')
           }
         }
-      } else if (accessLevel === 'booking') {
+      } else if (credentialType === 'booking') {
         where = {
           ...where,
           credentials: {
-            booking_id: { not: null }
+            isNot: null,
+            is: credentialNotEmpty('booking_id')
           }
         }
-      } else if (accessLevel === 'agoda') {
+      } else if (credentialType === 'agoda') {
         where = {
           ...where,
           credentials: {
-            agoda_id: { not: null }
+            isNot: null,
+            is: credentialNotEmpty('agoda_id')
           }
         }
       }
@@ -366,9 +373,6 @@ export class PropertyService implements IPropertyService {
     }
     if (query.bank_type) {
       additionalFilters.bank_type = query.bank_type
-    }
-    if (query.access_level) {
-      additionalFilters.access_level = query.access_level
     }
 
     // Handle portfolio_id filter with shared properties support
@@ -451,41 +455,52 @@ export class PropertyService implements IPropertyService {
       }
     }
 
-    // Handle access_level filter for credentials
-    if (query.access_level && query.access_level.toLowerCase() !== 'all') {
-      const accessLevel = query.access_level.toLowerCase()
+    // Handle credential_type filter for credentials
+    if (query.credential_type && query.credential_type.toLowerCase() !== 'all') {
+      const credentialType = query.credential_type.toLowerCase()
 
-      if (accessLevel === 'full') {
-        // All three IDs must exist
+      // Helper to create filter for non-null and non-empty credential field
+      const credentialNotEmpty = (field: string) => ({
+        AND: [{ [field]: { not: null } }, { [field]: { not: '' } }]
+      })
+
+      if (credentialType === 'full') {
+        // All three IDs must exist and be non-empty
         where = {
           ...where,
           credentials: {
-            AND: [
-              { expedia_id: { not: null } },
-              { agoda_id: { not: null } },
-              { booking_id: { not: null } }
-            ]
+            isNot: null,
+            is: {
+              AND: [
+                ...credentialNotEmpty('expedia_id').AND,
+                ...credentialNotEmpty('agoda_id').AND,
+                ...credentialNotEmpty('booking_id').AND
+              ]
+            }
           }
         }
-      } else if (accessLevel === 'expedia') {
+      } else if (credentialType === 'expedia') {
         where = {
           ...where,
           credentials: {
-            expedia_id: { not: null }
+            isNot: null,
+            is: credentialNotEmpty('expedia_id')
           }
         }
-      } else if (accessLevel === 'booking') {
+      } else if (credentialType === 'booking') {
         where = {
           ...where,
           credentials: {
-            booking_id: { not: null }
+            isNot: null,
+            is: credentialNotEmpty('booking_id')
           }
         }
-      } else if (accessLevel === 'agoda') {
+      } else if (credentialType === 'agoda') {
         where = {
           ...where,
           credentials: {
-            agoda_id: { not: null }
+            isNot: null,
+            is: credentialNotEmpty('agoda_id')
           }
         }
       }

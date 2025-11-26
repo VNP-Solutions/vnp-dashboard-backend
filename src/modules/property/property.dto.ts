@@ -177,12 +177,12 @@ export class PropertyQueryDto extends QueryDto {
   is_active?: string
 
   @ApiPropertyOptional({
-    description: 'Filter by access level (full/expedia/booking/agoda/All)',
+    description: 'Filter by credential type (full/expedia/booking/agoda/all)',
     example: 'full'
   })
   @IsOptional()
   @IsString()
-  access_level?: string
+  credential_type?: string
 }
 
 export class SharePropertyDto {
