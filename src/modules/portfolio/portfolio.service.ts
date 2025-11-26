@@ -206,8 +206,25 @@ export class PortfolioService implements IPortfolioService {
       this.portfolioRepository.count(where, undefined)
     ])
 
+    // Add pending action info to each portfolio
+    const enrichedData = data.map((portfolio: any) => {
+      const hasPendingAction =
+        portfolio.pendingActions && portfolio.pendingActions.length > 0
+      const pendingAction = hasPendingAction ? portfolio.pendingActions[0] : null
+
+      // Remove pendingActions array from response to avoid duplication
+      const { pendingActions: _pendingActions, ...portfolioWithoutPendingActions } =
+        portfolio
+
+      return {
+        ...portfolioWithoutPendingActions,
+        has_pending_action: hasPendingAction,
+        pending_action: pendingAction
+      }
+    })
+
     return QueryBuilder.buildPaginatedResult(
-      data,
+      enrichedData,
       total,
       query.page || 1,
       query.limit || 10
@@ -293,7 +310,24 @@ export class PortfolioService implements IPortfolioService {
       userIsSuperAdmin
     )
 
-    return data
+    // Add pending action info to each portfolio
+    const enrichedData = data.map((portfolio: any) => {
+      const hasPendingAction =
+        portfolio.pendingActions && portfolio.pendingActions.length > 0
+      const pendingAction = hasPendingAction ? portfolio.pendingActions[0] : null
+
+      // Remove pendingActions array from response to avoid duplication
+      const { pendingActions: _pendingActions, ...portfolioWithoutPendingActions } =
+        portfolio
+
+      return {
+        ...portfolioWithoutPendingActions,
+        has_pending_action: hasPendingAction,
+        pending_action: pendingAction
+      }
+    })
+
+    return enrichedData
   }
 
   async findOne(id: string, user: IUserWithPermissions) {

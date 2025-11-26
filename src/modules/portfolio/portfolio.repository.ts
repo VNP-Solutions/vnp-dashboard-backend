@@ -46,6 +46,30 @@ export class PortfolioRepository implements IPortfolioRepository {
             type: true,
             is_active: true
           }
+        },
+        pendingActions: {
+          where: {
+            status: 'PENDING'
+          },
+          select: {
+            id: true,
+            action_type: true,
+            status: true,
+            requested_user_id: true,
+            reason: true,
+            created_at: true,
+            requestedBy: {
+              select: {
+                id: true,
+                email: true,
+                first_name: true,
+                last_name: true
+              }
+            }
+          },
+          orderBy: {
+            created_at: 'desc'
+          }
         }
       }
     })
