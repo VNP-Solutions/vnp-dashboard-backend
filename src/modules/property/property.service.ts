@@ -258,26 +258,20 @@ export class PropertyService implements IPropertyService {
     }
 
     // Handle credential_type filter for credentials
+    // Filter properties based on which OTA credentials they have
     if (query.credential_type && query.credential_type.toLowerCase() !== 'all') {
       const credentialType = query.credential_type.toLowerCase()
 
-      // Helper to create filter for non-null and non-empty credential field
-      const credentialNotEmpty = (field: string) => ({
-        AND: [{ [field]: { not: null } }, { [field]: { not: '' } }]
-      })
-
+      // Use gt: '' to check field is not null AND not empty (works for MongoDB string fields)
       if (credentialType === 'full') {
         // All three IDs must exist and be non-empty
         where = {
           ...where,
           credentials: {
-            isNot: null,
             is: {
-              AND: [
-                ...credentialNotEmpty('expedia_id').AND,
-                ...credentialNotEmpty('agoda_id').AND,
-                ...credentialNotEmpty('booking_id').AND
-              ]
+              expedia_id: { gt: '' },
+              agoda_id: { gt: '' },
+              booking_id: { gt: '' }
             }
           }
         }
@@ -285,24 +279,27 @@ export class PropertyService implements IPropertyService {
         where = {
           ...where,
           credentials: {
-            isNot: null,
-            is: credentialNotEmpty('expedia_id')
+            is: {
+              expedia_id: { gt: '' }
+            }
           }
         }
       } else if (credentialType === 'booking') {
         where = {
           ...where,
           credentials: {
-            isNot: null,
-            is: credentialNotEmpty('booking_id')
+            is: {
+              booking_id: { gt: '' }
+            }
           }
         }
       } else if (credentialType === 'agoda') {
         where = {
           ...where,
           credentials: {
-            isNot: null,
-            is: credentialNotEmpty('agoda_id')
+            is: {
+              agoda_id: { gt: '' }
+            }
           }
         }
       }
@@ -456,26 +453,20 @@ export class PropertyService implements IPropertyService {
     }
 
     // Handle credential_type filter for credentials
+    // Filter properties based on which OTA credentials they have
     if (query.credential_type && query.credential_type.toLowerCase() !== 'all') {
       const credentialType = query.credential_type.toLowerCase()
 
-      // Helper to create filter for non-null and non-empty credential field
-      const credentialNotEmpty = (field: string) => ({
-        AND: [{ [field]: { not: null } }, { [field]: { not: '' } }]
-      })
-
+      // Use gt: '' to check field is not null AND not empty (works for MongoDB string fields)
       if (credentialType === 'full') {
         // All three IDs must exist and be non-empty
         where = {
           ...where,
           credentials: {
-            isNot: null,
             is: {
-              AND: [
-                ...credentialNotEmpty('expedia_id').AND,
-                ...credentialNotEmpty('agoda_id').AND,
-                ...credentialNotEmpty('booking_id').AND
-              ]
+              expedia_id: { gt: '' },
+              agoda_id: { gt: '' },
+              booking_id: { gt: '' }
             }
           }
         }
@@ -483,24 +474,27 @@ export class PropertyService implements IPropertyService {
         where = {
           ...where,
           credentials: {
-            isNot: null,
-            is: credentialNotEmpty('expedia_id')
+            is: {
+              expedia_id: { gt: '' }
+            }
           }
         }
       } else if (credentialType === 'booking') {
         where = {
           ...where,
           credentials: {
-            isNot: null,
-            is: credentialNotEmpty('booking_id')
+            is: {
+              booking_id: { gt: '' }
+            }
           }
         }
       } else if (credentialType === 'agoda') {
         where = {
           ...where,
           credentials: {
-            isNot: null,
-            is: credentialNotEmpty('agoda_id')
+            is: {
+              agoda_id: { gt: '' }
+            }
           }
         }
       }
