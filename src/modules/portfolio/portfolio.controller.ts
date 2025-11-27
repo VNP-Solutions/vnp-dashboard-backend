@@ -359,6 +359,82 @@ export class PortfolioController {
     return this.portfolioService.bulkImport(file, user)
   }
 
+  @Post('bulk-update')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Bulk update portfolios from Excel file',
+    description: `
+    Upload an Excel file (.xlsx or .xls) to bulk update existing portfolios.
+    Only Super Admin and internal users can use this endpoint.
+    
+    Required column:
+    - Portfolio ID/Portfolio Id/Portfolio id/portfolio_id/ID/Id/id: ID of the portfolio to update (must exist)
+    
+    Optional columns (only update if provided):
+    - Portfolio Name/Portfolio name/Name: Name of the portfolio
+    - Service Type/Service type: Service type name (will be created if doesn't exist)
+    - Active status/Active Status/Status/Is Active: Active status (Active/Inactive)
+    - Contact Email/Contact email/Contact: Contact email
+    - Access Email/Access email: Access email
+    - Access Phone/Access phone/Access Phone NO/Access Phone No/Access Contact: Access phone
+    - Documents/Contract URL/Contract Url/Contract url: Contract URL(s) - comma-separated (Super Admin only)
+    - Commissionable/Is Commissionable/is_commissionable: Commissionable status (Yes/No)
+    - Sales Agent/Sales agent: Sales agent name (required if commissionable is Yes)
+    
+    Note: Empty cells will keep existing values unchanged.
+    `
+  })
+  @ApiBody({
+    description: 'Excel file containing portfolio update data',
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk update completed successfully',
+    schema: {
+      example: {
+        totalRows: 10,
+        successCount: 8,
+        failureCount: 2,
+        errors: [
+          {
+            row: 3,
+            portfolioId: '507f1f77bcf86cd799439011',
+            error: 'Portfolio not found'
+          }
+        ],
+        successfulUpdates: [
+          '507f1f77bcf86cd799439012',
+          '507f1f77bcf86cd799439013'
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid file or file format or only Super Admin and internal users can bulk update'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkUpdate(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.bulkUpdate(file, user)
+  }
+
   @Get(':id/stats')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
   @ApiOperation({
