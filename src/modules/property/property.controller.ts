@@ -573,6 +573,102 @@ export class PropertyController {
     return this.propertyService.bulkImport(file, user)
   }
 
+  @Post('bulk-update')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Bulk update properties from Excel file',
+    description: `
+    Upload an Excel file (.xlsx or .xls) to bulk update existing properties.
+    Only Super Admin and internal users can use this endpoint.
+    
+    Required column:
+    - Property ID/Property Id/Property id/property_id/ID/Id/id: ID of the property to update (must exist)
+    
+    Optional columns (only update if provided):
+    - Property Name/Property name/Name: Name of the property
+    - Address/Property Address: Property address
+    - Property Currency/Currency/Currency Code: Currency code (will be created if doesn't exist)
+    - Card Descriptor/Card descriptor/Descriptor: Card descriptor
+    - Next Due Date/Next due date/Due Date: Next due date (mm/dd/yyyy)
+    - Portfolio/Portfolio Name/Portfolio name: Portfolio name (will be created if doesn't exist)
+    - Expedia ID/Expedia Id/Expedia id/ExpediaID: Expedia ID
+    - Expedia Username/Expedia username/Expedia User: Expedia username
+    - Expedia Password/Expedia password/Expedia Pass: Expedia password
+    - Agoda ID/Agoda Id/Agoda id/AgodaID: Agoda ID
+    - Agoda Username/Agoda username/Agoda User: Agoda username
+    - Agoda Password/Agoda password/Agoda Pass: Agoda password
+    - Booking ID/Booking Id/Booking id/BookingID: Booking ID
+    - Booking Username/Booking username/Booking User: Booking username
+    - Booking Password/Booking password/Booking Pass: Booking password
+    - Bank Type (None / Stripe / Bank)/Bank Type/Bank type: Bank type
+    - Stripe Account Email/Stripe Email/Stripe account email: Stripe email (required if Bank Type is Stripe)
+    - Bank Sub Type (ACH / Domestic US Wire / International Wire)/Bank Sub Type: Bank sub type (required if Bank Type is Bank)
+    - Hotel Portfolio Name/Hotel portfolio name/Hotel Name: Hotel portfolio name
+    - Beneficiary Name/Beneficiary name/Beneficiary: Beneficiary name
+    - Beneficiary Address/Beneficiary address/Address (Beneficiary): Beneficiary address
+    - Account Number/Account number/Bank Account: Account number
+    - Account Name/Account name/Account Holder: Account name
+    - Bank Name/Bank name/Bank: Bank name
+    - Bank Branch/Bank branch/Branch: Bank branch
+    - Swift or BIC or IBAN/Swift/BIC/IBAN: Swift/BIC/IBAN code
+    - Routing Number/Routing number/Routing/ABA: Routing number
+    - Bank Account Type/Bank account type/Account Type: Bank account type
+    - Currency (Bank)/Bank Currency/Currency Code (Bank): Bank currency
+    
+    Note: Empty cells will keep existing values unchanged.
+    `
+  })
+  @ApiBody({
+    description: 'Excel file containing property update data',
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk update completed successfully',
+    schema: {
+      example: {
+        totalRows: 10,
+        successCount: 8,
+        failureCount: 2,
+        errors: [
+          {
+            row: 3,
+            propertyId: '507f1f77bcf86cd799439011',
+            error: 'Property not found'
+          }
+        ],
+        successfulUpdates: [
+          '507f1f77bcf86cd799439012',
+          '507f1f77bcf86cd799439013'
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid file or file format or only Super Admin and internal users can bulk update'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  bulkUpdate(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.bulkUpdate(file, user)
+  }
+
   @Get(':id/stats')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ, true)
   @ApiOperation({

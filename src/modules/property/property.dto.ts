@@ -241,6 +241,38 @@ export class BulkImportResultDto {
   successfulImports: string[]
 }
 
+export class BulkUpdateResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  totalRows: number
+
+  @ApiProperty({
+    example: 8,
+    description: 'Number of properties successfully updated'
+  })
+  successCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of rows that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      { row: 3, propertyId: '507f1f77bcf86cd799439011', error: 'Property not found' }
+    ],
+    description: 'List of errors encountered during update'
+  })
+  errors: Array<{
+    row: number
+    propertyId: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'List of successfully updated property IDs'
+  })
+  successfulUpdates: string[]
+}
+
 export class PropertyStatsResponseDto {
   @ApiProperty({
     example: 50000,

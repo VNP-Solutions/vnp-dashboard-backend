@@ -3,6 +3,7 @@ import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   BulkTransferPropertyDto,
+  BulkUpdateResultDto,
   CompleteBankDetailsDto,
   CompleteCreatePropertyDto,
   CompletePropertyCredentialsDto,
@@ -237,6 +238,10 @@ export interface IPropertyService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<any>
+  bulkUpdate(
+    file: Express.Multer.File,
+    user: IUserWithPermissions
+  ): Promise<BulkUpdateResultDto>
   getStats(
     propertyId: string,
     user: IUserWithPermissions
