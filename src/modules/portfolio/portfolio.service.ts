@@ -142,12 +142,25 @@ export class PortfolioService implements IPortfolioService {
       additionalFilters.service_type_id = query.service_type_id
     }
     if (query.is_active) {
-      additionalFilters.is_active = query.is_active
+      const isActiveValue = query.is_active.toLowerCase().trim()
+      if (isActiveValue === 'all') {
+        // Don't apply is_active filter when "all" is specified
+      } else if (isActiveValue === 'true') {
+        additionalFilters.is_active = true
+      } else if (isActiveValue === 'false') {
+        additionalFilters.is_active = false
+      } else {
+        // Default to true if invalid value provided
+        additionalFilters.is_active = true
+      }
     }
 
     // External users can only see active portfolios
     if (!userIsSuperAdmin && !userIsInternal) {
-      additionalFilters.is_active = true
+      // Only override if is_active filter wasn't explicitly set to "all"
+      if (!query.is_active || query.is_active.toLowerCase().trim() !== 'all') {
+        additionalFilters.is_active = true
+      }
     }
 
     // Merge with existing filters
@@ -255,12 +268,25 @@ export class PortfolioService implements IPortfolioService {
       additionalFilters.service_type_id = query.service_type_id
     }
     if (query.is_active) {
-      additionalFilters.is_active = query.is_active
+      const isActiveValue = query.is_active.toLowerCase().trim()
+      if (isActiveValue === 'all') {
+        // Don't apply is_active filter when "all" is specified
+      } else if (isActiveValue === 'true') {
+        additionalFilters.is_active = true
+      } else if (isActiveValue === 'false') {
+        additionalFilters.is_active = false
+      } else {
+        // Default to true if invalid value provided
+        additionalFilters.is_active = true
+      }
     }
 
     // External users can only see active portfolios
     if (!userIsSuperAdmin && !userIsInternal) {
-      additionalFilters.is_active = true
+      // Only override if is_active filter wasn't explicitly set to "all"
+      if (!query.is_active || query.is_active.toLowerCase().trim() !== 'all') {
+        additionalFilters.is_active = true
+      }
     }
 
     // Merge with existing filters

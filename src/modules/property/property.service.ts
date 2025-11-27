@@ -229,7 +229,17 @@ export class PropertyService implements IPropertyService {
     // Build additional filters from query params
     const additionalFilters: any = {}
     if (query.is_active) {
-      additionalFilters.is_active = query.is_active
+      const isActiveValue = query.is_active.toLowerCase().trim()
+      if (isActiveValue === 'all') {
+        // Don't apply is_active filter when "all" is specified
+      } else if (isActiveValue === 'true') {
+        additionalFilters.is_active = true
+      } else if (isActiveValue === 'false') {
+        additionalFilters.is_active = false
+      } else {
+        // Default to true if invalid value provided
+        additionalFilters.is_active = true
+      }
     } else {
       // Filter out deactivated properties for non-super-admins and non-internal users
       if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
@@ -472,7 +482,17 @@ export class PropertyService implements IPropertyService {
     // Build additional filters from query params
     const additionalFilters: any = {}
     if (query.is_active) {
-      additionalFilters.is_active = query.is_active
+      const isActiveValue = query.is_active.toLowerCase().trim()
+      if (isActiveValue === 'all') {
+        // Don't apply is_active filter when "all" is specified
+      } else if (isActiveValue === 'true') {
+        additionalFilters.is_active = true
+      } else if (isActiveValue === 'false') {
+        additionalFilters.is_active = false
+      } else {
+        // Default to true if invalid value provided
+        additionalFilters.is_active = true
+      }
     } else {
       // Filter out deactivated properties for non-super-admins and non-internal users
       if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
