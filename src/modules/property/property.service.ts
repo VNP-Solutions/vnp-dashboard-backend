@@ -32,6 +32,7 @@ import type { IPropertyBankDetailsRepository } from '../property-bank-details/pr
 import type { IPropertyCredentialsRepository } from '../property-credentials/property-credentials.interface'
 import {
   BulkImportResultDto,
+  BulkUpdateResultDto,
   BulkTransferPropertyDto,
   CompleteCreatePropertyDto,
   CompleteUpdatePropertyDto,
@@ -1979,6 +1980,807 @@ export class PropertyService implements IPropertyService {
           result.errors.push({
             row: rowNumber,
             property: propertyName,
+            error: error.message || 'Unknown error occurred'
+          })
+          result.failureCount++
+        }
+      }
+
+      return result
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to process Excel file: ${error.message}`
+      )
+    }
+  }
+
+  async bulkUpdate(
+    file: Express.Multer.File,
+    user: IUserWithPermissions
+  ): Promise<BulkUpdateResultDto> {
+    // Only super admins and internal users can bulk update properties
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const isInternal = isInternalUser(user)
+
+    if (!isSuperAdmin && !isInternal) {
+      throw new BadRequestException(
+        'Only Super Admin and internal users can bulk update properties'
+      )
+    }
+
+    if (!file) {
+      throw new BadRequestException('No file provided')
+    }
+
+    if (
+      !file.originalname.endsWith('.xlsx') &&
+      !file.originalname.endsWith('.xls')
+    ) {
+      throw new BadRequestException(
+        'File must be an Excel file (.xlsx or .xls)'
+      )
+    }
+
+    const result: BulkUpdateResultDto = {
+      totalRows: 0,
+      successCount: 0,
+      failureCount: 0,
+      errors: [],
+      successfulUpdates: []
+    }
+
+    try {
+      // Parse Excel file
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const data = XLSX.utils.sheet_to_json(worksheet)
+
+      if (!data || data.length === 0) {
+        throw new BadRequestException('Excel file is empty')
+      }
+
+      result.totalRows = data.length
+
+      // Helper function to find header value with flexible naming
+      const findHeaderValue = (
+        row: any,
+        possibleNames: string[]
+      ): string | undefined => {
+        // First, try to find exact matches
+        for (const name of possibleNames) {
+          const value = row[name]
+          if (value !== undefined && value !== null && value !== '') {
+            return String(value).trim()
+          }
+        }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return String(value).trim()
+              }
+            }
+          }
+        }
+
+        return undefined
+      }
+
+      // Helper function to get raw value (preserves type for dates and numbers)
+      const getRawValue = (row: any, possibleNames: string[]): any => {
+        // First, try to find exact matches
+        for (const name of possibleNames) {
+          const value = row[name]
+          if (value !== undefined && value !== null && value !== '') {
+            return value
+          }
+        }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return value
+              }
+            }
+          }
+        }
+
+        return undefined
+      }
+
+      // Helper function to parse date in mm/dd/yyyy format or Excel serial number
+      const parseDate = (dateValue: any): Date | null => {
+        if (!dateValue) return null
+
+        try {
+          // If it's already a Date object, return it
+          if (dateValue instanceof Date) {
+            if (!isNaN(dateValue.getTime())) {
+              return dateValue
+            }
+            return null
+          }
+
+          // If it's a number (Excel serial date), convert it
+          if (typeof dateValue === 'number') {
+            const excelEpoch = new Date(1899, 11, 30) // December 30, 1899
+            const date = new Date(
+              excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000
+            )
+            if (
+              !isNaN(date.getTime()) &&
+              date.getFullYear() >= 1900 &&
+              date.getFullYear() <= 2100
+            ) {
+              return date
+            }
+            return null
+          }
+
+          // Convert to string for string parsing
+          const dateString = String(dateValue)
+
+          // Try to parse mm/dd/yyyy format
+          const parts = dateString.trim().split('/')
+          if (parts.length === 3) {
+            const month = parseInt(parts[0], 10)
+            const day = parseInt(parts[1], 10)
+            const year = parseInt(parts[2], 10)
+
+            if (
+              !isNaN(month) &&
+              !isNaN(day) &&
+              !isNaN(year) &&
+              year >= 1900 &&
+              year <= 2100
+            ) {
+              return new Date(year, month - 1, day)
+            }
+          }
+
+          // Try to parse as ISO date
+          const date = new Date(dateString)
+          if (
+            !isNaN(date.getTime()) &&
+            date.getFullYear() >= 1900 &&
+            date.getFullYear() <= 2100
+          ) {
+            return date
+          }
+
+          return null
+        } catch {
+          return null
+        }
+      }
+
+      const encryptionSecret = this.configService.get('encryption.secret', {
+        infer: true
+      })!
+
+      // Process each row
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i] as any
+        const rowNumber = i + 2 // Excel row number (header is row 1)
+
+        try {
+          // Extract Property ID (required)
+          const propertyIdValue = findHeaderValue(row, [
+            'Property ID',
+            'Property Id',
+            'Property id',
+            'property_id',
+            'ID',
+            'Id',
+            'id'
+          ])
+
+          if (!propertyIdValue) {
+            result.errors.push({
+              row: rowNumber,
+              propertyId: 'Unknown',
+              error: 'Property ID is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Validate MongoDB ObjectId format
+          if (!QueryBuilder.isValidObjectId(propertyIdValue)) {
+            result.errors.push({
+              row: rowNumber,
+              propertyId: propertyIdValue,
+              error:
+                'Invalid property ID format (must be a valid MongoDB ObjectId)'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Find existing property
+          const existingProperty = await this.propertyRepository.findById(
+            propertyIdValue
+          )
+          if (!existingProperty) {
+            result.errors.push({
+              row: rowNumber,
+              propertyId: propertyIdValue,
+              error: 'Property not found'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Prepare update data (only include fields that have values)
+          const updateData: any = {}
+
+          // Extract property name (if provided)
+          const propertyName = findHeaderValue(row, [
+            'Property Name',
+            'Property name',
+            'Name'
+          ])
+          if (propertyName) {
+            // Check if name is being changed and if new name already exists
+            if (propertyName !== existingProperty.name) {
+              const propertyWithSameName =
+                await this.propertyRepository.findByName(propertyName)
+              if (propertyWithSameName) {
+                result.errors.push({
+                  row: rowNumber,
+                  propertyId: propertyIdValue,
+                  error: 'Property with this name already exists'
+                })
+                result.failureCount++
+                continue
+              }
+            }
+            updateData.name = propertyName
+          }
+
+          // Extract address (if provided)
+          const address = findHeaderValue(row, ['Address', 'Property Address'])
+          if (address !== undefined) {
+            updateData.address = address || ''
+          }
+
+          // Extract currency code (if provided)
+          const currencyCode = findHeaderValue(row, [
+            'Property Currency',
+            'Currency',
+            'Currency Code'
+          ])
+          if (currencyCode) {
+            // Find or create currency
+            let currency = await this.currencyRepository.findByCode(currencyCode)
+            if (!currency) {
+              currency = await this.currencyRepository.create({
+                code: currencyCode,
+                name: currencyCode,
+                symbol: currencyCode,
+                is_active: true
+              })
+            }
+            updateData.currency_id = currency.id
+          }
+
+          // Extract card descriptor (if provided)
+          const cardDescriptor = findHeaderValue(row, [
+            'Card Descriptor',
+            'Card descriptor',
+            'Descriptor'
+          ])
+          if (cardDescriptor !== undefined) {
+            updateData.card_descriptor = cardDescriptor || undefined
+          }
+
+          // Extract next due date (if provided)
+          const nextDueDateValue = getRawValue(row, [
+            'Next Due Date',
+            'Next due date',
+            'Due Date'
+          ])
+          if (nextDueDateValue) {
+            const nextDueDate = parseDate(nextDueDateValue)
+            if (!nextDueDate) {
+              result.errors.push({
+                row: rowNumber,
+                propertyId: propertyIdValue,
+                error:
+                  'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
+              })
+              result.failureCount++
+              continue
+            }
+            updateData.next_due_date = nextDueDate.toISOString()
+          }
+
+          // Extract portfolio name (if provided)
+          const portfolioName = findHeaderValue(row, [
+            'Portfolio',
+            'Portfolio Name',
+            'Portfolio name'
+          ])
+          if (portfolioName) {
+            let portfolio =
+              await this.portfolioRepository.findByName(portfolioName)
+            if (!portfolio) {
+              // Create new portfolio with default service type
+              let defaultServiceType = await this.prisma.serviceType.findFirst({
+                where: { type: 'Default' }
+              })
+              if (!defaultServiceType) {
+                defaultServiceType = await this.prisma.serviceType.create({
+                  data: {
+                    type: 'Default',
+                    is_active: true
+                  }
+                })
+              }
+              portfolio = await this.portfolioRepository.create({
+                name: portfolioName,
+                service_type_id: defaultServiceType.id,
+                is_active: true,
+                is_commissionable: false
+              })
+            }
+            updateData.portfolio_id = portfolio.id
+          }
+
+          // Extract credential fields to check if credentials need updating
+          const expediaId = findHeaderValue(row, [
+            'Expedia ID',
+            'Expedia Id',
+            'Expedia id',
+            'ExpediaID'
+          ])
+          const expediaUsername = findHeaderValue(row, [
+            'Expedia Username',
+            'Expedia username',
+            'Expedia User'
+          ])
+          const expediaPassword = findHeaderValue(row, [
+            'Expedia Password',
+            'Expedia password',
+            'Expedia Pass'
+          ])
+          const agodaId = findHeaderValue(row, [
+            'Agoda ID',
+            'Agoda Id',
+            'Agoda id',
+            'AgodaID'
+          ])
+          const agodaUsername = findHeaderValue(row, [
+            'Agoda Username',
+            'Agoda username',
+            'Agoda User'
+          ])
+          const agodaPassword = findHeaderValue(row, [
+            'Agoda Password',
+            'Agoda password',
+            'Agoda Pass'
+          ])
+          const bookingId = findHeaderValue(row, [
+            'Booking ID',
+            'Booking Id',
+            'Booking id',
+            'BookingID'
+          ])
+          const bookingUsername = findHeaderValue(row, [
+            'Booking Username',
+            'Booking username',
+            'Booking User'
+          ])
+          const bookingPassword = findHeaderValue(row, [
+            'Booking Password',
+            'Booking password',
+            'Booking Pass'
+          ])
+
+          const hasCredentialsUpdate =
+            expediaId ||
+            expediaUsername ||
+            expediaPassword ||
+            agodaId ||
+            agodaUsername ||
+            agodaPassword ||
+            bookingId ||
+            bookingUsername ||
+            bookingPassword
+
+          // Handle bank details update (if provided)
+          const bankTypeRaw = findHeaderValue(row, [
+            'Bank Type (None / Stripe / Bank)',
+            'Bank Type',
+            'Bank type',
+            'bank_type'
+          ])
+
+          const hasBankDetailsUpdate = !!bankTypeRaw
+          const hasPropertyUpdate = Object.keys(updateData).length > 0
+
+          // Check if there's anything to update
+          if (!hasPropertyUpdate && !hasCredentialsUpdate && !hasBankDetailsUpdate) {
+            result.errors.push({
+              row: rowNumber,
+              propertyId: propertyIdValue,
+              error: 'No fields to update (all fields are empty)'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Update property if there's data to update
+          if (hasPropertyUpdate) {
+            await this.propertyRepository.update(propertyIdValue, updateData)
+          }
+
+          // Update credentials if any credential field is provided
+          if (hasCredentialsUpdate) {
+            const existingCredentials =
+              await this.credentialsRepository.findByPropertyId(propertyIdValue)
+
+            const credentialsData: any = {}
+
+            // Update Expedia credentials if provided
+            if (expediaId !== undefined) {
+              credentialsData.expedia_id = expediaId || null
+            }
+            if (expediaUsername !== undefined) {
+              credentialsData.expedia_username = expediaUsername || null
+            }
+            if (expediaPassword) {
+              credentialsData.expedia_password = EncryptionUtil.encrypt(
+                expediaPassword,
+                encryptionSecret
+              )
+            }
+
+            // Update Agoda credentials if provided
+            if (agodaId !== undefined) {
+              credentialsData.agoda_id = agodaId || null
+            }
+            if (agodaUsername !== undefined) {
+              credentialsData.agoda_username = agodaUsername || null
+            }
+            if (agodaPassword) {
+              credentialsData.agoda_password = EncryptionUtil.encrypt(
+                agodaPassword,
+                encryptionSecret
+              )
+            }
+
+            // Update Booking credentials if provided
+            if (bookingId !== undefined) {
+              credentialsData.booking_id = bookingId || null
+            }
+            if (bookingUsername !== undefined) {
+              credentialsData.booking_username = bookingUsername || null
+            }
+            if (bookingPassword) {
+              credentialsData.booking_password = EncryptionUtil.encrypt(
+                bookingPassword,
+                encryptionSecret
+              )
+            }
+
+            if (existingCredentials) {
+              // Merge with existing credentials
+              await this.credentialsRepository.update(
+                propertyIdValue,
+                credentialsData
+              )
+            } else if (Object.keys(credentialsData).length > 0) {
+              // Create new credentials
+              credentialsData.property_id = propertyIdValue
+              await this.credentialsRepository.create(credentialsData)
+            }
+          }
+
+          // Handle bank details update (if provided)
+          if (hasBankDetailsUpdate) {
+            const bankTypeNormalized = bankTypeRaw.toLowerCase().trim()
+
+            if (bankTypeNormalized === 'none') {
+              // Delete bank details if they exist
+              const existingBankDetails =
+                await this.bankDetailsRepository.findByPropertyId(propertyIdValue)
+              if (existingBankDetails) {
+                await this.bankDetailsRepository.delete(propertyIdValue)
+              }
+            } else if (bankTypeNormalized === 'stripe') {
+              const stripeAccountEmail = findHeaderValue(row, [
+                'Stripe Account Email',
+                'Stripe Email',
+                'Stripe account email',
+                'stripe_account_email'
+              ])
+
+              if (!stripeAccountEmail || !stripeAccountEmail.trim()) {
+                result.errors.push({
+                  row: rowNumber,
+                  propertyId: propertyIdValue,
+                  error:
+                    'Stripe Account Email is required when Bank Type is Stripe'
+                })
+                result.failureCount++
+                continue
+              }
+
+              const existingBankDetails =
+                await this.bankDetailsRepository.findByPropertyId(propertyIdValue)
+
+              const bankDetailsData: any = {
+                bank_type: BankType.stripe,
+                stripe_account_email: stripeAccountEmail.trim(),
+                bank_sub_type: null,
+                hotel_portfolio_name: null,
+                beneficiary_name: null,
+                beneficiary_address: null,
+                account_number: null,
+                account_name: null,
+                bank_name: null,
+                bank_branch: null,
+                swift_bic_iban: null,
+                routing_number: null,
+                bank_account_type: null,
+                currency: null
+              }
+
+              if (existingBankDetails) {
+                await this.bankDetailsRepository.update(
+                  propertyIdValue,
+                  bankDetailsData
+                )
+              } else {
+                bankDetailsData.property_id = propertyIdValue
+                await this.bankDetailsRepository.create(bankDetailsData)
+              }
+            } else if (bankTypeNormalized === 'bank') {
+              const bankSubTypeRaw = findHeaderValue(row, [
+                'Bank Sub Type (ACH / Domestic US Wire / International Wire)',
+                'Bank Sub Type',
+                'Bank sub type',
+                'Bank Sub type',
+                'bank_sub_type',
+                'Sub Type',
+                'SubType',
+                'Subtype',
+                'Bank Subtype'
+              ])
+
+              if (!bankSubTypeRaw) {
+                result.errors.push({
+                  row: rowNumber,
+                  propertyId: propertyIdValue,
+                  error:
+                    'Bank Sub Type is required when Bank Type is Bank (ACH / Domestic US Wire / International Wire)'
+                })
+                result.failureCount++
+                continue
+              }
+
+              const bankSubTypeNormalized = bankSubTypeRaw.toLowerCase().trim()
+              let mappedBankSubType: string
+
+              if (bankSubTypeNormalized === 'ach') {
+                mappedBankSubType = 'ach'
+              } else if (
+                bankSubTypeNormalized === 'domestic us wire' ||
+                bankSubTypeNormalized === 'domestic_us_wire' ||
+                bankSubTypeNormalized === 'domestic wire'
+              ) {
+                mappedBankSubType = 'domestic_wire'
+              } else if (
+                bankSubTypeNormalized === 'international wire' ||
+                bankSubTypeNormalized === 'international_wire'
+              ) {
+                mappedBankSubType = 'international_wire'
+              } else {
+                result.errors.push({
+                  row: rowNumber,
+                  propertyId: propertyIdValue,
+                  error: `Invalid Bank Sub Type: "${bankSubTypeRaw}". Expected "ACH", "Domestic US Wire", or "International Wire"`
+                })
+                result.failureCount++
+                continue
+              }
+
+              const existingBankDetails =
+                await this.bankDetailsRepository.findByPropertyId(propertyIdValue)
+
+              const bankDetailsData: any = {
+                bank_type: BankType.bank,
+                bank_sub_type: mappedBankSubType,
+                stripe_account_email: null
+              }
+
+              // Extract bank fields (all optional for update)
+              const hotelPortfolioName = findHeaderValue(row, [
+                'Hotel Portfolio Name',
+                'Hotel portfolio name',
+                'hotel_portfolio_name',
+                'Hotel Name',
+                'Hotel name',
+                'Portfolio Name (Bank)'
+              ])
+              if (hotelPortfolioName !== undefined) {
+                bankDetailsData.hotel_portfolio_name = hotelPortfolioName || null
+              }
+
+              const beneficiaryName = findHeaderValue(row, [
+                'Beneficiary Name',
+                'Beneficiary name',
+                'beneficiary_name',
+                'Beneficiary',
+                'Beneficiary Name (ACH)'
+              ])
+              if (beneficiaryName !== undefined) {
+                bankDetailsData.beneficiary_name = beneficiaryName || null
+              }
+
+              const beneficiaryAddress = findHeaderValue(row, [
+                'Beneficiary Address',
+                'Beneficiary address',
+                'beneficiary_address',
+                'Address (Beneficiary)',
+                'Beneficiary addr'
+              ])
+              if (beneficiaryAddress !== undefined) {
+                bankDetailsData.beneficiary_address = beneficiaryAddress || null
+              }
+
+              const accountNumber = findHeaderValue(row, [
+                'Account Number',
+                'Account number',
+                'account_number',
+                'Bank Account',
+                'Bank Account Number',
+                'Account No',
+                'Account #'
+              ])
+              if (accountNumber !== undefined) {
+                bankDetailsData.account_number = accountNumber || null
+              }
+
+              const accountName = findHeaderValue(row, [
+                'Account Name',
+                'Account name',
+                'account_name',
+                'Account Holder',
+                'Account holder'
+              ])
+              if (accountName !== undefined) {
+                bankDetailsData.account_name = accountName || null
+              }
+
+              const bankName = findHeaderValue(row, [
+                'Bank Name',
+                'Bank name',
+                'bank_name',
+                'Bank'
+              ])
+              if (bankName !== undefined) {
+                bankDetailsData.bank_name = bankName || null
+              }
+
+              const bankBranch = findHeaderValue(row, [
+                'Bank Branch',
+                'Bank branch',
+                'bank_branch',
+                'Branch',
+                'Branch Name'
+              ])
+              if (bankBranch !== undefined) {
+                bankDetailsData.bank_branch = bankBranch || null
+              }
+
+              const swiftBicIban = findHeaderValue(row, [
+                'Swift or BIC or IBAN',
+                'Swift or Bic or Iban',
+                'Swift/BIC/IBAN',
+                'Swift/Bic/Iban',
+                'swift_bic_iban',
+                'Swift Code',
+                'Swift code',
+                'SWIFT',
+                'Swift',
+                'SWIFT Code',
+                'BIC',
+                'SWIFT/BIC',
+                'IBAN',
+                'Iban'
+              ])
+              if (swiftBicIban !== undefined) {
+                bankDetailsData.swift_bic_iban = swiftBicIban || null
+              }
+
+              const routingNumber = findHeaderValue(row, [
+                'Routing Number',
+                'Routing number',
+                'routing_number',
+                'Routing',
+                'Routing No',
+                'ABA Number',
+                'ABA'
+              ])
+              if (routingNumber !== undefined) {
+                bankDetailsData.routing_number = routingNumber || null
+              }
+
+              const bankAccountType = findHeaderValue(row, [
+                'Bank Account Type',
+                'Bank account type',
+                'bank_account_type',
+                'Account Type',
+                'Account type',
+                'Type'
+              ])
+              if (bankAccountType !== undefined) {
+                bankDetailsData.bank_account_type = bankAccountType || null
+              }
+
+              const bankCurrency = findHeaderValue(row, [
+                'Currency (Bank)',
+                'Bank Currency',
+                'currency',
+                'Currency Code (Bank)'
+              ])
+              if (bankCurrency !== undefined) {
+                bankDetailsData.currency = bankCurrency || null
+              }
+
+              if (existingBankDetails) {
+                await this.bankDetailsRepository.update(
+                  propertyIdValue,
+                  bankDetailsData
+                )
+              } else {
+                bankDetailsData.property_id = propertyIdValue
+                await this.bankDetailsRepository.create(bankDetailsData)
+              }
+            } else {
+              // Invalid bank type
+              result.errors.push({
+                row: rowNumber,
+                propertyId: propertyIdValue,
+                error: `Invalid Bank Type: "${bankTypeRaw}". Expected "None", "Stripe", or "Bank"`
+              })
+              result.failureCount++
+              continue
+            }
+          }
+
+          result.successCount++
+          result.successfulUpdates.push(propertyIdValue)
+        } catch (error) {
+          const propertyIdValue =
+            findHeaderValue(row, [
+              'Property ID',
+              'Property Id',
+              'Property id',
+              'property_id',
+              'ID',
+              'Id',
+              'id'
+            ]) || 'Unknown'
+
+          result.errors.push({
+            row: rowNumber,
+            propertyId: propertyIdValue,
             error: error.message || 'Unknown error occurred'
           })
           result.failureCount++

@@ -3,6 +3,7 @@ import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import {
+  BulkUpdateResultDto,
   CreatePortfolioDto,
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
@@ -118,6 +119,10 @@ export interface IPortfolioService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<any>
+  bulkUpdate(
+    file: Express.Multer.File,
+    user: IUserWithPermissions
+  ): Promise<BulkUpdateResultDto>
   getStats(
     portfolioId: string,
     query: PortfolioStatsQueryDto,

@@ -26,6 +26,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import type { IServiceTypeRepository } from '../service-type/service-type.interface'
 import {
   BulkImportResultDto,
+  BulkUpdateResultDto,
   CreatePortfolioDto,
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
@@ -210,11 +211,15 @@ export class PortfolioService implements IPortfolioService {
     const enrichedData = data.map((portfolio: any) => {
       const hasPendingAction =
         portfolio.pendingActions && portfolio.pendingActions.length > 0
-      const pendingAction = hasPendingAction ? portfolio.pendingActions[0] : null
+      const pendingAction = hasPendingAction
+        ? portfolio.pendingActions[0]
+        : null
 
       // Remove pendingActions array from response to avoid duplication
-      const { pendingActions: _pendingActions, ...portfolioWithoutPendingActions } =
-        portfolio
+      const {
+        pendingActions: _pendingActions,
+        ...portfolioWithoutPendingActions
+      } = portfolio
 
       return {
         ...portfolioWithoutPendingActions,
@@ -314,11 +319,15 @@ export class PortfolioService implements IPortfolioService {
     const enrichedData = data.map((portfolio: any) => {
       const hasPendingAction =
         portfolio.pendingActions && portfolio.pendingActions.length > 0
-      const pendingAction = hasPendingAction ? portfolio.pendingActions[0] : null
+      const pendingAction = hasPendingAction
+        ? portfolio.pendingActions[0]
+        : null
 
       // Remove pendingActions array from response to avoid duplication
-      const { pendingActions: _pendingActions, ...portfolioWithoutPendingActions } =
-        portfolio
+      const {
+        pendingActions: _pendingActions,
+        ...portfolioWithoutPendingActions
+      } = portfolio
 
       return {
         ...portfolioWithoutPendingActions,
@@ -933,7 +942,9 @@ export class PortfolioService implements IPortfolioService {
 
           let isCommissionable = false
           if (commissionableRaw) {
-            const commissionableNormalized = commissionableRaw.toLowerCase().trim()
+            const commissionableNormalized = commissionableRaw
+              .toLowerCase()
+              .trim()
             if (commissionableNormalized === 'yes') {
               isCommissionable = true
             } else if (commissionableNormalized === 'no') {
@@ -1015,6 +1026,376 @@ export class PortfolioService implements IPortfolioService {
           result.errors.push({
             row: rowNumber,
             portfolio: portfolioName,
+            error: error.message || 'Unknown error occurred'
+          })
+          result.failureCount++
+        }
+      }
+
+      return result
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to process Excel file: ${error.message}`
+      )
+    }
+  }
+
+  async bulkUpdate(
+    file: Express.Multer.File,
+    user: IUserWithPermissions
+  ): Promise<BulkUpdateResultDto> {
+    // Only super admins and internal users can bulk update portfolios
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const isInternal = isInternalUser(user)
+
+    if (!isSuperAdmin && !isInternal) {
+      throw new BadRequestException(
+        'Only Super Admin and internal users can bulk update portfolios'
+      )
+    }
+
+    if (!file) {
+      throw new BadRequestException('No file provided')
+    }
+
+    if (
+      !file.originalname.endsWith('.xlsx') &&
+      !file.originalname.endsWith('.xls')
+    ) {
+      throw new BadRequestException(
+        'File must be an Excel file (.xlsx or .xls)'
+      )
+    }
+
+    const result: BulkUpdateResultDto = {
+      totalRows: 0,
+      successCount: 0,
+      failureCount: 0,
+      errors: [],
+      successfulUpdates: []
+    }
+
+    try {
+      // Parse Excel file
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const data = XLSX.utils.sheet_to_json(worksheet)
+
+      if (!data || data.length === 0) {
+        throw new BadRequestException('Excel file is empty')
+      }
+
+      result.totalRows = data.length
+
+      // Helper function to find header value with flexible naming
+      // Handles column names with asterisks (e.g., "Portfolio Name*")
+      const findHeaderValue = (
+        row: any,
+        possibleNames: string[]
+      ): string | undefined => {
+        // First, try to find exact matches
+        for (const name of possibleNames) {
+          const value = row[name]
+          if (value !== undefined && value !== null && value !== '') {
+            return String(value).trim()
+          }
+        }
+
+        // If no exact match, try matching by removing asterisks from Excel column names
+        const rowKeys = Object.keys(row)
+        for (const name of possibleNames) {
+          for (const key of rowKeys) {
+            // Remove asterisk and trim from the Excel column name
+            const cleanKey = key.split('*')[0].trim()
+            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                return String(value).trim()
+              }
+            }
+          }
+        }
+
+        return undefined
+      }
+
+      // Process each row
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i] as any
+        const rowNumber = i + 2 // Excel row number (header is row 1)
+
+        try {
+          // Extract Portfolio ID (required)
+          const portfolioIdValue = findHeaderValue(row, [
+            'Portfolio ID',
+            'Portfolio Id',
+            'Portfolio id',
+            'portfolio_id',
+            'ID',
+            'Id',
+            'id'
+          ])
+
+          if (!portfolioIdValue) {
+            result.errors.push({
+              row: rowNumber,
+              portfolioId: 'Unknown',
+              error: 'Portfolio ID is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Validate MongoDB ObjectId format
+          if (!QueryBuilder.isValidObjectId(portfolioIdValue)) {
+            result.errors.push({
+              row: rowNumber,
+              portfolioId: portfolioIdValue,
+              error:
+                'Invalid portfolio ID format (must be a valid MongoDB ObjectId)'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Find existing portfolio
+          const existingPortfolio = await this.portfolioRepository.findById(
+            portfolioIdValue,
+            user.id,
+            isSuperAdmin
+          )
+          if (!existingPortfolio) {
+            result.errors.push({
+              row: rowNumber,
+              portfolioId: portfolioIdValue,
+              error: 'Portfolio not found'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Prepare update data (only include fields that have values)
+          const updateData: any = {}
+
+          // Extract portfolio name (if provided)
+          const portfolioName = findHeaderValue(row, [
+            'Portfolio Name',
+            'Portofolio',
+            'Portfolio name',
+            'Name'
+          ])
+          if (portfolioName) {
+            // Check if name is being changed and if new name already exists
+            if (portfolioName !== existingPortfolio.name) {
+              const portfolioWithSameName =
+                await this.portfolioRepository.findByName(portfolioName)
+              if (portfolioWithSameName) {
+                result.errors.push({
+                  row: rowNumber,
+                  portfolioId: portfolioIdValue,
+                  error: 'Portfolio with this name already exists'
+                })
+                result.failureCount++
+                continue
+              }
+            }
+            updateData.name = portfolioName
+          }
+
+          // Extract service type name (if provided)
+          const serviceTypeName = findHeaderValue(row, [
+            'Service Type',
+            'Service type'
+          ])
+          if (serviceTypeName) {
+            // Find or create service type
+            let serviceType =
+              await this.serviceTypeRepository.findByType(serviceTypeName)
+
+            if (!serviceType) {
+              // Create new service type
+              serviceType = await this.serviceTypeRepository.create({
+                type: serviceTypeName,
+                is_active: true
+              })
+            }
+            updateData.service_type_id = serviceType.id
+          }
+
+          // Extract active status (if provided) - map "Active"/"Inactive" to true/false
+          const activeStatusRaw = findHeaderValue(row, [
+            'Active status',
+            'Active Status',
+            'Status',
+            'Is Active'
+          ])
+          if (activeStatusRaw) {
+            const activeStatusNormalized = activeStatusRaw.toLowerCase().trim()
+            if (activeStatusNormalized === 'active') {
+              updateData.is_active = true
+            } else if (activeStatusNormalized === 'inactive') {
+              updateData.is_active = false
+            } else {
+              result.errors.push({
+                row: rowNumber,
+                portfolioId: portfolioIdValue,
+                error: `Invalid Active status value: "${activeStatusRaw}". Expected "Active" or "Inactive"`
+              })
+              result.failureCount++
+              continue
+            }
+          }
+
+          // Extract contact email (if provided)
+          const contactEmail = findHeaderValue(row, [
+            'Contact Email',
+            'Contact email',
+            'Contact'
+          ])
+          if (contactEmail !== undefined) {
+            updateData.contact_email = contactEmail || undefined
+          }
+
+          // Extract access email (if provided)
+          const accessEmail = findHeaderValue(row, [
+            'Access Email',
+            'Access email'
+          ])
+          if (accessEmail !== undefined) {
+            updateData.access_email = accessEmail || undefined
+          }
+
+          // Extract access phone (if provided)
+          const accessPhone = findHeaderValue(row, [
+            'Access Phone',
+            'Access phone',
+            'Access Phone NO',
+            'Access Phone No',
+            'Access Phone no',
+            'Access phone no',
+            'Access Contact',
+            'Access contact'
+          ])
+          if (accessPhone !== undefined) {
+            updateData.access_phone = accessPhone || undefined
+          }
+
+          // Extract contract URL/Documents (if provided)
+          const contractUrl = findHeaderValue(row, [
+            'Documents',
+            'Contract URL',
+            'Contract Url',
+            'Contract url'
+          ])
+
+          // Extract commissionable (if provided) - map "Yes"/"No" to true/false
+          const commissionableRaw = findHeaderValue(row, [
+            'Commissionable',
+            'Is Commissionable',
+            'is_commissionable'
+          ])
+          if (commissionableRaw !== undefined) {
+            const commissionableNormalized = commissionableRaw
+              .toLowerCase()
+              .trim()
+            if (commissionableNormalized === 'yes') {
+              updateData.is_commissionable = true
+            } else if (commissionableNormalized === 'no') {
+              updateData.is_commissionable = false
+            } else {
+              result.errors.push({
+                row: rowNumber,
+                portfolioId: portfolioIdValue,
+                error: `Invalid Commissionable value: "${commissionableRaw}". Expected "Yes" or "No"`
+              })
+              result.failureCount++
+              continue
+            }
+          }
+
+          // Extract sales agent (if provided)
+          const salesAgent = findHeaderValue(row, [
+            'Sales Agent',
+            'Sales agent'
+          ])
+          if (salesAgent !== undefined) {
+            updateData.sales_agent = salesAgent || undefined
+          }
+
+          // Validate: If commissionable is true, sales_agent is required
+          const isCommissionable =
+            updateData.is_commissionable !== undefined
+              ? updateData.is_commissionable
+              : existingPortfolio.is_commissionable
+
+          const finalSalesAgent =
+            updateData.sales_agent !== undefined
+              ? updateData.sales_agent
+              : existingPortfolio.sales_agent
+
+          if (isCommissionable && !finalSalesAgent) {
+            result.errors.push({
+              row: rowNumber,
+              portfolioId: portfolioIdValue,
+              error: 'Sales Agent is required when portfolio is commissionable'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Only update if there's something to update
+          if (Object.keys(updateData).length === 0) {
+            result.errors.push({
+              row: rowNumber,
+              portfolioId: portfolioIdValue,
+              error: 'No fields to update (all fields are empty)'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Update the portfolio
+          await this.portfolioRepository.update(
+            portfolioIdValue,
+            updateData,
+            user.id,
+            isSuperAdmin
+          )
+
+          // If contract URL is provided and user is super admin, create contract URL entries
+          if (contractUrl && isSuperAdmin) {
+            const urls = contractUrl
+              .split(',')
+              .map(url => url.trim())
+              .filter(url => url)
+            for (const url of urls) {
+              await this.contractUrlRepository.create({
+                url,
+                portfolio_id: portfolioIdValue,
+                user_id: user.id,
+                is_active: true
+              })
+            }
+          }
+
+          result.successCount++
+          result.successfulUpdates.push(portfolioIdValue)
+        } catch (error) {
+          const portfolioIdValue =
+            findHeaderValue(row, [
+              'Portfolio ID',
+              'Portfolio Id',
+              'Portfolio id',
+              'portfolio_id',
+              'ID',
+              'Id',
+              'id'
+            ]) || 'Unknown'
+
+          result.errors.push({
+            row: rowNumber,
+            portfolioId: portfolioIdValue,
             error: error.message || 'Unknown error occurred'
           })
           result.failureCount++
