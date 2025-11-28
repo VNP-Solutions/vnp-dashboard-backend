@@ -25,13 +25,19 @@ export type UserWithRole = Prisma.UserGetPayload<{
       select: {
         id: true
         name: true
+        description: true
         is_external: true
+        portfolio_permission: true
+        property_permission: true
+        audit_permission: true
+        user_permission: true
+        system_settings_permission: true
       }
     }
   }
 }>
 
-export type UserWithDetails = Prisma.UserGetPayload<{
+export type UserWithDetailsBase = Prisma.UserGetPayload<{
   select: {
     id: true
     first_name: true
@@ -65,6 +71,23 @@ export type UserWithDetails = Prisma.UserGetPayload<{
     }
   }
 }>
+
+export type AccessedPortfolio = {
+  id: string
+  name: string
+}
+
+export type AccessedProperty = {
+  id: string
+  name: string
+}
+
+export type UserWithDetails = Omit<UserWithDetailsBase, 'userAccessedProperties'> & {
+  userAccessedProperties: {
+    portfolios: AccessedPortfolio[]
+    properties: AccessedProperty[]
+  } | null
+}
 
 export interface IUserRepository {
   findAll(queryOptions: any, userIds?: string[]): Promise<UserWithRole[]>

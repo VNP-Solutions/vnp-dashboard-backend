@@ -38,7 +38,13 @@ export class UserRepository implements IUserRepository {
           select: {
             id: true,
             name: true,
-            is_external: true
+            description: true,
+            is_external: true,
+            portfolio_permission: true,
+            property_permission: true,
+            audit_permission: true,
+            user_permission: true,
+            system_settings_permission: true
           }
         }
       }
@@ -52,7 +58,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async findById(id: string): Promise<UserWithDetails | null> {
-    return this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
         id: true,
@@ -87,6 +93,44 @@ export class UserRepository implements IUserRepository {
         }
       }
     })
+
+    if (!user) {
+      return null
+    }
+
+    // Get the first userAccessedProperties record (there should be at most one per user)
+    const accessRecord = user.userAccessedProperties[0]
+
+    if (!accessRecord) {
+      return {
+        ...user,
+        userAccessedProperties: null
+      }
+    }
+
+    // Fetch portfolio and property details
+    const [portfolios, properties] = await Promise.all([
+      accessRecord.portfolio_id.length > 0
+        ? this.prisma.portfolio.findMany({
+            where: { id: { in: accessRecord.portfolio_id } },
+            select: { id: true, name: true }
+          })
+        : [],
+      accessRecord.property_id.length > 0
+        ? this.prisma.property.findMany({
+            where: { id: { in: accessRecord.property_id } },
+            select: { id: true, name: true }
+          })
+        : []
+    ])
+
+    return {
+      ...user,
+      userAccessedProperties: {
+        portfolios,
+        properties
+      }
+    }
   }
 
   async update(id: string, data: Partial<User>): Promise<UserWithRole> {
@@ -109,7 +153,13 @@ export class UserRepository implements IUserRepository {
           select: {
             id: true,
             name: true,
-            is_external: true
+            description: true,
+            is_external: true,
+            portfolio_permission: true,
+            property_permission: true,
+            audit_permission: true,
+            user_permission: true,
+            system_settings_permission: true
           }
         }
       }
