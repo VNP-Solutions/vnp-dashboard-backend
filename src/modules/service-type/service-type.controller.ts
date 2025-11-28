@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Inject,
   Param,
@@ -24,7 +23,12 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreateServiceTypeDto, DeleteServiceTypeDto, ReorderServiceTypeDto, UpdateServiceTypeDto } from './service-type.dto'
+import {
+  CreateServiceTypeDto,
+  DeleteServiceTypeDto,
+  ReorderServiceTypeDto,
+  UpdateServiceTypeDto
+} from './service-type.dto'
 import type { IServiceTypeService } from './service-type.interface'
 
 @ApiTags('Service Type')
@@ -100,7 +104,9 @@ export class ServiceTypeController {
 
   @Post(':id/delete')
   @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.DELETE)
-  @ApiOperation({ summary: 'Delete a service type (requires password verification)' })
+  @ApiOperation({
+    summary: 'Delete a service type (requires password verification)'
+  })
   @ApiResponse({
     status: 200,
     description: 'Service type deleted successfully'
@@ -108,7 +114,8 @@ export class ServiceTypeController {
   @ApiResponse({ status: 404, description: 'Service type not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete service type with associated portfolios or invalid password'
+    description:
+      'Cannot delete service type with associated portfolios or invalid password'
   })
   @ApiResponse({
     status: 403,
@@ -119,13 +126,20 @@ export class ServiceTypeController {
     @Body() deleteServiceTypeDto: DeleteServiceTypeDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.serviceTypeService.remove(id, deleteServiceTypeDto.password, user)
+    return this.serviceTypeService.remove(
+      id,
+      deleteServiceTypeDto.password,
+      user
+    )
   }
 
   @Patch(':id/reorder')
   @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.UPDATE)
   @ApiOperation({ summary: 'Reorder a service type' })
-  @ApiResponse({ status: 200, description: 'Service type order updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Service type order updated successfully'
+  })
   @ApiResponse({ status: 404, description: 'Service type not found' })
   @ApiResponse({
     status: 403,

@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Inject,
   Param,
@@ -24,7 +23,12 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreateUserRoleDto, DeleteUserRoleDto, ReorderUserRoleDto, UpdateUserRoleDto } from './user-role.dto'
+import {
+  CreateUserRoleDto,
+  DeleteUserRoleDto,
+  ReorderUserRoleDto,
+  UpdateUserRoleDto
+} from './user-role.dto'
 import type { IUserRoleService } from './user-role.interface'
 
 @ApiTags('User Role')

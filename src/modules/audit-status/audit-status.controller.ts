@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Inject,
   Param,
@@ -24,7 +23,12 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreateAuditStatusDto, DeleteAuditStatusDto, ReorderAuditStatusDto, UpdateAuditStatusDto } from './audit-status.dto'
+import {
+  CreateAuditStatusDto,
+  DeleteAuditStatusDto,
+  ReorderAuditStatusDto,
+  UpdateAuditStatusDto
+} from './audit-status.dto'
 import type { IAuditStatusService } from './audit-status.interface'
 
 @ApiTags('Audit Status')
@@ -104,7 +108,9 @@ export class AuditStatusController {
 
   @Post(':id/delete')
   @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.DELETE)
-  @ApiOperation({ summary: 'Delete an audit status (requires password verification)' })
+  @ApiOperation({
+    summary: 'Delete an audit status (requires password verification)'
+  })
   @ApiResponse({
     status: 200,
     description: 'Audit status deleted successfully'
@@ -112,7 +118,8 @@ export class AuditStatusController {
   @ApiResponse({ status: 404, description: 'Audit status not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete audit status with associated audits or invalid password'
+    description:
+      'Cannot delete audit status with associated audits or invalid password'
   })
   @ApiResponse({
     status: 403,
@@ -123,13 +130,20 @@ export class AuditStatusController {
     @Body() deleteAuditStatusDto: DeleteAuditStatusDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.auditStatusService.remove(id, deleteAuditStatusDto.password, user)
+    return this.auditStatusService.remove(
+      id,
+      deleteAuditStatusDto.password,
+      user
+    )
   }
 
   @Patch(':id/reorder')
   @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.UPDATE)
   @ApiOperation({ summary: 'Reorder an audit status' })
-  @ApiResponse({ status: 200, description: 'Audit status order updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Audit status order updated successfully'
+  })
   @ApiResponse({ status: 404, description: 'Audit status not found' })
   @ApiResponse({
     status: 403,

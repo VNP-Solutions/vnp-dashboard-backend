@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Inject,
   Param,
@@ -111,12 +110,15 @@ export class AuditBatchController {
 
   @Post(':id/delete')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE)
-  @ApiOperation({ summary: 'Delete an audit batch (requires password verification)' })
+  @ApiOperation({
+    summary: 'Delete an audit batch (requires password verification)'
+  })
   @ApiResponse({ status: 200, description: 'Batch deleted successfully' })
   @ApiResponse({ status: 404, description: 'Batch not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete batch with associated audits or invalid password'
+    description:
+      'Cannot delete batch with associated audits or invalid password'
   })
   @ApiResponse({
     status: 403,

@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Inject,
   Param,
@@ -24,7 +23,12 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { CreateCurrencyDto, DeleteCurrencyDto, ReorderCurrencyDto, UpdateCurrencyDto } from './currency.dto'
+import {
+  CreateCurrencyDto,
+  DeleteCurrencyDto,
+  ReorderCurrencyDto,
+  UpdateCurrencyDto
+} from './currency.dto'
 import type { ICurrencyService } from './currency.interface'
 
 @ApiTags('Currency')
@@ -95,12 +99,15 @@ export class CurrencyController {
 
   @Post(':id/delete')
   @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.DELETE)
-  @ApiOperation({ summary: 'Delete a currency (requires password verification)' })
+  @ApiOperation({
+    summary: 'Delete a currency (requires password verification)'
+  })
   @ApiResponse({ status: 200, description: 'Currency deleted successfully' })
   @ApiResponse({ status: 404, description: 'Currency not found' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete currency with associated properties or invalid password'
+    description:
+      'Cannot delete currency with associated properties or invalid password'
   })
   @ApiResponse({
     status: 403,
@@ -117,7 +124,10 @@ export class CurrencyController {
   @Patch(':id/reorder')
   @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.UPDATE)
   @ApiOperation({ summary: 'Reorder a currency' })
-  @ApiResponse({ status: 200, description: 'Currency order updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Currency order updated successfully'
+  })
   @ApiResponse({ status: 404, description: 'Currency not found' })
   @ApiResponse({
     status: 403,
