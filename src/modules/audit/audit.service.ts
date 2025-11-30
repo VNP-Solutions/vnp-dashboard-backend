@@ -1287,46 +1287,46 @@ export class AuditService implements IAuditService {
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
-          // Extract property name
-          const propertyName = findHeaderValue(row, [
-            'Property Name',
-            'Property name',
-            'Property',
-            'Name'
+          // Extract Expedia ID (required)
+          const expediaId = findHeaderValue(row, [
+            'Expedia ID',
+            'Expedia Id',
+            'Expedia id',
+            'expedia_id'
           ])
 
           // Debug log
           console.log(
-            `Row ${rowNumber}: propertyName =`,
-            propertyName,
+            `Row ${rowNumber}: expediaId =`,
+            expediaId,
             'from row:',
             JSON.stringify(row)
           )
 
-          if (!propertyName) {
+          if (!expediaId) {
             result.errors.push({
               row: rowNumber,
               audit: 'Unknown',
               error:
-                'Property name is required. Available columns: ' +
+                'Expedia ID is required. Available columns: ' +
                 Object.keys(row).join(', ')
             })
             result.failureCount++
             continue
           }
 
-          // Find property by name
+          // Find property by Expedia ID
           const property =
-            await this.propertyRepository.findByName(propertyName)
+            await this.propertyRepository.findByExpediaId(expediaId)
           if (!property) {
             console.log(
               '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Property '${propertyName}' not found in database`
+              `❌ Row ${rowNumber} FAILED: Property with Expedia ID '${expediaId}' not found in database`
             )
             result.errors.push({
               row: rowNumber,
-              audit: propertyName,
-              error: 'Property not found'
+              audit: expediaId,
+              error: 'Property not found with this Expedia ID'
             })
             result.failureCount++
             continue
@@ -1356,7 +1356,7 @@ export class AuditService implements IAuditService {
             )
             result.errors.push({
               row: rowNumber,
-              audit: propertyName,
+              audit: expediaId,
               error: 'Audit status is required'
             })
             result.failureCount++
@@ -1414,7 +1414,7 @@ export class AuditService implements IAuditService {
               )
               result.errors.push({
                 row: rowNumber,
-                audit: propertyName,
+                audit: expediaId,
                 error: 'Invalid start date format (expected mm/dd/yyyy)'
               })
               result.failureCount++
@@ -1441,7 +1441,7 @@ export class AuditService implements IAuditService {
               )
               result.errors.push({
                 row: rowNumber,
-                audit: propertyName,
+                audit: expediaId,
                 error: 'Invalid end date format (expected mm/dd/yyyy)'
               })
               result.failureCount++
@@ -1457,7 +1457,7 @@ export class AuditService implements IAuditService {
             )
             result.errors.push({
               row: rowNumber,
-              audit: propertyName,
+              audit: expediaId,
               error: 'Start date must be before end date'
             })
             result.failureCount++
@@ -1508,20 +1508,20 @@ export class AuditService implements IAuditService {
           // Create the audit
           await this.auditRepository.create(auditData)
 
-          const auditDescription = `${propertyName} - ${typeOfOta ? typeOfOta : 'Unknown OTA'} Audit`
+          const auditDescription = `${expediaId} - ${typeOfOta ? typeOfOta : 'Unknown OTA'} Audit`
           result.successCount++
           result.successfulImports.push(auditDescription)
           console.log(
             '\x1b[32m%s\x1b[0m',
-            `✅ Row ${rowNumber} SUCCESS: Created audit for '${propertyName}' (${typeOfOta || 'Unknown OTA'})`
+            `✅ Row ${rowNumber} SUCCESS: Created audit for Expedia ID '${expediaId}' (${typeOfOta || 'Unknown OTA'})`
           )
         } catch (error) {
-          const propertyName =
+          const expediaIdValue =
             findHeaderValue(row, [
-              'Property Name',
-              'Property name',
-              'Property',
-              'Name'
+              'Expedia ID',
+              'Expedia Id',
+              'Expedia id',
+              'expedia_id'
             ]) || 'Unknown'
 
           console.log(
@@ -1530,7 +1530,7 @@ export class AuditService implements IAuditService {
           )
           result.errors.push({
             row: rowNumber,
-            audit: propertyName,
+            audit: expediaIdValue,
             error: error.message || 'Unknown error occurred'
           })
           result.failureCount++

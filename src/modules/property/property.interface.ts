@@ -150,6 +150,7 @@ export interface IPropertyRepository {
   findById(id: string): Promise<PropertyWithFullDetails | null>
   findByIds(ids: string[]): Promise<Property[]>
   findByName(name: string): Promise<Property | null>
+  findByExpediaId(expediaId: string): Promise<Property | null>
   update(id: string, data: UpdatePropertyDto): Promise<PropertyWithRelations>
   delete(id: string): Promise<Property>
   countAudits(propertyId: string): Promise<number>

@@ -320,7 +320,7 @@ export class AuditController {
     Upload an Excel file (.xlsx or .xls) to bulk import audits.
 
     Required columns:
-    - Property Name/Property name/Property/Name: Name of the property (must exist)
+    - Expedia ID/Expedia Id/Expedia id/expedia_id: Expedia ID of the property (must exist)
     - Audit Status/Audit status/Status: Status name (will be created if doesn't exist)
 
     Optional columns:

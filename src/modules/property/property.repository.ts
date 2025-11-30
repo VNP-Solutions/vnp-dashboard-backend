@@ -576,6 +576,16 @@ export class PropertyRepository implements IPropertyRepository {
     })
   }
 
+  async findByExpediaId(expediaId: string) {
+    return this.prisma.property.findFirst({
+      where: {
+        credentials: {
+          expedia_id: expediaId
+        }
+      }
+    })
+  }
+
   async update(id: string, data: UpdatePropertyDto) {
     const updateData: any = { ...data }
     if (data.next_due_date) {
