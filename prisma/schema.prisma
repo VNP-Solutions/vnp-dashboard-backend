@@ -118,8 +118,8 @@ model Audit {
   amount_collectable Int?
   amount_confirmed   Int?
   is_archived        Boolean     @default(false)
-  start_date         DateTime
-  end_date           DateTime
+  start_date         DateTime?
+  end_date           DateTime?
   property_id        String      @db.ObjectId
   property           Property    @relation(fields: [property_id], references: [id], onDelete: Cascade)
   batch_id           String?     @db.ObjectId

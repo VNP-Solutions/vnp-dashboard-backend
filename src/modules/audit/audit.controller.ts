@@ -318,19 +318,21 @@ export class AuditController {
     summary: 'Bulk import audits from Excel file',
     description: `
     Upload an Excel file (.xlsx or .xls) to bulk import audits.
-    
+
     Required columns:
     - Property Name/Property name/Property/Name: Name of the property (must exist)
-    - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
-    - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)  
     - Audit Status/Audit status/Status: Status name (will be created if doesn't exist)
-    
+
     Optional columns:
+    - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
+    - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)
     - OTA/OTA Type/Ota Type/Ota type: OTA type (expedia, agoda, booking)
     - Amount Collectable/Amount collectable/amount_collectable: Collectable amount
-    - Amount Confirmed/Amount confirmed/amount_confirmed: Confirmed amount  
+    - Amount Confirmed/Amount confirmed/amount_confirmed: Confirmed amount
     - Report URL/Report url/report_url/Report/URL: Report URL
     - Batch/Batch No: Batch number (will be created if doesn't exist)
+
+    Note: If both start and end dates are provided, start date must be before end date.
     `
   })
   @ApiBody({

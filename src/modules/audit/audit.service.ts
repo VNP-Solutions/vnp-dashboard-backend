@@ -57,12 +57,14 @@ export class AuditService implements IAuditService {
   ) {}
 
   async create(data: CreateAuditDto, _user: IUserWithPermissions) {
-    // Validate date range
-    const startDate = new Date(data.start_date)
-    const endDate = new Date(data.end_date)
+    // Validate date range only if both dates are provided
+    if (data.start_date && data.end_date) {
+      const startDate = new Date(data.start_date)
+      const endDate = new Date(data.end_date)
 
-    if (startDate >= endDate) {
-      throw new BadRequestException('Start date must be before end date')
+      if (startDate >= endDate) {
+        throw new BadRequestException('Start date must be before end date')
+      }
     }
 
     return this.auditRepository.create(data)
@@ -480,12 +482,19 @@ export class AuditService implements IAuditService {
     }
 
     // Validate date range if dates are being updated
+    // Only validate if we'll have both dates after the update
     if (data.start_date || data.end_date) {
-      const startDate = new Date(data.start_date || audit.start_date)
-      const endDate = new Date(data.end_date || audit.end_date)
+      const startDateStr = data.start_date || audit.start_date
+      const endDateStr = data.end_date || audit.end_date
 
-      if (startDate >= endDate) {
-        throw new BadRequestException('Start date must be before end date')
+      // Only validate if both dates will be present after update
+      if (startDateStr && endDateStr) {
+        const startDate = new Date(startDateStr)
+        const endDate = new Date(endDateStr)
+
+        if (startDate >= endDate) {
+          throw new BadRequestException('Start date must be before end date')
+        }
       }
     }
 
@@ -1386,7 +1395,7 @@ export class AuditService implements IAuditService {
             ? parseFloat(amountConfirmedValue)
             : undefined
 
-          // Extract start date (use raw value to preserve Excel date format)
+          // Extract start date (use raw value to preserve Excel date format) - optional
           const startDateValue = getRawValue(row, [
             'Start Date',
             'Start date',
@@ -1394,36 +1403,26 @@ export class AuditService implements IAuditService {
             'From Date',
             'From'
           ])
-          if (!startDateValue) {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Start date is required`
-            )
-            result.errors.push({
-              row: rowNumber,
-              audit: propertyName,
-              error: 'Start date is required'
-            })
-            result.failureCount++
-            continue
+
+          let startDate: Date | null = null
+          if (startDateValue) {
+            startDate = parseDate(startDateValue)
+            if (!startDate) {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ Row ${rowNumber} FAILED: Invalid start date format`
+              )
+              result.errors.push({
+                row: rowNumber,
+                audit: propertyName,
+                error: 'Invalid start date format (expected mm/dd/yyyy)'
+              })
+              result.failureCount++
+              continue
+            }
           }
 
-          const startDate = parseDate(startDateValue)
-          if (!startDate) {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Invalid start date format`
-            )
-            result.errors.push({
-              row: rowNumber,
-              audit: propertyName,
-              error: 'Invalid start date format (expected mm/dd/yyyy)'
-            })
-            result.failureCount++
-            continue
-          }
-
-          // Extract end date (use raw value to preserve Excel date format)
+          // Extract end date (use raw value to preserve Excel date format) - optional
           const endDateValue = getRawValue(row, [
             'End Date',
             'End date',
@@ -1431,37 +1430,27 @@ export class AuditService implements IAuditService {
             'To Date',
             'To'
           ])
-          if (!endDateValue) {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: End date is required`
-            )
-            result.errors.push({
-              row: rowNumber,
-              audit: propertyName,
-              error: 'End date is required'
-            })
-            result.failureCount++
-            continue
+
+          let endDate: Date | null = null
+          if (endDateValue) {
+            endDate = parseDate(endDateValue)
+            if (!endDate) {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ Row ${rowNumber} FAILED: Invalid end date format`
+              )
+              result.errors.push({
+                row: rowNumber,
+                audit: propertyName,
+                error: 'Invalid end date format (expected mm/dd/yyyy)'
+              })
+              result.failureCount++
+              continue
+            }
           }
 
-          const endDate = parseDate(endDateValue)
-          if (!endDate) {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Invalid end date format`
-            )
-            result.errors.push({
-              row: rowNumber,
-              audit: propertyName,
-              error: 'Invalid end date format (expected mm/dd/yyyy)'
-            })
-            result.failureCount++
-            continue
-          }
-
-          // Validate date range
-          if (startDate >= endDate) {
+          // Validate date range only if both dates are provided
+          if (startDate && endDate && startDate >= endDate) {
             console.log(
               '\x1b[31m%s\x1b[0m',
               `❌ Row ${rowNumber} FAILED: Start date must be before end date`
@@ -1507,8 +1496,8 @@ export class AuditService implements IAuditService {
           const auditData: CreateAuditDto = {
             property_id: property.id,
             audit_status_id: auditStatus.id,
-            start_date: startDate.toISOString(),
-            end_date: endDate.toISOString(),
+            start_date: startDate ? startDate.toISOString() : undefined,
+            end_date: endDate ? endDate.toISOString() : undefined,
             type_of_ota: typeOfOta || undefined,
             amount_collectable: amountCollectable,
             amount_confirmed: amountConfirmed,

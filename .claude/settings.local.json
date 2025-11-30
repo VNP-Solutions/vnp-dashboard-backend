@@ -10,7 +10,8 @@
       "Bash(yarn eslint:*)",
       "Bash(yarn lint:*)",
       "Bash(dir:*)",
-      "Bash(npx tsc --noEmit)"
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx prisma generate:*)"
     ],
     "deny": [],
     "ask": []

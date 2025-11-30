@@ -47,21 +47,21 @@ export class CreateAuditDto {
   @IsOptional()
   amount_confirmed?: number
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '2024-01-01T00:00:00Z',
     description: 'Audit start date'
   })
   @IsDateString()
-  @IsNotEmpty()
-  start_date: string
+  @IsOptional()
+  start_date?: string
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '2024-01-31T23:59:59Z',
     description: 'Audit end date'
   })
   @IsDateString()
-  @IsNotEmpty()
-  end_date: string
+  @IsOptional()
+  end_date?: string
 
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',

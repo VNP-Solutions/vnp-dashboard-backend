@@ -11,8 +11,8 @@ export class AuditRepository implements IAuditRepository {
     return this.prisma.audit.create({
       data: {
         ...data,
-        start_date: new Date(data.start_date),
-        end_date: new Date(data.end_date)
+        start_date: data.start_date ? new Date(data.start_date) : undefined,
+        end_date: data.end_date ? new Date(data.end_date) : undefined
       },
       include: {
         auditStatus: {

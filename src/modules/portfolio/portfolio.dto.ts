@@ -251,11 +251,11 @@ export class PortfolioStatsAuditDto {
   @ApiProperty({ example: 20000, description: 'Amount confirmed' })
   amount_confirmed: number | null
 
-  @ApiProperty({ example: '2024-01-01', description: 'Start date' })
-  start_date: Date
+  @ApiPropertyOptional({ example: '2024-01-01', description: 'Start date' })
+  start_date: Date | null
 
-  @ApiProperty({ example: '2024-01-31', description: 'End date' })
-  end_date: Date
+  @ApiPropertyOptional({ example: '2024-01-31', description: 'End date' })
+  end_date: Date | null
 
   @ApiProperty({ example: 'Hotel ABC', description: 'Property name' })
   property_name: string
