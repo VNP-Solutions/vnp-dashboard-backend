@@ -9,6 +9,7 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import {
   CreateTaskDto,
   DeleteAllTasksDto,
+  TaskEntityType,
   TaskQueryDto,
   UpdateTaskDto
 } from './task.dto'
@@ -53,6 +54,22 @@ export class TaskService implements ITaskService {
     // Add audit filter if provided
     if (query.audit_id) {
       where.audit_id = query.audit_id
+    }
+
+    // Filter by entity type - get all tasks for a specific entity type
+    // TaskEntityType.ALL is equivalent to no filter (returns all tasks)
+    if (query.entity_type && query.entity_type !== TaskEntityType.ALL) {
+      switch (query.entity_type) {
+        case TaskEntityType.PORTFOLIO:
+          where.portfolio_id = { not: null }
+          break
+        case TaskEntityType.PROPERTY:
+          where.property_id = { not: null }
+          break
+        case TaskEntityType.AUDIT:
+          where.audit_id = { not: null }
+          break
+      }
     }
 
     // Filter by is_done

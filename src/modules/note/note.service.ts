@@ -9,6 +9,7 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import {
   CreateNoteDto,
   DeleteAllNotesDto,
+  NoteEntityType,
   NoteQueryDto,
   UpdateNoteDto
 } from './note.dto'
@@ -53,6 +54,22 @@ export class NoteService implements INoteService {
     // Add audit filter if provided
     if (query.audit_id) {
       where.audit_id = query.audit_id
+    }
+
+    // Filter by entity type - get all notes for a specific entity type
+    // NoteEntityType.ALL is equivalent to no filter (returns all notes)
+    if (query.entity_type && query.entity_type !== NoteEntityType.ALL) {
+      switch (query.entity_type) {
+        case NoteEntityType.PORTFOLIO:
+          where.portfolio_id = { not: null }
+          break
+        case NoteEntityType.PROPERTY:
+          where.property_id = { not: null }
+          break
+        case NoteEntityType.AUDIT:
+          where.audit_id = { not: null }
+          break
+      }
     }
 
     // Filter by is_done

@@ -3,10 +3,18 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString
 } from 'class-validator'
+
+export enum TaskEntityType {
+  ALL = 'all',
+  PORTFOLIO = 'portfolio',
+  PROPERTY = 'property',
+  AUDIT = 'audit'
+}
 
 export class CreateTaskDto {
   @ApiProperty({
@@ -101,6 +109,16 @@ export class TaskQueryDto {
   @IsOptional()
   @IsString()
   audit_id?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by entity type (all, portfolio, property, audit). Returns all tasks for that entity type.',
+    example: 'portfolio',
+    enum: TaskEntityType
+  })
+  @IsOptional()
+  @IsEnum(TaskEntityType)
+  entity_type?: TaskEntityType
 
   @ApiPropertyOptional({
     description: 'Filter by done status (true/false)',
