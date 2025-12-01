@@ -1,6 +1,19 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator'
+import {
+  IsBoolean,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString
+} from 'class-validator'
+
+export enum NoteEntityType {
+  ALL = 'all',
+  PORTFOLIO = 'portfolio',
+  PROPERTY = 'property',
+  AUDIT = 'audit'
+}
 
 export class CreateNoteDto {
   @ApiProperty({
@@ -79,6 +92,16 @@ export class NoteQueryDto {
   @IsOptional()
   @IsString()
   audit_id?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by entity type (portfolio, property, audit). Returns all notes for that entity type.',
+    example: 'portfolio',
+    enum: NoteEntityType
+  })
+  @IsOptional()
+  @IsEnum(NoteEntityType)
+  entity_type?: NoteEntityType
 
   @ApiPropertyOptional({
     description: 'Filter by done status (true/false)',
