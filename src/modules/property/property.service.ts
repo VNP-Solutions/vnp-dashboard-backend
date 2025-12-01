@@ -399,12 +399,10 @@ export class PropertyService implements IPropertyService {
       const accessType = isShared ? 'shared' : 'owned'
 
       // Add pending action info if exists
-      const hasPendingAction =
-        property.pendingActions && property.pendingActions.length > 0
-      const pendingAction = hasPendingAction ? property.pendingActions[0] : null
+      const pendingActions = property.pendingActions || []
 
       // Remove pendingActions array from response to avoid duplication
-      const { _pendingActions, ...propertyWithoutPendingActions } = property
+      const { pendingActions: _pendingActions, ...propertyWithoutPendingActions } = property
 
       // Decrypt credential passwords if credentials exist
       let decryptedCredentials = propertyWithoutPendingActions.credentials
@@ -456,8 +454,8 @@ export class PropertyService implements IPropertyService {
         viewing_portfolio_id: isShared
           ? query.portfolio_id
           : property.portfolio_id,
-        has_pending_action: hasPendingAction,
-        pending_action: pendingAction
+        has_pending_action: pendingActions.length > 0,
+        pending_actions: pendingActions
       }
     })
 
@@ -650,12 +648,10 @@ export class PropertyService implements IPropertyService {
       const accessType = isShared ? 'shared' : 'owned'
 
       // Add pending action info if exists
-      const hasPendingAction =
-        property.pendingActions && property.pendingActions.length > 0
-      const pendingAction = hasPendingAction ? property.pendingActions[0] : null
+      const pendingActions = property.pendingActions || []
 
       // Remove pendingActions array from response to avoid duplication
-      const { _pendingActions, ...propertyWithoutPendingActions } = property
+      const { pendingActions: _pendingActions, ...propertyWithoutPendingActions } = property
 
       // Decrypt credential passwords if credentials exist
       let decryptedCredentials = propertyWithoutPendingActions.credentials
@@ -707,8 +703,8 @@ export class PropertyService implements IPropertyService {
         viewing_portfolio_id: isShared
           ? query.portfolio_id
           : property.portfolio_id,
-        has_pending_action: hasPendingAction,
-        pending_action: pendingAction
+        has_pending_action: pendingActions.length > 0,
+        pending_actions: pendingActions
       }
     })
 
