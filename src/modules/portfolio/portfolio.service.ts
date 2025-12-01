@@ -795,27 +795,30 @@ export class PortfolioService implements IPortfolioService {
 
       result.totalRows = data.length
 
+      // Helper function to clean column name - removes asterisks and other markers, trims whitespace
+      const cleanColumnName = (name: string): string => {
+        return name
+          .replace(/[*＊✱✲⁎∗]/g, '') // Remove various asterisk characters
+          .trim()
+          .toLowerCase()
+      }
+
       // Helper function to find header value with flexible naming
       // Handles column names with asterisks (e.g., "Portfolio Name*")
       const findHeaderValue = (
         row: any,
         possibleNames: string[]
       ): string | undefined => {
-        // First, try to find exact matches
-        for (const name of possibleNames) {
-          const value = row[name]
-          if (value !== undefined && value !== null && value !== '') {
-            return String(value).trim()
-          }
-        }
-
-        // If no exact match, try matching by removing asterisks from Excel column names
         const rowKeys = Object.keys(row)
+
+        // Try to find a matching column
         for (const name of possibleNames) {
+          const cleanName = cleanColumnName(name)
+
           for (const key of rowKeys) {
-            // Remove asterisk and trim from the Excel column name
-            const cleanKey = key.split('*')[0].trim()
-            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+            const cleanKey = cleanColumnName(key)
+
+            if (cleanKey === cleanName) {
               const value = row[key]
               if (value !== undefined && value !== null && value !== '') {
                 return String(value).trim()
@@ -1114,27 +1117,30 @@ export class PortfolioService implements IPortfolioService {
 
       result.totalRows = data.length
 
+      // Helper function to clean column name - removes asterisks and other markers, trims whitespace
+      const cleanColumnName = (name: string): string => {
+        return name
+          .replace(/[*＊✱✲⁎∗]/g, '') // Remove various asterisk characters
+          .trim()
+          .toLowerCase()
+      }
+
       // Helper function to find header value with flexible naming
       // Handles column names with asterisks (e.g., "Portfolio Name*")
       const findHeaderValue = (
         row: any,
         possibleNames: string[]
       ): string | undefined => {
-        // First, try to find exact matches
-        for (const name of possibleNames) {
-          const value = row[name]
-          if (value !== undefined && value !== null && value !== '') {
-            return String(value).trim()
-          }
-        }
-
-        // If no exact match, try matching by removing asterisks from Excel column names
         const rowKeys = Object.keys(row)
+
+        // Try to find a matching column
         for (const name of possibleNames) {
+          const cleanName = cleanColumnName(name)
+
           for (const key of rowKeys) {
-            // Remove asterisk and trim from the Excel column name
-            const cleanKey = key.split('*')[0].trim()
-            if (cleanKey.toLowerCase() === name.toLowerCase()) {
+            const cleanKey = cleanColumnName(key)
+
+            if (cleanKey === cleanName) {
               const value = row[key]
               if (value !== undefined && value !== null && value !== '') {
                 return String(value).trim()
@@ -1144,6 +1150,20 @@ export class PortfolioService implements IPortfolioService {
         }
 
         return undefined
+      }
+
+      // Log column headers from first row for debugging
+      if (data.length > 0) {
+        const firstRow = data[0] as any
+        const columnHeaders = Object.keys(firstRow)
+        console.log('Excel column headers:', columnHeaders)
+        console.log(
+          'Column headers (with char codes):',
+          columnHeaders.map(h => ({
+            header: h,
+            chars: [...h].map(c => c.charCodeAt(0))
+          }))
+        )
       }
 
       // Process each row
@@ -1164,6 +1184,9 @@ export class PortfolioService implements IPortfolioService {
           ])
 
           if (!portfolioIdValue) {
+            // Log row keys for debugging
+            console.log(`Row ${rowNumber} keys:`, Object.keys(row))
+            console.log(`Row ${rowNumber} values:`, row)
             result.errors.push({
               row: rowNumber,
               portfolioId: 'Unknown',
