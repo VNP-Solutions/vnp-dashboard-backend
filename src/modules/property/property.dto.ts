@@ -1,5 +1,4 @@
-import { OmitType, PartialType } from '@nestjs/mapped-types'
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
   IsArray,
