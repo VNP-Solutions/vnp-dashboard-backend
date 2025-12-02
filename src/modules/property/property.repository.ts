@@ -68,22 +68,24 @@ export class PropertyRepository implements IPropertyRepository {
         await tx.propertyCredentials.create({
           data: {
             property_id: property.id,
+            // Only expedia_id is required, username and password are optional
             expedia_id: credentialsData.expedia.id,
-            expedia_username: credentialsData.expedia.username,
-            expedia_password: EncryptionUtil.encrypt(
-              credentialsData.expedia.password,
-              encryptionSecret
-            ),
-            agoda_id: credentialsData.agoda?.id || '',
-            agoda_username: credentialsData.agoda?.username || '',
+            expedia_username: credentialsData.expedia.username || null,
+            expedia_password: credentialsData.expedia.password
+              ? EncryptionUtil.encrypt(credentialsData.expedia.password, encryptionSecret)
+              : null,
+            // All agoda fields are optional
+            agoda_id: credentialsData.agoda?.id || null,
+            agoda_username: credentialsData.agoda?.username || null,
             agoda_password: credentialsData.agoda?.password
               ? EncryptionUtil.encrypt(credentialsData.agoda.password, encryptionSecret)
-              : '',
-            booking_id: credentialsData.booking?.id || '',
-            booking_username: credentialsData.booking?.username || '',
+              : null,
+            // All booking fields are optional
+            booking_id: credentialsData.booking?.id || null,
+            booking_username: credentialsData.booking?.username || null,
             booking_password: credentialsData.booking?.password
               ? EncryptionUtil.encrypt(credentialsData.booking.password, encryptionSecret)
-              : ''
+              : null
           }
         })
       }
@@ -227,22 +229,24 @@ export class PropertyRepository implements IPropertyRepository {
         })
 
         const credentialsPayload: any = {
+          // Only expedia_id is required, username and password are optional
           expedia_id: credentialsData.expedia.id,
-          expedia_username: credentialsData.expedia.username,
-          expedia_password: EncryptionUtil.encrypt(
-            credentialsData.expedia.password,
-            encryptionSecret
-          ),
-          agoda_id: credentialsData.agoda?.id || '',
-          agoda_username: credentialsData.agoda?.username || '',
+          expedia_username: credentialsData.expedia.username || null,
+          expedia_password: credentialsData.expedia.password
+            ? EncryptionUtil.encrypt(credentialsData.expedia.password, encryptionSecret)
+            : null,
+          // All agoda fields are optional
+          agoda_id: credentialsData.agoda?.id || null,
+          agoda_username: credentialsData.agoda?.username || null,
           agoda_password: credentialsData.agoda?.password
             ? EncryptionUtil.encrypt(credentialsData.agoda.password, encryptionSecret)
-            : '',
-          booking_id: credentialsData.booking?.id || '',
-          booking_username: credentialsData.booking?.username || '',
+            : null,
+          // All booking fields are optional
+          booking_id: credentialsData.booking?.id || null,
+          booking_username: credentialsData.booking?.username || null,
           booking_password: credentialsData.booking?.password
             ? EncryptionUtil.encrypt(credentialsData.booking.password, encryptionSecret)
-            : ''
+            : null
         }
 
         if (existingCredentials) {

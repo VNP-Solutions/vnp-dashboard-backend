@@ -59,13 +59,12 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
 
     const encryptedData: any = {
       property_id: data.property_id,
-      // Expedia is required
+      // Only expedia_id is required, username and password are optional
       expedia_id: data.expedia.id,
-      expedia_username: data.expedia.username,
-      expedia_password: EncryptionUtil.encrypt(
-        data.expedia.password,
-        encryptionSecret
-      )
+      expedia_username: data.expedia.username || null,
+      expedia_password: data.expedia.password
+        ? EncryptionUtil.encrypt(data.expedia.password, encryptionSecret)
+        : null
     }
 
     if (data.agoda) {
@@ -139,14 +138,14 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
     // If a credential (agoda/booking) is not in the payload, it will be cleared
     const updateData: any = {}
 
-    // Handle Expedia credentials
+    // Handle Expedia credentials - only expedia_id is required
     if (data.expedia) {
       updateData.expedia_id = data.expedia.id
-      updateData.expedia_username = data.expedia.username
-      updateData.expedia_password = EncryptionUtil.encrypt(
-        data.expedia.password,
-        encryptionSecret
-      )
+      // Username and password are optional but must be provided together (validated in DTO)
+      updateData.expedia_username = data.expedia.username || null
+      updateData.expedia_password = data.expedia.password
+        ? EncryptionUtil.encrypt(data.expedia.password, encryptionSecret)
+        : null
     } else {
       // If expedia is not provided, clear it
       updateData.expedia_id = null
@@ -154,33 +153,33 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
       updateData.expedia_password = null
     }
 
-    // Handle Agoda credentials
-    if (data.agoda && data.agoda.username && data.agoda.password) {
-      // Agoda credentials provided - update them
+    // Handle Agoda credentials - all fields are optional
+    if (data.agoda) {
+      // ID can be provided independently
       updateData.agoda_id = data.agoda.id || null
-      updateData.agoda_username = data.agoda.username
-      updateData.agoda_password = EncryptionUtil.encrypt(
-        data.agoda.password,
-        encryptionSecret
-      )
+      // Username and password must be provided together (validated in DTO)
+      updateData.agoda_username = data.agoda.username || null
+      updateData.agoda_password = data.agoda.password
+        ? EncryptionUtil.encrypt(data.agoda.password, encryptionSecret)
+        : null
     } else {
-      // Agoda not provided or incomplete - clear it
+      // Agoda not provided - clear it
       updateData.agoda_id = null
       updateData.agoda_username = null
       updateData.agoda_password = null
     }
 
-    // Handle Booking credentials
-    if (data.booking && data.booking.username && data.booking.password) {
-      // Booking credentials provided - update them
+    // Handle Booking credentials - all fields are optional
+    if (data.booking) {
+      // ID can be provided independently
       updateData.booking_id = data.booking.id || null
-      updateData.booking_username = data.booking.username
-      updateData.booking_password = EncryptionUtil.encrypt(
-        data.booking.password,
-        encryptionSecret
-      )
+      // Username and password must be provided together (validated in DTO)
+      updateData.booking_username = data.booking.username || null
+      updateData.booking_password = data.booking.password
+        ? EncryptionUtil.encrypt(data.booking.password, encryptionSecret)
+        : null
     } else {
-      // Booking not provided or incomplete - clear it
+      // Booking not provided - clear it
       updateData.booking_id = null
       updateData.booking_username = null
       updateData.booking_password = null

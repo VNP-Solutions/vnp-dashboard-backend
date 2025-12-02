@@ -15,8 +15,8 @@ export type PropertyCredentialsWithDecrypted = {
   created_at: Date
   updated_at: Date
   expedia_id: string
-  expedia_username: string
-  expedia_password: string
+  expedia_username: string | null
+  expedia_password: string | null
   agoda_id: string | null
   agoda_username: string | null
   agoda_password: string | null

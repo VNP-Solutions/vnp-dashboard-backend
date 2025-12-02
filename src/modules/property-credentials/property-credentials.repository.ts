@@ -35,11 +35,10 @@ export class PropertyCredentialsRepository
 
     return {
       ...credentials,
-      // Expedia fields are required and always decrypted
-      expedia_password: EncryptionUtil.decrypt(
-        credentials.expedia_password,
-        encryptionSecret
-      ),
+      // Expedia password is now optional - decrypt only if present
+      expedia_password: credentials.expedia_password
+        ? EncryptionUtil.decrypt(credentials.expedia_password, encryptionSecret)
+        : null,
       // Optional fields - decrypt only if present
       agoda_password: credentials.agoda_password
         ? EncryptionUtil.decrypt(credentials.agoda_password, encryptionSecret)
@@ -68,10 +67,10 @@ export class PropertyCredentialsRepository
 
     return credentials.map(cred => ({
       ...cred,
-      expedia_password: EncryptionUtil.decrypt(
-        cred.expedia_password,
-        encryptionSecret
-      ),
+      // Expedia password is now optional - decrypt only if present
+      expedia_password: cred.expedia_password
+        ? EncryptionUtil.decrypt(cred.expedia_password, encryptionSecret)
+        : null,
       agoda_password: cred.agoda_password
         ? EncryptionUtil.decrypt(cred.agoda_password, encryptionSecret)
         : null,
