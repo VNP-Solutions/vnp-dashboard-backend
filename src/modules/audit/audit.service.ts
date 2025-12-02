@@ -8,7 +8,10 @@ import {
 import { OtaType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { ModuleType } from '../../common/interfaces/permission.interface'
+import {
+  ModuleType,
+  PermissionAction
+} from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import {
   COMPLETED_AUDIT_STATUSES,
@@ -1781,5 +1784,32 @@ export class AuditService implements IAuditService {
       // Log the error but don't fail the status update
       console.error('Failed to send audit status change notification:', error)
     }
+  }
+
+  async remove(id: string, user: IUserWithPermissions) {
+    // Validate that only super admins can delete audits
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only super admins can delete audits')
+    }
+
+    // Check if audit exists and user has permission to access it
+    const audit = await this.auditRepository.findById(id)
+
+    if (!audit) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    // Check permission to access this audit (using requirePermission which is async)
+    await this.permissionService.requirePermission(
+      user,
+      ModuleType.AUDIT,
+      PermissionAction.DELETE,
+      audit.property_id
+    )
+
+    // Delete the audit
+    await this.auditRepository.delete(id)
+
+    return { message: 'Audit deleted successfully' }
   }
 }

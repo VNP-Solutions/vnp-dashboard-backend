@@ -108,6 +108,7 @@ export interface IAuditRepository {
     data: UpdateAuditDto
   ): Promise<{ count: number }>
   bulkArchive(auditIds: string[]): Promise<{ count: number }>
+  delete(id: string): Promise<void>
 }
 
 export interface IAuditService {
@@ -157,4 +158,5 @@ export interface IAuditService {
     updated_count: number
     updated_ids: string[]
   }>
+  remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
 }

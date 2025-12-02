@@ -221,8 +221,8 @@ export class AuditRepository implements IAuditRepository {
     })
   }
 
-  async delete(id: string) {
-    return this.prisma.audit.delete({
+  async delete(id: string): Promise<void> {
+    await this.prisma.audit.delete({
       where: { id }
     })
   }
