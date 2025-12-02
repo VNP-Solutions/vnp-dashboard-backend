@@ -146,8 +146,8 @@ model Audit {
 model PropertyCredentials {
   id               String   @id @default(auto()) @map("_id") @db.ObjectId
   expedia_id       String
-  expedia_username String
-  expedia_password String
+  expedia_username String?
+  expedia_password String?
   agoda_id         String?
   agoda_username   String?
   agoda_password   String?

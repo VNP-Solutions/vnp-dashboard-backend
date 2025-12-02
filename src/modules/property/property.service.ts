@@ -1659,7 +1659,7 @@ export class PropertyService implements IPropertyService {
           }
 
           // Extract and create credentials
-          // Expedia ID is REQUIRED
+          // Expedia ID is REQUIRED, username and password are optional
           const expediaId = findHeaderValue(row, [
             'Expedia ID',
             'Expedia Id',
@@ -1722,85 +1722,92 @@ export class PropertyService implements IPropertyService {
             'Booking Pass'
           ])
 
-          // Check if Expedia credentials are complete (username and password required for safety)
-          const hasExpediaCredentials =
-            expediaId && expediaUsername && expediaPassword
-
-          if (!hasExpediaCredentials) {
-            // Add warning to error list but continue processing
+          // Validate username/password pairs - if one is provided, both must be provided
+          const hasExpediaUsername = !!expediaUsername
+          const hasExpediaPassword = !!expediaPassword
+          if (hasExpediaUsername !== hasExpediaPassword) {
             result.errors.push({
               row: rowNumber,
               property: propertyName,
-              error: `Property ${existingProperty ? 'updated' : 'created'} successfully but missing Expedia Username or Password`
+              error: 'Expedia username and password must be provided together'
             })
+            result.failureCount++
+            continue
           }
 
-          // Create or update credentials only if Expedia credentials are complete
-          if (hasExpediaCredentials) {
-            // Check if credentials already exist
-            const existingCredentials =
-              await this.credentialsRepository.findByPropertyId(propertyId)
+          const hasAgodaUsername = !!agodaUsername
+          const hasAgodaPassword = !!agodaPassword
+          if (hasAgodaUsername !== hasAgodaPassword) {
+            result.errors.push({
+              row: rowNumber,
+              property: propertyName,
+              error: 'Agoda username and password must be provided together'
+            })
+            result.failureCount++
+            continue
+          }
 
-            const encryptionSecret = this.configService.get(
-              'encryption.secret',
-              {
-                infer: true
-              }
-            )!
+          const hasBookingUsername = !!bookingUsername
+          const hasBookingPassword = !!bookingPassword
+          if (hasBookingUsername !== hasBookingPassword) {
+            result.errors.push({
+              row: rowNumber,
+              property: propertyName,
+              error: 'Booking username and password must be provided together'
+            })
+            result.failureCount++
+            continue
+          }
 
-            const credentialsData: any = {}
+          // Create or update credentials - only expedia_id is required
+          // Check if credentials already exist
+          const existingCredentials =
+            await this.credentialsRepository.findByPropertyId(propertyId)
 
-            // Set required Expedia credentials
-            credentialsData.expedia_id = expediaId
-            credentialsData.expedia_username = expediaUsername
-            credentialsData.expedia_password = EncryptionUtil.encrypt(
-              expediaPassword,
-              encryptionSecret
+          const encryptionSecret = this.configService.get(
+            'encryption.secret',
+            {
+              infer: true
+            }
+          )!
+
+          const credentialsData: any = {}
+
+          // Set Expedia credentials - only ID is required
+          credentialsData.expedia_id = expediaId
+          credentialsData.expedia_username = expediaUsername || null
+          credentialsData.expedia_password = expediaPassword
+            ? EncryptionUtil.encrypt(expediaPassword, encryptionSecret)
+            : null
+
+          // Set Agoda credentials if any field is provided
+          if (agodaId || agodaUsername) {
+            credentialsData.agoda_id = agodaId || null
+            credentialsData.agoda_username = agodaUsername || null
+            credentialsData.agoda_password = agodaPassword
+              ? EncryptionUtil.encrypt(agodaPassword, encryptionSecret)
+              : null
+          }
+
+          // Set Booking credentials if any field is provided
+          if (bookingId || bookingUsername) {
+            credentialsData.booking_id = bookingId || null
+            credentialsData.booking_username = bookingUsername || null
+            credentialsData.booking_password = bookingPassword
+              ? EncryptionUtil.encrypt(bookingPassword, encryptionSecret)
+              : null
+          }
+
+          if (existingCredentials) {
+            // Update existing credentials (merge with existing)
+            await this.credentialsRepository.update(
+              propertyId,
+              credentialsData
             )
-
-            // Update Agoda credentials only if provided
-            if (agodaId || agodaUsername || agodaPassword) {
-              if (agodaId !== undefined) {
-                credentialsData.agoda_id = agodaId || null
-              }
-              if (agodaUsername !== undefined) {
-                credentialsData.agoda_username = agodaUsername || null
-              }
-              if (agodaPassword) {
-                credentialsData.agoda_password = EncryptionUtil.encrypt(
-                  agodaPassword,
-                  encryptionSecret
-                )
-              }
-            }
-
-            // Update Booking credentials only if provided
-            if (bookingId || bookingUsername || bookingPassword) {
-              if (bookingId !== undefined) {
-                credentialsData.booking_id = bookingId || null
-              }
-              if (bookingUsername !== undefined) {
-                credentialsData.booking_username = bookingUsername || null
-              }
-              if (bookingPassword) {
-                credentialsData.booking_password = EncryptionUtil.encrypt(
-                  bookingPassword,
-                  encryptionSecret
-                )
-              }
-            }
-
-            if (existingCredentials) {
-              // Update existing credentials (merge with existing)
-              await this.credentialsRepository.update(
-                propertyId,
-                credentialsData
-              )
-            } else {
-              // Create new credentials
-              credentialsData.property_id = propertyId
-              await this.credentialsRepository.create(credentialsData)
-            }
+          } else {
+            // Create new credentials
+            credentialsData.property_id = propertyId
+            await this.credentialsRepository.create(credentialsData)
           }
 
           // Extract and create bank details if provided
@@ -2549,6 +2556,43 @@ export class PropertyService implements IPropertyService {
             bookingId ||
             bookingUsername ||
             bookingPassword
+
+          // Validate username/password pairs - if one is provided, both must be provided
+          const hasExpediaUsername = !!expediaUsername
+          const hasExpediaPassword = !!expediaPassword
+          if (hasExpediaUsername !== hasExpediaPassword) {
+            result.errors.push({
+              row: rowNumber,
+              propertyId: propertyIdValue,
+              error: 'Expedia username and password must be provided together'
+            })
+            result.failureCount++
+            continue
+          }
+
+          const hasAgodaUsername = !!agodaUsername
+          const hasAgodaPassword = !!agodaPassword
+          if (hasAgodaUsername !== hasAgodaPassword) {
+            result.errors.push({
+              row: rowNumber,
+              propertyId: propertyIdValue,
+              error: 'Agoda username and password must be provided together'
+            })
+            result.failureCount++
+            continue
+          }
+
+          const hasBookingUsername = !!bookingUsername
+          const hasBookingPassword = !!bookingPassword
+          if (hasBookingUsername !== hasBookingPassword) {
+            result.errors.push({
+              row: rowNumber,
+              propertyId: propertyIdValue,
+              error: 'Booking username and password must be provided together'
+            })
+            result.failureCount++
+            continue
+          }
 
           // Handle bank details update (if provided)
           const bankTypeRaw = findHeaderValue(row, [

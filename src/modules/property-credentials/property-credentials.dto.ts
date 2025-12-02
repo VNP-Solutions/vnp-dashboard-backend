@@ -1,7 +1,45 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsArray, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator'
+import {
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateNested,
+  ValidationArguments,
+  registerDecorator,
+  ValidationOptions
+} from 'class-validator'
+
+// Custom validator to ensure username and password are provided together
+function UsernamePasswordTogether(validationOptions?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: 'usernamePasswordTogether',
+      target: object.constructor,
+      propertyName: propertyName,
+      options: validationOptions,
+      validator: {
+        validate(_value: any, args: ValidationArguments) {
+          const obj = args.object as any
+          const hasUsername = obj.username !== undefined && obj.username !== null && obj.username !== ''
+          const hasPassword = obj.password !== undefined && obj.password !== null && obj.password !== ''
+          // Both must be present or both must be absent
+          return hasUsername === hasPassword
+        },
+        defaultMessage(args: ValidationArguments) {
+          const obj = args.object as any
+          const hasUsername = obj.username !== undefined && obj.username !== null && obj.username !== ''
+          if (hasUsername) {
+            return 'Password is required when username is provided'
+          }
+          return 'Username is required when password is provided'
+        }
+      }
+    })
+  }
+}
 
 export class OtaCredentialsDto {
   @ApiPropertyOptional({
@@ -14,15 +52,16 @@ export class OtaCredentialsDto {
 
   @ApiPropertyOptional({
     example: 'hotel_user@example.com',
-    description: 'OTA username'
+    description: 'OTA username (must be provided with password)'
   })
   @IsString()
   @IsOptional()
+  @UsernamePasswordTogether({ message: 'Username and password must be provided together' })
   username?: string
 
   @ApiPropertyOptional({
     example: 'SecurePassword123!',
-    description: 'OTA password (will be encrypted)'
+    description: 'OTA password (will be encrypted, must be provided with username)'
   })
   @IsString()
   @IsOptional()
@@ -32,27 +71,28 @@ export class OtaCredentialsDto {
 export class ExpediaCredentialsDto {
   @ApiProperty({
     example: 'EXP123456',
-    description: 'Expedia ID'
+    description: 'Expedia ID (required)'
   })
   @IsString()
   @IsNotEmpty()
   id: string
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'hotel_user@example.com',
-    description: 'Expedia username'
+    description: 'Expedia username (optional, but must be provided with password)'
   })
   @IsString()
-  @IsNotEmpty()
-  username: string
+  @IsOptional()
+  @UsernamePasswordTogether({ message: 'Username and password must be provided together' })
+  username?: string
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'SecurePassword123!',
-    description: 'Expedia password (will be encrypted)'
+    description: 'Expedia password (will be encrypted, optional but must be provided with username)'
   })
   @IsString()
-  @IsNotEmpty()
-  password: string
+  @IsOptional()
+  password?: string
 }
 
 export class CreatePropertyCredentialsDto {
