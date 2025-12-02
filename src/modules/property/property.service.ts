@@ -271,6 +271,7 @@ export class PropertyService implements IPropertyService {
     }
 
     // Configuration for query builder
+    // Note: credentials.expedia_id is handled separately below with proper Prisma 'is' syntax for one-to-one relations
     const queryConfig = {
       searchFields: [
         'id',
@@ -315,6 +316,64 @@ export class PropertyService implements IPropertyService {
     )
     let where = queryResult.where
     const { skip, take, orderBy } = queryResult
+
+    // Add credentials.expedia_id search if search term is provided
+    // This uses proper Prisma 'is' syntax for one-to-one optional relations
+    if (query.search && !QueryBuilder.shouldIgnoreValue(query.search)) {
+      const searchTerm = query.search
+      // Add credentials.expedia_id to the OR conditions if they exist
+      if (where.OR && Array.isArray(where.OR)) {
+        where.OR.push({
+          credentials: {
+            is: {
+              expedia_id: {
+                contains: searchTerm,
+                mode: 'insensitive'
+              }
+            }
+          }
+        })
+      } else if (Object.keys(where).length === 0) {
+        // No existing conditions, create OR with just credentials search
+        where = {
+          OR: [
+            {
+              credentials: {
+                is: {
+                  expedia_id: {
+                    contains: searchTerm,
+                    mode: 'insensitive'
+                  }
+                }
+              }
+            }
+          ]
+        }
+      } else {
+        // Existing conditions but no OR, need to restructure
+        // The search should already have created OR conditions, but handle edge case
+        const existingConditions = { ...where }
+        where = {
+          AND: [
+            existingConditions,
+            {
+              OR: [
+                {
+                  credentials: {
+                    is: {
+                      expedia_id: {
+                        contains: searchTerm,
+                        mode: 'insensitive'
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
 
     // Manually add portfolio filter to ensure it's properly combined with search/filters
     if (Object.keys(portfolioFilter).length > 0) {
@@ -523,6 +582,7 @@ export class PropertyService implements IPropertyService {
     }
 
     // Configuration for query builder
+    // Note: credentials.expedia_id is handled separately below with proper Prisma 'is' syntax for one-to-one relations
     const queryConfig = {
       searchFields: [
         'id',
@@ -567,6 +627,64 @@ export class PropertyService implements IPropertyService {
     )
     let where = queryResult.where
     const { orderBy } = queryResult
+
+    // Add credentials.expedia_id search if search term is provided
+    // This uses proper Prisma 'is' syntax for one-to-one optional relations
+    if (query.search && !QueryBuilder.shouldIgnoreValue(query.search)) {
+      const searchTerm = query.search
+      // Add credentials.expedia_id to the OR conditions if they exist
+      if (where.OR && Array.isArray(where.OR)) {
+        where.OR.push({
+          credentials: {
+            is: {
+              expedia_id: {
+                contains: searchTerm,
+                mode: 'insensitive'
+              }
+            }
+          }
+        })
+      } else if (Object.keys(where).length === 0) {
+        // No existing conditions, create OR with just credentials search
+        where = {
+          OR: [
+            {
+              credentials: {
+                is: {
+                  expedia_id: {
+                    contains: searchTerm,
+                    mode: 'insensitive'
+                  }
+                }
+              }
+            }
+          ]
+        }
+      } else {
+        // Existing conditions but no OR, need to restructure
+        // The search should already have created OR conditions, but handle edge case
+        const existingConditions = { ...where }
+        where = {
+          AND: [
+            existingConditions,
+            {
+              OR: [
+                {
+                  credentials: {
+                    is: {
+                      expedia_id: {
+                        contains: searchTerm,
+                        mode: 'insensitive'
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
 
     // Manually add portfolio filter to ensure it's properly combined with search/filters
     if (Object.keys(portfolioFilter).length > 0) {
