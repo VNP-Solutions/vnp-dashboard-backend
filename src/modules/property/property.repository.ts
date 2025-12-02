@@ -208,7 +208,8 @@ export class PropertyRepository implements IPropertyRepository {
   ) {
     const encryptionSecret = process.env.JWT_ACCESS_SECRET || ''
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(
+      async (tx) => {
       // Update property data if provided
       if (propertyData && Object.keys(propertyData).length > 0) {
         const updateData: any = { ...propertyData }
@@ -383,7 +384,11 @@ export class PropertyRepository implements IPropertyRepository {
       }
 
       return completeProperty
-    })
+    },
+      {
+        timeout: 30000, // 30 seconds timeout for complex update operations
+      }
+    )
   }
 
   async findAll(queryOptions: any, _propertyIds?: string[]) {

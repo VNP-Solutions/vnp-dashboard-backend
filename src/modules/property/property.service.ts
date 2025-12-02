@@ -32,8 +32,8 @@ import type { IPropertyBankDetailsRepository } from '../property-bank-details/pr
 import type { IPropertyCredentialsRepository } from '../property-credentials/property-credentials.interface'
 import {
   BulkImportResultDto,
-  BulkUpdateResultDto,
   BulkTransferPropertyDto,
+  BulkUpdateResultDto,
   CompleteCreatePropertyDto,
   CompleteUpdatePropertyDto,
   CreatePropertyDto,
@@ -390,7 +390,10 @@ export class PropertyService implements IPropertyService {
 
     // Handle credential_type filter for credentials
     // Filter properties based on which OTA credentials they have
-    if (query.credential_type && query.credential_type.toLowerCase() !== 'all') {
+    if (
+      query.credential_type &&
+      query.credential_type.toLowerCase() !== 'all'
+    ) {
       const credentialType = query.credential_type.toLowerCase()
 
       // Use gt: '' to check field is not null AND not empty (works for MongoDB string fields)
@@ -461,7 +464,10 @@ export class PropertyService implements IPropertyService {
       const pendingActions = property.pendingActions || []
 
       // Remove pendingActions array from response to avoid duplication
-      const { pendingActions: _pendingActions, ...propertyWithoutPendingActions } = property
+      const {
+        pendingActions: _pendingActions,
+        ...propertyWithoutPendingActions
+      } = property
 
       // Decrypt credential passwords if credentials exist
       let decryptedCredentials = propertyWithoutPendingActions.credentials
@@ -701,7 +707,10 @@ export class PropertyService implements IPropertyService {
 
     // Handle credential_type filter for credentials
     // Filter properties based on which OTA credentials they have
-    if (query.credential_type && query.credential_type.toLowerCase() !== 'all') {
+    if (
+      query.credential_type &&
+      query.credential_type.toLowerCase() !== 'all'
+    ) {
       const credentialType = query.credential_type.toLowerCase()
 
       // Use gt: '' to check field is not null AND not empty (works for MongoDB string fields)
@@ -769,7 +778,10 @@ export class PropertyService implements IPropertyService {
       const pendingActions = property.pendingActions || []
 
       // Remove pendingActions array from response to avoid duplication
-      const { pendingActions: _pendingActions, ...propertyWithoutPendingActions } = property
+      const {
+        pendingActions: _pendingActions,
+        ...propertyWithoutPendingActions
+      } = property
 
       // Decrypt credential passwords if credentials exist
       let decryptedCredentials = propertyWithoutPendingActions.credentials
@@ -1284,9 +1296,7 @@ export class PropertyService implements IPropertyService {
 
     // External users cannot activate properties
     if (!isInternalUser(user)) {
-      throw new ForbiddenException(
-        'External users cannot activate properties'
-      )
+      throw new ForbiddenException('External users cannot activate properties')
     }
 
     const isSuperAdmin = isUserSuperAdmin(user)
@@ -1764,12 +1774,9 @@ export class PropertyService implements IPropertyService {
           const existingCredentials =
             await this.credentialsRepository.findByPropertyId(propertyId)
 
-          const encryptionSecret = this.configService.get(
-            'encryption.secret',
-            {
-              infer: true
-            }
-          )!
+          const encryptionSecret = this.configService.get('encryption.secret', {
+            infer: true
+          })!
 
           const credentialsData: any = {}
 
@@ -1800,10 +1807,7 @@ export class PropertyService implements IPropertyService {
 
           if (existingCredentials) {
             // Update existing credentials (merge with existing)
-            await this.credentialsRepository.update(
-              propertyId,
-              credentialsData
-            )
+            await this.credentialsRepository.update(propertyId, credentialsData)
           } else {
             // Create new credentials
             credentialsData.property_id = propertyId
@@ -2367,9 +2371,8 @@ export class PropertyService implements IPropertyService {
           }
 
           // Find existing property
-          const existingProperty = await this.propertyRepository.findById(
-            propertyIdValue
-          )
+          const existingProperty =
+            await this.propertyRepository.findById(propertyIdValue)
           if (!existingProperty) {
             result.errors.push({
               row: rowNumber,
@@ -2421,7 +2424,8 @@ export class PropertyService implements IPropertyService {
           ])
           if (currencyCode) {
             // Find or create currency
-            let currency = await this.currencyRepository.findByCode(currencyCode)
+            let currency =
+              await this.currencyRepository.findByCode(currencyCode)
             if (!currency) {
               currency = await this.currencyRepository.create({
                 code: currencyCode,
@@ -2606,7 +2610,11 @@ export class PropertyService implements IPropertyService {
           const hasPropertyUpdate = Object.keys(updateData).length > 0
 
           // Check if there's anything to update
-          if (!hasPropertyUpdate && !hasCredentialsUpdate && !hasBankDetailsUpdate) {
+          if (
+            !hasPropertyUpdate &&
+            !hasCredentialsUpdate &&
+            !hasBankDetailsUpdate
+          ) {
             result.errors.push({
               row: rowNumber,
               propertyId: propertyIdValue,
@@ -2690,7 +2698,9 @@ export class PropertyService implements IPropertyService {
             if (bankTypeNormalized === 'none') {
               // Delete bank details if they exist
               const existingBankDetails =
-                await this.bankDetailsRepository.findByPropertyId(propertyIdValue)
+                await this.bankDetailsRepository.findByPropertyId(
+                  propertyIdValue
+                )
               if (existingBankDetails) {
                 await this.bankDetailsRepository.delete(propertyIdValue)
               }
@@ -2714,7 +2724,9 @@ export class PropertyService implements IPropertyService {
               }
 
               const existingBankDetails =
-                await this.bankDetailsRepository.findByPropertyId(propertyIdValue)
+                await this.bankDetailsRepository.findByPropertyId(
+                  propertyIdValue
+                )
 
               const bankDetailsData: any = {
                 bank_type: BankType.stripe,
@@ -2793,7 +2805,9 @@ export class PropertyService implements IPropertyService {
               }
 
               const existingBankDetails =
-                await this.bankDetailsRepository.findByPropertyId(propertyIdValue)
+                await this.bankDetailsRepository.findByPropertyId(
+                  propertyIdValue
+                )
 
               const bankDetailsData: any = {
                 bank_type: BankType.bank,
@@ -2811,7 +2825,8 @@ export class PropertyService implements IPropertyService {
                 'Portfolio Name (Bank)'
               ])
               if (hotelPortfolioName !== undefined) {
-                bankDetailsData.hotel_portfolio_name = hotelPortfolioName || null
+                bankDetailsData.hotel_portfolio_name =
+                  hotelPortfolioName || null
               }
 
               const beneficiaryName = findHeaderValue(row, [
@@ -3153,3 +3168,79 @@ export class PropertyService implements IPropertyService {
     return (this.propertyRepository as any).prisma
   }
 }
+
+/*
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OGRiYWY5ZjgyNWQxNjUwZDBmZThhNzkiLCJlbWFpbCI6Im5hZWVtaGFzYW4yOEBnbWFpbC5jb20iLCJyb2xlX2lkIjoiNjhkYmFmOWU4MjVkMTY1MGQwZmU4YTc4IiwiaWF0IjoxNzY0NjcxOTA4LCJleHAiOjE3OTYyMDc5MDh9.dIR2PWRkML9iHZAkp0bAIWyYlKgYuL-dg_wXvj9Vptk
+{
+      "id": "692eb75412ca6f1c300289fd",
+      "name": "A prop under Swift portfolio 5",
+      "address": "NAI",
+      "currency_id": "68edf343f045370c2ff99ca5",
+      "card_descriptor": "TEST DESC",
+      "is_active": true,
+      "next_due_date": null,
+      "portfolio_id": "6925767bf9ac9df01d2ed5f2",
+      "previous_portfolio_id": null,
+      "show_in_portfolio": [],
+      "created_at": "2025-12-02T09:54:28.394Z",
+      "updated_at": "2025-12-02T09:55:23.281Z",
+      "currency": {
+        "id": "68edf343f045370c2ff99ca5",
+        "code": "BDT",
+        "name": "Bangladeshi Taka",
+        "symbol": "৳"
+      },
+      "portfolio": {
+        "id": "6925767bf9ac9df01d2ed5f2",
+        "name": "SwiftServe Logistics",
+        "is_active": false,
+        "service_type_id": "68dba6c93acd7725ac2bd8e2",
+        "serviceType": {
+          "id": "68dba6c93acd7725ac2bd8e2",
+          "type": "OTA"
+        }
+      },
+      "credentials": {
+        "id": "692eb75512ca6f1c300289fe",
+        "expedia_id": "222",
+        "expedia_username": "mahi121.mr@gmail.com",
+        "expedia_password": "Aa@123456",
+        "agoda_id": "222",
+        "agoda_username": null,
+        "agoda_password": null,
+        "booking_id": "111",
+        "booking_username": null,
+        "booking_password": null,
+        "property_id": "692eb75412ca6f1c300289fd",
+        "created_at": "2025-12-02T09:54:29.092Z",
+        "updated_at": "2025-12-02T09:55:30.014Z"
+      },
+      "bankDetails": {
+        "id": "692eb75512ca6f1c300289ff",
+        "bank_type": "stripe",
+        "bank_sub_type": null,
+        "hotel_portfolio_name": null,
+        "beneficiary_name": null,
+        "beneficiary_address": null,
+        "account_number": null,
+        "account_name": null,
+        "bank_name": null,
+        "bank_branch": null,
+        "swift_bic_iban": null,
+        "routing_number": null,
+        "bank_account_type": null,
+        "currency": null,
+        "stripe_account_email": "test@gmail.com",
+        "associated_user_id": "68dce408d7953eca8e6b660d",
+        "property_id": "692eb75412ca6f1c300289fd",
+        "created_at": "2025-12-02T09:54:29.740Z",
+        "updated_at": "2025-12-02T09:55:33.950Z"
+      },
+      "total_audits": 0,
+      "previous_portfolio": null,
+      "access_type": "owned",
+      "viewing_portfolio_id": "6925767bf9ac9df01d2ed5f2",
+      "has_pending_action": false,
+      "pending_actions": []
+    },
+*/
