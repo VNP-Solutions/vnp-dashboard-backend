@@ -279,3 +279,13 @@ export class BulkUploadReportDto {
   @IsNotEmpty()
   report_url: string
 }
+
+export class DeleteAuditDto {
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}

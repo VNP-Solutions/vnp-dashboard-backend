@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -34,10 +35,13 @@ import {
   BulkArchiveAuditDto,
   BulkUploadReportDto,
   CreateAuditDto,
+  DeleteAuditDto,
   GlobalStatsResponseDto,
   UpdateAuditDto
 } from './audit.dto'
 import type { IAuditService } from './audit.interface'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import type { IAuthRepository } from '../auth/auth.interface'
 
 @ApiTags('Audit')
 @ApiBearerAuth('JWT-auth')
@@ -46,7 +50,9 @@ import type { IAuditService } from './audit.interface'
 export class AuditController {
   constructor(
     @Inject('IAuditService')
-    private readonly auditService: IAuditService
+    private readonly auditService: IAuditService,
+    @Inject('IAuthRepository')
+    private readonly authRepository: IAuthRepository
   ) {}
 
   @Post()
@@ -455,6 +461,47 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.bulkUploadReport(bulkUploadReportDto, user)
+  }
+
+  @Post(':id/delete')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE, true)
+  @ApiOperation({
+    summary: 'Delete an audit (Super admin only, requires password verification)',
+    description:
+      'Only super admins can delete audits. Password verification is required. The audit will be permanently deleted and this action cannot be undone.'
+  })
+  @ApiResponse({ status: 200, description: 'Audit deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid password'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only super admins can delete audits'
+  })
+  async remove(
+    @Param('id') id: string,
+    @Body() deleteAuditDto: DeleteAuditDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // Password validation is required for all users during deletion
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      deleteAuditDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    return this.auditService.remove(id, user)
   }
 
   @Patch(':id')
