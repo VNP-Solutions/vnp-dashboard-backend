@@ -111,10 +111,7 @@ export class PropertyRepository implements IPropertyRepository {
           bankData.beneficiary_address = bankDetailsData.beneficiary_address
         }
         if (bankDetailsData.account_number) {
-          bankData.account_number = EncryptionUtil.encrypt(
-            bankDetailsData.account_number,
-            encryptionSecret
-          )
+          bankData.account_number = bankDetailsData.account_number
         }
         if (bankDetailsData.account_name) {
           bankData.account_name = bankDetailsData.account_name
@@ -289,10 +286,7 @@ export class PropertyRepository implements IPropertyRepository {
           bankData.beneficiary_address = bankDetailsData.beneficiary_address
         }
         if (bankDetailsData.account_number) {
-          bankData.account_number = EncryptionUtil.encrypt(
-            bankDetailsData.account_number,
-            encryptionSecret
-          )
+          bankData.account_number = bankDetailsData.account_number
         }
         if (bankDetailsData.account_name) {
           bankData.account_name = bankDetailsData.account_name
