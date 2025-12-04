@@ -169,6 +169,8 @@ export class AuthService implements IAuthService {
       role.is_external
     )
 
+    console.log(`Invitation sent to ${data.email}. Temp password: ${tempPassword}`)
+
     return {
       message: `Invitation sent successfully. Temporary password is valid for ${expiryDays} days.`
     }

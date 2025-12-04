@@ -55,12 +55,37 @@ export class AuditRepository implements IAuditRepository {
   async findAll(queryOptions: any, propertyIds?: string[]) {
     const { where, skip, take, orderBy } = queryOptions
 
-    let finalWhere = where
+    let finalWhere = { ...where }
 
     if (propertyIds && propertyIds.length > 0) {
-      finalWhere = {
-        ...where,
-        property_id: {
+      // If there's already a property_id filter in where, intersect with accessible propertyIds
+      if (where.property_id) {
+        const existingPropertyId = where.property_id
+        if (typeof existingPropertyId === 'string') {
+          // Single property_id filter - only include if it's in accessible propertyIds
+          if (propertyIds.includes(existingPropertyId)) {
+            finalWhere.property_id = existingPropertyId
+          } else {
+            // User doesn't have access to this property - return empty result
+            finalWhere.property_id = { in: [] }
+          }
+        } else if (existingPropertyId.in) {
+          // property_id: { in: [...] } - intersect with accessible propertyIds
+          finalWhere.property_id = {
+            in: existingPropertyId.in.filter((id: string) =>
+              propertyIds.includes(id)
+            )
+          }
+        } else {
+          // Other operator - add AND condition
+          finalWhere.AND = [
+            { property_id: existingPropertyId },
+            { property_id: { in: propertyIds } }
+          ]
+        }
+      } else {
+        // No existing property_id filter - just use accessible propertyIds
+        finalWhere.property_id = {
           in: propertyIds
         }
       }
@@ -110,12 +135,37 @@ export class AuditRepository implements IAuditRepository {
   }
 
   async count(whereClause: any, propertyIds?: string[]): Promise<number> {
-    let finalWhere = whereClause
+    let finalWhere = { ...whereClause }
 
     if (propertyIds && propertyIds.length > 0) {
-      finalWhere = {
-        ...whereClause,
-        property_id: {
+      // If there's already a property_id filter in whereClause, intersect with accessible propertyIds
+      if (whereClause.property_id) {
+        const existingPropertyId = whereClause.property_id
+        if (typeof existingPropertyId === 'string') {
+          // Single property_id filter - only include if it's in accessible propertyIds
+          if (propertyIds.includes(existingPropertyId)) {
+            finalWhere.property_id = existingPropertyId
+          } else {
+            // User doesn't have access to this property - return 0
+            finalWhere.property_id = { in: [] }
+          }
+        } else if (existingPropertyId.in) {
+          // property_id: { in: [...] } - intersect with accessible propertyIds
+          finalWhere.property_id = {
+            in: existingPropertyId.in.filter((id: string) =>
+              propertyIds.includes(id)
+            )
+          }
+        } else {
+          // Other operator - add AND condition
+          finalWhere.AND = [
+            { property_id: existingPropertyId },
+            { property_id: { in: propertyIds } }
+          ]
+        }
+      } else {
+        // No existing property_id filter - just use accessible propertyIds
+        finalWhere.property_id = {
           in: propertyIds
         }
       }
