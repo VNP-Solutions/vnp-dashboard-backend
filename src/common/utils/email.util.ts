@@ -802,4 +802,73 @@ export class EmailUtil {
       }
     }
   }
+
+  async sendPropertyActivateRejectionEmail(
+    recipientEmails: string[],
+    propertyName: string,
+    portfolioName: string,
+    rejectionReason: string,
+    requestedDate: Date
+  ): Promise<void> {
+    // Remove duplicates and filter out empty emails
+    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+
+    if (uniqueEmails.length === 0) {
+      console.warn('No valid recipient emails provided for property activation rejection notification')
+      return
+    }
+
+    // Format the requested date
+    const formattedDate = requestedDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    // Send individual emails to each recipient for personalization
+    for (const userEmail of uniqueEmails) {
+      try {
+        // Fetch user's first name from database
+        const user = await this.prisma.user.findUnique({
+          where: { email: userEmail },
+          select: { first_name: true }
+        })
+
+        const firstName = user?.first_name?.split(' ')[0] || ''
+        const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+
+        const mailOptions = {
+          from: this.configService.get('smtp.email', { infer: true }),
+          to: userEmail,
+          subject: `Property Activation Request Rejected – ${propertyName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <p><strong>${greeting}</strong></p>
+              <p>We wanted to inform you that the request to activate <strong>${propertyName}</strong> under <strong>${portfolioName}</strong> has been <strong style="color: #dc3545;">rejected</strong>.</p>
+              <p><strong>📅 Requested Date:</strong> ${formattedDate}</p>
+              <p><strong>❌ Rejection Reason:</strong></p>
+              <div style="background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0; color: #721c24;">${rejectionReason}</p>
+              </div>
+              <p>The property remains inactive in the <strong>VNP Solutions Dashboard</strong>.</p>
+              <p>If you have any questions or need further clarification, please contact <strong>support@vnpsolutions.com</strong>.</p>
+              <div style="margin-top: 30px; color: #666;">
+                <p>Warm regards,<br><strong>VNP Solutions Support Team</strong></p>
+              </div>
+            </div>
+          `,
+          text: `${greeting}\n\nWe wanted to inform you that the request to activate ${propertyName} under ${portfolioName} has been rejected.\n\n📅 Requested Date: ${formattedDate}\n\n❌ Rejection Reason:\n${rejectionReason}\n\nThe property remains inactive in the VNP Solutions Dashboard.\n\nIf you have any questions or need further clarification, please contact support@vnpsolutions.com.\n\nWarm regards,\nVNP Solutions Support Team`
+        }
+
+        const info = await this.transporter.sendMail(mailOptions)
+        console.log('✓ Property activation rejection email sent:', {
+          to: userEmail,
+          messageId: info.messageId
+        })
+      } catch (error) {
+        console.error(`✗ Failed to send property activation rejection email to ${userEmail}:`, error)
+        // Continue sending to other recipients even if one fails
+      }
+    }
+  }
 }

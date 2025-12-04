@@ -460,18 +460,14 @@ export class PropertyController {
   @Post(':id/deactivate')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Deactivate a property (Internal users only, requires password verification)',
-    description: 'Super admins can directly deactivate. Internal non-admin users create a pending action. External users cannot deactivate. Password verification is required for all.'
+    summary: 'Deactivate a property (requires password verification)',
+    description: 'Super admins can directly deactivate. All other users (internal and external) create a pending action for approval. Password verification is required for all.'
   })
   @ApiResponse({ status: 200, description: 'Property deactivated successfully or deactivation request submitted for approval' })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
     description: 'Invalid password or property already deactivated'
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - External users cannot deactivate properties'
   })
   async deactivate(
     @Param('id') id: string,
@@ -500,18 +496,14 @@ export class PropertyController {
   @Post(':id/activate')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Activate a property (Internal users only, requires password verification)',
-    description: 'Super admins can directly activate. Internal non-admin users create a pending action. External users cannot activate. Password verification is required for all.'
+    summary: 'Activate a property (requires password verification)',
+    description: 'Super admins can directly activate. All other users (internal and external) create a pending action for approval. Password verification is required for all.'
   })
   @ApiResponse({ status: 200, description: 'Property activated successfully or activation request submitted for approval' })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
     description: 'Invalid password or property already active'
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - External users cannot activate properties'
   })
   async activate(
     @Param('id') id: string,
