@@ -74,7 +74,7 @@ export default (): Configuration => ({
     passwordRegex:
       /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,32}$/,
     otpExpiryMinutes: 5,
-    tempPasswordExpiryDays: 7
+    tempPasswordExpiryDays: 5
   },
   encryption: {
     secret: process.env.JWT_ACCESS_SECRET!
