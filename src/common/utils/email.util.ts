@@ -121,6 +121,7 @@ export class EmailUtil {
             <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 20px 0;">
               ${tempPassword}
             </div>
+            <p style="color: #666;">⏳ This temporary password is valid for <strong>5 days</strong>.</p>
             <p>Click the link below to set up your account and get started:</p>
             ${redirectUrl ? `<p><a href="${redirectUrl}?email=${email}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold;">Accept Invitation →</a></p>` : ''}
             <p style="color: #666;">If you weren't expecting this invitation, please contact your manager or reply to this email.</p>
@@ -129,7 +130,7 @@ export class EmailUtil {
             </div>
           </div>
         `,
-        text: `${greeting}\n\nWelcome aboard! You've been invited to join the VNP Solutions platform as part of our internal team.\n\nYour temporary password is: ${tempPassword}\n\nClick the link below to set up your account and get started:\n${redirectUrl ? `${redirectUrl}?email=${email}` : ''}\n\nIf you weren't expecting this invitation, please contact your manager or reply to this email.\n\nBest regards,\nVNP Solutions Admin`
+        text: `${greeting}\n\nWelcome aboard! You've been invited to join the VNP Solutions platform as part of our internal team.\n\nYour temporary password is: ${tempPassword}\n\nThis temporary password is valid for 5 days.\n\nClick the link below to set up your account and get started:\n${redirectUrl ? `${redirectUrl}?email=${email}` : ''}\n\nIf you weren't expecting this invitation, please contact your manager or reply to this email.\n\nBest regards,\nVNP Solutions Admin`
       }
 
       try {
@@ -161,6 +162,7 @@ export class EmailUtil {
           <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 20px 0;">
             ${tempPassword}
           </div>
+          <p style="color: #666;">⏳ This temporary password is valid for <strong>5 days</strong>.</p>
           <p>Click below to activate your account:</p>
           ${redirectUrl ? `<p><a href="${redirectUrl}?email=${email}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold;">Activate Account →</a></p>` : ''}
           <p style="color: #666;">If you need any help during setup, please contact us at support@vnpsolutions.com.</p>
@@ -169,7 +171,7 @@ export class EmailUtil {
           </div>
         </div>
       `,
-      text: `${greeting}\n\nWe're excited to have you onboard with VNP Solutions, your trusted partner for OTA Revenue Recovery and Audit Services.\n\nYou've been invited to access your property's dashboard to review audit results, payment summaries, and compliance reports.\n\nYour temporary password is: ${tempPassword}\n\nClick below to activate your account:\n${redirectUrl ? `${redirectUrl}?email=${email}` : ''}\n\nIf you need any help during setup, please contact us at support@vnpsolutions.com.\n\nWarm regards,\nClient Success Team\nVNP Solutions`
+      text: `${greeting}\n\nWe're excited to have you onboard with VNP Solutions, your trusted partner for OTA Revenue Recovery and Audit Services.\n\nYou've been invited to access your property's dashboard to review audit results, payment summaries, and compliance reports.\n\nYour temporary password is: ${tempPassword}\n\nThis temporary password is valid for 5 days.\n\nClick below to activate your account:\n${redirectUrl ? `${redirectUrl}?email=${email}` : ''}\n\nIf you need any help during setup, please contact us at support@vnpsolutions.com.\n\nWarm regards,\nClient Success Team\nVNP Solutions`
     }
 
     try {
