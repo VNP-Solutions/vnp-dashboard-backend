@@ -74,22 +74,45 @@ export class AuditService implements IAuditService {
   }
 
   async findAll(query: AuditQueryDto, user: IUserWithPermissions) {
-    const accessiblePropertyIds =
-      await this.permissionService.getAccessibleResourceIds(
-        user,
-        ModuleType.AUDIT
-      )
+    // Get audit access level to determine behavior
+    const auditPermission = user.role.audit_permission
 
-    if (
-      Array.isArray(accessiblePropertyIds) &&
-      accessiblePropertyIds.length === 0
-    ) {
+    // If audit access level is 'none', return empty result
+    if (!auditPermission || auditPermission.access_level === 'none') {
       return QueryBuilder.buildPaginatedResult(
         [],
         0,
         query.page || 1,
         query.limit || 10
       )
+    }
+
+    // Determine accessible property IDs based on audit access level
+    let accessiblePropertyIds: string[] | 'all'
+
+    if (auditPermission.access_level === 'all') {
+      // If audit access is 'all', show all audits
+      accessiblePropertyIds = 'all'
+    } else {
+      // If audit access is 'partial', rely on property access level and accessed property list
+      accessiblePropertyIds =
+        await this.permissionService.getAccessibleResourceIds(
+          user,
+          ModuleType.PROPERTY
+        )
+
+      // If user has no accessible properties, return empty result
+      if (
+        Array.isArray(accessiblePropertyIds) &&
+        accessiblePropertyIds.length === 0
+      ) {
+        return QueryBuilder.buildPaginatedResult(
+          [],
+          0,
+          query.page || 1,
+          query.limit || 10
+        )
+      }
     }
 
     // Build additional filters from query params
@@ -220,6 +243,10 @@ export class AuditService implements IAuditService {
       baseWhere
     )
 
+    console.log('Audit findAll - mergedQuery.filters:', JSON.stringify(mergedQuery.filters))
+    console.log('Audit findAll - baseWhere:', JSON.stringify(baseWhere))
+    console.log('Audit findAll - where after buildPrismaQuery:', JSON.stringify(where))
+
     // Add expedia_id filter if provided
     let finalWhere = where
     if (query.expedia_id) {
@@ -253,6 +280,9 @@ export class AuditService implements IAuditService {
       }
     }
 
+    console.log('Audit findAll - finalWhere:', JSON.stringify(finalWhere))
+    console.log('Audit findAll - accessiblePropertyIds:', accessiblePropertyIds)
+
     // Fetch data and count
     const [data, total] = await Promise.all([
       this.auditRepository.findAll(
@@ -274,17 +304,35 @@ export class AuditService implements IAuditService {
   }
 
   async findAllForExport(query: AuditQueryDto, user: IUserWithPermissions) {
-    const accessiblePropertyIds =
-      await this.permissionService.getAccessibleResourceIds(
-        user,
-        ModuleType.AUDIT
-      )
+    // Get audit access level to determine behavior
+    const auditPermission = user.role.audit_permission
 
-    if (
-      Array.isArray(accessiblePropertyIds) &&
-      accessiblePropertyIds.length === 0
-    ) {
+    // If audit access level is 'none', return empty result
+    if (!auditPermission || auditPermission.access_level === 'none') {
       return []
+    }
+
+    // Determine accessible property IDs based on audit access level
+    let accessiblePropertyIds: string[] | 'all'
+
+    if (auditPermission.access_level === 'all') {
+      // If audit access is 'all', show all audits
+      accessiblePropertyIds = 'all'
+    } else {
+      // If audit access is 'partial', rely on property access level and accessed property list
+      accessiblePropertyIds =
+        await this.permissionService.getAccessibleResourceIds(
+          user,
+          ModuleType.PROPERTY
+        )
+
+      // If user has no accessible properties, return empty result
+      if (
+        Array.isArray(accessiblePropertyIds) &&
+        accessiblePropertyIds.length === 0
+      ) {
+        return []
+      }
     }
 
     // Build additional filters from query params
@@ -1588,32 +1636,49 @@ export class AuditService implements IAuditService {
   async getGlobalStats(
     user: IUserWithPermissions
   ): Promise<GlobalStatsResponseDto> {
-    // Get accessible property IDs based on user permissions
-    const accessiblePropertyIds =
-      await this.permissionService.getAccessibleResourceIds(
-        user,
-        ModuleType.PROPERTY
-      )
+    // Get audit access level to determine behavior
+    const auditPermission = user.role.audit_permission
+    const emptyStats = {
+      amount_collectable: {
+        total: 0,
+        expedia: 0,
+        booking: 0,
+        agoda: 0
+      },
+      amount_confirmed: {
+        total: 0,
+        expedia: 0,
+        booking: 0,
+        agoda: 0
+      },
+      completed_audit_count: 0
+    }
 
-    // If user has no access to any properties, return zeros
-    if (
-      Array.isArray(accessiblePropertyIds) &&
-      accessiblePropertyIds.length === 0
-    ) {
-      return {
-        amount_collectable: {
-          total: 0,
-          expedia: 0,
-          booking: 0,
-          agoda: 0
-        },
-        amount_confirmed: {
-          total: 0,
-          expedia: 0,
-          booking: 0,
-          agoda: 0
-        },
-        completed_audit_count: 0
+    // If audit access level is 'none', return zeros
+    if (!auditPermission || auditPermission.access_level === 'none') {
+      return emptyStats
+    }
+
+    // Determine accessible property IDs based on audit access level
+    let accessiblePropertyIds: string[] | 'all'
+
+    if (auditPermission.access_level === 'all') {
+      // If audit access is 'all', show stats for all audits
+      accessiblePropertyIds = 'all'
+    } else {
+      // If audit access is 'partial', rely on property access level and accessed property list
+      accessiblePropertyIds =
+        await this.permissionService.getAccessibleResourceIds(
+          user,
+          ModuleType.PROPERTY
+        )
+
+      // If user has no accessible properties, return zeros
+      if (
+        Array.isArray(accessiblePropertyIds) &&
+        accessiblePropertyIds.length === 0
+      ) {
+        return emptyStats
       }
     }
 
