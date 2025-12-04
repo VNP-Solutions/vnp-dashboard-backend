@@ -1241,19 +1241,12 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('Property is already deactivated')
     }
 
-    // External users cannot deactivate properties
-    if (!isInternalUser(user)) {
-      throw new ForbiddenException(
-        'External users cannot deactivate properties'
-      )
-    }
-
     const isSuperAdmin = isUserSuperAdmin(user)
 
-    // Internal users (non-super admin) must provide a reason
+    // Non-super admin users must provide a reason
     if (!isSuperAdmin && !reason) {
       throw new BadRequestException(
-        'Reason is required for internal users to deactivate properties'
+        'Reason is required to request property deactivation'
       )
     }
 
@@ -1266,7 +1259,7 @@ export class PropertyService implements IPropertyService {
       return { message: 'Property deactivated successfully' }
     }
 
-    // Internal non-super admin users create pending action for approval
+    // All other users (internal and external) create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'property',
       property_id: id,
@@ -1294,17 +1287,12 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('Property is already active')
     }
 
-    // External users cannot activate properties
-    if (!isInternalUser(user)) {
-      throw new ForbiddenException('External users cannot activate properties')
-    }
-
     const isSuperAdmin = isUserSuperAdmin(user)
 
-    // Internal users (non-super admin) must provide a reason
+    // Non-super admin users must provide a reason
     if (!isSuperAdmin && !reason) {
       throw new BadRequestException(
-        'Reason is required for internal users to activate properties'
+        'Reason is required to request property activation'
       )
     }
 
@@ -1317,7 +1305,7 @@ export class PropertyService implements IPropertyService {
       return { message: 'Property activated successfully' }
     }
 
-    // Internal non-super admin users create pending action for approval
+    // All other users (internal and external) create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'property',
       property_id: id,

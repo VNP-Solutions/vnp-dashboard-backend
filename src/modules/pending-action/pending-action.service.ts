@@ -332,6 +332,11 @@ export class PendingActionService
         await this.propertyService.deactivate(pendingAction.property_id, user)
         break
 
+      case PendingActionType.PROPERTY_ACTIVATE:
+        // Activate the property
+        await this.propertyService.activate(pendingAction.property_id, user)
+        break
+
       case PendingActionType.PORTFOLIO_DEACTIVATE:
         // Deactivate the portfolio
         // Note: This will be implemented when portfolio deactivation is added
@@ -596,6 +601,43 @@ export class PendingActionService
 
           // Send rejection email
           await this.emailUtil.sendPropertyDeactivateRejectionEmail(
+            recipientEmails,
+            property.name,
+            portfolio.name,
+            rejectionReason,
+            pendingAction.created_at
+          )
+          break
+        }
+
+        case PendingActionType.PROPERTY_ACTIVATE: {
+          // Get property details
+          const property = await this.prisma.property.findUnique({
+            where: { id: pendingAction.property_id },
+            select: { name: true, portfolio_id: true }
+          })
+
+          if (!property) {
+            console.error('Property not found for rejection email notification')
+            return
+          }
+
+          // Get portfolio details and contact email
+          const portfolio = await this.portfolioRepository.findById(
+            property.portfolio_id
+          )
+
+          if (!portfolio) {
+            console.error('Portfolio not found for rejection email notification')
+            return
+          }
+
+          if (portfolio.contact_email) {
+            recipientEmails.push(portfolio.contact_email)
+          }
+
+          // Send rejection email
+          await this.emailUtil.sendPropertyActivateRejectionEmail(
             recipientEmails,
             property.name,
             portfolio.name,

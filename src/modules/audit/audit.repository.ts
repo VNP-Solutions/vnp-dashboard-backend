@@ -55,7 +55,7 @@ export class AuditRepository implements IAuditRepository {
   async findAll(queryOptions: any, propertyIds?: string[]) {
     const { where, skip, take, orderBy } = queryOptions
 
-    let finalWhere = { ...where }
+    const finalWhere = { ...where }
 
     if (propertyIds && propertyIds.length > 0) {
       // If there's already a property_id filter in where, intersect with accessible propertyIds
@@ -135,7 +135,7 @@ export class AuditRepository implements IAuditRepository {
   }
 
   async count(whereClause: any, propertyIds?: string[]): Promise<number> {
-    let finalWhere = { ...whereClause }
+    const finalWhere = { ...whereClause }
 
     if (propertyIds && propertyIds.length > 0) {
       // If there's already a property_id filter in whereClause, intersect with accessible propertyIds
