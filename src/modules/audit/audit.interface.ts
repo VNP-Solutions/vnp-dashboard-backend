@@ -32,6 +32,21 @@ type AuditWithRelations = Prisma.AuditGetPayload<{
         id: true
         name: true
         is_active: true
+        currency: {
+          select: {
+            id: true
+            code: true
+            name: true
+            symbol: true
+          }
+        }
+        credentials: {
+          select: {
+            expedia_id: true
+            agoda_id: true
+            booking_id: true
+          }
+        }
         portfolio: {
           select: {
             id: true
@@ -65,6 +80,14 @@ type AuditWithFullDetails = Prisma.AuditGetPayload<{
         address: true
         is_active: true
         card_descriptor: true
+        currency: {
+          select: {
+            id: true
+            code: true
+            name: true
+            symbol: true
+          }
+        }
         portfolio: {
           select: {
             id: true
