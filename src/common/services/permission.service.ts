@@ -378,4 +378,89 @@ export class PermissionService {
     // If someone tries to use PARTIAL for these modules, deny access
     return false
   }
+
+  /**
+   * Update user access after a property transfer.
+   *
+   * Logic:
+   * 1. For users with partial portfolio + partial property access:
+   *    - If the property is transferred to a portfolio the user has access to → keep property access
+   *    - If the property is transferred to a portfolio the user doesn't have access to → remove property access
+   *
+   * 2. For users with none portfolio + partial property access:
+   *    - Keep property access regardless of destination portfolio
+   *
+   * @param propertyId - The ID of the transferred property
+   * @param newPortfolioId - The ID of the new portfolio
+   */
+  async updateUserAccessAfterPropertyTransfer(
+    propertyId: string,
+    newPortfolioId: string
+  ): Promise<void> {
+    // Find all users who have access to this property
+    const usersWithPropertyAccess =
+      await this.prisma.userAccessedProperty.findMany({
+        where: {
+          property_id: { has: propertyId }
+        },
+        include: {
+          user: {
+            include: {
+              role: true
+            }
+          }
+        }
+      })
+
+    for (const userAccess of usersWithPropertyAccess) {
+      const user = userAccess.user
+      const role = user.role
+
+      // Get portfolio permission for this user
+      const portfolioPermission = role.portfolio_permission
+      const propertyPermission = role.property_permission
+
+      // Skip if user doesn't have partial property access (shouldn't happen, but safety check)
+      if (propertyPermission?.access_level !== AccessLevel.partial) {
+        continue
+      }
+
+      // Case 1: User has NO portfolio access (none) + partial property access
+      // Keep property access regardless of destination portfolio
+      if (portfolioPermission?.access_level === AccessLevel.none) {
+        // No action needed - user keeps property access
+        continue
+      }
+
+      // Case 2: User has ALL portfolio access
+      // Keep property access (they can access all portfolios anyway)
+      if (portfolioPermission?.access_level === AccessLevel.all) {
+        // No action needed - user keeps property access
+        continue
+      }
+
+      // Case 3: User has PARTIAL portfolio access + partial property access
+      // Check if the new portfolio is in the user's accessible portfolios
+      if (portfolioPermission?.access_level === AccessLevel.partial) {
+        const accessiblePortfolios = userAccess.portfolio_id || []
+        const hasAccessToNewPortfolio =
+          accessiblePortfolios.includes(newPortfolioId)
+
+        if (!hasAccessToNewPortfolio) {
+          // Remove property access since user doesn't have access to the new portfolio
+          const updatedPropertyIds = (userAccess.property_id || []).filter(
+            (id) => id !== propertyId
+          )
+
+          await this.prisma.userAccessedProperty.update({
+            where: { id: userAccess.id },
+            data: {
+              property_id: updatedPropertyIds
+            }
+          })
+        }
+        // If user has access to the new portfolio, keep the property access (no action needed)
+      }
+    }
+  }
 }
