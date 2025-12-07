@@ -1045,6 +1045,12 @@ export class PropertyService implements IPropertyService {
         previous_portfolio_id: property.portfolio_id
       })
 
+      // Update user access after property transfer
+      await this.permissionService.updateUserAccessAfterPropertyTransfer(
+        id,
+        data.new_portfolio_id
+      )
+
       // Send transfer notification email to both portfolio contact emails
       try {
         // Get current portfolio details
@@ -1175,6 +1181,12 @@ export class PropertyService implements IPropertyService {
           portfolio_id: data.new_portfolio_id,
           previous_portfolio_id: property.portfolio_id
         })
+
+        // Update user access after property transfer
+        await this.permissionService.updateUserAccessAfterPropertyTransfer(
+          propertyId,
+          data.new_portfolio_id
+        )
 
         results.push({
           property_id: propertyId,
