@@ -20,8 +20,8 @@ import {
 } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import {
-  isUserSuperAdmin,
-  isInternalUser
+  isInternalUser,
+  isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IAuditBatchRepository } from '../audit-batch/audit-batch.interface'
@@ -129,6 +129,9 @@ export class AuditService implements IAuditService {
     if (query.property_id) {
       additionalFilters.property_id = query.property_id
     }
+    if (query.portfolio_id) {
+      additionalFilters.portfolio_id = query.portfolio_id
+    }
     // Handle is_archived filter: true/false/All/empty
     if (
       query.is_archived !== undefined &&
@@ -190,6 +193,7 @@ export class AuditService implements IAuditService {
         'type_of_ota',
         'audit_status_id',
         'property_id',
+        'portfolio_id',
         'is_archived'
       ],
       sortableFields: [
@@ -207,7 +211,8 @@ export class AuditService implements IAuditService {
       nestedFieldMap: {
         property_name: 'property.name',
         audit_status: 'auditStatus.status',
-        expedia_id: 'property.credentials.expedia_id'
+        expedia_id: 'property.credentials.expedia_id',
+        portfolio_id: 'property.portfolio_id'
       }
     }
 
@@ -243,9 +248,15 @@ export class AuditService implements IAuditService {
       baseWhere
     )
 
-    console.log('Audit findAll - mergedQuery.filters:', JSON.stringify(mergedQuery.filters))
+    console.log(
+      'Audit findAll - mergedQuery.filters:',
+      JSON.stringify(mergedQuery.filters)
+    )
     console.log('Audit findAll - baseWhere:', JSON.stringify(baseWhere))
-    console.log('Audit findAll - where after buildPrismaQuery:', JSON.stringify(where))
+    console.log(
+      'Audit findAll - where after buildPrismaQuery:',
+      JSON.stringify(where)
+    )
 
     // Add expedia_id filter if provided
     let finalWhere = where
@@ -276,6 +287,41 @@ export class AuditService implements IAuditService {
           audit_status_id: {
             in: statusIds
           }
+        }
+      }
+    }
+
+    // Add portfolio_id filter if provided
+    if (query.portfolio_id) {
+      // Find all properties in the specified portfolio
+      const portfolioProperties = await this.prisma.property.findMany({
+        where: {
+          portfolio_id: query.portfolio_id
+        },
+        select: {
+          id: true
+        }
+      })
+
+      if (portfolioProperties.length > 0) {
+        const portfolioPropertyIds = portfolioProperties.map(p => p.id)
+        
+        // Add property filter to intersect with existing property filters
+        if (finalWhere.property_id && finalWhere.property_id.in) {
+          // Intersect with existing property IDs
+          finalWhere.property_id.in = finalWhere.property_id.in.filter(
+            (id: string) => portfolioPropertyIds.includes(id)
+          )
+        } else {
+          // Set property ID filter to portfolio properties
+          finalWhere.property_id = {
+            in: portfolioPropertyIds
+          }
+        }
+      } else {
+        // If portfolio has no properties, return no results
+        finalWhere.property_id = {
+          in: []
         }
       }
     }
@@ -349,6 +395,9 @@ export class AuditService implements IAuditService {
     if (query.property_id) {
       additionalFilters.property_id = query.property_id
     }
+    if (query.portfolio_id) {
+      additionalFilters.portfolio_id = query.portfolio_id
+    }
     // Handle is_archived filter: true/false/All/empty
     if (
       query.is_archived !== undefined &&
@@ -410,6 +459,7 @@ export class AuditService implements IAuditService {
         'type_of_ota',
         'audit_status_id',
         'property_id',
+        'portfolio_id',
         'is_archived'
       ],
       sortableFields: [
@@ -427,7 +477,8 @@ export class AuditService implements IAuditService {
       nestedFieldMap: {
         property_name: 'property.name',
         audit_status: 'auditStatus.status',
-        expedia_id: 'property.credentials.expedia_id'
+        expedia_id: 'property.credentials.expedia_id',
+        portfolio_id: 'property.portfolio_id'
       }
     }
 
@@ -496,6 +547,41 @@ export class AuditService implements IAuditService {
       }
     }
 
+    // Add portfolio_id filter if provided
+    if (query.portfolio_id) {
+      // Find all properties in the specified portfolio
+      const portfolioProperties = await this.prisma.property.findMany({
+        where: {
+          portfolio_id: query.portfolio_id
+        },
+        select: {
+          id: true
+        }
+      })
+
+      if (portfolioProperties.length > 0) {
+        const portfolioPropertyIds = portfolioProperties.map(p => p.id)
+        
+        // Add property filter to intersect with existing property filters
+        if (finalWhere.property_id && finalWhere.property_id.in) {
+          // Intersect with existing property IDs
+          finalWhere.property_id.in = finalWhere.property_id.in.filter(
+            (id: string) => portfolioPropertyIds.includes(id)
+          )
+        } else {
+          // Set property ID filter to portfolio properties
+          finalWhere.property_id = {
+            in: portfolioPropertyIds
+          }
+        }
+      } else {
+        // If portfolio has no properties, return no results
+        finalWhere.property_id = {
+          in: []
+        }
+      }
+    }
+
     // Fetch all data without pagination
     const data = await this.auditRepository.findAll(
       { where: finalWhere, orderBy },
@@ -550,7 +636,10 @@ export class AuditService implements IAuditService {
     }
 
     // Check if status is changing and send email notification
-    if (data.audit_status_id && data.audit_status_id !== audit.audit_status_id) {
+    if (
+      data.audit_status_id &&
+      data.audit_status_id !== audit.audit_status_id
+    ) {
       await this.sendAuditStatusChangeNotification(audit, data.audit_status_id)
     }
 
@@ -566,9 +655,7 @@ export class AuditService implements IAuditService {
 
     // Only super admins and internal users can archive audits
     if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
-      throw new ForbiddenException(
-        'External users cannot archive audits'
-      )
+      throw new ForbiddenException('External users cannot archive audits')
     }
 
     // Check if audit is already archived

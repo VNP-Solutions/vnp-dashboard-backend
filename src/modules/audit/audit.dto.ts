@@ -153,6 +153,14 @@ export class AuditQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   status?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by portfolio ID',
+    example: '507f1f77bcf86cd799439011'
+  })
+  @IsOptional()
+  @IsString()
+  portfolio_id?: string
 }
 
 export class BulkArchiveAuditDto {
