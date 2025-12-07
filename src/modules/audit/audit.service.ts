@@ -31,6 +31,7 @@ import type { IPropertyRepository } from '../property/property.interface'
 import {
   AuditQueryDto,
   BulkArchiveAuditDto,
+  BulkDeleteAuditDto,
   BulkImportResultDto,
   BulkUpdateResultDto,
   BulkUploadReportDto,
@@ -1963,5 +1964,55 @@ export class AuditService implements IAuditService {
     await this.auditRepository.delete(id)
 
     return { message: 'Audit deleted successfully' }
+  }
+
+  async bulkDelete(data: BulkDeleteAuditDto, user: IUserWithPermissions) {
+    const { audit_ids } = data
+
+    // Validate that only super admins can delete audits
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only super admins can delete audits')
+    }
+
+    if (!audit_ids || audit_ids.length === 0) {
+      throw new BadRequestException('No audit IDs provided')
+    }
+
+    // Fetch all audits
+    const audits = await this.auditRepository.findByIds(audit_ids)
+
+    const successfulIds: string[] = []
+    const failedAudits: Array<{ id: string; reason: string }> = []
+
+    // Check each audit individually
+    for (const auditId of audit_ids) {
+      const audit = audits.find(a => a.id === auditId)
+
+      // Audit not found
+      if (!audit) {
+        failedAudits.push({
+          id: auditId,
+          reason: 'Audit not found'
+        })
+        continue
+      }
+
+      // Passed all validations
+      successfulIds.push(auditId)
+    }
+
+    // Delete all successful audits
+    let deletedCount = 0
+    if (successfulIds.length > 0) {
+      const result = await this.auditRepository.bulkDelete(successfulIds)
+      deletedCount = result.count
+    }
+
+    return {
+      message: `Successfully deleted ${deletedCount} audit(s), ${failedAudits.length} failed`,
+      successfully_deleted: deletedCount,
+      failed_to_delete: failedAudits.length,
+      failed_audits: failedAudits
+    }
   }
 }

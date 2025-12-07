@@ -4,6 +4,7 @@ import { IUserWithPermissions } from '../../common/interfaces/permission.interfa
 import {
   AuditQueryDto,
   BulkArchiveAuditDto,
+  BulkDeleteAuditDto,
   BulkImportResultDto,
   BulkUpdateResultDto,
   BulkUploadReportDto,
@@ -131,6 +132,7 @@ export interface IAuditRepository {
     data: UpdateAuditDto
   ): Promise<{ count: number }>
   bulkArchive(auditIds: string[]): Promise<{ count: number }>
+  bulkDelete(auditIds: string[]): Promise<{ count: number }>
   delete(id: string): Promise<void>
 }
 
@@ -182,4 +184,13 @@ export interface IAuditService {
     updated_ids: string[]
   }>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  bulkDelete(
+    data: BulkDeleteAuditDto,
+    user: IUserWithPermissions
+  ): Promise<{
+    message: string
+    successfully_deleted: number
+    failed_to_delete: number
+    failed_audits: Array<{ id: string; reason: string }>
+  }>
 }

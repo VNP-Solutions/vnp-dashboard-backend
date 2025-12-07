@@ -297,3 +297,22 @@ export class DeleteAuditDto {
   @IsNotEmpty()
   password: string
 }
+
+export class BulkDeleteAuditDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of audit IDs to delete'
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  audit_ids: string[]
+
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'Super admin password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}

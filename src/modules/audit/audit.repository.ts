@@ -513,4 +513,16 @@ export class AuditRepository implements IAuditRepository {
       }
     })
   }
+
+  async bulkDelete(auditIds: string[]) {
+    const result = await this.prisma.audit.deleteMany({
+      where: {
+        id: {
+          in: auditIds
+        }
+      }
+    })
+
+    return { count: result.count }
+  }
 }
