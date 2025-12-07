@@ -33,6 +33,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   AuditQueryDto,
   BulkArchiveAuditDto,
+  BulkDeleteAuditDto,
   BulkUploadReportDto,
   CreateAuditDto,
   DeleteAuditDto,
@@ -461,6 +462,84 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.bulkUploadReport(bulkUploadReportDto, user)
+  }
+
+  @Post('bulk-delete')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE)
+  @ApiOperation({
+    summary: 'Bulk delete multiple audits (Super admin only, requires password verification)',
+    description:
+      'Only super admins can delete audits. Password verification is required. The audits will be permanently deleted and this action cannot be undone.'
+  })
+  @ApiBody({
+    type: BulkDeleteAuditDto,
+    description: 'Bulk delete payload with audit IDs and password',
+    examples: {
+      'Basic Example': {
+        value: {
+          audit_ids: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+          password: 'YourPassword123!'
+        }
+      },
+      'Multiple Audits': {
+        value: {
+          audit_ids: [
+            '507f1f77bcf86cd799439011',
+            '507f1f77bcf86cd799439012',
+            '507f1f77bcf86cd799439013',
+            '507f1f77bcf86cd799439014'
+          ],
+          password: 'YourPassword123!'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk delete completed with success/failure details',
+    schema: {
+      example: {
+        message: 'Successfully deleted 2 audit(s), 1 failed',
+        successfully_deleted: 2,
+        failed_to_delete: 1,
+        failed_audits: [
+          {
+            id: '507f1f77bcf86cd799439013',
+            reason: 'Audit not found'
+          }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid data, no audit IDs provided, or invalid password'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only super admins can delete audits'
+  })
+  async bulkDelete(
+    @Body() bulkDeleteDto: BulkDeleteAuditDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // Password validation is required for all users during deletion
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      bulkDeleteDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    return this.auditService.bulkDelete(bulkDeleteDto, user)
   }
 
   @Post(':id/delete')
