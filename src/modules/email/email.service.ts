@@ -44,15 +44,24 @@ export class EmailService implements IEmailService {
       allAttachments = [...allAttachments, ...urlAttachments]
     }
 
-    // Send the email
+    // Remove duplicates and filter empty values
+    const recipients = [...new Set(data.to.filter(email => email && email.trim()))]
+
+    if (recipients.length === 0) {
+      return { message: 'No valid recipient emails provided' }
+    }
+
+    // Send the email to all recipients
     await this.emailUtil.sendEmail(
-      data.to,
+      recipients,
       data.subject,
       fullEmailBody,
       allAttachments.length > 0 ? allAttachments : undefined
     )
 
-    return { message: 'Email sent successfully' }
+    return {
+      message: `Email sent successfully to ${recipients.length} recipient${recipients.length > 1 ? 's' : ''}`
+    }
   }
 
   private async buildSenderInfo(
