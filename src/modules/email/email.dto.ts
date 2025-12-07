@@ -32,12 +32,14 @@ export class AttachmentUrlDto {
 
 export class SendEmailDto {
   @ApiProperty({
-    example: 'recipient@example.com',
-    description: 'Recipient email address'
+    example: ['recipient@example.com', 'another@example.com'],
+    description: 'Array of recipient email addresses',
+    type: [String]
   })
-  @IsEmail()
-  @IsNotEmpty()
-  to: string
+  @IsArray()
+  @IsEmail({}, { each: true })
+  @IsNotEmpty({ each: true })
+  to: string[]
 
   @ApiProperty({
     example: 'Important Update',

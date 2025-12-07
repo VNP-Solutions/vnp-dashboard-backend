@@ -232,14 +232,24 @@ export class EmailUtil {
   }
 
   async sendEmail(
-    to: string,
+    to: string | string[],
     subject: string,
     body: string,
     attachments?: EmailAttachment[]
   ): Promise<void> {
+    // Handle array of emails - remove duplicates and filter empty values
+    const recipients = Array.isArray(to)
+      ? [...new Set(to.filter(email => email && email.trim()))]
+      : [to]
+
+    if (recipients.length === 0) {
+      console.warn('No valid recipient emails provided')
+      return
+    }
+
     const mailOptions: nodemailer.SendMailOptions = {
       from: this.configService.get('smtp.email', { infer: true }),
-      to,
+      to: recipients,
       subject,
       text: body
     }
@@ -281,14 +291,15 @@ export class EmailUtil {
       const info = await this.transporter.sendMail(mailOptions)
       console.log('✓ Email sent successfully!', {
         messageId: info.messageId,
-        to,
+        to: recipients,
+        recipientCount: recipients.length,
         subject,
         response: info.response,
         attachmentCount: attachments?.length || 0
       })
     } catch (error) {
       console.error('✗ Failed to send email:', {
-        to,
+        to: recipients,
         subject,
         error: error instanceof Error ? error.message : error,
         stack: error instanceof Error ? error.stack : undefined
