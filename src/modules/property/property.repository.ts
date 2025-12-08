@@ -408,6 +408,7 @@ export class PropertyRepository implements IPropertyRepository {
             name: true,
             is_active: true,
             service_type_id: true,
+            contact_email: true,
             serviceType: {
               select: {
                 id: true,

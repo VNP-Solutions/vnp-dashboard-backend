@@ -141,7 +141,8 @@ export class AuditRepository implements IAuditRepository {
             portfolio: {
               select: {
                 id: true,
-                name: true
+                name: true,
+                contact_email: true
               }
             }
           }
