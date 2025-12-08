@@ -306,7 +306,7 @@ export class AuditService implements IAuditService {
 
       if (portfolioProperties.length > 0) {
         const portfolioPropertyIds = portfolioProperties.map(p => p.id)
-        
+
         // Add property filter to intersect with existing property filters
         if (finalWhere.property_id && finalWhere.property_id.in) {
           // Intersect with existing property IDs
@@ -562,7 +562,7 @@ export class AuditService implements IAuditService {
 
       if (portfolioProperties.length > 0) {
         const portfolioPropertyIds = portfolioProperties.map(p => p.id)
-        
+
         // Add property filter to intersect with existing property filters
         if (finalWhere.property_id && finalWhere.property_id.in) {
           // Intersect with existing property IDs
@@ -602,11 +602,16 @@ export class AuditService implements IAuditService {
     return audit
   }
 
-  async update(id: string, data: UpdateAuditDto, _user: IUserWithPermissions) {
+  async update(id: string, data: UpdateAuditDto, user: IUserWithPermissions) {
     const audit = await this.auditRepository.findById(id)
 
     if (!audit) {
       throw new NotFoundException('Audit not found')
+    }
+
+    // Only super admins and internal users can update audits
+    if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
+      throw new ForbiddenException('External users cannot update audits')
     }
 
     // Validate batch_id if provided
@@ -679,8 +684,13 @@ export class AuditService implements IAuditService {
 
   async bulkUpdate(
     file: Express.Multer.File,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ): Promise<BulkUpdateResultDto> {
+    // Only super admins and internal users can bulk update audits
+    if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
+      throw new ForbiddenException('External users cannot bulk update audits')
+    }
+
     if (!file) {
       throw new BadRequestException('No file provided')
     }
