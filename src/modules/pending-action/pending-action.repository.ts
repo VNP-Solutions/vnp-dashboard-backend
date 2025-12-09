@@ -24,6 +24,26 @@ type PendingActionWithRelations = Prisma.PendingActionGetPayload<{
         name: true
       }
     }
+    audit: {
+      select: {
+        id: true
+        type_of_ota: true
+        amount_confirmed: true
+        property: {
+          select: {
+            id: true
+            name: true
+            portfolio: {
+              select: {
+                id: true
+                name: true
+                contact_email: true
+              }
+            }
+          }
+        }
+      }
+    }
     requestedBy: {
       select: {
         id: true
@@ -51,6 +71,7 @@ export class PendingActionRepository implements IPendingActionRepository {
     resource_type: string
     property_id?: string
     portfolio_id?: string
+    audit_id?: string
     action_type: string
     requested_user_id: string
     transfer_data?: {
@@ -64,6 +85,9 @@ export class PendingActionRepository implements IPendingActionRepository {
         name: string
       }
     }
+    audit_update_data?: {
+      amount_confirmed: number
+    }
     reason?: string
   }): Promise<PendingActionWithRelations> {
     return this.prisma.pendingAction.create({
@@ -71,6 +95,7 @@ export class PendingActionRepository implements IPendingActionRepository {
         resource_type: data.resource_type,
         property_id: data.property_id,
         portfolio_id: data.portfolio_id,
+        audit_id: data.audit_id,
         action_type: data.action_type as any,
         requested_user_id: data.requested_user_id,
         transfer_data: data.transfer_data
@@ -78,6 +103,11 @@ export class PendingActionRepository implements IPendingActionRepository {
               new_portfolio_id: data.transfer_data.new_portfolio_id,
               portfolio_from: data.transfer_data.portfolio_from,
               portfolio_to: data.transfer_data.portfolio_to
+            }
+          : undefined,
+        audit_update_data: data.audit_update_data
+          ? {
+              amount_confirmed: data.audit_update_data.amount_confirmed
             }
           : undefined,
         reason: data.reason,
@@ -101,6 +131,26 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             name: true
+          }
+        },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            amount_confirmed: true,
+            property: {
+              select: {
+                id: true,
+                name: true,
+                portfolio: {
+                  select: {
+                    id: true,
+                    name: true,
+                    contact_email: true
+                  }
+                }
+              }
+            }
           }
         },
         requestedBy: {
@@ -152,6 +202,26 @@ export class PendingActionRepository implements IPendingActionRepository {
             name: true
           }
         },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            amount_confirmed: true,
+            property: {
+              select: {
+                id: true,
+                name: true,
+                portfolio: {
+                  select: {
+                    id: true,
+                    name: true,
+                    contact_email: true
+                  }
+                }
+              }
+            }
+          }
+        },
         requestedBy: {
           select: {
             id: true,
@@ -201,6 +271,26 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             name: true
+          }
+        },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            amount_confirmed: true,
+            property: {
+              select: {
+                id: true,
+                name: true,
+                portfolio: {
+                  select: {
+                    id: true,
+                    name: true,
+                    contact_email: true
+                  }
+                }
+              }
+            }
           }
         },
         requestedBy: {
@@ -260,6 +350,26 @@ export class PendingActionRepository implements IPendingActionRepository {
             name: true
           }
         },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            amount_confirmed: true,
+            property: {
+              select: {
+                id: true,
+                name: true,
+                portfolio: {
+                  select: {
+                    id: true,
+                    name: true,
+                    contact_email: true
+                  }
+                }
+              }
+            }
+          }
+        },
         requestedBy: {
           select: {
             id: true,
@@ -306,6 +416,26 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             name: true
+          }
+        },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            amount_confirmed: true,
+            property: {
+              select: {
+                id: true,
+                name: true,
+                portfolio: {
+                  select: {
+                    id: true,
+                    name: true,
+                    contact_email: true
+                  }
+                }
+              }
+            }
           }
         },
         requestedBy: {
@@ -357,6 +487,93 @@ export class PendingActionRepository implements IPendingActionRepository {
             name: true
           }
         },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            amount_confirmed: true,
+            property: {
+              select: {
+                id: true,
+                name: true,
+                portfolio: {
+                  select: {
+                    id: true,
+                    name: true,
+                    contact_email: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        requestedBy: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true
+          }
+        },
+        approvedBy: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true
+          }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    })
+  }
+
+  async findByAuditId(auditId: string): Promise<PendingActionWithRelations[]> {
+    return this.prisma.pendingAction.findMany({
+      where: {
+        audit_id: auditId,
+        status: 'PENDING'
+      },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            portfolio_id: true,
+            portfolio: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        },
+        portfolio: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            amount_confirmed: true,
+            property: {
+              select: {
+                id: true,
+                name: true,
+                portfolio: {
+                  select: {
+                    id: true,
+                    name: true,
+                    contact_email: true
+                  }
+                }
+              }
+            }
+          }
+        },
         requestedBy: {
           select: {
             id: true,
@@ -401,6 +618,26 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             name: true
+          }
+        },
+        audit: {
+          select: {
+            id: true,
+            type_of_ota: true,
+            amount_confirmed: true,
+            property: {
+              select: {
+                id: true,
+                name: true,
+                portfolio: {
+                  select: {
+                    id: true,
+                    name: true,
+                    contact_email: true
+                  }
+                }
+              }
+            }
           }
         },
         requestedBy: {

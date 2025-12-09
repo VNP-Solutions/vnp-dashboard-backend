@@ -4,6 +4,7 @@ import { EmailUtil } from '../../common/utils/email.util'
 import { AuditBatchRepository } from '../audit-batch/audit-batch.repository'
 import { AuditStatusRepository } from '../audit-status/audit-status.repository'
 import { AuthModule } from '../auth/auth.module'
+import { PendingActionRepository } from '../pending-action/pending-action.repository'
 import { PrismaService } from '../prisma/prisma.service'
 import { PropertyRepository } from '../property/property.repository'
 import { AuditController } from './audit.controller'
@@ -33,6 +34,10 @@ import { AuditService } from './audit.service'
     {
       provide: 'IAuditBatchRepository',
       useClass: AuditBatchRepository
+    },
+    {
+      provide: 'IPendingActionRepository',
+      useClass: PendingActionRepository
     },
     PermissionService,
     PrismaService,

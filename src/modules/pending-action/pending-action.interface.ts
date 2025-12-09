@@ -28,6 +28,26 @@ type PendingActionWithRelations = Prisma.PendingActionGetPayload<{
         name: true
       }
     }
+    audit: {
+      select: {
+        id: true
+        type_of_ota: true
+        amount_confirmed: true
+        property: {
+          select: {
+            id: true
+            name: true
+            portfolio: {
+              select: {
+                id: true
+                name: true
+                contact_email: true
+              }
+            }
+          }
+        }
+      }
+    }
     requestedBy: {
       select: {
         id: true
@@ -52,6 +72,7 @@ export interface IPendingActionRepository {
     resource_type: string
     property_id?: string
     portfolio_id?: string
+    audit_id?: string
     action_type: string
     requested_user_id: string
     transfer_data?: {
@@ -64,6 +85,9 @@ export interface IPendingActionRepository {
         id: string
         name: string
       }
+    }
+    audit_update_data?: {
+      amount_confirmed: number
     }
     reason?: string
   }): Promise<PendingActionWithRelations>
@@ -87,6 +111,7 @@ export interface IPendingActionRepository {
   ): Promise<PendingActionWithRelations>
   findByPropertyId(propertyId: string): Promise<PendingActionWithRelations[]>
   findByPortfolioId(portfolioId: string): Promise<PendingActionWithRelations[]>
+  findByAuditId(auditId: string): Promise<PendingActionWithRelations[]>
   findByStatus(status: string): Promise<PendingActionWithRelations[]>
 }
 
@@ -116,4 +141,5 @@ export interface IPendingActionService {
   findByPortfolioId(
     portfolioId: string
   ): Promise<PendingActionWithRelations[]>
+  findByAuditId(auditId: string): Promise<PendingActionWithRelations[]>
 }

@@ -126,8 +126,9 @@ model Audit {
   batch              AuditBatch? @relation(fields: [batch_id], references: [id])
   report_url         String?
 
-  notes Note[]
-  tasks Task[]
+  notes          Note[]
+  tasks          Task[]
+  pendingActions PendingAction[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -421,6 +422,7 @@ enum PendingActionType {
   PROPERTY_ACTIVATE
   PORTFOLIO_DEACTIVATE
   PORTFOLIO_ACTIVATE
+  AUDIT_UPDATE_AMOUNT_CONFIRMED
 }
 
 enum PendingActionStatus {
@@ -440,18 +442,25 @@ type PortfolioInfo {
   name String
 }
 
+type AuditUpdateData {
+  amount_confirmed Int
+}
+
 model PendingAction {
   id                String               @id @default(auto()) @map("_id") @db.ObjectId
-  resource_type     String               // 'property' or 'portfolio'
+  resource_type     String               // 'property', 'portfolio', or 'audit'
   property_id       String?              @db.ObjectId
   property          Property?            @relation(fields: [property_id], references: [id], onDelete: Cascade)
   portfolio_id      String?              @db.ObjectId
   portfolio         Portfolio?           @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  audit_id          String?              @db.ObjectId
+  audit             Audit?               @relation(fields: [audit_id], references: [id], onDelete: Cascade)
   action_type       PendingActionType
   status            PendingActionStatus  @default(PENDING)
   requested_user_id String               @db.ObjectId
   requestedBy       User                 @relation("PendingActionRequestedBy", fields: [requested_user_id], references: [id], onDelete: Cascade)
   transfer_data     TransferData?        // Stores new_portfolio_id for transfer actions
+  audit_update_data AuditUpdateData?     // Stores amount_confirmed for audit update actions
   reason            String?              // Reason provided by requester for the action
   approval_user_id  String?              @db.ObjectId
   approvedBy        User?                @relation("PendingActionApprovedBy", fields: [approval_user_id], references: [id], onDelete: SetNull)
@@ -462,6 +471,7 @@ model PendingAction {
 
   @@index([property_id])
   @@index([portfolio_id])
+  @@index([audit_id])
   @@index([requested_user_id])
   @@index([resource_type])
   @@index([status])
@@ -469,6 +479,7 @@ model PendingAction {
   @@index([status, action_type])
   @@index([property_id, status])
   @@index([portfolio_id, status])
+  @@index([audit_id, status])
   @@index([requested_user_id, status])
   @@index([resource_type, status])
 }
