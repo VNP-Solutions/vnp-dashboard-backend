@@ -10,7 +10,7 @@ import { QueryDto } from '../../common/dto/query.dto'
 
 export class CreatePendingActionDto {
   @ApiProperty({
-    description: 'Resource type (property or portfolio)'
+    description: 'Resource type (property, portfolio, or audit)'
   })
   @IsString()
   @IsNotEmpty()
@@ -29,6 +29,13 @@ export class CreatePendingActionDto {
   @IsString()
   @IsOptional()
   portfolio_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Audit ID for audit-related actions'
+  })
+  @IsString()
+  @IsOptional()
+  audit_id?: string
 
   @ApiProperty({
     enum: PendingActionType,
@@ -52,6 +59,14 @@ export class CreatePendingActionDto {
       id: string
       name: string
     }
+  }
+
+  @ApiPropertyOptional({
+    description: 'Audit update data for audit update actions'
+  })
+  @IsOptional()
+  audit_update_data?: {
+    amount_confirmed: number
   }
 
   @ApiPropertyOptional({
@@ -99,6 +114,13 @@ export class PendingActionQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   portfolio_id?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by audit ID'
+  })
+  @IsOptional()
+  @IsString()
+  audit_id?: string
 
   @ApiPropertyOptional({
     description: 'Filter by resource type'

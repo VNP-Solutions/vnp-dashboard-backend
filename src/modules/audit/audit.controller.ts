@@ -38,6 +38,7 @@ import {
   CreateAuditDto,
   DeleteAuditDto,
   GlobalStatsResponseDto,
+  RequestUpdateAmountConfirmedDto,
   UpdateAuditDto
 } from './audit.dto'
 import type { IAuditService } from './audit.interface'
@@ -602,5 +603,45 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.update(id, updateAuditDto, user)
+  }
+
+  @Post(':id/request-update-amount-confirmed')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary:
+      'Request to update amount confirmed (external users only). Creates a pending action for super admin approval.'
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Update request submitted successfully'
+  })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - Invalid password, non-external user, or pending request already exists'
+  })
+  async requestUpdateAmountConfirmed(
+    @Param('id') id: string,
+    @Body() data: RequestUpdateAmountConfirmedDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // Verify password
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      data.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    return this.auditService.requestUpdateAmountConfirmed(id, data, user)
   }
 }

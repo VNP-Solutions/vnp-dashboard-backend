@@ -15,7 +15,9 @@
     "lint": "eslint \"src/**/*.ts\" --fix",
     "seed": "ts-node prisma/seed.ts",
     "generate": "prisma generate",
-    "push": "prisma db push"
+    "migrate": "prisma migrate dev",
+    "push": "prisma db push",
+    "studio": "prisma studio"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",

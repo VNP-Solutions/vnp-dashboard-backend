@@ -146,6 +146,27 @@ export class AuditRepository implements IAuditRepository {
               }
             }
           }
+        },
+        pendingActions: {
+          where: {
+            status: 'PENDING'
+          },
+          select: {
+            id: true,
+            action_type: true,
+            status: true,
+            audit_update_data: true,
+            reason: true,
+            created_at: true,
+            requestedBy: {
+              select: {
+                id: true,
+                email: true,
+                first_name: true,
+                last_name: true
+              }
+            }
+          }
         }
       }
     })
@@ -244,6 +265,27 @@ export class AuditRepository implements IAuditRepository {
                 expedia_id: true,
                 agoda_id: true,
                 booking_id: true
+              }
+            }
+          }
+        },
+        pendingActions: {
+          where: {
+            status: 'PENDING'
+          },
+          select: {
+            id: true,
+            action_type: true,
+            status: true,
+            audit_update_data: true,
+            reason: true,
+            created_at: true,
+            requestedBy: {
+              select: {
+                id: true,
+                email: true,
+                first_name: true,
+                last_name: true
               }
             }
           }
@@ -444,6 +486,27 @@ export class AuditRepository implements IAuditRepository {
                 expedia_id: true,
                 agoda_id: true,
                 booking_id: true
+              }
+            }
+          }
+        },
+        pendingActions: {
+          where: {
+            status: 'PENDING'
+          },
+          select: {
+            id: true,
+            action_type: true,
+            status: true,
+            audit_update_data: true,
+            reason: true,
+            created_at: true,
+            requestedBy: {
+              select: {
+                id: true,
+                email: true,
+                first_name: true,
+                last_name: true
               }
             }
           }

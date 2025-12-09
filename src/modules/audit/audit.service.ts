@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import { OtaType } from '@prisma/client'
+import { OtaType, PendingActionType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
@@ -27,6 +27,7 @@ import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IAuditBatchRepository } from '../audit-batch/audit-batch.interface'
 import type { IAuditStatusRepository } from '../audit-status/audit-status.interface'
 import { PrismaService } from '../prisma/prisma.service'
+import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
 import type { IPropertyRepository } from '../property/property.interface'
 import {
   AuditQueryDto,
@@ -37,6 +38,7 @@ import {
   BulkUploadReportDto,
   CreateAuditDto,
   GlobalStatsResponseDto,
+  RequestUpdateAmountConfirmedDto,
   UpdateAuditDto
 } from './audit.dto'
 import type { IAuditRepository, IAuditService } from './audit.interface'
@@ -54,6 +56,8 @@ export class AuditService implements IAuditService {
     private propertyRepository: IPropertyRepository,
     @Inject('IAuditBatchRepository')
     private auditBatchRepository: IAuditBatchRepository,
+    @Inject('IPendingActionRepository')
+    private pendingActionRepository: IPendingActionRepository,
     @Inject(PrismaService)
     private prisma: PrismaService,
     @Inject(EmailUtil)
@@ -650,6 +654,53 @@ export class AuditService implements IAuditService {
     }
 
     return this.auditRepository.update(id, data)
+  }
+
+  async requestUpdateAmountConfirmed(
+    id: string,
+    data: RequestUpdateAmountConfirmedDto,
+    user: IUserWithPermissions
+  ) {
+    const audit = await this.auditRepository.findById(id)
+
+    if (!audit) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    // Only external users should use this endpoint
+    // Super admins and internal users can update directly
+    if (isUserSuperAdmin(user) || isInternalUser(user)) {
+      throw new BadRequestException(
+        'Only external users can request amount confirmed updates. Internal users and super admins can update directly.'
+      )
+    }
+
+    // Check if there's already a pending action for this audit
+    const existingPendingActions =
+      await this.pendingActionRepository.findByAuditId(id)
+    if (existingPendingActions.length > 0) {
+      throw new BadRequestException(
+        'There is already a pending update request for this audit. Please wait for it to be approved or rejected.'
+      )
+    }
+
+    // Create the pending action
+    const pendingAction = await this.pendingActionRepository.create({
+      resource_type: 'audit',
+      audit_id: id,
+      action_type: PendingActionType.AUDIT_UPDATE_AMOUNT_CONFIRMED,
+      requested_user_id: user.id,
+      audit_update_data: {
+        amount_confirmed: data.amount_confirmed
+      },
+      reason: data.reason
+    })
+
+    return {
+      message:
+        'Update request submitted for approval. A super admin will review your request.',
+      pending_action: pendingAction
+    }
   }
 
   async archive(id: string, user: IUserWithPermissions) {

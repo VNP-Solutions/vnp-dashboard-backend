@@ -10,6 +10,7 @@ import {
   BulkUploadReportDto,
   CreateAuditDto,
   GlobalStatsResponseDto,
+  RequestUpdateAmountConfirmedDto,
   UpdateAuditDto
 } from './audit.dto'
 
@@ -192,5 +193,13 @@ export interface IAuditService {
     successfully_deleted: number
     failed_to_delete: number
     failed_audits: Array<{ id: string; reason: string }>
+  }>
+  requestUpdateAmountConfirmed(
+    id: string,
+    data: RequestUpdateAmountConfirmedDto,
+    user: IUserWithPermissions
+  ): Promise<{
+    message: string
+    pending_action: any
   }>
 }

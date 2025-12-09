@@ -316,3 +316,28 @@ export class BulkDeleteAuditDto {
   @IsNotEmpty()
   password: string
 }
+
+export class RequestUpdateAmountConfirmedDto {
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+
+  @ApiProperty({
+    example: 5000,
+    description: 'New amount confirmed value'
+  })
+  @IsNumber()
+  @IsNotEmpty()
+  amount_confirmed: number
+
+  @ApiPropertyOptional({
+    description: 'Optional reason for the change request'
+  })
+  @IsString()
+  @IsOptional()
+  reason?: string
+}

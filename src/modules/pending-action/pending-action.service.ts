@@ -113,6 +113,9 @@ export class PendingActionService
     if (query.resource_type) {
       additionalFilters.resource_type = query.resource_type
     }
+    if (query.audit_id) {
+      additionalFilters.audit_id = query.audit_id
+    }
 
     // Merge with existing filters
     const mergedQuery = {
@@ -144,6 +147,7 @@ export class PendingActionService
         'approval_user_id',
         'property_id',
         'portfolio_id',
+        'audit_id',
         'resource_type'
       ],
       sortableFields: [
@@ -297,6 +301,10 @@ export class PendingActionService
     return this.repository.findByPortfolioId(portfolioId)
   }
 
+  findByAuditId(auditId: string) {
+    return this.repository.findByAuditId(auditId)
+  }
+
   /**
    * Execute the actual property action
    * This method delegates to the property service to perform the actual operation
@@ -343,6 +351,26 @@ export class PendingActionService
         throw new BadRequestException(
           'Portfolio deactivation is not yet implemented'
         )
+
+      case PendingActionType.AUDIT_UPDATE_AMOUNT_CONFIRMED:
+        // Update the audit's amount_confirmed field
+        if (!pendingAction.audit_id) {
+          throw new BadRequestException(
+            'Audit ID is missing for AUDIT_UPDATE_AMOUNT_CONFIRMED action'
+          )
+        }
+        if (!pendingAction.audit_update_data?.amount_confirmed) {
+          throw new BadRequestException(
+            'Audit update data is missing for AUDIT_UPDATE_AMOUNT_CONFIRMED action'
+          )
+        }
+        await this.prisma.audit.update({
+          where: { id: pendingAction.audit_id },
+          data: {
+            amount_confirmed: pendingAction.audit_update_data.amount_confirmed
+          }
+        })
+        break
 
       default:
         throw new BadRequestException(
