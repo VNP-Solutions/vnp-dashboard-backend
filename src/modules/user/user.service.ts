@@ -8,10 +8,13 @@ import {
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import { PrismaService } from '../prisma/prisma.service'
 import {
   AssignUserRoleDto,
+  DeleteUserDto,
   UpdateOwnProfileDto,
   UpdateUserDto,
   UserQueryDto
@@ -24,7 +27,8 @@ export class UserService implements IUserService {
     @Inject('IUserRepository')
     private userRepository: IUserRepository,
     @Inject(PermissionService)
-    private permissionService: PermissionService
+    private permissionService: PermissionService,
+    private prisma: PrismaService
   ) {}
 
   async getProfile(userId: string) {
@@ -376,26 +380,49 @@ export class UserService implements IUserService {
     return { message: 'User access revoked successfully' }
   }
 
-  async remove(id: string, currentUser: IUserWithPermissions) {
+  async remove(
+    id: string,
+    data: DeleteUserDto,
+    currentUser: IUserWithPermissions
+  ) {
+    // Only super admins can delete users
+    if (!isUserSuperAdmin(currentUser)) {
+      throw new ForbiddenException('Only super admins can delete users')
+    }
+
+    // Prevent users from deleting themselves
+    if (currentUser.id === id) {
+      throw new BadRequestException('You cannot delete yourself')
+    }
+
     const user = await this.userRepository.findById(id)
 
     if (!user) {
       throw new NotFoundException('User not found')
     }
 
-    // Check if user has permission to delete this user
-    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
-      currentUser,
-      ModuleType.USER
-    )
-
-    if (accessibleIds !== 'all' && !accessibleIds.includes(id)) {
-      throw new ForbiddenException('You do not have access to delete this user')
+    // Check if the user to be deleted is a super admin
+    if (isUserSuperAdmin(user as unknown as IUserWithPermissions)) {
+      throw new ForbiddenException('Super admin users cannot be deleted')
     }
 
-    // Prevent users from deleting themselves
-    if (currentUser.id === id) {
-      throw new BadRequestException('You cannot delete yourself')
+    // Verify current user's password
+    const currentUserFromDb = await this.prisma.user.findUnique({
+      where: { id: currentUser.id },
+      select: { password: true }
+    })
+
+    if (!currentUserFromDb) {
+      throw new NotFoundException('Current user not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      data.password,
+      currentUserFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
     }
 
     await this.userRepository.delete(id)
