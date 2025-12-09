@@ -192,7 +192,7 @@ export class AuditService implements IAuditService {
 
     // Configuration for query builder - remove nested fields for MongoDB compatibility
     const queryConfig = {
-      searchFields: ['id', 'batch.batch_no'],
+      searchFields: ['id', 'property_id', 'batch.batch_no', 'batch_id', 'type_of_ota', 'audit_status_id', 'auditStatus.status', 'property.name', 'property.portfolio_id', 'property.portfolio.name'],
       filterableFields: [
         'batch_id',
         'type_of_ota',
@@ -458,7 +458,7 @@ export class AuditService implements IAuditService {
 
     // Configuration for query builder - remove nested fields for MongoDB compatibility
     const queryConfig = {
-      searchFields: ['id', 'batch.batch_no'],
+      searchFields: ['id', 'property_id', 'batch.batch_no', 'batch_id', 'type_of_ota', 'audit_status_id', 'auditStatus.status', 'property.name', 'property.portfolio_id', 'property.portfolio.name'],
       filterableFields: [
         'batch_id',
         'type_of_ota',
