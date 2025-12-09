@@ -3,6 +3,7 @@ import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AssignUserRoleDto,
+  DeleteUserDto,
   UpdateOwnProfileDto,
   UpdateUserDto,
   UserQueryDto
@@ -146,5 +147,9 @@ export interface IUserService {
     data: any,
     user: IUserWithPermissions
   ): Promise<{ message: string }>
-  remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  remove(
+    id: string,
+    data: DeleteUserDto,
+    user: IUserWithPermissions
+  ): Promise<{ message: string }>
 }

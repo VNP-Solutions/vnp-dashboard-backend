@@ -1,11 +1,11 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Inject,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards
 } from '@nestjs/common'
@@ -26,6 +26,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   AssignUserRoleDto,
+  DeleteUserDto,
   ManageUserAccessDto,
   UpdateOwnProfileDto,
   UpdateUserDto,
@@ -199,20 +200,28 @@ export class UserController {
     return this.userService.revokeAccess(id, manageUserAccessDto, user)
   }
 
-  @Delete(':id')
+  @Post(':id/delete')
   @RequirePermission(ModuleType.USER, PermissionAction.DELETE, true)
-  @ApiOperation({ summary: 'Delete a user (admin only, cannot delete self)' })
+  @ApiOperation({
+    summary:
+      'Delete a user (super admin only, requires password verification, cannot delete self or other super admins)'
+  })
   @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Cannot delete yourself'
+    description: 'Bad Request - Cannot delete yourself or invalid password'
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description:
+      'Forbidden - Only super admins can delete users, super admin users cannot be deleted'
   })
-  remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.userService.remove(id, user)
+  remove(
+    @Param('id') id: string,
+    @Body() deleteUserDto: DeleteUserDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.userService.remove(id, deleteUserDto, user)
   }
 }

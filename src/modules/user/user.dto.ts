@@ -216,3 +216,13 @@ export class UserQueryDto extends QueryDto {
   @IsString()
   is_verified?: string
 }
+
+export class DeleteUserDto {
+  @ApiProperty({
+    example: 'Password@123',
+    description: 'Current user password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
