@@ -186,24 +186,6 @@ export class ConsolidatedReportController {
     )
   }
 
-  @Delete(':id')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE, true)
-  @ApiOperation({
-    summary: 'Delete a consolidated report (Super Admin only)'
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Consolidated report deleted successfully'
-  })
-  @ApiResponse({ status: 404, description: 'Consolidated report not found' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Only Super Admin can delete consolidated reports'
-  })
-  remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.consolidatedReportService.remove(id, user)
-  }
-
   @Delete('bulk')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE)
   @ApiOperation({
@@ -227,5 +209,23 @@ export class ConsolidatedReportController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.consolidatedReportService.bulkDelete(bulkDeleteDto, user)
+  }
+
+  @Delete(':id')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE, true)
+  @ApiOperation({
+    summary: 'Delete a consolidated report (Super Admin only)'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Consolidated report deleted successfully'
+  })
+  @ApiResponse({ status: 404, description: 'Consolidated report not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only Super Admin can delete consolidated reports'
+  })
+  remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
+    return this.consolidatedReportService.remove(id, user)
   }
 }
