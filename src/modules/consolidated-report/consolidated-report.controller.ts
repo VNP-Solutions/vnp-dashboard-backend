@@ -27,6 +27,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   BulkCreateConsolidatedReportDto,
+  BulkDeleteConsolidatedReportDto,
   ConsolidatedReportQueryDto,
   CreateConsolidatedReportDto,
   UpdateConsolidatedReportDto
@@ -201,5 +202,30 @@ export class ConsolidatedReportController {
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.consolidatedReportService.remove(id, user)
+  }
+
+  @Delete('bulk')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE)
+  @ApiOperation({
+    summary:
+      'Delete multiple consolidated reports for a portfolio (Super Admin only)'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk consolidated reports deleted successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only Super Admin can delete consolidated reports'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Report does not belong to specified portfolio'
+  })
+  bulkDelete(
+    @Body() bulkDeleteDto: BulkDeleteConsolidatedReportDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.consolidatedReportService.bulkDelete(bulkDeleteDto, user)
   }
 }

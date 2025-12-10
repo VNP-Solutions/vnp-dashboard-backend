@@ -4,6 +4,8 @@ import { IUserWithPermissions } from '../../common/interfaces/permission.interfa
 import {
   BulkCreateConsolidatedReportDto,
   BulkCreateResultDto,
+  BulkDeleteConsolidatedReportDto,
+  BulkDeleteResultDto,
   ConsolidatedReportQueryDto,
   CreateConsolidatedReportDto,
   UpdateConsolidatedReportDto
@@ -97,4 +99,8 @@ export interface IConsolidatedReportService {
     user: IUserWithPermissions
   ): Promise<ConsolidatedReportWithRelations>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  bulkDelete(
+    data: BulkDeleteConsolidatedReportDto,
+    user: IUserWithPermissions
+  ): Promise<BulkDeleteResultDto>
 }

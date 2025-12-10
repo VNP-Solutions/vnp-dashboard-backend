@@ -16,6 +16,8 @@ import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   BulkCreateConsolidatedReportDto,
   BulkCreateResultDto,
+  BulkDeleteConsolidatedReportDto,
+  BulkDeleteResultDto,
   ConsolidatedReportQueryDto,
   CreateConsolidatedReportDto,
   UpdateConsolidatedReportDto
@@ -413,5 +415,79 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
     await this.consolidatedReportRepository.delete(id)
 
     return { message: 'Consolidated report deleted successfully' }
+  }
+
+  async bulkDelete(
+    data: BulkDeleteConsolidatedReportDto,
+    user: IUserWithPermissions
+  ): Promise<BulkDeleteResultDto> {
+    // Only super admin can delete consolidated reports
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only Super Admin can delete consolidated reports'
+      )
+    }
+
+    // Verify user has access to the portfolio
+    const accessiblePortfolioIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PORTFOLIO
+      )
+
+    if (
+      accessiblePortfolioIds !== 'all' &&
+      Array.isArray(accessiblePortfolioIds) &&
+      !accessiblePortfolioIds.includes(data.portfolio_id)
+    ) {
+      throw new BadRequestException('You do not have access to this portfolio')
+    }
+
+    const result: BulkDeleteResultDto = {
+      totalReports: data.report_ids.length,
+      successCount: 0,
+      failureCount: 0,
+      errors: [],
+      deletedReportIds: []
+    }
+
+    // Process each report
+    for (const reportId of data.report_ids) {
+      try {
+        const consolidatedReport =
+          await this.consolidatedReportRepository.findById(reportId)
+
+        if (!consolidatedReport) {
+          result.failureCount++
+          result.errors.push({
+            report_id: reportId,
+            error: 'Consolidated report not found'
+          })
+          continue
+        }
+
+        // Verify report belongs to the specified portfolio
+        if (consolidatedReport.portfolio_id !== data.portfolio_id) {
+          result.failureCount++
+          result.errors.push({
+            report_id: reportId,
+            error: 'Report does not belong to the specified portfolio'
+          })
+          continue
+        }
+
+        await this.consolidatedReportRepository.delete(reportId)
+        result.successCount++
+        result.deletedReportIds.push(reportId)
+      } catch (error) {
+        result.failureCount++
+        result.errors.push({
+          report_id: reportId,
+          error: error.message || 'Unknown error occurred'
+        })
+      }
+    }
+
+    return result
   }
 }
