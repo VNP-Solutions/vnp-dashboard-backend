@@ -26,6 +26,7 @@ model User {
   notes                     Note[]
   tasks                     Task[]
   contractUrls              ContractUrl[]
+  consolidatedReports       ConsolidatedReport[]
   requestedPendingActions   PendingAction[]            @relation("PendingActionRequestedBy")
   approvedPendingActions    PendingAction[]            @relation("PendingActionApprovedBy")
 
@@ -48,11 +49,12 @@ model Portfolio {
   access_email      String?
   access_phone      String?
 
-  properties     Property[]
-  notes          Note[]
-  tasks          Task[]
-  contractUrls   ContractUrl[]
-  pendingActions PendingAction[]
+  properties          Property[]
+  notes               Note[]
+  tasks               Task[]
+  contractUrls        ContractUrl[]
+  consolidatedReports ConsolidatedReport[]
+  pendingActions      PendingAction[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -379,6 +381,21 @@ model ContractUrl {
   @@index([user_id])
   @@index([is_active])
   @@index([portfolio_id, user_id])
+}
+
+model ConsolidatedReport {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  url          String
+  portfolio_id String    @db.ObjectId
+  portfolio    Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  user_id      String    @db.ObjectId
+  user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([portfolio_id])
+  @@index([user_id])
 }
 
 enum OtaType {
