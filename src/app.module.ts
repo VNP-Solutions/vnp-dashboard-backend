@@ -16,6 +16,7 @@ import { AuditBatchModule } from './modules/audit-batch/audit-batch.module'
 import { AuditModule } from './modules/audit/audit.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
+import { ConsolidatedReportModule } from './modules/consolidated-report/consolidated-report.module'
 import { ContractUrlModule } from './modules/contract-url/contract-url.module'
 import { CurrencyModule } from './modules/currency/currency.module'
 import { EmailModule } from './modules/email/email.module'
@@ -44,6 +45,7 @@ import { UserModule } from './modules/user/user.module'
     AuditModule,
     AuditBatchModule,
     AuditStatusModule,
+    ConsolidatedReportModule,
     ContractUrlModule,
     CurrencyModule,
     EmailModule,
