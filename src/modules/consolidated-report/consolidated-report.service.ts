@@ -14,6 +14,8 @@ import {
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
+  BulkCreateConsolidatedReportDto,
+  BulkCreateResultDto,
   ConsolidatedReportQueryDto,
   CreateConsolidatedReportDto,
   UpdateConsolidatedReportDto
@@ -55,10 +57,73 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
       throw new BadRequestException('You do not have access to this portfolio')
     }
 
-    const consolidatedReport =
-      await this.consolidatedReportRepository.create(data)
+    const consolidatedReport = await this.consolidatedReportRepository.create({
+      ...data,
+      user_id: user.id
+    })
 
     return consolidatedReport
+  }
+
+  async bulkCreate(
+    data: BulkCreateConsolidatedReportDto,
+    user: IUserWithPermissions
+  ): Promise<BulkCreateResultDto> {
+    // Only internal users (super admin and internal) can create consolidated reports
+    if (!isInternalUser(user)) {
+      throw new ForbiddenException(
+        'Only internal users can create consolidated reports'
+      )
+    }
+
+    // Verify user has access to the portfolio
+    const accessiblePortfolioIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PORTFOLIO
+      )
+
+    if (
+      accessiblePortfolioIds !== 'all' &&
+      Array.isArray(accessiblePortfolioIds) &&
+      !accessiblePortfolioIds.includes(data.portfolio_id)
+    ) {
+      throw new BadRequestException('You do not have access to this portfolio')
+    }
+
+    const result: BulkCreateResultDto = {
+      totalReports: data.reports.length,
+      successCount: 0,
+      failureCount: 0,
+      errors: [],
+      successfulReportIds: []
+    }
+
+    // Process each report
+    for (let i = 0; i < data.reports.length; i++) {
+      const reportItem = data.reports[i]
+
+      try {
+        const consolidatedReport =
+          await this.consolidatedReportRepository.create({
+            url: reportItem.url,
+            portfolio_id: data.portfolio_id,
+            user_id: user.id
+          })
+
+        result.successCount++
+        result.successfulReportIds.push(consolidatedReport.id)
+      } catch (error) {
+        result.failureCount++
+        result.errors.push({
+          index: i,
+          url: reportItem.url,
+          error: error.message || 'Unknown error occurred'
+        })
+      }
+    }
+
+    return result
   }
 
   async findAll(

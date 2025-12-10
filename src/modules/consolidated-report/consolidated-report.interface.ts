@@ -2,6 +2,8 @@ import { ConsolidatedReport, Prisma } from '@prisma/client'
 import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
+  BulkCreateConsolidatedReportDto,
+  BulkCreateResultDto,
   ConsolidatedReportQueryDto,
   CreateConsolidatedReportDto,
   UpdateConsolidatedReportDto
@@ -13,6 +15,14 @@ type ConsolidatedReportWithRelations = Prisma.ConsolidatedReportGetPayload<{
       select: {
         id: true
         name: true
+      }
+    }
+    user: {
+      select: {
+        id: true
+        first_name: true
+        last_name: true
+        email: true
       }
     }
   }
@@ -27,11 +37,21 @@ type ConsolidatedReportWithFullDetails = Prisma.ConsolidatedReportGetPayload<{
         is_active: true
       }
     }
+    user: {
+      select: {
+        id: true
+        first_name: true
+        last_name: true
+        email: true
+      }
+    }
   }
 }>
 
 export interface IConsolidatedReportRepository {
-  create(data: CreateConsolidatedReportDto): Promise<ConsolidatedReportWithRelations>
+  create(
+    data: CreateConsolidatedReportDto & { user_id: string }
+  ): Promise<ConsolidatedReportWithRelations>
   findAll(
     queryOptions: any,
     portfolioId?: string
@@ -51,6 +71,10 @@ export interface IConsolidatedReportService {
     data: CreateConsolidatedReportDto,
     user: IUserWithPermissions
   ): Promise<ConsolidatedReportWithRelations>
+  bulkCreate(
+    data: BulkCreateConsolidatedReportDto,
+    user: IUserWithPermissions
+  ): Promise<BulkCreateResultDto>
   findAll(
     query: ConsolidatedReportQueryDto,
     user: IUserWithPermissions

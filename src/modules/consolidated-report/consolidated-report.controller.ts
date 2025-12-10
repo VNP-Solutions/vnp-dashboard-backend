@@ -26,6 +26,7 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
+  BulkCreateConsolidatedReportDto,
   ConsolidatedReportQueryDto,
   CreateConsolidatedReportDto,
   UpdateConsolidatedReportDto
@@ -63,6 +64,28 @@ export class ConsolidatedReportController {
       createConsolidatedReportDto,
       user
     )
+  }
+
+  @Post('bulk')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
+  @ApiOperation({
+    summary:
+      'Create multiple consolidated reports for a portfolio (Internal users only)'
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Bulk consolidated reports created successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden - Only internal users can create consolidated reports'
+  })
+  bulkCreate(
+    @Body() bulkCreateDto: BulkCreateConsolidatedReportDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.consolidatedReportService.bulkCreate(bulkCreateDto, user)
   }
 
   @Get()

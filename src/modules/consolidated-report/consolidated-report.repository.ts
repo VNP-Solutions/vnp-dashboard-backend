@@ -12,7 +12,7 @@ export class ConsolidatedReportRepository
 {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
-  async create(data: CreateConsolidatedReportDto) {
+  async create(data: CreateConsolidatedReportDto & { user_id: string }) {
     return this.prisma.consolidatedReport.create({
       data,
       include: {
@@ -20,6 +20,14 @@ export class ConsolidatedReportRepository
           select: {
             id: true,
             name: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true
           }
         }
       }
@@ -39,6 +47,14 @@ export class ConsolidatedReportRepository
           select: {
             id: true,
             name: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true
           }
         }
       }
@@ -61,6 +77,14 @@ export class ConsolidatedReportRepository
             name: true,
             is_active: true
           }
+        },
+        user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true
+          }
         }
       }
     })
@@ -76,6 +100,14 @@ export class ConsolidatedReportRepository
           select: {
             id: true,
             name: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true
           }
         }
       },
@@ -94,6 +126,14 @@ export class ConsolidatedReportRepository
           select: {
             id: true,
             name: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true
           }
         }
       }
