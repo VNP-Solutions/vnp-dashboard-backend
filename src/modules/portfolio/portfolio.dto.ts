@@ -31,13 +31,13 @@ export class CreatePortfolioDto {
   @IsNotEmpty()
   service_type_id: string
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'USD',
-    description: 'Currency code for the portfolio'
+    description: 'Currency code for the portfolio (defaults to USD if not provided)'
   })
   @IsString()
-  @IsNotEmpty()
-  currency: string
+  @IsOptional()
+  currency?: string
 
   @ApiPropertyOptional({
     example: 'https://example.com/contract.pdf',

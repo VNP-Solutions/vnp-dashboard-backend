@@ -921,23 +921,14 @@ export class PortfolioService implements IPortfolioService {
             continue
           }
 
-          // Extract currency (REQUIRED)
-          const currency = findHeaderValue(row, [
-            'Currency',
-            'currency',
-            'Currency Code',
-            'currency_code'
-          ])
-
-          if (!currency) {
-            result.errors.push({
-              row: rowNumber,
-              portfolio: portfolioName,
-              error: 'Currency is required'
-            })
-            result.failureCount++
-            continue
-          }
+          // Extract currency (OPTIONAL - defaults to USD)
+          const currency =
+            findHeaderValue(row, [
+              'Currency',
+              'currency',
+              'Currency Code',
+              'currency_code'
+            ]) || 'USD'
 
           // Extract contact email (OPTIONAL)
           const contactEmail = findHeaderValue(row, [

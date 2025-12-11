@@ -42,7 +42,7 @@ model Portfolio {
   name              String      @unique
   service_type_id   String      @db.ObjectId
   serviceType       ServiceType @relation(fields: [service_type_id], references: [id])
-  currency          String
+  currency          String      @default("USD")
   is_active         Boolean
   contact_email     String?
   is_commissionable Boolean
