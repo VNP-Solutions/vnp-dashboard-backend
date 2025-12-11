@@ -675,6 +675,13 @@ export class AuditService implements IAuditService {
       )
     }
 
+    // Check if amount_confirmed is already set
+    if (audit.amount_confirmed !== null && audit.amount_confirmed !== undefined) {
+      throw new BadRequestException(
+        'Amount confirmed is already set for this audit. You cannot request an update.'
+      )
+    }
+
     // Check if there's already a pending action for this audit
     const existingPendingActions =
       await this.pendingActionRepository.findByAuditId(id)
