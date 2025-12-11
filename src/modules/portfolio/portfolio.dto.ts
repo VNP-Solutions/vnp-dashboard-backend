@@ -31,6 +31,14 @@ export class CreatePortfolioDto {
   @IsNotEmpty()
   service_type_id: string
 
+  @ApiProperty({
+    example: 'USD',
+    description: 'Currency code for the portfolio'
+  })
+  @IsString()
+  @IsNotEmpty()
+  currency: string
+
   @ApiPropertyOptional({
     example: 'https://example.com/contract.pdf',
     description: 'Contract document URL (will be saved as user-specific contract URL)'

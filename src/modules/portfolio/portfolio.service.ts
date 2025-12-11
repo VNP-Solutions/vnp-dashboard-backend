@@ -921,6 +921,24 @@ export class PortfolioService implements IPortfolioService {
             continue
           }
 
+          // Extract currency (REQUIRED)
+          const currency = findHeaderValue(row, [
+            'Currency',
+            'currency',
+            'Currency Code',
+            'currency_code'
+          ])
+
+          if (!currency) {
+            result.errors.push({
+              row: rowNumber,
+              portfolio: portfolioName,
+              error: 'Currency is required'
+            })
+            result.failureCount++
+            continue
+          }
+
           // Extract contact email (OPTIONAL)
           const contactEmail = findHeaderValue(row, [
             'Contact Email',
@@ -1002,6 +1020,7 @@ export class PortfolioService implements IPortfolioService {
           const portfolioData: Omit<CreatePortfolioDto, 'contract_url'> = {
             name: portfolioName,
             service_type_id: serviceType.id,
+            currency: currency,
             is_active: isActive,
             contact_email: contactEmail || undefined,
             is_commissionable: isCommissionable,
@@ -1286,6 +1305,17 @@ export class PortfolioService implements IPortfolioService {
               result.failureCount++
               continue
             }
+          }
+
+          // Extract currency (if provided)
+          const currency = findHeaderValue(row, [
+            'Currency',
+            'currency',
+            'Currency Code',
+            'currency_code'
+          ])
+          if (currency) {
+            updateData.currency = currency
           }
 
           // Extract contact email (if provided)

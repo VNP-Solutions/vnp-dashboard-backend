@@ -1628,7 +1628,7 @@ export class PropertyService implements IPropertyService {
               service_type_id: defaultServiceType.id,
               is_active: true,
               is_commissionable: false
-            })
+            } as any)
           }
 
           // Create or update property
@@ -2495,7 +2495,7 @@ export class PropertyService implements IPropertyService {
                 service_type_id: defaultServiceType.id,
                 is_active: true,
                 is_commissionable: false
-              })
+              } as any)
             }
             updateData.portfolio_id = portfolio.id
           }
