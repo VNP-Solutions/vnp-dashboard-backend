@@ -606,10 +606,10 @@ export class AuditController {
   }
 
   @Post(':id/request-update-amount-confirmed')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Request to update amount confirmed (external users only). Creates a pending action for super admin approval.'
+      'Request to update amount confirmed (external users only, when amount_confirmed is not set). Creates a pending action for super admin approval.'
   })
   @ApiResponse({
     status: 201,
@@ -619,7 +619,7 @@ export class AuditController {
   @ApiResponse({
     status: 400,
     description:
-      'Bad Request - Invalid password, non-external user, or pending request already exists'
+      'Bad Request - Invalid password, non-external user, amount already set, or pending request already exists'
   })
   async requestUpdateAmountConfirmed(
     @Param('id') id: string,
