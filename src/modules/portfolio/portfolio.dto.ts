@@ -32,6 +32,14 @@ export class CreatePortfolioDto {
   service_type_id: string
 
   @ApiPropertyOptional({
+    example: 'USD',
+    description: 'Currency code for the portfolio (defaults to USD if not provided)'
+  })
+  @IsString()
+  @IsOptional()
+  currency?: string
+
+  @ApiPropertyOptional({
     example: 'https://example.com/contract.pdf',
     description: 'Contract document URL (will be saved as user-specific contract URL)'
   })
