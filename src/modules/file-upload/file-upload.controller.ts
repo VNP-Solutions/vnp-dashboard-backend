@@ -34,7 +34,11 @@ export class FileUploadController {
   ) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 50 * 1024 * 1024 } // 50 MB
+    })
+  )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload a file to S3' })
   @ApiBody({
@@ -66,7 +70,11 @@ export class FileUploadController {
   }
 
   @Post('bulk')
-  @UseInterceptors(FilesInterceptor('files', 20))
+  @UseInterceptors(
+    FilesInterceptor('files', 20, {
+      limits: { fileSize: 50 * 1024 * 1024 } // 50 MB per file
+    })
+  )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload multiple files to S3 (max 20 files)' })
   @ApiBody({
