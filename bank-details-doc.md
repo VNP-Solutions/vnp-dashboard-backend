@@ -29,3 +29,4 @@ Summary of Changes
    completeUpdate: Skips bank_details if user lacks UPDATE permission (silently)
    findAll, findAllForExport, getPropertiesByPortfolios, findOne: Sets bankDetails: null if user lacks READ permission
    bulkImport: Skips bank details creation if user lacks CREATE permission (silently)
+10. Update bulk update property api and so the template will be updated also
