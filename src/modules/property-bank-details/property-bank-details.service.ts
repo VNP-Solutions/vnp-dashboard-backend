@@ -10,10 +10,10 @@ import { BankSubType, BankType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
-  isPortfolioManagerFor,
-  isPropertyManagerFor,
-  isUserSuperAdmin
-} from '../../common/utils/permission.util'
+  ModuleType,
+  PermissionAction
+} from '../../common/interfaces/permission.interface'
+import { PermissionService } from '../../common/services/permission.service'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   BulkUpdateBankDetailsResultDto,
@@ -30,7 +30,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   constructor(
     @Inject('IPropertyBankDetailsRepository')
     private propertyBankDetailsRepository: IPropertyBankDetailsRepository,
-    @Inject(PrismaService) private prisma: PrismaService
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(PermissionService) private permissionService: PermissionService
   ) {}
 
   /**
@@ -160,60 +161,41 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   }
 
   /**
-   * Check if user has permission to edit bank details for a property
-   * Only super admin, property manager, or portfolio manager can edit
+   * Check if user has permission to perform an action on bank details for a property
+   * Uses the new bank_details_permission from the user's role
    */
-  private async checkEditPermission(
+  private async checkBankDetailsPermission(
     user: IUserWithPermissions,
-    propertyId: string
+    propertyId: string,
+    action: PermissionAction
   ): Promise<void> {
-    // Super admin can do anything
-    if (isUserSuperAdmin(user)) {
-      return
-    }
-
-    // Get property with portfolio info
+    // Verify property exists
     const property = await this.prisma.property.findUnique({
       where: { id: propertyId },
-      select: {
-        id: true,
-        portfolio_id: true
-      }
+      select: { id: true }
     })
 
     if (!property) {
       throw new NotFoundException('Property not found')
     }
 
-    // Get user's accessible properties and portfolios
-    const userAccess = await this.prisma.userAccessedProperty.findFirst({
-      where: { user_id: user.id }
-    })
-
-    const accessiblePropertyIds = userAccess?.property_id || []
-    const accessiblePortfolioIds = userAccess?.portfolio_id || []
-
-    // Check if user is property manager for this property
-    if (isPropertyManagerFor(user, propertyId, accessiblePropertyIds)) {
-      return
-    }
-
-    // Check if user is portfolio manager for the parent portfolio
-    if (
-      isPortfolioManagerFor(user, property.portfolio_id, accessiblePortfolioIds)
-    ) {
-      return
-    }
-
-    // User doesn't have permission
-    throw new ForbiddenException(
-      'You do not have permission to edit bank details for this property. Only super admins, property managers, or portfolio managers can edit bank details.'
+    // Use PermissionService to check bank_details permission
+    // For partial access, propertyId is used since bank_details access maps to property access
+    await this.permissionService.requirePermission(
+      user,
+      ModuleType.BANK_DETAILS,
+      action,
+      propertyId
     )
   }
 
   async create(data: CreatePropertyBankDetailsDto, user: IUserWithPermissions) {
-    // Check permission
-    await this.checkEditPermission(user, data.property_id)
+    // Check permission - require CREATE permission on BANK_DETAILS module
+    await this.checkBankDetailsPermission(
+      user,
+      data.property_id,
+      PermissionAction.CREATE
+    )
 
     const existingBankDetails =
       await this.propertyBankDetailsRepository.findByPropertyId(
@@ -253,8 +235,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     data: UpdatePropertyBankDetailsDto,
     user: IUserWithPermissions
   ) {
-    // Check permission
-    await this.checkEditPermission(user, propertyId)
+    // Check permission - require UPDATE permission on BANK_DETAILS module
+    await this.checkBankDetailsPermission(
+      user,
+      propertyId,
+      PermissionAction.UPDATE
+    )
 
     const bankDetails =
       await this.propertyBankDetailsRepository.findByPropertyId(propertyId)
@@ -432,9 +418,13 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             continue
           }
 
-          // Check permission for this property
+          // Check permission for this property - need UPDATE permission for bulk update
           try {
-            await this.checkEditPermission(user, property.id)
+            await this.checkBankDetailsPermission(
+              user,
+              property.id,
+              PermissionAction.UPDATE
+            )
           } catch {
             console.log(
               '\x1b[31m%s\x1b[0m',

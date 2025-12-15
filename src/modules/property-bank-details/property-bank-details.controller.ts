@@ -45,11 +45,11 @@ export class PropertyBankDetailsController {
   ) {}
 
   @Post()
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.BANK_DETAILS, PermissionAction.CREATE)
   @ApiOperation({
     summary: 'Create property bank details',
     description:
-      'Creates bank details for a property. Only super admin, property manager, or portfolio manager can create bank details. ' +
+      'Creates bank details for a property. Requires bank_details CREATE permission. ' +
       'For Stripe: Only stripe_account_email is required. ' +
       'For Bank: bank_sub_type is required (ach, domestic_wire, or international_wire). ' +
       'ACH requires: hotel_portfolio_name, beneficiary_name, bank_name, routing_number, account_number, bank_account_type. ' +
@@ -85,7 +85,7 @@ export class PropertyBankDetailsController {
   }
 
   @Get('property/:propertyId')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ, true)
+  @RequirePermission(ModuleType.BANK_DETAILS, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get bank details by property ID' })
   @ApiResponse({
     status: 200,
@@ -107,11 +107,11 @@ export class PropertyBankDetailsController {
   }
 
   @Patch('property/:propertyId')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
+  @RequirePermission(ModuleType.BANK_DETAILS, PermissionAction.UPDATE, true)
   @ApiOperation({
     summary: 'Update bank details by property ID',
     description:
-      'Updates bank details for a property. Only super admin, property manager, or portfolio manager can update bank details. ' +
+      'Updates bank details for a property. Requires bank_details UPDATE permission. ' +
       'For Stripe: Only stripe_account_email is required. ' +
       'For Bank: bank_sub_type is required (ach, domestic_wire, or international_wire). ' +
       'ACH requires: hotel_portfolio_name, beneficiary_name, bank_name, routing_number, account_number, bank_account_type. ' +
@@ -149,13 +149,13 @@ export class PropertyBankDetailsController {
   }
 
   @Post('bulk-update')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
+  @RequirePermission(ModuleType.BANK_DETAILS, PermissionAction.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Bulk update property bank details from Excel file',
     description:
-      'Updates bank details for multiple properties from an Excel file. Only super admin, property manager, or portfolio manager can update bank details. ' +
+      'Updates bank details for multiple properties from an Excel file. Requires bank_details UPDATE permission. ' +
       'The first column must be "Property Name" to identify the property. ' +
       'For Stripe: Include "Stripe Account Email" column. ' +
       'For Bank: Include "Bank Sub Type" column (ach, domestic_wire, or international_wire). ' +

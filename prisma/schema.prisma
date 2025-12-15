@@ -239,6 +239,7 @@ model UserRole {
   audit_permission           AuditPermission?
   user_permission            UserPermission?
   system_settings_permission SystemSettingsPermission?
+  bank_details_permission    BankDetailsPermission?
   users                      User[]
 
   created_at DateTime @default(now())
@@ -270,6 +271,11 @@ type UserPermission {
 }
 
 type SystemSettingsPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type BankDetailsPermission {
   permission_level PermissionLevel
   access_level     AccessLevel
 }

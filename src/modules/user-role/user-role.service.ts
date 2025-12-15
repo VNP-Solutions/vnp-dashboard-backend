@@ -43,7 +43,8 @@ export class UserRoleService implements IUserRoleService {
       property_permission: data.property_permission ?? null,
       audit_permission: data.audit_permission ?? null,
       user_permission: data.user_permission ?? null,
-      system_settings_permission: data.system_settings_permission ?? null
+      system_settings_permission: data.system_settings_permission ?? null,
+      bank_details_permission: data.bank_details_permission ?? null
     })
 
     if (warnings.length > 0) {
@@ -113,6 +114,10 @@ export class UserRoleService implements IUserRoleService {
       system_settings_permission:
         data.system_settings_permission ??
         userRole.system_settings_permission ??
+        null,
+      bank_details_permission:
+        data.bank_details_permission ??
+        userRole.bank_details_permission ??
         null
     })
 

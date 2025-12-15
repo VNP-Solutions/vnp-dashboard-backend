@@ -187,12 +187,18 @@ export class PermissionService {
         return []
       }
 
-      // Only PORTFOLIO and PROPERTY support partial access via UserAccessedProperty
+      // PORTFOLIO, PROPERTY, and BANK_DETAILS support partial access via UserAccessedProperty
       if (module === ModuleType.PORTFOLIO) {
         return userAccessedProperties.portfolio_id || []
       }
 
       if (module === ModuleType.PROPERTY) {
+        return userAccessedProperties.property_id || []
+      }
+
+      // BANK_DETAILS partial access maps to PROPERTY access
+      // User can only access bank details for properties they have access to
+      if (module === ModuleType.BANK_DETAILS) {
         return userAccessedProperties.property_id || []
       }
 
@@ -219,6 +225,8 @@ export class PermissionService {
         return user.role.user_permission
       case ModuleType.SYSTEM_SETTINGS:
         return user.role.system_settings_permission
+      case ModuleType.BANK_DETAILS:
+        return user.role.bank_details_permission
       default:
         return null
     }
@@ -226,10 +234,15 @@ export class PermissionService {
 
   /**
    * Validate if a module supports partial access
-   * Only PORTFOLIO and PROPERTY have resource-level access control via UserAccessedProperty
+   * PORTFOLIO, PROPERTY, and BANK_DETAILS have resource-level access control via UserAccessedProperty
+   * Note: BANK_DETAILS partial access maps to PROPERTY access (user can only access bank details for properties they have access to)
    */
   moduleSupportsPartialAccess(module: ModuleType): boolean {
-    return module === ModuleType.PORTFOLIO || module === ModuleType.PROPERTY
+    return (
+      module === ModuleType.PORTFOLIO ||
+      module === ModuleType.PROPERTY ||
+      module === ModuleType.BANK_DETAILS
+    )
   }
 
   /**
@@ -242,6 +255,7 @@ export class PermissionService {
     audit_permission: IPermission | null
     user_permission: IPermission | null
     system_settings_permission: IPermission | null
+    bank_details_permission: IPermission | null
   }): string[] {
     const warnings: string[] = []
 
@@ -258,7 +272,7 @@ export class PermissionService {
         !this.moduleSupportsPartialAccess(module)
       ) {
         warnings.push(
-          `${moduleName}: PARTIAL access_level is not supported. Only PORTFOLIO and PROPERTY support partial access. This will behave as NO ACCESS.`
+          `${moduleName}: PARTIAL access_level is not supported. Only PORTFOLIO, PROPERTY, and BANK_DETAILS support partial access. This will behave as NO ACCESS.`
         )
       }
 
@@ -286,6 +300,11 @@ export class PermissionService {
       role.system_settings_permission,
       'System Settings',
       ModuleType.SYSTEM_SETTINGS
+    )
+    checkPermission(
+      role.bank_details_permission,
+      'Bank Details',
+      ModuleType.BANK_DETAILS
     )
 
     return warnings
@@ -362,13 +381,20 @@ export class PermissionService {
       return false
     }
 
-    // Only PORTFOLIO and PROPERTY support resource-level access control
+    // PORTFOLIO, PROPERTY, and BANK_DETAILS support resource-level access control
     if (module === ModuleType.PORTFOLIO) {
       const portfolioIds = userAccessedProperties.portfolio_id || []
       return portfolioIds.includes(resourceId)
     }
 
     if (module === ModuleType.PROPERTY) {
+      const propertyIds = userAccessedProperties.property_id || []
+      return propertyIds.includes(resourceId)
+    }
+
+    // BANK_DETAILS partial access maps to PROPERTY access
+    // resourceId here is the property_id that the bank details belong to
+    if (module === ModuleType.BANK_DETAILS) {
       const propertyIds = userAccessedProperties.property_id || []
       return propertyIds.includes(resourceId)
     }

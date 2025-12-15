@@ -19,6 +19,9 @@ import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
+  canCreateBankDetails,
+  canReadBankDetails,
+  canUpdateBankDetails,
   canPerformBulkTransfer,
   isInternalUser,
   isUserSuperAdmin
@@ -130,11 +133,17 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Currency not found')
     }
 
+    // Check if user has permission to create bank details
+    // If not, skip bank_details creation silently
+    const bankDetailsToCreate = canCreateBankDetails(user)
+      ? data.bank_details
+      : undefined
+
     // Create property with credentials and bank details in a transaction
     const property = await this.propertyRepository.completeCreate(
       data.property,
       data.credentials,
-      data.bank_details,
+      bankDetailsToCreate,
       user.id
     )
 
@@ -201,12 +210,18 @@ export class PropertyService implements IPropertyService {
       }
     }
 
+    // Check if user has permission to update bank details
+    // If not, skip bank_details update silently
+    const bankDetailsToUpdate = canUpdateBankDetails(user)
+      ? data.bank_details
+      : undefined
+
     // Update property with credentials and bank details in a transaction
     return this.propertyRepository.completeUpdate(
       id,
       data.property,
       data.credentials,
-      data.bank_details,
+      bankDetailsToUpdate,
       user.id
     )
   }
@@ -511,9 +526,16 @@ export class PropertyService implements IPropertyService {
         }
       }
 
+      // Filter bank details based on user permission
+      // If user doesn't have READ permission for bank_details, set bankDetails to null
+      const filteredBankDetails = canReadBankDetails(user)
+        ? propertyWithoutPendingActions.bankDetails
+        : null
+
       return {
         ...propertyWithoutPendingActions,
         credentials: decryptedCredentials,
+        bankDetails: filteredBankDetails,
         access_type: accessType,
         // Add viewing_portfolio_id for shared properties (the portfolio context user is viewing from)
         viewing_portfolio_id: isShared
@@ -825,9 +847,16 @@ export class PropertyService implements IPropertyService {
         }
       }
 
+      // Filter bank details based on user permission
+      // If user doesn't have READ permission for bank_details, set bankDetails to null
+      const filteredBankDetails = canReadBankDetails(user)
+        ? propertyWithoutPendingActions.bankDetails
+        : null
+
       return {
         ...propertyWithoutPendingActions,
         credentials: decryptedCredentials,
+        bankDetails: filteredBankDetails,
         access_type: accessType,
         // Add viewing_portfolio_id for shared properties (the portfolio context user is viewing from)
         viewing_portfolio_id: isShared
@@ -876,9 +905,10 @@ export class PropertyService implements IPropertyService {
         undefined
       )
 
-      // Add access_type field to each property
+      // Add access_type field to each property and filter bank details based on permission
       return properties.map((property: any) => ({
         ...property,
+        bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
         access_type: 'owned' as const
       }))
     }
@@ -912,13 +942,14 @@ export class PropertyService implements IPropertyService {
       undefined
     )
 
-    // Add access_type field to each property
+    // Add access_type field to each property and filter bank details based on permission
     return properties.map((property: any) => {
       const accessType = data.portfolio_ids.includes(property.portfolio_id)
         ? 'owned'
         : 'shared'
       return {
         ...property,
+        bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
         access_type: accessType
       }
     })
@@ -957,8 +988,10 @@ export class PropertyService implements IPropertyService {
 
     // Add access_type field - for findOne, we consider it owned if it's in user's portfolio
     // This is a simplified approach; you may want to add portfolio context if needed
+    // Filter bank details based on user permission
     return {
       ...property,
+      bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
       access_type: 'owned' as const
     }
   }
@@ -1335,7 +1368,7 @@ export class PropertyService implements IPropertyService {
 
   async bulkImport(
     file: Express.Multer.File,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ): Promise<BulkImportResultDto> {
     if (!file) {
       throw new BadRequestException('No file provided')
@@ -1812,6 +1845,14 @@ export class PropertyService implements IPropertyService {
             // Create new credentials
             credentialsData.property_id = propertyId
             await this.credentialsRepository.create(credentialsData)
+          }
+
+          // Check if user has permission to create bank details
+          // If not, silently skip bank details creation and mark as success
+          if (!canCreateBankDetails(user)) {
+            result.successCount++
+            result.successfulImports.push(propertyName)
+            continue
           }
 
           // Extract and create bank details if provided

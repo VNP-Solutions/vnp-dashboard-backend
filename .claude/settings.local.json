@@ -11,7 +11,9 @@
       "Bash(yarn lint:*)",
       "Bash(dir:*)",
       "Bash(npx tsc --noEmit)",
-      "Bash(npx prisma generate:*)"
+      "Bash(npx prisma generate:*)",
+      "Bash(findstr:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

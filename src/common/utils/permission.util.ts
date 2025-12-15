@@ -365,3 +365,76 @@ export function canPerformBulkTransfer(user: IUserWithPermissions): boolean {
   // Check if user is a property manager or portfolio manager
   return isPropertyManager(user) || isPortfolioManager(user)
 }
+
+/**
+ * Get the bank details permission for a user
+ */
+export function getBankDetailsPermission(
+  user: IUserWithPermissions
+): IPermission | null {
+  if (!user || !user.role) return null
+  return user.role.bank_details_permission
+}
+
+/**
+ * Check if a user can read bank details
+ * User must have bank_details_permission with READ capability and access_level != none
+ */
+export function canReadBankDetails(user: IUserWithPermissions): boolean {
+  const permission = getBankDetailsPermission(user)
+  return canRead(permission)
+}
+
+/**
+ * Check if a user can create bank details
+ * User must have bank_details_permission with CREATE capability and access_level != none
+ */
+export function canCreateBankDetails(user: IUserWithPermissions): boolean {
+  const permission = getBankDetailsPermission(user)
+  return canCreate(permission)
+}
+
+/**
+ * Check if a user can update bank details
+ * User must have bank_details_permission with UPDATE capability and access_level != none
+ */
+export function canUpdateBankDetails(user: IUserWithPermissions): boolean {
+  const permission = getBankDetailsPermission(user)
+  return canUpdate(permission)
+}
+
+/**
+ * Check if a user can delete bank details
+ * User must have bank_details_permission with DELETE capability and access_level != none
+ */
+export function canDeleteBankDetails(user: IUserWithPermissions): boolean {
+  const permission = getBankDetailsPermission(user)
+  return canDelete(permission)
+}
+
+/**
+ * Check if a user has any bank details permission (access_level != none)
+ */
+export function hasAnyBankDetailsAccess(user: IUserWithPermissions): boolean {
+  const permission = getBankDetailsPermission(user)
+  return hasAnyAccess(permission)
+}
+
+/**
+ * Check if a user has full access to all bank details (access_level == all)
+ */
+export function hasFullBankDetailsAccess(user: IUserWithPermissions): boolean {
+  const permission = getBankDetailsPermission(user)
+  return hasFullAccess(permission)
+}
+
+/**
+ * Check if a user has partial access to bank details (access_level == partial)
+ * Partial access means user can only access bank details for properties they have access to
+ */
+export function hasPartialBankDetailsAccess(
+  user: IUserWithPermissions
+): boolean {
+  const permission = getBankDetailsPermission(user)
+  return requiresPartialCheck(permission)
+}
