@@ -68,13 +68,18 @@ export class AuthController {
   @Public(false)
   @HttpCode(HttpStatus.CREATED)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Invite a new user (requires authentication)' })
+  @ApiOperation({ summary: 'Invite a new user (requires authentication and user_permission.permission_level = all)' })
   @ApiResponse({ status: 201, description: 'User invited successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permission to invite users' })
   async inviteUser(
     @Body() body: InviteUserDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    const result = await this.authService.inviteUser(body, user.id)
+    const result = await this.authService.inviteUser(
+      body,
+      user.id,
+      user.role?.user_permission?.permission_level
+    )
     return {
       message: result.message,
       data: null

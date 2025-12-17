@@ -47,7 +47,11 @@ export interface IAuthRepository {
 export interface IAuthService {
   requestLoginOtp(email: string, password: string): Promise<{ message: string }>
   verifyLoginOtp(data: VerifyLoginOtpDto): Promise<AuthResponseDto>
-  inviteUser(data: InviteUserDto, inviterId: string): Promise<{ message: string }>
+  inviteUser(
+    data: InviteUserDto,
+    inviterId: string,
+    inviterRolePermissionLevel: string | undefined
+  ): Promise<{ message: string }>
   verifyInvitation(data: VerifyInvitationDto): Promise<AuthResponseDto>
   requestPasswordReset(email: string): Promise<{ message: string }>
   resetPassword(data: ResetPasswordDto): Promise<{ message: string }>
