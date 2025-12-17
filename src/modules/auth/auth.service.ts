@@ -119,7 +119,10 @@ export class AuthService implements IAuthService {
     return this.generateAuthResponse(userWithRole as unknown as UserWithRole)
   }
 
-  async inviteUser(data: InviteUserDto): Promise<{ message: string }> {
+  async inviteUser(
+    data: InviteUserDto,
+    inviterId: string
+  ): Promise<{ message: string }> {
     const existingUser = await this.authRepository.findUserByEmail(data.email)
 
     if (existingUser) {
@@ -140,7 +143,8 @@ export class AuthService implements IAuthService {
       user_role_id: data.role_id,
       password: hashedPassword,
       temp_password: tempPassword,
-      is_verified: false
+      is_verified: false,
+      invited_by_id: inviterId
     })
 
     if (data.portfolio_ids || data.property_ids) {

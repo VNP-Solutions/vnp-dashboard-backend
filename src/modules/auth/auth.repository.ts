@@ -74,6 +74,7 @@ export class AuthRepository implements IAuthRepository {
     password: string
     temp_password?: string
     is_verified: boolean
+    invited_by_id?: string
   }): Promise<User> {
     return this.prisma.user.create({
       data
