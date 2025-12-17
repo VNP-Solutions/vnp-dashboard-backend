@@ -6,7 +6,8 @@ import {
   Inject,
   Post
 } from '@nestjs/common'
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AuthResponseDto,
   InviteUserDto,
@@ -18,6 +19,7 @@ import {
   VerifyLoginOtpDto
 } from './auth.dto'
 import type { IAuthService } from './auth.interface'
+import { CurrentUser } from './decorators/current-user.decorator'
 import { Public } from './decorators/public.decorator'
 
 @ApiTags('Authentication')
@@ -63,11 +65,21 @@ export class AuthController {
   }
 
   @Post('invite')
+  @Public(false)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Invite a new user' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Invite a new user (requires authentication and user_permission.permission_level = all)' })
   @ApiResponse({ status: 201, description: 'User invited successfully' })
-  async inviteUser(@Body() body: InviteUserDto) {
-    const result = await this.authService.inviteUser(body)
+  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permission to invite users' })
+  async inviteUser(
+    @Body() body: InviteUserDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const result = await this.authService.inviteUser(
+      body,
+      user.id,
+      user.role?.user_permission?.permission_level
+    )
     return {
       message: result.message,
       data: null

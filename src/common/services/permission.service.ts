@@ -174,6 +174,15 @@ export class PermissionService {
 
     // For PARTIAL access, check UserAccessedProperty from DB
     if (permission.access_level === AccessLevel.partial) {
+      // USER module partial access: user can only see users they invited
+      if (module === ModuleType.USER) {
+        const invitedUsers = await this.prisma.user.findMany({
+          where: { invited_by_id: user.id },
+          select: { id: true }
+        })
+        return invitedUsers.map(u => u.id)
+      }
+
       const userAccessedProperties =
         await this.prisma.userAccessedProperty.findFirst({
           where: { user_id: user.id },
@@ -202,7 +211,7 @@ export class PermissionService {
         return userAccessedProperties.property_id || []
       }
 
-      // Other modules (AUDIT, USER, SYSTEM_SETTINGS) don't support partial access
+      // Other modules (AUDIT, SYSTEM_SETTINGS) don't support partial access
       // If a user has PARTIAL access to these modules, treat as no access
       return []
     }
@@ -235,13 +244,15 @@ export class PermissionService {
   /**
    * Validate if a module supports partial access
    * PORTFOLIO, PROPERTY, and BANK_DETAILS have resource-level access control via UserAccessedProperty
+   * USER module partial access: user can only see users they invited
    * Note: BANK_DETAILS partial access maps to PROPERTY access (user can only access bank details for properties they have access to)
    */
   moduleSupportsPartialAccess(module: ModuleType): boolean {
     return (
       module === ModuleType.PORTFOLIO ||
       module === ModuleType.PROPERTY ||
-      module === ModuleType.BANK_DETAILS
+      module === ModuleType.BANK_DETAILS ||
+      module === ModuleType.USER
     )
   }
 
@@ -272,7 +283,7 @@ export class PermissionService {
         !this.moduleSupportsPartialAccess(module)
       ) {
         warnings.push(
-          `${moduleName}: PARTIAL access_level is not supported. Only PORTFOLIO, PROPERTY, and BANK_DETAILS support partial access. This will behave as NO ACCESS.`
+          `${moduleName}: PARTIAL access_level is not supported. Only PORTFOLIO, PROPERTY, BANK_DETAILS, and USER support partial access. This will behave as NO ACCESS.`
         )
       }
 
@@ -368,6 +379,15 @@ export class PermissionService {
     module: ModuleType,
     resourceId: string
   ): Promise<boolean> {
+    // USER module partial access: check if the resource user was invited by current user
+    if (module === ModuleType.USER) {
+      const targetUser = await this.prisma.user.findUnique({
+        where: { id: resourceId },
+        select: { invited_by_id: true }
+      })
+      return targetUser?.invited_by_id === user.id
+    }
+
     const userAccessedProperties =
       await this.prisma.userAccessedProperty.findFirst({
         where: { user_id: user.id },
@@ -399,7 +419,7 @@ export class PermissionService {
       return propertyIds.includes(resourceId)
     }
 
-    // Other modules (AUDIT, USER, SYSTEM_SETTINGS) don't support partial access
+    // Other modules (AUDIT, SYSTEM_SETTINGS) don't support partial access
     // For these modules, PARTIAL access_level should not be used
     // If someone tries to use PARTIAL for these modules, deny access
     return false

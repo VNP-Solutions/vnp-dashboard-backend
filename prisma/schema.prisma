@@ -20,6 +20,9 @@ model User {
   contact_number String?
   is_verified    Boolean
   temp_password  String?
+  invited_by_id  String?  @db.ObjectId
+  invitedBy      User?    @relation("UserInvitedBy", fields: [invited_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  invitedUsers   User[]   @relation("UserInvitedBy")
 
   otps                      Otp[]
   userAccessedProperties    UserAccessedProperty[]
@@ -35,6 +38,7 @@ model User {
 
   @@index([user_role_id])
   @@index([is_verified])
+  @@index([invited_by_id])
 }
 
 model Portfolio {

@@ -9,6 +9,13 @@ import {
   UserQueryDto
 } from './user.dto'
 
+export type InvitedByUser = {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+}
+
 export type UserWithRole = Prisma.UserGetPayload<{
   select: {
     id: true
@@ -22,6 +29,7 @@ export type UserWithRole = Prisma.UserGetPayload<{
     contact_number: true
     created_at: true
     updated_at: true
+    invited_by_id: true
     role: {
       select: {
         id: true
@@ -33,6 +41,14 @@ export type UserWithRole = Prisma.UserGetPayload<{
         audit_permission: true
         user_permission: true
         system_settings_permission: true
+      }
+    }
+    invitedBy: {
+      select: {
+        id: true
+        first_name: true
+        last_name: true
+        email: true
       }
     }
   }
@@ -51,6 +67,7 @@ export type UserWithDetailsBase = Prisma.UserGetPayload<{
     contact_number: true
     created_at: true
     updated_at: true
+    invited_by_id: true
     role: {
       select: {
         id: true
@@ -62,6 +79,14 @@ export type UserWithDetailsBase = Prisma.UserGetPayload<{
         audit_permission: true
         user_permission: true
         system_settings_permission: true
+      }
+    }
+    invitedBy: {
+      select: {
+        id: true
+        first_name: true
+        last_name: true
+        email: true
       }
     }
     userAccessedProperties: {

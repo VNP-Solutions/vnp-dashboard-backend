@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException
@@ -119,7 +120,18 @@ export class AuthService implements IAuthService {
     return this.generateAuthResponse(userWithRole as unknown as UserWithRole)
   }
 
-  async inviteUser(data: InviteUserDto): Promise<{ message: string }> {
+  async inviteUser(
+    data: InviteUserDto,
+    inviterId: string,
+    inviterRolePermissionLevel: string | undefined
+  ): Promise<{ message: string }> {
+    // Check if user has permission to invite (permission_level must be 'all')
+    if (inviterRolePermissionLevel !== 'all') {
+      throw new ForbiddenException(
+        'You do not have permission to invite users. Only users with full user management permission can invite.'
+      )
+    }
+
     const existingUser = await this.authRepository.findUserByEmail(data.email)
 
     if (existingUser) {
@@ -140,7 +152,8 @@ export class AuthService implements IAuthService {
       user_role_id: data.role_id,
       password: hashedPassword,
       temp_password: tempPassword,
-      is_verified: false
+      is_verified: false,
+      invited_by_id: inviterId
     })
 
     if (data.portfolio_ids || data.property_ids) {

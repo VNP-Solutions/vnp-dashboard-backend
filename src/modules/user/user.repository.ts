@@ -34,6 +34,7 @@ export class UserRepository implements IUserRepository {
         contact_number: true,
         created_at: true,
         updated_at: true,
+        invited_by_id: true,
         role: {
           select: {
             id: true,
@@ -45,6 +46,14 @@ export class UserRepository implements IUserRepository {
             audit_permission: true,
             user_permission: true,
             system_settings_permission: true
+          }
+        },
+        invitedBy: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true
           }
         }
       }
@@ -72,6 +81,7 @@ export class UserRepository implements IUserRepository {
         contact_number: true,
         created_at: true,
         updated_at: true,
+        invited_by_id: true,
         role: {
           select: {
             id: true,
@@ -83,6 +93,14 @@ export class UserRepository implements IUserRepository {
             audit_permission: true,
             user_permission: true,
             system_settings_permission: true
+          }
+        },
+        invitedBy: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true
           }
         },
         userAccessedProperties: {
@@ -149,6 +167,7 @@ export class UserRepository implements IUserRepository {
         contact_number: true,
         created_at: true,
         updated_at: true,
+        invited_by_id: true,
         role: {
           select: {
             id: true,
@@ -160,6 +179,14 @@ export class UserRepository implements IUserRepository {
             audit_permission: true,
             user_permission: true,
             system_settings_permission: true
+          }
+        },
+        invitedBy: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true
           }
         }
       }
