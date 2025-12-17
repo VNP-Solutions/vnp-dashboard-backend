@@ -174,6 +174,12 @@ export class PermissionService {
 
     // For PARTIAL access, check UserAccessedProperty from DB
     if (permission.access_level === AccessLevel.partial) {
+      // SYSTEM_SETTINGS: partial access behaves same as 'all' access
+      // All system settings are available regardless of access level (except 'none')
+      if (module === ModuleType.SYSTEM_SETTINGS) {
+        return 'all'
+      }
+
       // USER module partial access: user can only see users they invited
       if (module === ModuleType.USER) {
         const invitedUsers = await this.prisma.user.findMany({
@@ -211,8 +217,8 @@ export class PermissionService {
         return userAccessedProperties.property_id || []
       }
 
-      // Other modules (AUDIT, SYSTEM_SETTINGS) don't support partial access
-      // If a user has PARTIAL access to these modules, treat as no access
+      // AUDIT module doesn't support partial access
+      // If a user has PARTIAL access to AUDIT, treat as no access
       return []
     }
 
@@ -245,6 +251,7 @@ export class PermissionService {
    * Validate if a module supports partial access
    * PORTFOLIO, PROPERTY, and BANK_DETAILS have resource-level access control via UserAccessedProperty
    * USER module partial access: user can only see users they invited
+   * SYSTEM_SETTINGS partial access: behaves same as 'all' access (all settings available)
    * Note: BANK_DETAILS partial access maps to PROPERTY access (user can only access bank details for properties they have access to)
    */
   moduleSupportsPartialAccess(module: ModuleType): boolean {
@@ -252,7 +259,8 @@ export class PermissionService {
       module === ModuleType.PORTFOLIO ||
       module === ModuleType.PROPERTY ||
       module === ModuleType.BANK_DETAILS ||
-      module === ModuleType.USER
+      module === ModuleType.USER ||
+      module === ModuleType.SYSTEM_SETTINGS
     )
   }
 
@@ -283,15 +291,17 @@ export class PermissionService {
         !this.moduleSupportsPartialAccess(module)
       ) {
         warnings.push(
-          `${moduleName}: PARTIAL access_level is not supported. Only PORTFOLIO, PROPERTY, BANK_DETAILS, and USER support partial access. This will behave as NO ACCESS.`
+          `${moduleName}: PARTIAL access_level is not supported. Only PORTFOLIO, PROPERTY, BANK_DETAILS, USER, and SYSTEM_SETTINGS support partial access. This will behave as NO ACCESS.`
         )
       }
 
       // Warn about potential CREATE issues with PARTIAL access
+      // Skip for SYSTEM_SETTINGS since partial access behaves same as 'all' (no resource assignment)
       if (
         permission.access_level === AccessLevel.partial &&
         (permission.permission_level === PermissionLevel.all ||
-          permission.permission_level === PermissionLevel.update)
+          permission.permission_level === PermissionLevel.update) &&
+        module !== ModuleType.SYSTEM_SETTINGS
       ) {
         warnings.push(
           `${moduleName}: Users can CREATE resources and will automatically gain access to them through UserAccessedProperty.`
@@ -379,6 +389,12 @@ export class PermissionService {
     module: ModuleType,
     resourceId: string
   ): Promise<boolean> {
+    // SYSTEM_SETTINGS: partial access behaves same as 'all' access
+    // All system settings are available regardless of access level (except 'none')
+    if (module === ModuleType.SYSTEM_SETTINGS) {
+      return true
+    }
+
     // USER module partial access: check if the resource user was invited by current user
     if (module === ModuleType.USER) {
       const targetUser = await this.prisma.user.findUnique({
@@ -419,9 +435,8 @@ export class PermissionService {
       return propertyIds.includes(resourceId)
     }
 
-    // Other modules (AUDIT, SYSTEM_SETTINGS) don't support partial access
-    // For these modules, PARTIAL access_level should not be used
-    // If someone tries to use PARTIAL for these modules, deny access
+    // AUDIT module doesn't support partial access
+    // If someone tries to use PARTIAL for AUDIT, deny access
     return false
   }
 
