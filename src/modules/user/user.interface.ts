@@ -30,6 +30,7 @@ export type UserWithRole = Prisma.UserGetPayload<{
     created_at: true
     updated_at: true
     invited_by_id: true
+    invitation_sent_at: true
     role: {
       select: {
         id: true
@@ -68,6 +69,7 @@ export type UserWithDetailsBase = Prisma.UserGetPayload<{
     created_at: true
     updated_at: true
     invited_by_id: true
+    invitation_sent_at: true
     role: {
       select: {
         id: true

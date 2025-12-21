@@ -35,6 +35,7 @@ export class UserRepository implements IUserRepository {
         created_at: true,
         updated_at: true,
         invited_by_id: true,
+        invitation_sent_at: true,
         role: {
           select: {
             id: true,
@@ -82,6 +83,7 @@ export class UserRepository implements IUserRepository {
         created_at: true,
         updated_at: true,
         invited_by_id: true,
+        invitation_sent_at: true,
         role: {
           select: {
             id: true,
@@ -168,6 +170,7 @@ export class UserRepository implements IUserRepository {
         created_at: true,
         updated_at: true,
         invited_by_id: true,
+        invitation_sent_at: true,
         role: {
           select: {
             id: true,
