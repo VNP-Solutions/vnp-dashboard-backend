@@ -153,7 +153,8 @@ export class AuthService implements IAuthService {
       password: hashedPassword,
       temp_password: tempPassword,
       is_verified: false,
-      invited_by_id: inviterId
+      invited_by_id: inviterId,
+      invitation_sent_at: new Date()
     })
 
     if (data.portfolio_ids || data.property_ids) {
@@ -186,6 +187,93 @@ export class AuthService implements IAuthService {
 
     return {
       message: `Invitation sent successfully. Temporary password is valid for ${expiryDays} days.`
+    }
+  }
+
+  async resendInvitation(
+    email: string,
+    inviterRolePermissionLevel: string | undefined
+  ): Promise<{ message: string }> {
+    // Check if user has permission to resend invitation (permission_level must be 'all')
+    if (inviterRolePermissionLevel !== 'all') {
+      throw new ForbiddenException(
+        'You do not have permission to resend invitations. Only users with full user management permission can resend.'
+      )
+    }
+
+    const user = await this.authRepository.findUserByEmail(email)
+
+    if (!user) {
+      throw new BadRequestException('User not found')
+    }
+
+    // Check if user has a pending invitation (temp_password exists and is_verified is false)
+    if (!user.temp_password || user.is_verified) {
+      throw new BadRequestException(
+        'No pending invitation found for this user. The user may have already verified their account.'
+      )
+    }
+
+    // Check 5-minute cooldown
+    const COOLDOWN_MINUTES = 5
+    if (user.invitation_sent_at) {
+      const timeSinceLastInvitation =
+        Date.now() - new Date(user.invitation_sent_at).getTime()
+      const cooldownMs = COOLDOWN_MINUTES * 60 * 1000
+
+      if (timeSinceLastInvitation < cooldownMs) {
+        const remainingSeconds = Math.ceil(
+          (cooldownMs - timeSinceLastInvitation) / 1000
+        )
+        const remainingMinutes = Math.floor(remainingSeconds / 60)
+        const remainingSecs = remainingSeconds % 60
+
+        throw new BadRequestException(
+          `Please wait ${remainingMinutes}m ${remainingSecs}s before resending the invitation.`
+        )
+      }
+    }
+
+    // Generate new temporary password
+    const tempPassword = EncryptionUtil.generateTempPassword()
+    const hashedPassword = await EncryptionUtil.hashPassword(tempPassword)
+    const expiryDays = this.configService.get('auth.tempPasswordExpiryDays', {
+      infer: true
+    })!
+
+    // Update user with new temp password and invitation sent timestamp
+    await this.authRepository.updateUserPassword(user.id, hashedPassword)
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        temp_password: tempPassword,
+        invitation_sent_at: new Date()
+      }
+    })
+
+    // Fetch role details to get is_external flag
+    const role = await this.prisma.userRole.findUnique({
+      where: { id: user.user_role_id },
+      select: { name: true, is_external: true }
+    })
+
+    if (!role) {
+      throw new Error('Role not found')
+    }
+
+    // Send invitation email
+    await this.emailUtil.sendInvitationEmail(
+      user.email,
+      tempPassword,
+      role.name,
+      user.first_name,
+      role.is_external
+    )
+
+    console.log(`Invitation resent to ${email}. Temp password: ${tempPassword}`)
+
+    return {
+      message: `Invitation resent successfully. Temporary password is valid for ${expiryDays} days.`
     }
   }
 

@@ -14,6 +14,7 @@ import {
   LoginRequestOtpDto,
   RefreshTokenDto,
   RequestPasswordResetDto,
+  ResendInvitationDto,
   ResetPasswordDto,
   VerifyInvitationDto,
   VerifyLoginOtpDto
@@ -78,6 +79,37 @@ export class AuthController {
     const result = await this.authService.inviteUser(
       body,
       user.id,
+      user.role?.user_permission?.permission_level
+    )
+    return {
+      message: result.message,
+      data: null
+    }
+  }
+
+  @Post('resend-invitation')
+  @Public(false)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Resend invitation email (requires authentication and user_permission.permission_level = all)'
+  })
+  @ApiResponse({ status: 200, description: 'Invitation resent successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'No pending invitation or cooldown not elapsed (5 minutes)'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permission to resend invitations'
+  })
+  async resendInvitation(
+    @Body() body: ResendInvitationDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const result = await this.authService.resendInvitation(
+      body.email,
       user.role?.user_permission?.permission_level
     )
     return {

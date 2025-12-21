@@ -18,9 +18,10 @@ model User {
   password       String
   display_image  String?
   contact_number String?
-  is_verified    Boolean
-  temp_password  String?
-  invited_by_id  String?  @db.ObjectId
+  is_verified          Boolean
+  temp_password        String?
+  invitation_sent_at   DateTime?
+  invited_by_id        String?  @db.ObjectId
   invitedBy      User?    @relation("UserInvitedBy", fields: [invited_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   invitedUsers   User[]   @relation("UserInvitedBy")
 

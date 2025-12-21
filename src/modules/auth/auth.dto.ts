@@ -100,6 +100,16 @@ export class InviteUserDto {
   property_ids?: string[]
 }
 
+export class ResendInvitationDto {
+  @ApiProperty({
+    example: 'user@example.com',
+    description: 'Email address of the user to resend invitation to'
+  })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string
+}
+
 export class VerifyInvitationDto {
   @ApiProperty({
     example: 'user@example.com',
