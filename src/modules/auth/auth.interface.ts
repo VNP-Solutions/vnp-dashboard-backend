@@ -34,6 +34,7 @@ export interface IAuthRepository {
     temp_password?: string
     is_verified: boolean
     invited_by_id?: string
+    invitation_sent_at?: Date
   }): Promise<User>
   updateUserPassword(userId: string, password: string): Promise<void>
   clearTempPassword(userId: string): Promise<void>
@@ -42,6 +43,7 @@ export interface IAuthRepository {
     portfolioIds: string[],
     propertyIds: string[]
   ): Promise<void>
+  updateInvitationSentAt(userId: string): Promise<void>
 }
 
 export interface IAuthService {
@@ -50,6 +52,10 @@ export interface IAuthService {
   inviteUser(
     data: InviteUserDto,
     inviterId: string,
+    inviterRolePermissionLevel: string | undefined
+  ): Promise<{ message: string }>
+  resendInvitation(
+    email: string,
     inviterRolePermissionLevel: string | undefined
   ): Promise<{ message: string }>
   verifyInvitation(data: VerifyInvitationDto): Promise<AuthResponseDto>

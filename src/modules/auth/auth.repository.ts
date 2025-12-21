@@ -75,6 +75,7 @@ export class AuthRepository implements IAuthRepository {
     temp_password?: string
     is_verified: boolean
     invited_by_id?: string
+    invitation_sent_at?: Date
   }): Promise<User> {
     return this.prisma.user.create({
       data
@@ -106,6 +107,13 @@ export class AuthRepository implements IAuthRepository {
         portfolio_id: portfolioIds,
         property_id: propertyIds
       }
+    })
+  }
+
+  async updateInvitationSentAt(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { invitation_sent_at: new Date() }
     })
   }
 }
