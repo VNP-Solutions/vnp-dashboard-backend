@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type, Transform } from 'class-transformer'
 import {
+  Allow,
   IsArray,
   IsEnum,
   IsInt,
@@ -39,6 +40,7 @@ export class ColumnFilterDto {
       'Filter value. For "between" operator, use {from: value, to: value}. For "in" operator, use array.',
     example: 'Marriott'
   })
+  @Allow()
   value: any
 }
 
@@ -219,8 +221,17 @@ export class ReportRowDto {
   @ApiPropertyOptional({ description: 'Portfolio Contact Email' })
   portfolioContactEmail: string | null
 
-  @ApiPropertyOptional({ description: 'Service Type' })
+  @ApiPropertyOptional({ description: 'Service Type (Posting Type)' })
   serviceType: string | null
+
+  @ApiPropertyOptional({ description: 'OTA ID (computed based on otaType)' })
+  otaId: string | null
+
+  @ApiPropertyOptional({ description: 'OTA Username (computed based on otaType)' })
+  otaUsername: string | null
+
+  @ApiPropertyOptional({ description: 'OTA Password (computed based on otaType)' })
+  otaPassword: string | null
 
   @ApiPropertyOptional({ description: 'Expedia ID' })
   expediaId: string | null

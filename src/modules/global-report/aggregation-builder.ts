@@ -540,15 +540,17 @@ export class AggregationBuilder {
       'property.card_descriptor': 1,
       'property.portfolio_id': 1,
 
-      // Credentials - OTA IDs and usernames only, NO passwords
+      // Credentials - OTA IDs, usernames, and passwords
       'credentials._id': 1,
       'credentials.expedia_id': 1,
       'credentials.expedia_username': 1,
+      'credentials.expedia_password': 1,
       'credentials.agoda_id': 1,
       'credentials.agoda_username': 1,
+      'credentials.agoda_password': 1,
       'credentials.booking_id': 1,
       'credentials.booking_username': 1,
-      // Note: Passwords are NOT included
+      'credentials.booking_password': 1,
 
       // Bank Details - bank_type only, NO account numbers
       'bankDetails._id': 1,

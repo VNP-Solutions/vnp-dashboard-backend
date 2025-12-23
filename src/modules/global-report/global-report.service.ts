@@ -197,9 +197,17 @@ export class GlobalReportService implements IGlobalReportService {
    * Transform raw MongoDB document to ReportRowDto
    */
   private transformToReportRow(doc: any): ReportRowDto {
+    const otaType = doc.type_of_ota || null
+    const credentials = doc.credentials || {}
+
+    // Compute OTA ID, Username and Password based on otaType
+    const otaId = this.getOtaField(otaType, credentials, 'id')
+    const otaUsername = this.getOtaField(otaType, credentials, 'username')
+    const otaPassword = this.getOtaField(otaType, credentials, 'password')
+
     return {
       auditId: this.extractId(doc._id),
-      otaType: doc.type_of_ota || null,
+      otaType,
       billingType: doc.billing_type || null,
       startDate: doc.start_date ? new Date(doc.start_date) : null,
       endDate: doc.end_date ? new Date(doc.end_date) : null,
@@ -224,16 +232,38 @@ export class GlobalReportService implements IGlobalReportService {
       portfolioName: doc.portfolio?.name || '',
       portfolioContactEmail: doc.portfolio?.contact_email || null,
       serviceType: doc.serviceType?.type || null,
-      expediaId: doc.credentials?.expedia_id || null,
-      expediaUsername: doc.credentials?.expedia_username || null,
-      agodaId: doc.credentials?.agoda_id || null,
-      agodaUsername: doc.credentials?.agoda_username || null,
-      bookingId: doc.credentials?.booking_id || null,
-      bookingUsername: doc.credentials?.booking_username || null,
+      otaId,
+      otaUsername,
+      otaPassword,
+      expediaId: credentials.expedia_id || null,
+      expediaUsername: credentials.expedia_username || null,
+      agodaId: credentials.agoda_id || null,
+      agodaUsername: credentials.agoda_username || null,
+      bookingId: credentials.booking_id || null,
+      bookingUsername: credentials.booking_username || null,
       bankType: doc.bankDetails?.bank_type || null,
       reportUrl: doc.report_url || null,
       auditCreatedAt: doc.created_at ? new Date(doc.created_at) : new Date(),
       auditUpdatedAt: doc.updated_at ? new Date(doc.updated_at) : new Date()
+    }
+  }
+
+  /**
+   * Get OTA-specific field (id, username, or password) based on otaType
+   */
+  private getOtaField(otaType: string | null, credentials: any, fieldType: 'id' | 'username' | 'password'): string | null {
+    if (!otaType) return null
+
+    const otaLower = otaType.toLowerCase()
+    switch (otaLower) {
+      case 'expedia':
+        return credentials[`expedia_${fieldType}`] || null
+      case 'agoda':
+        return credentials[`agoda_${fieldType}`] || null
+      case 'booking':
+        return credentials[`booking_${fieldType}`] || null
+      default:
+        return null
     }
   }
 

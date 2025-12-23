@@ -545,6 +545,41 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP, SERVICE_TYPE_LOOKUP]
   },
 
+  // ==================== COMPUTED OTA FIELDS (virtual - computed in service) ====================
+
+  otaId: {
+    key: 'otaId',
+    label: 'OTA ID',
+    dataType: ColumnDataType.STRING,
+    filterable: false, // Cannot filter on computed field
+    sortable: false,
+    source: 'credentials',
+    fieldPath: 'credentials.expedia_id', // Placeholder - computed in service
+    allowedOperators: []
+  },
+
+  otaUsername: {
+    key: 'otaUsername',
+    label: 'OTA Username',
+    dataType: ColumnDataType.STRING,
+    filterable: false, // Cannot filter on computed field
+    sortable: false,
+    source: 'credentials',
+    fieldPath: 'credentials.expedia_username', // Placeholder - computed in service
+    allowedOperators: []
+  },
+
+  otaPassword: {
+    key: 'otaPassword',
+    label: 'OTA Password',
+    dataType: ColumnDataType.STRING,
+    filterable: false, // Cannot filter on computed field
+    sortable: false,
+    source: 'credentials',
+    fieldPath: 'credentials.expedia_password', // Placeholder - computed in service
+    allowedOperators: []
+  },
+
   // ==================== CREDENTIALS - OTA IDs and Usernames (NO passwords) ====================
 
   expediaId: {
