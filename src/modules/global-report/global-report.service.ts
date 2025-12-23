@@ -238,13 +238,11 @@ export class GlobalReportService implements IGlobalReportService {
       // 7. OTA Review Status
       auditStatus: doc.auditStatus?.status || null,
       // 8. Start Date
-      startDate: doc.start_date ? new Date(doc.start_date) : null,
+      startDate: this.extractDate(doc.start_date),
       // 9. End Date
-      endDate: doc.end_date ? new Date(doc.end_date) : null,
+      endDate: this.extractDate(doc.end_date),
       // 10. Next Due Date
-      nextDueDate: doc.property?.next_due_date
-        ? new Date(doc.property.next_due_date)
-        : null,
+      nextDueDate: this.extractDate(doc.property?.next_due_date),
       // 11. Currency
       currency: doc.currency?.code || '',
       // 12. Amount Collectable
@@ -258,6 +256,36 @@ export class GlobalReportService implements IGlobalReportService {
       // 16. OTA Password
       otaPassword
     }
+  }
+
+  /**
+   * Extract Date from MongoDB extended JSON format or plain value
+   * MongoDB aggregateRaw returns dates as { $date: "ISO_STRING" } or { $date: { $numberLong: "timestamp" } }
+   */
+  private extractDate(value: any): Date | null {
+    if (!value) return null
+
+    // Handle MongoDB extended JSON date format: { $date: "2024-01-01T00:00:00Z" }
+    if (typeof value === 'object' && value.$date) {
+      // Could be string ISO date or { $numberLong: "timestamp" }
+      if (typeof value.$date === 'string') {
+        return new Date(value.$date)
+      }
+      if (typeof value.$date === 'object' && value.$date.$numberLong) {
+        return new Date(parseInt(value.$date.$numberLong, 10))
+      }
+    }
+
+    // Handle plain Date object or ISO string
+    if (value instanceof Date) {
+      return value
+    }
+
+    if (typeof value === 'string') {
+      return new Date(value)
+    }
+
+    return null
   }
 
   /**
