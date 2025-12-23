@@ -111,14 +111,19 @@ export class AggregationBuilder {
       columnsUsed.push(sort.column)
     }
 
-    // Always include essential lookups for display
+    // Always include essential lookups for display of required fields
     columnsUsed.push(
       'propertyName',
       'portfolioName',
       'currency',
       'auditStatus',
-      'serviceType'
+      'serviceType',
+      'portfolioContactEmail',
+      'nextDueDate'
     )
+
+    // Always need credentials for OTA ID/Username/Password
+    this.requiredLookups.add('credentials')
 
     const lookups = getRequiredLookups(columnsUsed)
     lookups.forEach(lookup => this.requiredLookups.add(lookup.as))
@@ -160,10 +165,8 @@ export class AggregationBuilder {
     // Define lookup order to handle dependencies
     const lookupOrder = [
       'auditStatus',
-      'batch',
       'property',
       'credentials',
-      'bankDetails',
       'portfolio',
       'currency',
       'serviceType'
@@ -180,17 +183,6 @@ export class AggregationBuilder {
               localField: 'audit_status_id',
               foreignField: '_id',
               as: 'auditStatus'
-            }
-          })
-          break
-
-        case 'batch':
-          this.pipeline.push({
-            $lookup: {
-              from: 'AuditBatch',
-              localField: 'batch_id',
-              foreignField: '_id',
-              as: 'batch'
             }
           })
           break
@@ -214,17 +206,6 @@ export class AggregationBuilder {
               localField: 'property._id',
               foreignField: 'property_id',
               as: 'credentials'
-            }
-          })
-          break
-
-        case 'bankDetails':
-          this.pipeline.push({
-            $lookup: {
-              from: 'PropertyBankDetails',
-              localField: 'property._id',
-              foreignField: 'property_id',
-              as: 'bankDetails'
             }
           })
           break
@@ -271,10 +252,8 @@ export class AggregationBuilder {
   private addUnwindStages(): void {
     const unwindFields = [
       'auditStatus',
-      'batch',
       'property',
       'credentials',
-      'bankDetails',
       'portfolio',
       'currency',
       'serviceType'
@@ -501,47 +480,31 @@ export class AggregationBuilder {
   }
 
   /**
-   * Build $project stage to exclude sensitive fields and shape output
+   * Build $project stage for the 16 required fields only
+   *
+   * Fields: portfolio, property, service type, billing type, ota type, ota id,
+   * ota review status, start date, end date, next due date, currency,
+   * amount collectable, amount confirmed, portfolio contact email,
+   * ota username, ota password
    */
   private buildProjection(): any {
     return {
-      // Audit fields
-      _id: 1,
+      // Audit fields needed
       type_of_ota: 1,
       billing_type: 1,
-      amount_collectable: 1,
-      amount_confirmed: 1,
-      is_archived: 1,
       start_date: 1,
       end_date: 1,
-      report_url: 1,
-      created_at: 1,
-      updated_at: 1,
-      property_id: 1,
-      audit_status_id: 1,
-      batch_id: 1,
+      amount_collectable: 1,
+      amount_confirmed: 1,
 
-      // Audit Status
-      'auditStatus._id': 1,
+      // Audit Status (OTA Review Status)
       'auditStatus.status': 1,
-      'auditStatus.order': 1,
 
-      // Batch
-      'batch._id': 1,
-      'batch.batch_no': 1,
-      'batch.order': 1,
-
-      // Property - exclude sensitive data
-      'property._id': 1,
+      // Property
       'property.name': 1,
-      'property.address': 1,
-      'property.is_active': 1,
       'property.next_due_date': 1,
-      'property.card_descriptor': 1,
-      'property.portfolio_id': 1,
 
       // Credentials - OTA IDs, usernames, and passwords
-      'credentials._id': 1,
       'credentials.expedia_id': 1,
       'credentials.expedia_username': 1,
       'credentials.expedia_password': 1,
@@ -552,28 +515,14 @@ export class AggregationBuilder {
       'credentials.booking_username': 1,
       'credentials.booking_password': 1,
 
-      // Bank Details - bank_type only, NO account numbers
-      'bankDetails._id': 1,
-      'bankDetails.bank_type': 1,
-      'bankDetails.bank_sub_type': 1,
-      // Note: Account numbers, routing numbers etc are NOT included
-
       // Currency
-      'currency._id': 1,
       'currency.code': 1,
-      'currency.name': 1,
-      'currency.symbol': 1,
 
       // Portfolio
-      'portfolio._id': 1,
       'portfolio.name': 1,
       'portfolio.contact_email': 1,
-      'portfolio.is_active': 1,
-      'portfolio.is_commissionable': 1,
-      'portfolio.sales_agent': 1,
 
       // Service Type
-      'serviceType._id': 1,
       'serviceType.type': 1
     }
   }

@@ -45,9 +45,7 @@ export type LookupSource =
   | 'property'
   | 'portfolio'
   | 'credentials'
-  | 'bankDetails'
   | 'auditStatus'
-  | 'batch'
   | 'currency'
   | 'serviceType'
 
@@ -113,10 +111,6 @@ const ENUM_OPERATORS = [
   FilterOperator.IS_NOT_NULL
 ]
 
-const BOOLEAN_OPERATORS = [FilterOperator.EQ]
-
-const OBJECT_ID_OPERATORS = [FilterOperator.EQ, FilterOperator.IN]
-
 // Lookup configurations for related collections
 const PROPERTY_LOOKUP: LookupConfig = {
   from: 'Property',
@@ -132,32 +126,11 @@ const PORTFOLIO_LOOKUP: LookupConfig = {
   as: 'portfolio'
 }
 
-const CREDENTIALS_LOOKUP: LookupConfig = {
-  from: 'PropertyCredentials',
-  localField: 'property._id',
-  foreignField: 'property_id',
-  as: 'credentials'
-}
-
-const BANK_DETAILS_LOOKUP: LookupConfig = {
-  from: 'PropertyBankDetails',
-  localField: 'property._id',
-  foreignField: 'property_id',
-  as: 'bankDetails'
-}
-
 const AUDIT_STATUS_LOOKUP: LookupConfig = {
   from: 'AuditStatus',
   localField: 'audit_status_id',
   foreignField: '_id',
   as: 'auditStatus'
-}
-
-const BATCH_LOOKUP: LookupConfig = {
-  from: 'AuditBatch',
-  localField: 'batch_id',
-  foreignField: '_id',
-  as: 'batch'
 }
 
 const CURRENCY_LOOKUP: LookupConfig = {
@@ -176,301 +149,27 @@ const SERVICE_TYPE_LOOKUP: LookupConfig = {
 
 /**
  * All reportable columns for the Global Report API
+ *
+ * Fields included:
+ * - portfolio
+ * - property
+ * - service type
+ * - billing type
+ * - ota type
+ * - ota id
+ * - ota review status
+ * - start date
+ * - end date
+ * - next due date
+ * - currency
+ * - amount collectable
+ * - amount confirmed
+ * - portfolio contact email
+ * - ota username
+ * - ota password
  */
 export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
-  // ==================== AUDIT FIELDS (no lookup needed) ====================
-
-  auditId: {
-    key: 'auditId',
-    label: 'Audit ID',
-    dataType: ColumnDataType.OBJECT_ID,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: '_id',
-    allowedOperators: OBJECT_ID_OPERATORS
-  },
-
-  otaType: {
-    key: 'otaType',
-    label: 'OTA Type',
-    dataType: ColumnDataType.ENUM,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'type_of_ota',
-    allowedOperators: ENUM_OPERATORS,
-    enumValues: ['expedia', 'agoda', 'booking']
-  },
-
-  billingType: {
-    key: 'billingType',
-    label: 'Billing Type',
-    dataType: ColumnDataType.ENUM,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'billing_type',
-    allowedOperators: ENUM_OPERATORS,
-    enumValues: ['VCC', 'DB', 'EBS']
-  },
-
-  startDate: {
-    key: 'startDate',
-    label: 'Start Date',
-    dataType: ColumnDataType.DATE,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'start_date',
-    allowedOperators: DATE_OPERATORS
-  },
-
-  endDate: {
-    key: 'endDate',
-    label: 'End Date',
-    dataType: ColumnDataType.DATE,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'end_date',
-    allowedOperators: DATE_OPERATORS
-  },
-
-  amountCollectable: {
-    key: 'amountCollectable',
-    label: 'Amount Collectable',
-    dataType: ColumnDataType.NUMBER,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'amount_collectable',
-    allowedOperators: NUMBER_OPERATORS
-  },
-
-  amountConfirmed: {
-    key: 'amountConfirmed',
-    label: 'Amount Confirmed',
-    dataType: ColumnDataType.NUMBER,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'amount_confirmed',
-    allowedOperators: NUMBER_OPERATORS
-  },
-
-  isArchived: {
-    key: 'isArchived',
-    label: 'Is Archived',
-    dataType: ColumnDataType.BOOLEAN,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'is_archived',
-    allowedOperators: BOOLEAN_OPERATORS
-  },
-
-  auditCreatedAt: {
-    key: 'auditCreatedAt',
-    label: 'Audit Created At',
-    dataType: ColumnDataType.DATE,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'created_at',
-    allowedOperators: DATE_OPERATORS
-  },
-
-  auditUpdatedAt: {
-    key: 'auditUpdatedAt',
-    label: 'Audit Updated At',
-    dataType: ColumnDataType.DATE,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'updated_at',
-    allowedOperators: DATE_OPERATORS
-  },
-
-  reportUrl: {
-    key: 'reportUrl',
-    label: 'Report URL',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: false,
-    source: 'audit',
-    fieldPath: 'report_url',
-    allowedOperators: [
-      FilterOperator.EQ,
-      FilterOperator.CONTAINS,
-      FilterOperator.IS_NULL,
-      FilterOperator.IS_NOT_NULL
-    ]
-  },
-
-  // ==================== AUDIT STATUS (requires lookup) ====================
-
-  auditStatus: {
-    key: 'auditStatus',
-    label: 'OTA Review Status',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'auditStatus',
-    fieldPath: 'auditStatus.status',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [AUDIT_STATUS_LOOKUP]
-  },
-
-  auditStatusId: {
-    key: 'auditStatusId',
-    label: 'Audit Status ID',
-    dataType: ColumnDataType.OBJECT_ID,
-    filterable: true,
-    sortable: false,
-    source: 'audit',
-    fieldPath: 'audit_status_id',
-    allowedOperators: OBJECT_ID_OPERATORS
-  },
-
-  // ==================== BATCH (requires lookup) ====================
-
-  batchNo: {
-    key: 'batchNo',
-    label: 'Batch No',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'batch',
-    fieldPath: 'batch.batch_no',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [BATCH_LOOKUP]
-  },
-
-  batchId: {
-    key: 'batchId',
-    label: 'Batch ID',
-    dataType: ColumnDataType.OBJECT_ID,
-    filterable: true,
-    sortable: false,
-    source: 'audit',
-    fieldPath: 'batch_id',
-    allowedOperators: [...OBJECT_ID_OPERATORS, FilterOperator.IS_NULL, FilterOperator.IS_NOT_NULL]
-  },
-
-  // ==================== PROPERTY (requires lookup) ====================
-
-  propertyId: {
-    key: 'propertyId',
-    label: 'Property ID',
-    dataType: ColumnDataType.OBJECT_ID,
-    filterable: true,
-    sortable: false,
-    source: 'audit',
-    fieldPath: 'property_id',
-    allowedOperators: OBJECT_ID_OPERATORS
-  },
-
-  propertyName: {
-    key: 'propertyName',
-    label: 'Property Name',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'property',
-    fieldPath: 'property.name',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP]
-  },
-
-  propertyAddress: {
-    key: 'propertyAddress',
-    label: 'Property Address',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'property',
-    fieldPath: 'property.address',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP]
-  },
-
-  propertyIsActive: {
-    key: 'propertyIsActive',
-    label: 'Property Active',
-    dataType: ColumnDataType.BOOLEAN,
-    filterable: true,
-    sortable: false,
-    source: 'property',
-    fieldPath: 'property.is_active',
-    allowedOperators: BOOLEAN_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP]
-  },
-
-  nextDueDate: {
-    key: 'nextDueDate',
-    label: 'Next Due Date',
-    dataType: ColumnDataType.DATE,
-    filterable: true,
-    sortable: true,
-    source: 'property',
-    fieldPath: 'property.next_due_date',
-    allowedOperators: DATE_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP]
-  },
-
-  cardDescriptor: {
-    key: 'cardDescriptor',
-    label: 'Card Descriptor',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'property',
-    fieldPath: 'property.card_descriptor',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP]
-  },
-
-  // ==================== CURRENCY (requires property + currency lookup) ====================
-
-  currency: {
-    key: 'currency',
-    label: 'Currency',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'currency',
-    fieldPath: 'currency.code',
-    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.NEQ],
-    requiresLookup: [PROPERTY_LOOKUP, CURRENCY_LOOKUP]
-  },
-
-  currencyName: {
-    key: 'currencyName',
-    label: 'Currency Name',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: false,
-    source: 'currency',
-    fieldPath: 'currency.name',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, CURRENCY_LOOKUP]
-  },
-
-  // ==================== PORTFOLIO (requires property + portfolio lookup) ====================
-
-  portfolioId: {
-    key: 'portfolioId',
-    label: 'Portfolio ID',
-    dataType: ColumnDataType.OBJECT_ID,
-    filterable: true,
-    sortable: false,
-    source: 'property',
-    fieldPath: 'property.portfolio_id',
-    allowedOperators: OBJECT_ID_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP]
-  },
-
+  // Portfolio Name
   portfolioName: {
     key: 'portfolioName',
     label: 'Portfolio',
@@ -483,56 +182,20 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP]
   },
 
-  portfolioContactEmail: {
-    key: 'portfolioContactEmail',
-    label: 'Portfolio Contact Email',
+  // Property Name
+  propertyName: {
+    key: 'propertyName',
+    label: 'Property',
     dataType: ColumnDataType.STRING,
     filterable: true,
     sortable: true,
-    source: 'portfolio',
-    fieldPath: 'portfolio.contact_email',
+    source: 'property',
+    fieldPath: 'property.name',
     allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP]
+    requiresLookup: [PROPERTY_LOOKUP]
   },
 
-  portfolioIsActive: {
-    key: 'portfolioIsActive',
-    label: 'Portfolio Active',
-    dataType: ColumnDataType.BOOLEAN,
-    filterable: true,
-    sortable: false,
-    source: 'portfolio',
-    fieldPath: 'portfolio.is_active',
-    allowedOperators: BOOLEAN_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP]
-  },
-
-  portfolioIsCommissionable: {
-    key: 'portfolioIsCommissionable',
-    label: 'Is Commissionable',
-    dataType: ColumnDataType.BOOLEAN,
-    filterable: true,
-    sortable: false,
-    source: 'portfolio',
-    fieldPath: 'portfolio.is_commissionable',
-    allowedOperators: BOOLEAN_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP]
-  },
-
-  salesAgent: {
-    key: 'salesAgent',
-    label: 'Sales Agent',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'portfolio',
-    fieldPath: 'portfolio.sales_agent',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP]
-  },
-
-  // ==================== SERVICE TYPE (requires property + portfolio + serviceType lookup) ====================
-
+  // Service Type (Posting Type)
   serviceType: {
     key: 'serviceType',
     label: 'Service Type',
@@ -545,141 +208,166 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP, SERVICE_TYPE_LOOKUP]
   },
 
-  // ==================== COMPUTED OTA FIELDS (virtual - computed in service) ====================
+  // Billing Type
+  billingType: {
+    key: 'billingType',
+    label: 'Billing Type',
+    dataType: ColumnDataType.ENUM,
+    filterable: true,
+    sortable: true,
+    source: 'audit',
+    fieldPath: 'billing_type',
+    allowedOperators: ENUM_OPERATORS,
+    enumValues: ['VCC', 'DB', 'EBS']
+  },
 
+  // OTA Type
+  otaType: {
+    key: 'otaType',
+    label: 'OTA Type',
+    dataType: ColumnDataType.ENUM,
+    filterable: true,
+    sortable: true,
+    source: 'audit',
+    fieldPath: 'type_of_ota',
+    allowedOperators: ENUM_OPERATORS,
+    enumValues: ['expedia', 'agoda', 'booking']
+  },
+
+  // OTA ID (computed - not directly filterable)
   otaId: {
     key: 'otaId',
     label: 'OTA ID',
     dataType: ColumnDataType.STRING,
-    filterable: false, // Cannot filter on computed field
+    filterable: false,
     sortable: false,
     source: 'credentials',
-    fieldPath: 'credentials.expedia_id', // Placeholder - computed in service
+    fieldPath: 'credentials.expedia_id',
     allowedOperators: []
   },
 
+  // OTA Review Status
+  auditStatus: {
+    key: 'auditStatus',
+    label: 'OTA Review Status',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: true,
+    source: 'auditStatus',
+    fieldPath: 'auditStatus.status',
+    allowedOperators: STRING_OPERATORS,
+    requiresLookup: [AUDIT_STATUS_LOOKUP]
+  },
+
+  // Start Date
+  startDate: {
+    key: 'startDate',
+    label: 'Start Date',
+    dataType: ColumnDataType.DATE,
+    filterable: true,
+    sortable: true,
+    source: 'audit',
+    fieldPath: 'start_date',
+    allowedOperators: DATE_OPERATORS
+  },
+
+  // End Date
+  endDate: {
+    key: 'endDate',
+    label: 'End Date',
+    dataType: ColumnDataType.DATE,
+    filterable: true,
+    sortable: true,
+    source: 'audit',
+    fieldPath: 'end_date',
+    allowedOperators: DATE_OPERATORS
+  },
+
+  // Next Due Date
+  nextDueDate: {
+    key: 'nextDueDate',
+    label: 'Next Due Date',
+    dataType: ColumnDataType.DATE,
+    filterable: true,
+    sortable: true,
+    source: 'property',
+    fieldPath: 'property.next_due_date',
+    allowedOperators: DATE_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP]
+  },
+
+  // Currency
+  currency: {
+    key: 'currency',
+    label: 'Currency',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: true,
+    source: 'currency',
+    fieldPath: 'currency.code',
+    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.NEQ],
+    requiresLookup: [PROPERTY_LOOKUP, CURRENCY_LOOKUP]
+  },
+
+  // Amount Collectable
+  amountCollectable: {
+    key: 'amountCollectable',
+    label: 'Amount Collectable',
+    dataType: ColumnDataType.NUMBER,
+    filterable: true,
+    sortable: true,
+    source: 'audit',
+    fieldPath: 'amount_collectable',
+    allowedOperators: NUMBER_OPERATORS
+  },
+
+  // Amount Confirmed
+  amountConfirmed: {
+    key: 'amountConfirmed',
+    label: 'Amount Confirmed',
+    dataType: ColumnDataType.NUMBER,
+    filterable: true,
+    sortable: true,
+    source: 'audit',
+    fieldPath: 'amount_confirmed',
+    allowedOperators: NUMBER_OPERATORS
+  },
+
+  // Portfolio Contact Email
+  portfolioContactEmail: {
+    key: 'portfolioContactEmail',
+    label: 'Portfolio Contact Email',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: true,
+    source: 'portfolio',
+    fieldPath: 'portfolio.contact_email',
+    allowedOperators: STRING_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP]
+  },
+
+  // OTA Username (computed - not directly filterable)
   otaUsername: {
     key: 'otaUsername',
     label: 'OTA Username',
     dataType: ColumnDataType.STRING,
-    filterable: false, // Cannot filter on computed field
+    filterable: false,
     sortable: false,
     source: 'credentials',
-    fieldPath: 'credentials.expedia_username', // Placeholder - computed in service
+    fieldPath: 'credentials.expedia_username',
     allowedOperators: []
   },
 
+  // OTA Password (computed - not directly filterable)
   otaPassword: {
     key: 'otaPassword',
     label: 'OTA Password',
     dataType: ColumnDataType.STRING,
-    filterable: false, // Cannot filter on computed field
+    filterable: false,
     sortable: false,
     source: 'credentials',
-    fieldPath: 'credentials.expedia_password', // Placeholder - computed in service
+    fieldPath: 'credentials.expedia_password',
     allowedOperators: []
-  },
-
-  // ==================== CREDENTIALS - OTA IDs and Usernames (NO passwords) ====================
-
-  expediaId: {
-    key: 'expediaId',
-    label: 'Expedia ID',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'credentials',
-    fieldPath: 'credentials.expedia_id',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
-  },
-
-  expediaUsername: {
-    key: 'expediaUsername',
-    label: 'Expedia Username',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: false,
-    source: 'credentials',
-    fieldPath: 'credentials.expedia_username',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
-  },
-
-  agodaId: {
-    key: 'agodaId',
-    label: 'Agoda ID',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'credentials',
-    fieldPath: 'credentials.agoda_id',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
-  },
-
-  agodaUsername: {
-    key: 'agodaUsername',
-    label: 'Agoda Username',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: false,
-    source: 'credentials',
-    fieldPath: 'credentials.agoda_username',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
-  },
-
-  bookingId: {
-    key: 'bookingId',
-    label: 'Booking ID',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'credentials',
-    fieldPath: 'credentials.booking_id',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
-  },
-
-  bookingUsername: {
-    key: 'bookingUsername',
-    label: 'Booking Username',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: false,
-    source: 'credentials',
-    fieldPath: 'credentials.booking_username',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
-  },
-
-  // ==================== BANK DETAILS - bank_type only (NO sensitive data) ====================
-
-  bankType: {
-    key: 'bankType',
-    label: 'Bank Type',
-    dataType: ColumnDataType.ENUM,
-    filterable: true,
-    sortable: false,
-    source: 'bankDetails',
-    fieldPath: 'bankDetails.bank_type',
-    allowedOperators: ENUM_OPERATORS,
-    enumValues: ['bank', 'stripe'],
-    requiresLookup: [PROPERTY_LOOKUP, BANK_DETAILS_LOOKUP]
-  },
-
-  bankSubType: {
-    key: 'bankSubType',
-    label: 'Bank Sub Type',
-    dataType: ColumnDataType.ENUM,
-    filterable: true,
-    sortable: false,
-    source: 'bankDetails',
-    fieldPath: 'bankDetails.bank_sub_type',
-    allowedOperators: ENUM_OPERATORS,
-    enumValues: ['ach', 'domestic_wire', 'international_wire'],
-    requiresLookup: [PROPERTY_LOOKUP, BANK_DETAILS_LOOKUP]
   }
 }
 
@@ -740,10 +428,8 @@ export function getRequiredLookups(columnKeys: string[]): LookupConfig[] {
   const orderedLookups: LookupConfig[] = []
   const lookupOrder = [
     'auditStatus',
-    'batch',
     'property',
     'credentials',
-    'bankDetails',
     'portfolio',
     'currency',
     'serviceType'

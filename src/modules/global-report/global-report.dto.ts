@@ -159,16 +159,46 @@ export class GlobalReportExportDto extends GlobalReportQueryDto {
 
 /**
  * Single row in the report response
+ *
+ * Fields:
+ * - portfolio
+ * - property
+ * - service type
+ * - billing type
+ * - ota type
+ * - ota id
+ * - ota review status
+ * - start date
+ * - end date
+ * - next due date
+ * - currency
+ * - amount collectable
+ * - amount confirmed
+ * - portfolio contact email
+ * - ota username
+ * - ota password
  */
 export class ReportRowDto {
-  @ApiProperty({ description: 'Audit ID' })
-  auditId: string
+  @ApiProperty({ description: 'Portfolio Name' })
+  portfolioName: string
+
+  @ApiProperty({ description: 'Property Name' })
+  propertyName: string
+
+  @ApiPropertyOptional({ description: 'Service Type' })
+  serviceType: string | null
+
+  @ApiPropertyOptional({ description: 'Billing Type (VCC, DB, EBS)' })
+  billingType: string | null
 
   @ApiPropertyOptional({ description: 'OTA Type (expedia, agoda, booking)' })
   otaType: string | null
 
-  @ApiPropertyOptional({ description: 'Billing Type (VCC, DB, EBS)' })
-  billingType: string | null
+  @ApiPropertyOptional({ description: 'OTA ID (computed based on otaType)' })
+  otaId: string | null
+
+  @ApiPropertyOptional({ description: 'OTA Review Status' })
+  auditStatus: string | null
 
   @ApiPropertyOptional({ description: 'Start Date' })
   startDate: Date | null
@@ -176,92 +206,26 @@ export class ReportRowDto {
   @ApiPropertyOptional({ description: 'End Date' })
   endDate: Date | null
 
-  @ApiPropertyOptional({ description: 'Amount Collectable' })
-  amountCollectable: number | null
-
-  @ApiPropertyOptional({ description: 'Amount Confirmed' })
-  amountConfirmed: number | null
-
-  @ApiProperty({ description: 'Is Archived' })
-  isArchived: boolean
-
-  @ApiPropertyOptional({ description: 'Audit Status' })
-  auditStatus: string | null
-
-  @ApiPropertyOptional({ description: 'Batch Number' })
-  batchNo: string | null
-
-  @ApiProperty({ description: 'Property ID' })
-  propertyId: string
-
-  @ApiProperty({ description: 'Property Name' })
-  propertyName: string
-
-  @ApiPropertyOptional({ description: 'Property Address' })
-  propertyAddress: string | null
-
-  @ApiProperty({ description: 'Property Is Active' })
-  propertyIsActive: boolean
-
   @ApiPropertyOptional({ description: 'Next Due Date' })
   nextDueDate: Date | null
 
   @ApiProperty({ description: 'Currency Code' })
   currency: string
 
-  @ApiPropertyOptional({ description: 'Currency Symbol' })
-  currencySymbol: string | null
+  @ApiPropertyOptional({ description: 'Amount Collectable' })
+  amountCollectable: number | null
 
-  @ApiProperty({ description: 'Portfolio ID' })
-  portfolioId: string
-
-  @ApiProperty({ description: 'Portfolio Name' })
-  portfolioName: string
+  @ApiPropertyOptional({ description: 'Amount Confirmed' })
+  amountConfirmed: number | null
 
   @ApiPropertyOptional({ description: 'Portfolio Contact Email' })
   portfolioContactEmail: string | null
-
-  @ApiPropertyOptional({ description: 'Service Type (Posting Type)' })
-  serviceType: string | null
-
-  @ApiPropertyOptional({ description: 'OTA ID (computed based on otaType)' })
-  otaId: string | null
 
   @ApiPropertyOptional({ description: 'OTA Username (computed based on otaType)' })
   otaUsername: string | null
 
   @ApiPropertyOptional({ description: 'OTA Password (computed based on otaType)' })
   otaPassword: string | null
-
-  @ApiPropertyOptional({ description: 'Expedia ID' })
-  expediaId: string | null
-
-  @ApiPropertyOptional({ description: 'Expedia Username' })
-  expediaUsername: string | null
-
-  @ApiPropertyOptional({ description: 'Agoda ID' })
-  agodaId: string | null
-
-  @ApiPropertyOptional({ description: 'Agoda Username' })
-  agodaUsername: string | null
-
-  @ApiPropertyOptional({ description: 'Booking ID' })
-  bookingId: string | null
-
-  @ApiPropertyOptional({ description: 'Booking Username' })
-  bookingUsername: string | null
-
-  @ApiPropertyOptional({ description: 'Bank Type' })
-  bankType: string | null
-
-  @ApiPropertyOptional({ description: 'Report URL' })
-  reportUrl: string | null
-
-  @ApiProperty({ description: 'Audit Created At' })
-  auditCreatedAt: Date
-
-  @ApiProperty({ description: 'Audit Updated At' })
-  auditUpdatedAt: Date
 }
 
 /**

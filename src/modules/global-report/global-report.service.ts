@@ -4,9 +4,12 @@ import {
   Injectable,
   BadRequestException
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import * as XLSX from 'xlsx'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { isUserSuperAdmin } from '../../common/utils/permission.util'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { Configuration } from '../../config/configuration'
 import {
   REPORT_COLUMNS,
   getAllColumnKeys
@@ -24,10 +27,18 @@ import type { IGlobalReportRepository, IGlobalReportService } from './global-rep
 
 @Injectable()
 export class GlobalReportService implements IGlobalReportService {
+  private readonly encryptionSecret: string
+
   constructor(
     @Inject('IGlobalReportRepository')
-    private globalReportRepository: IGlobalReportRepository
-  ) {}
+    private globalReportRepository: IGlobalReportRepository,
+    @Inject(ConfigService)
+    private configService: ConfigService<Configuration>
+  ) {
+    this.encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+  }
 
   /**
    * Get paginated report data with filters and sorting
@@ -195,6 +206,12 @@ export class GlobalReportService implements IGlobalReportService {
 
   /**
    * Transform raw MongoDB document to ReportRowDto
+   *
+   * Returns only the 16 required fields:
+   * - portfolio, property, service type, billing type, ota type, ota id,
+   * - ota review status, start date, end date, next due date, currency,
+   * - amount collectable, amount confirmed, portfolio contact email,
+   * - ota username, ota password
    */
   private transformToReportRow(doc: any): ReportRowDto {
     const otaType = doc.type_of_ota || null
@@ -206,76 +223,78 @@ export class GlobalReportService implements IGlobalReportService {
     const otaPassword = this.getOtaField(otaType, credentials, 'password')
 
     return {
-      auditId: this.extractId(doc._id),
-      otaType,
-      billingType: doc.billing_type || null,
-      startDate: doc.start_date ? new Date(doc.start_date) : null,
-      endDate: doc.end_date ? new Date(doc.end_date) : null,
-      amountCollectable: doc.amount_collectable ?? null,
-      amountConfirmed: doc.amount_confirmed ?? null,
-      isArchived: doc.is_archived || false,
-      auditStatus: doc.auditStatus?.status || null,
-      batchNo: doc.batch?.batch_no || null,
-      propertyId: this.extractId(doc.property?._id) || this.extractId(doc.property_id) || '',
+      // 1. Portfolio
+      portfolioName: doc.portfolio?.name || '',
+      // 2. Property
       propertyName: doc.property?.name || '',
-      propertyAddress: doc.property?.address || null,
-      propertyIsActive: doc.property?.is_active ?? false,
+      // 3. Service Type
+      serviceType: doc.serviceType?.type || null,
+      // 4. Billing Type
+      billingType: doc.billing_type || null,
+      // 5. OTA Type
+      otaType,
+      // 6. OTA ID
+      otaId,
+      // 7. OTA Review Status
+      auditStatus: doc.auditStatus?.status || null,
+      // 8. Start Date
+      startDate: doc.start_date ? new Date(doc.start_date) : null,
+      // 9. End Date
+      endDate: doc.end_date ? new Date(doc.end_date) : null,
+      // 10. Next Due Date
       nextDueDate: doc.property?.next_due_date
         ? new Date(doc.property.next_due_date)
         : null,
+      // 11. Currency
       currency: doc.currency?.code || '',
-      currencySymbol: doc.currency?.symbol || null,
-      portfolioId:
-        this.extractId(doc.portfolio?._id) ||
-        this.extractId(doc.property?.portfolio_id) ||
-        '',
-      portfolioName: doc.portfolio?.name || '',
+      // 12. Amount Collectable
+      amountCollectable: doc.amount_collectable ?? null,
+      // 13. Amount Confirmed
+      amountConfirmed: doc.amount_confirmed ?? null,
+      // 14. Portfolio Contact Email
       portfolioContactEmail: doc.portfolio?.contact_email || null,
-      serviceType: doc.serviceType?.type || null,
-      otaId,
+      // 15. OTA Username
       otaUsername,
-      otaPassword,
-      expediaId: credentials.expedia_id || null,
-      expediaUsername: credentials.expedia_username || null,
-      agodaId: credentials.agoda_id || null,
-      agodaUsername: credentials.agoda_username || null,
-      bookingId: credentials.booking_id || null,
-      bookingUsername: credentials.booking_username || null,
-      bankType: doc.bankDetails?.bank_type || null,
-      reportUrl: doc.report_url || null,
-      auditCreatedAt: doc.created_at ? new Date(doc.created_at) : new Date(),
-      auditUpdatedAt: doc.updated_at ? new Date(doc.updated_at) : new Date()
+      // 16. OTA Password
+      otaPassword
     }
   }
 
   /**
    * Get OTA-specific field (id, username, or password) based on otaType
+   * Passwords are decrypted before returning
    */
   private getOtaField(otaType: string | null, credentials: any, fieldType: 'id' | 'username' | 'password'): string | null {
     if (!otaType) return null
 
     const otaLower = otaType.toLowerCase()
+    let value: string | null = null
+
     switch (otaLower) {
       case 'expedia':
-        return credentials[`expedia_${fieldType}`] || null
+        value = credentials[`expedia_${fieldType}`] || null
+        break
       case 'agoda':
-        return credentials[`agoda_${fieldType}`] || null
+        value = credentials[`agoda_${fieldType}`] || null
+        break
       case 'booking':
-        return credentials[`booking_${fieldType}`] || null
+        value = credentials[`booking_${fieldType}`] || null
+        break
       default:
         return null
     }
-  }
 
-  /**
-   * Extract ID string from MongoDB ObjectId or $oid format
-   */
-  private extractId(id: any): string {
-    if (!id) return ''
-    if (typeof id === 'string') return id
-    if (id.$oid) return id.$oid
-    if (id.toString) return id.toString()
-    return ''
+    // Decrypt password if it exists
+    if (fieldType === 'password' && value) {
+      try {
+        return EncryptionUtil.decrypt(value, this.encryptionSecret)
+      } catch {
+        // If decryption fails, return null
+        return null
+      }
+    }
+
+    return value
   }
 
   /**
