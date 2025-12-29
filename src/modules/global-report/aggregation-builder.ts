@@ -275,7 +275,7 @@ export class AggregationBuilder {
    * Add $match stage for filters on joined collections
    */
   private addPostLookupMatch(): void {
-    const matchConditions: any = {}
+    const matchConditions: any[] = []
 
     for (const filter of this.options.filters) {
       const col = REPORT_COLUMNS[filter.column]
@@ -284,14 +284,15 @@ export class AggregationBuilder {
       // Only process filters that require lookups here
       if (col.requiresLookup && col.requiresLookup.length > 0) {
         const condition = this.buildMatchCondition(col, filter)
-        if (condition) {
-          Object.assign(matchConditions, condition)
+        if (condition && Object.keys(condition).length > 0) {
+          matchConditions.push(condition)
         }
       }
     }
 
-    if (Object.keys(matchConditions).length > 0) {
-      this.pipeline.push({ $match: matchConditions })
+    if (matchConditions.length > 0) {
+      // Use $and to combine all conditions (supports both simple and $or conditions)
+      this.pipeline.push({ $match: { $and: matchConditions } })
     }
   }
 
@@ -299,6 +300,11 @@ export class AggregationBuilder {
    * Build a $match condition for a filter
    */
   private buildMatchCondition(col: ColumnMetadata, filter: ColumnFilter): any {
+    // Special case: otaId filter needs to search across all OTA ID fields
+    if (col.key === 'otaId') {
+      return this.buildOtaIdMatchCondition(filter)
+    }
+
     const fieldPath = col.fieldPath
     const condition: any = {}
 
@@ -391,6 +397,46 @@ export class AggregationBuilder {
    */
   private escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
+  /**
+   * Build a special $match condition for otaId filter
+   * Searches across all three OTA ID fields (expedia_id, agoda_id, booking_id)
+   */
+  private buildOtaIdMatchCondition(filter: ColumnFilter): any {
+    const otaIdFields = [
+      'credentials.expedia_id',
+      'credentials.agoda_id',
+      'credentials.booking_id'
+    ]
+
+    switch (filter.operator) {
+      case FilterOperator.EQ: {
+        // Match if any OTA ID field equals the value
+        return {
+          $or: otaIdFields.map(field => ({ [field]: filter.value }))
+        }
+      }
+
+      case FilterOperator.IN: {
+        // Match if any OTA ID field is in the array
+        const values = Array.isArray(filter.value) ? filter.value : [filter.value]
+        return {
+          $or: otaIdFields.map(field => ({ [field]: { $in: values } }))
+        }
+      }
+
+      case FilterOperator.CONTAINS: {
+        // Match if any OTA ID field contains the value (case-insensitive)
+        const regex = { $regex: this.escapeRegex(String(filter.value)), $options: 'i' }
+        return {
+          $or: otaIdFields.map(field => ({ [field]: regex }))
+        }
+      }
+
+      default:
+        return {}
+    }
   }
 
   /**

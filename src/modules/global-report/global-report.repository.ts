@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AggregationBuilder, AggregationOptions } from './aggregation-builder'
-import type { IGlobalReportRepository, AggregationResult } from './global-report.interface'
+import type {
+  IGlobalReportRepository,
+  AggregationResult,
+  OtaIdItem
+} from './global-report.interface'
 
 @Injectable()
 export class GlobalReportRepository implements IGlobalReportRepository {
@@ -45,5 +49,46 @@ export class GlobalReportRepository implements IGlobalReportRepository {
     })) as unknown as any[]
 
     return Array.isArray(result) ? result : []
+  }
+
+  /**
+   * Get all unique OTA IDs from PropertyCredentials
+   */
+  async findAllOtaIds(): Promise<OtaIdItem[]> {
+    const credentials = await this.prisma.propertyCredentials.findMany({
+      select: {
+        expedia_id: true,
+        agoda_id: true,
+        booking_id: true
+      }
+    })
+
+    const otaIds: OtaIdItem[] = []
+
+    for (const cred of credentials) {
+      if (cred.expedia_id) {
+        otaIds.push({ otaId: cred.expedia_id, otaType: 'expedia' })
+      }
+      if (cred.agoda_id) {
+        otaIds.push({ otaId: cred.agoda_id, otaType: 'agoda' })
+      }
+      if (cred.booking_id) {
+        otaIds.push({ otaId: cred.booking_id, otaType: 'booking' })
+      }
+    }
+
+    // Remove duplicates and sort
+    const uniqueOtaIds = otaIds.filter(
+      (item, index, self) =>
+        index === self.findIndex(t => t.otaId === item.otaId && t.otaType === item.otaType)
+    )
+
+    return uniqueOtaIds.sort((a, b) => {
+      // Sort by OTA type first, then by ID
+      if (a.otaType !== b.otaType) {
+        return a.otaType.localeCompare(b.otaType)
+      }
+      return a.otaId.localeCompare(b.otaId)
+    })
   }
 }

@@ -289,3 +289,26 @@ export class ColumnsMetadataResponseDto {
   @ApiProperty({ type: [ColumnMetadataDto] })
   columns: ColumnMetadataDto[]
 }
+
+/**
+ * Single OTA ID item
+ */
+export class OtaIdItemDto {
+  @ApiProperty({ description: 'OTA ID value', example: 'EXP-12345678' })
+  otaId: string
+
+  @ApiProperty({
+    description: 'OTA Type',
+    enum: ['expedia', 'agoda', 'booking'],
+    example: 'expedia'
+  })
+  otaType: string
+}
+
+/**
+ * Response for OTA IDs endpoint
+ */
+export class OtaIdsResponseDto {
+  @ApiProperty({ type: [OtaIdItemDto] })
+  data: OtaIdItemDto[]
+}

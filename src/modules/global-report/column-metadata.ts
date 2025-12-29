@@ -128,6 +128,13 @@ const PROPERTY_LOOKUP: LookupConfig = {
   as: 'property'
 }
 
+const CREDENTIALS_LOOKUP: LookupConfig = {
+  from: 'PropertyCredentials',
+  localField: 'property._id',
+  foreignField: 'property_id',
+  as: 'credentials'
+}
+
 const PORTFOLIO_LOOKUP: LookupConfig = {
   from: 'Portfolio',
   localField: 'property.portfolio_id',
@@ -284,16 +291,17 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     enumValues: ['expedia', 'agoda', 'booking']
   },
 
-  // OTA ID (computed - not directly filterable)
+  // OTA ID (filterable across all OTA types - expedia_id, agoda_id, booking_id)
   otaId: {
     key: 'otaId',
     label: 'OTA ID',
     dataType: ColumnDataType.STRING,
-    filterable: false,
+    filterable: true,
     sortable: false,
     source: 'credentials',
-    fieldPath: 'credentials.expedia_id',
-    allowedOperators: []
+    fieldPath: 'credentials', // Special case - handled in aggregation builder
+    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
   },
 
   // Audit Status ID (for filtering only)

@@ -3,7 +3,8 @@ import {
   GlobalReportQueryDto,
   GlobalReportExportDto,
   GlobalReportResponseDto,
-  ColumnsMetadataResponseDto
+  ColumnsMetadataResponseDto,
+  OtaIdsResponseDto
 } from './global-report.dto'
 import { ColumnFilter, SortConfig } from './aggregation-builder'
 
@@ -27,6 +28,14 @@ export interface AggregationResult<T> {
 }
 
 /**
+ * OTA ID item from database
+ */
+export interface OtaIdItem {
+  otaId: string
+  otaType: string
+}
+
+/**
  * Global Report Repository Interface
  */
 export interface IGlobalReportRepository {
@@ -41,6 +50,11 @@ export interface IGlobalReportRepository {
   findAllForExport(
     options: Omit<AggregationOptions, 'page' | 'limit'>
   ): Promise<any[]>
+
+  /**
+   * Get all unique OTA IDs from PropertyCredentials
+   */
+  findAllOtaIds(): Promise<OtaIdItem[]>
 }
 
 /**
@@ -67,4 +81,9 @@ export interface IGlobalReportService {
    * Get column metadata for the frontend
    */
   getColumnsMetadata(): ColumnsMetadataResponseDto
+
+  /**
+   * Get all OTA IDs for filtering
+   */
+  getOtaIds(user: IUserWithPermissions): Promise<OtaIdsResponseDto>
 }

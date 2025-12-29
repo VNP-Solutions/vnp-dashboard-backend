@@ -21,7 +21,8 @@ import {
   GlobalReportQueryDto,
   GlobalReportExportDto,
   GlobalReportResponseDto,
-  ColumnsMetadataResponseDto
+  ColumnsMetadataResponseDto,
+  OtaIdsResponseDto
 } from './global-report.dto'
 import type { IGlobalReportService } from './global-report.interface'
 
@@ -48,6 +49,27 @@ export class GlobalReportController {
   })
   getColumnsMetadata(): ColumnsMetadataResponseDto {
     return this.globalReportService.getColumnsMetadata()
+  }
+
+  @Get('ota-ids')
+  @ApiOperation({
+    summary: 'Get all OTA IDs for filtering (Super Admin only)',
+    description:
+      'Returns all unique OTA IDs from property credentials, grouped by OTA type. Use this to populate OTA ID filter dropdowns.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'OTA IDs retrieved successfully',
+    type: OtaIdsResponseDto
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getOtaIds(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<OtaIdsResponseDto> {
+    return this.globalReportService.getOtaIds(user)
   }
 
   @Post()

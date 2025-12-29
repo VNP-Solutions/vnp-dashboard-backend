@@ -19,6 +19,7 @@ import {
   GlobalReportExportDto,
   GlobalReportResponseDto,
   ColumnsMetadataResponseDto,
+  OtaIdsResponseDto,
   ReportRowDto,
   ColumnFilterDto,
   SortDto
@@ -157,6 +158,19 @@ export class GlobalReportService implements IGlobalReportService {
       }))
 
     return { columns }
+  }
+
+  /**
+   * Get all OTA IDs for filtering
+   */
+  async getOtaIds(user: IUserWithPermissions): Promise<OtaIdsResponseDto> {
+    // Super admin only
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only super admins can access OTA IDs')
+    }
+
+    const otaIds = await this.globalReportRepository.findAllOtaIds()
+    return { data: otaIds }
   }
 
   /**
