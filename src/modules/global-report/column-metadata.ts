@@ -431,28 +431,30 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP]
   },
 
-  // OTA Username (computed - not directly filterable)
+  // OTA Username (filterable across all OTA types - expedia_username, agoda_username, booking_username)
   otaUsername: {
     key: 'otaUsername',
     label: 'OTA Username',
     dataType: ColumnDataType.STRING,
-    filterable: false,
+    filterable: true,
     sortable: false,
     source: 'credentials',
-    fieldPath: 'credentials.expedia_username',
-    allowedOperators: []
+    fieldPath: 'credentials', // Special case - handled in aggregation builder
+    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
   },
 
-  // OTA Password (computed - not directly filterable)
+  // OTA Password (filterable across all OTA types - expedia_password, agoda_password, booking_password)
   otaPassword: {
     key: 'otaPassword',
     label: 'OTA Password',
     dataType: ColumnDataType.STRING,
-    filterable: false,
+    filterable: true,
     sortable: false,
     source: 'credentials',
-    fieldPath: 'credentials.expedia_password',
-    allowedOperators: []
+    fieldPath: 'credentials', // Special case - handled in aggregation builder
+    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
   }
 }
 

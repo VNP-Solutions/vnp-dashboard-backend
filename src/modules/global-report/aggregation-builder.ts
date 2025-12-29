@@ -305,6 +305,16 @@ export class AggregationBuilder {
       return this.buildOtaIdMatchCondition(filter)
     }
 
+    // Special case: otaUsername filter needs to search across all OTA username fields
+    if (col.key === 'otaUsername') {
+      return this.buildOtaUsernameMatchCondition(filter)
+    }
+
+    // Special case: otaPassword filter needs to search across all OTA password fields
+    if (col.key === 'otaPassword') {
+      return this.buildOtaPasswordMatchCondition(filter)
+    }
+
     const fieldPath = col.fieldPath
     const condition: any = {}
 
@@ -431,6 +441,81 @@ export class AggregationBuilder {
         const regex = { $regex: this.escapeRegex(String(filter.value)), $options: 'i' }
         return {
           $or: otaIdFields.map(field => ({ [field]: regex }))
+        }
+      }
+
+      default:
+        return {}
+    }
+  }
+
+  /**
+   * Build a special $match condition for otaUsername filter
+   * Searches across all three OTA username fields (expedia_username, agoda_username, booking_username)
+   */
+  private buildOtaUsernameMatchCondition(filter: ColumnFilter): any {
+    const otaUsernameFields = [
+      'credentials.expedia_username',
+      'credentials.agoda_username',
+      'credentials.booking_username'
+    ]
+
+    switch (filter.operator) {
+      case FilterOperator.EQ: {
+        return {
+          $or: otaUsernameFields.map(field => ({ [field]: filter.value }))
+        }
+      }
+
+      case FilterOperator.IN: {
+        const values = Array.isArray(filter.value) ? filter.value : [filter.value]
+        return {
+          $or: otaUsernameFields.map(field => ({ [field]: { $in: values } }))
+        }
+      }
+
+      case FilterOperator.CONTAINS: {
+        const regex = { $regex: this.escapeRegex(String(filter.value)), $options: 'i' }
+        return {
+          $or: otaUsernameFields.map(field => ({ [field]: regex }))
+        }
+      }
+
+      default:
+        return {}
+    }
+  }
+
+  /**
+   * Build a special $match condition for otaPassword filter
+   * Searches across all three OTA password fields (expedia_password, agoda_password, booking_password)
+   * Note: Passwords are stored encrypted, so filtering works on encrypted values
+   */
+  private buildOtaPasswordMatchCondition(filter: ColumnFilter): any {
+    const otaPasswordFields = [
+      'credentials.expedia_password',
+      'credentials.agoda_password',
+      'credentials.booking_password'
+    ]
+
+    switch (filter.operator) {
+      case FilterOperator.EQ: {
+        return {
+          $or: otaPasswordFields.map(field => ({ [field]: filter.value }))
+        }
+      }
+
+      case FilterOperator.IN: {
+        const values = Array.isArray(filter.value) ? filter.value : [filter.value]
+        return {
+          $or: otaPasswordFields.map(field => ({ [field]: { $in: values } }))
+        }
+      }
+
+      case FilterOperator.CONTAINS: {
+        const regex = { $regex: this.escapeRegex(String(filter.value)), $options: 'i' }
+        return {
+          $or: otaPasswordFields.map(field => ({ [field]: regex }))
         }
       }
 

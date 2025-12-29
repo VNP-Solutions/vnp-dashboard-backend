@@ -20,6 +20,9 @@ import {
   GlobalReportResponseDto,
   ColumnsMetadataResponseDto,
   OtaIdsResponseDto,
+  PortfolioContactEmailsResponseDto,
+  OtaUsernamesResponseDto,
+  OtaPasswordsResponseDto,
   ReportRowDto,
   ColumnFilterDto,
   SortDto
@@ -171,6 +174,62 @@ export class GlobalReportService implements IGlobalReportService {
 
     const otaIds = await this.globalReportRepository.findAllOtaIds()
     return { data: otaIds }
+  }
+
+  /**
+   * Get all portfolio contact emails for filtering
+   */
+  async getPortfolioContactEmails(user: IUserWithPermissions): Promise<PortfolioContactEmailsResponseDto> {
+    // Super admin only
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only super admins can access portfolio contact emails')
+    }
+
+    const emails = await this.globalReportRepository.findAllPortfolioContactEmails()
+    return { data: emails }
+  }
+
+  /**
+   * Get all OTA usernames for filtering
+   */
+  async getOtaUsernames(user: IUserWithPermissions): Promise<OtaUsernamesResponseDto> {
+    // Super admin only
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only super admins can access OTA usernames')
+    }
+
+    const usernames = await this.globalReportRepository.findAllOtaUsernames()
+    return { data: usernames }
+  }
+
+  /**
+   * Get all OTA passwords for filtering
+   * Passwords are decrypted before returning
+   */
+  async getOtaPasswords(user: IUserWithPermissions): Promise<OtaPasswordsResponseDto> {
+    // Super admin only
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only super admins can access OTA passwords')
+    }
+
+    const encryptedPasswords = await this.globalReportRepository.findAllOtaPasswords()
+
+    // Decrypt passwords
+    const decryptedPasswords = encryptedPasswords
+      .map(item => {
+        try {
+          return {
+            password: EncryptionUtil.decrypt(item.password, this.encryptionSecret),
+            otaType: item.otaType
+          }
+        } catch {
+          // Skip passwords that fail to decrypt
+          return null
+        }
+      })
+      .filter((item): item is { password: string; otaType: string } => item !== null)
+
+    return { data: decryptedPasswords }
   }
 
   /**

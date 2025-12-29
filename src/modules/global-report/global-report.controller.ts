@@ -22,7 +22,10 @@ import {
   GlobalReportExportDto,
   GlobalReportResponseDto,
   ColumnsMetadataResponseDto,
-  OtaIdsResponseDto
+  OtaIdsResponseDto,
+  PortfolioContactEmailsResponseDto,
+  OtaUsernamesResponseDto,
+  OtaPasswordsResponseDto
 } from './global-report.dto'
 import type { IGlobalReportService } from './global-report.interface'
 
@@ -70,6 +73,69 @@ export class GlobalReportController {
     @CurrentUser() user: IUserWithPermissions
   ): Promise<OtaIdsResponseDto> {
     return this.globalReportService.getOtaIds(user)
+  }
+
+  @Get('portfolio-contact-emails')
+  @ApiOperation({
+    summary: 'Get all portfolio contact emails for filtering (Super Admin only)',
+    description:
+      'Returns all unique portfolio contact emails. Use this to populate contact email filter dropdowns.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Portfolio contact emails retrieved successfully',
+    type: PortfolioContactEmailsResponseDto
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getPortfolioContactEmails(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<PortfolioContactEmailsResponseDto> {
+    return this.globalReportService.getPortfolioContactEmails(user)
+  }
+
+  @Get('ota-usernames')
+  @ApiOperation({
+    summary: 'Get all OTA usernames for filtering (Super Admin only)',
+    description:
+      'Returns all unique OTA usernames from property credentials, grouped by OTA type. Use this to populate OTA username filter dropdowns.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'OTA usernames retrieved successfully',
+    type: OtaUsernamesResponseDto
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getOtaUsernames(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<OtaUsernamesResponseDto> {
+    return this.globalReportService.getOtaUsernames(user)
+  }
+
+  @Get('ota-passwords')
+  @ApiOperation({
+    summary: 'Get all OTA passwords for filtering (Super Admin only)',
+    description:
+      'Returns all unique OTA passwords from property credentials (decrypted), grouped by OTA type. Use this to populate OTA password filter dropdowns.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'OTA passwords retrieved successfully',
+    type: OtaPasswordsResponseDto
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getOtaPasswords(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<OtaPasswordsResponseDto> {
+    return this.globalReportService.getOtaPasswords(user)
   }
 
   @Post()

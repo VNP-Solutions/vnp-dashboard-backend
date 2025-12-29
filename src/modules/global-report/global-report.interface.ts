@@ -4,7 +4,10 @@ import {
   GlobalReportExportDto,
   GlobalReportResponseDto,
   ColumnsMetadataResponseDto,
-  OtaIdsResponseDto
+  OtaIdsResponseDto,
+  PortfolioContactEmailsResponseDto,
+  OtaUsernamesResponseDto,
+  OtaPasswordsResponseDto
 } from './global-report.dto'
 import { ColumnFilter, SortConfig } from './aggregation-builder'
 
@@ -36,6 +39,30 @@ export interface OtaIdItem {
 }
 
 /**
+ * Portfolio contact email item from database
+ */
+export interface PortfolioContactEmailItem {
+  email: string
+  portfolioName: string
+}
+
+/**
+ * OTA username item from database
+ */
+export interface OtaUsernameItem {
+  username: string
+  otaType: string
+}
+
+/**
+ * OTA password item from database (encrypted in storage, decrypted for API)
+ */
+export interface OtaPasswordItem {
+  password: string
+  otaType: string
+}
+
+/**
  * Global Report Repository Interface
  */
 export interface IGlobalReportRepository {
@@ -55,6 +82,21 @@ export interface IGlobalReportRepository {
    * Get all unique OTA IDs from PropertyCredentials
    */
   findAllOtaIds(): Promise<OtaIdItem[]>
+
+  /**
+   * Get all unique portfolio contact emails
+   */
+  findAllPortfolioContactEmails(): Promise<PortfolioContactEmailItem[]>
+
+  /**
+   * Get all unique OTA usernames from PropertyCredentials
+   */
+  findAllOtaUsernames(): Promise<OtaUsernameItem[]>
+
+  /**
+   * Get all OTA passwords from PropertyCredentials (encrypted)
+   */
+  findAllOtaPasswords(): Promise<{ password: string; otaType: string }[]>
 }
 
 /**
@@ -86,4 +128,19 @@ export interface IGlobalReportService {
    * Get all OTA IDs for filtering
    */
   getOtaIds(user: IUserWithPermissions): Promise<OtaIdsResponseDto>
+
+  /**
+   * Get all portfolio contact emails for filtering
+   */
+  getPortfolioContactEmails(user: IUserWithPermissions): Promise<PortfolioContactEmailsResponseDto>
+
+  /**
+   * Get all OTA usernames for filtering
+   */
+  getOtaUsernames(user: IUserWithPermissions): Promise<OtaUsernamesResponseDto>
+
+  /**
+   * Get all OTA passwords for filtering
+   */
+  getOtaPasswords(user: IUserWithPermissions): Promise<OtaPasswordsResponseDto>
 }

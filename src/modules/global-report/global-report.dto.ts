@@ -312,3 +312,68 @@ export class OtaIdsResponseDto {
   @ApiProperty({ type: [OtaIdItemDto] })
   data: OtaIdItemDto[]
 }
+
+/**
+ * Single portfolio contact email item
+ */
+export class PortfolioContactEmailItemDto {
+  @ApiProperty({ description: 'Contact email address', example: 'contact@marriott.com' })
+  email: string
+
+  @ApiProperty({ description: 'Portfolio name', example: 'Marriott Hotels Group' })
+  portfolioName: string
+}
+
+/**
+ * Response for portfolio contact emails endpoint
+ */
+export class PortfolioContactEmailsResponseDto {
+  @ApiProperty({ type: [PortfolioContactEmailItemDto] })
+  data: PortfolioContactEmailItemDto[]
+}
+
+/**
+ * Single OTA username item
+ */
+export class OtaUsernameItemDto {
+  @ApiProperty({ description: 'OTA username', example: 'marriott_expedia_user' })
+  username: string
+
+  @ApiProperty({
+    description: 'OTA Type',
+    enum: ['expedia', 'agoda', 'booking'],
+    example: 'expedia'
+  })
+  otaType: string
+}
+
+/**
+ * Response for OTA usernames endpoint
+ */
+export class OtaUsernamesResponseDto {
+  @ApiProperty({ type: [OtaUsernameItemDto] })
+  data: OtaUsernameItemDto[]
+}
+
+/**
+ * Single OTA password item
+ */
+export class OtaPasswordItemDto {
+  @ApiProperty({ description: 'OTA password (decrypted)', example: 'SecureP@ss123' })
+  password: string
+
+  @ApiProperty({
+    description: 'OTA Type',
+    enum: ['expedia', 'agoda', 'booking'],
+    example: 'expedia'
+  })
+  otaType: string
+}
+
+/**
+ * Response for OTA passwords endpoint
+ */
+export class OtaPasswordsResponseDto {
+  @ApiProperty({ type: [OtaPasswordItemDto] })
+  data: OtaPasswordItemDto[]
+}
