@@ -141,17 +141,20 @@ export class GlobalReportService implements IGlobalReportService {
 
   /**
    * Get column metadata for the frontend
+   * Excludes filterOnly columns (ID columns used only for filtering)
    */
   getColumnsMetadata(): ColumnsMetadataResponseDto {
-    const columns = Object.values(REPORT_COLUMNS).map(col => ({
-      key: col.key,
-      label: col.label,
-      dataType: col.dataType,
-      filterable: col.filterable,
-      sortable: col.sortable,
-      allowedOperators: col.allowedOperators,
-      enumValues: col.enumValues
-    }))
+    const columns = Object.values(REPORT_COLUMNS)
+      .filter(col => !col.filterOnly)
+      .map(col => ({
+        key: col.key,
+        label: col.label,
+        dataType: col.dataType,
+        filterable: col.filterable,
+        sortable: col.sortable,
+        allowedOperators: col.allowedOperators,
+        enumValues: col.enumValues
+      }))
 
     return { columns }
   }

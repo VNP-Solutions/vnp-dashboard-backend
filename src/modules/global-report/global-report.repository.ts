@@ -14,6 +14,9 @@ export class GlobalReportRepository implements IGlobalReportRepository {
     const builder = new AggregationBuilder(options)
     const pipeline = builder.build()
 
+    // Debug: Log the generated pipeline
+    console.log('Generated pipeline:', JSON.stringify(pipeline, null, 2))
+
     // Use Prisma's aggregateRaw for MongoDB aggregation
     const result = (await this.prisma.audit.aggregateRaw({
       pipeline: pipeline

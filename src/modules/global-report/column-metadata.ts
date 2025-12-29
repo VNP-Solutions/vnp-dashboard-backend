@@ -67,6 +67,8 @@ export interface ColumnMetadata {
   allowedOperators: FilterOperator[]
   enumValues?: string[]
   requiresLookup?: LookupConfig[]
+  /** If true, this column is only for filtering and won't be returned in columns metadata API */
+  filterOnly?: boolean
 }
 
 // Common operator sets for reuse
@@ -79,6 +81,13 @@ const STRING_OPERATORS = [
   FilterOperator.STARTS_WITH,
   FilterOperator.IS_NULL,
   FilterOperator.IS_NOT_NULL
+]
+
+const OBJECT_ID_OPERATORS = [
+  FilterOperator.EQ,
+  FilterOperator.NEQ,
+  FilterOperator.IN,
+  FilterOperator.NIN
 ]
 
 const NUMBER_OPERATORS = [
@@ -151,17 +160,17 @@ const SERVICE_TYPE_LOOKUP: LookupConfig = {
  * All reportable columns for the Global Report API
  *
  * Fields included:
- * - portfolio
- * - property
- * - service type
+ * - portfolio (ID and name)
+ * - property (ID and name)
+ * - service type (ID and name)
  * - billing type
  * - ota type
  * - ota id
- * - ota review status
+ * - ota review status (ID and name)
  * - start date
  * - end date
  * - next due date
- * - currency
+ * - currency (ID and code)
  * - amount collectable
  * - amount confirmed
  * - portfolio contact email
@@ -169,6 +178,20 @@ const SERVICE_TYPE_LOOKUP: LookupConfig = {
  * - ota password
  */
 export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
+  // Portfolio ID (for filtering only)
+  portfolioId: {
+    key: 'portfolioId',
+    label: 'Portfolio ID',
+    dataType: ColumnDataType.OBJECT_ID,
+    filterable: true,
+    sortable: false,
+    source: 'property',
+    fieldPath: 'property.portfolio_id',
+    allowedOperators: OBJECT_ID_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP],
+    filterOnly: true
+  },
+
   // Portfolio Name
   portfolioName: {
     key: 'portfolioName',
@@ -182,6 +205,19 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP]
   },
 
+  // Property ID (for filtering only)
+  propertyId: {
+    key: 'propertyId',
+    label: 'Property ID',
+    dataType: ColumnDataType.OBJECT_ID,
+    filterable: true,
+    sortable: false,
+    source: 'audit',
+    fieldPath: 'property_id',
+    allowedOperators: OBJECT_ID_OPERATORS,
+    filterOnly: true
+  },
+
   // Property Name
   propertyName: {
     key: 'propertyName',
@@ -193,6 +229,20 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     fieldPath: 'property.name',
     allowedOperators: STRING_OPERATORS,
     requiresLookup: [PROPERTY_LOOKUP]
+  },
+
+  // Service Type ID (for filtering only)
+  serviceTypeId: {
+    key: 'serviceTypeId',
+    label: 'Service Type ID',
+    dataType: ColumnDataType.OBJECT_ID,
+    filterable: true,
+    sortable: false,
+    source: 'portfolio',
+    fieldPath: 'portfolio.service_type_id',
+    allowedOperators: OBJECT_ID_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP],
+    filterOnly: true
   },
 
   // Service Type (Posting Type)
@@ -246,6 +296,19 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     allowedOperators: []
   },
 
+  // Audit Status ID (for filtering only)
+  auditStatusId: {
+    key: 'auditStatusId',
+    label: 'Audit Status ID',
+    dataType: ColumnDataType.OBJECT_ID,
+    filterable: true,
+    sortable: false,
+    source: 'audit',
+    fieldPath: 'audit_status_id',
+    allowedOperators: OBJECT_ID_OPERATORS,
+    filterOnly: true
+  },
+
   // OTA Review Status
   auditStatus: {
     key: 'auditStatus',
@@ -294,6 +357,20 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     fieldPath: 'property.next_due_date',
     allowedOperators: DATE_OPERATORS,
     requiresLookup: [PROPERTY_LOOKUP]
+  },
+
+  // Currency ID (for filtering only)
+  currencyId: {
+    key: 'currencyId',
+    label: 'Currency ID',
+    dataType: ColumnDataType.OBJECT_ID,
+    filterable: true,
+    sortable: false,
+    source: 'property',
+    fieldPath: 'property.currency_id',
+    allowedOperators: OBJECT_ID_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP],
+    filterOnly: true
   },
 
   // Currency
