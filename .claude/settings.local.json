@@ -13,7 +13,8 @@
       "Bash(npx tsc --noEmit)",
       "Bash(npx prisma generate:*)",
       "Bash(findstr:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

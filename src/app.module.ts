@@ -21,6 +21,7 @@ import { ContractUrlModule } from './modules/contract-url/contract-url.module'
 import { CurrencyModule } from './modules/currency/currency.module'
 import { EmailModule } from './modules/email/email.module'
 import { FileUploadModule } from './modules/file-upload/file-upload.module'
+import { GlobalReportModule } from './modules/global-report/global-report.module'
 import { NoteModule } from './modules/note/note.module'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
 import { PrismaService } from './modules/prisma/prisma.service'
@@ -50,6 +51,7 @@ import { UserModule } from './modules/user/user.module'
     CurrencyModule,
     EmailModule,
     FileUploadModule,
+    GlobalReportModule,
     NoteModule,
     PortfolioModule,
     TaskModule,

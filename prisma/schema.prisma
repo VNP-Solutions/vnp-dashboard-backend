@@ -119,19 +119,20 @@ model Otp {
 }
 
 model Audit {
-  id                 String      @id @default(auto()) @map("_id") @db.ObjectId
+  id                 String       @id @default(auto()) @map("_id") @db.ObjectId
   type_of_ota        OtaType?
-  audit_status_id    String      @db.ObjectId
-  auditStatus        AuditStatus @relation(fields: [audit_status_id], references: [id])
+  billing_type       BillingType?
+  audit_status_id    String       @db.ObjectId
+  auditStatus        AuditStatus  @relation(fields: [audit_status_id], references: [id])
   amount_collectable Int?
   amount_confirmed   Int?
-  is_archived        Boolean     @default(false)
+  is_archived        Boolean      @default(false)
   start_date         DateTime?
   end_date           DateTime?
-  property_id        String      @db.ObjectId
-  property           Property    @relation(fields: [property_id], references: [id], onDelete: Cascade)
-  batch_id           String?     @db.ObjectId
-  batch              AuditBatch? @relation(fields: [batch_id], references: [id])
+  property_id        String       @db.ObjectId
+  property           Property     @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  batch_id           String?      @db.ObjectId
+  batch              AuditBatch?  @relation(fields: [batch_id], references: [id])
   report_url         String?
 
   notes          Note[]
@@ -144,6 +145,7 @@ model Audit {
   @@index([property_id])
   @@index([audit_status_id])
   @@index([type_of_ota])
+  @@index([billing_type])
   @@index([is_archived])
   @@index([start_date])
   @@index([end_date])
@@ -414,6 +416,12 @@ enum OtaType {
   expedia
   agoda
   booking
+}
+
+enum BillingType {
+  VCC
+  DB
+  EBS
 }
 
 enum BankType {
