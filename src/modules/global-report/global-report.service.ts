@@ -283,10 +283,10 @@ export class GlobalReportService implements IGlobalReportService {
   /**
    * Transform raw MongoDB document to ReportRowDto
    *
-   * Returns only the 16 required fields:
-   * - portfolio, property, service type, billing type, ota type, ota id,
-   * - ota review status, start date, end date, next due date, currency,
-   * - amount collectable, amount confirmed, portfolio contact email,
+   * Returns the following fields:
+   * - audit id (unique identifier), portfolio, property, service type, billing type,
+   * - ota type, ota id, ota review status, start date, end date, next due date,
+   * - currency, amount collectable, amount confirmed, portfolio contact email,
    * - ota username, ota password
    */
   private transformToReportRow(doc: any): ReportRowDto {
@@ -298,7 +298,13 @@ export class GlobalReportService implements IGlobalReportService {
     const otaUsername = this.getOtaField(otaType, credentials, 'username')
     const otaPassword = this.getOtaField(otaType, credentials, 'password')
 
+    // Extract audit ID from MongoDB document
+    // MongoDB aggregateRaw returns _id as { $oid: "..." } format
+    const auditId = this.extractObjectId(doc._id)
+
     return {
+      // Unique identifier
+      auditId,
       // 1. Portfolio
       portfolioName: doc.portfolio?.name || '',
       // 2. Property
@@ -332,6 +338,26 @@ export class GlobalReportService implements IGlobalReportService {
       // 16. OTA Password
       otaPassword
     }
+  }
+
+  /**
+   * Extract ObjectId string from MongoDB extended JSON format
+   * MongoDB aggregateRaw returns _id as { $oid: "..." } format
+   */
+  private extractObjectId(value: any): string {
+    if (!value) return ''
+
+    // Handle MongoDB extended JSON ObjectId format: { $oid: "..." }
+    if (typeof value === 'object' && value.$oid) {
+      return value.$oid
+    }
+
+    // Handle plain string
+    if (typeof value === 'string') {
+      return value
+    }
+
+    return ''
   }
 
   /**

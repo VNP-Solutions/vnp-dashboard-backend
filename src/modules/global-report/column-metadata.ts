@@ -167,6 +167,7 @@ const SERVICE_TYPE_LOOKUP: LookupConfig = {
  * All reportable columns for the Global Report API
  *
  * Fields included:
+ * - audit id (unique identifier)
  * - portfolio (ID and name)
  * - property (ID and name)
  * - service type (ID and name)
@@ -185,6 +186,18 @@ const SERVICE_TYPE_LOOKUP: LookupConfig = {
  * - ota password
  */
 export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
+  // Audit ID (unique identifier for each row)
+  auditId: {
+    key: 'auditId',
+    label: 'Audit ID',
+    dataType: ColumnDataType.STRING,
+    filterable: false,
+    sortable: false,
+    source: 'audit',
+    fieldPath: '_id',
+    allowedOperators: []
+  },
+
   // Portfolio ID (for filtering only)
   portfolioId: {
     key: 'portfolioId',
