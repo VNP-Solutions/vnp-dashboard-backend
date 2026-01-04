@@ -179,6 +179,9 @@ export class GlobalReportExportDto extends GlobalReportQueryDto {
  * - ota password
  */
 export class ReportRowDto {
+  @ApiProperty({ description: 'Audit ID (unique identifier)' })
+  auditId: string
+
   @ApiProperty({ description: 'Portfolio Name' })
   portfolioName: string
 
