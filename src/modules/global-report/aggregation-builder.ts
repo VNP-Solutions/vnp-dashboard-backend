@@ -367,19 +367,19 @@ export class AggregationBuilder {
         break
 
       case FilterOperator.BEFORE:
-        condition[fieldPath] = { $lt: new Date(value) }
+        condition[fieldPath] = { $lt: this.toExtendedJsonDate(value) }
         break
 
       case FilterOperator.AFTER:
-        condition[fieldPath] = { $gt: new Date(value) }
+        condition[fieldPath] = { $gt: this.toExtendedJsonDate(value) }
         break
 
       case FilterOperator.BETWEEN:
         if (value && typeof value === 'object' && 'from' in value && 'to' in value) {
           if (col.dataType === ColumnDataType.DATE) {
             condition[fieldPath] = {
-              $gte: new Date(value.from),
-              $lte: new Date(value.to)
+              $gte: this.toExtendedJsonDate(value.from),
+              $lte: this.toExtendedJsonDate(value.to)
             }
           } else {
             condition[fieldPath] = {
@@ -669,5 +669,14 @@ export class AggregationBuilder {
     }
     // Return as-is if not a valid ObjectId format
     return value
+  }
+
+  /**
+   * Convert a date value to MongoDB Extended JSON format for aggregateRaw
+   * Prisma's aggregateRaw requires dates in { $date: "ISO_STRING" } format
+   */
+  private toExtendedJsonDate(value: string | Date): { $date: string } {
+    const date = value instanceof Date ? value : new Date(value)
+    return { $date: date.toISOString() }
   }
 }
