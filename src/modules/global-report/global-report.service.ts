@@ -27,6 +27,8 @@ import {
   PortfolioContactEmailsResponseDto,
   OtaUsernamesResponseDto,
   OtaPasswordsResponseDto,
+  PortfoliosListResponseDto,
+  PropertiesListResponseDto,
   ReportRowDto,
   ColumnFilterDto,
   SortDto
@@ -279,6 +281,34 @@ export class GlobalReportService implements IGlobalReportService {
     }
 
     return { data: decryptedPasswords }
+  }
+
+  /**
+   * Get all portfolios (id and name only) for filtering
+   * Uses optimized repository method with caching
+   */
+  async getPortfolios(user: IUserWithPermissions): Promise<PortfoliosListResponseDto> {
+    // Super admin only
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only super admins can access portfolios list')
+    }
+
+    const portfolios = await this.globalReportRepository.findAllPortfolios()
+    return { data: portfolios }
+  }
+
+  /**
+   * Get all properties (id and name only) for filtering
+   * Uses optimized repository method with caching
+   */
+  async getProperties(user: IUserWithPermissions): Promise<PropertiesListResponseDto> {
+    // Super admin only
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException('Only super admins can access properties list')
+    }
+
+    const properties = await this.globalReportRepository.findAllProperties()
+    return { data: properties }
   }
 
   /**

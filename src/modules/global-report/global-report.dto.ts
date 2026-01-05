@@ -380,3 +380,41 @@ export class OtaPasswordsResponseDto {
   @ApiProperty({ type: [OtaPasswordItemDto] })
   data: OtaPasswordItemDto[]
 }
+
+/**
+ * Single portfolio item (id and name only)
+ */
+export class PortfolioListItemDto {
+  @ApiProperty({ description: 'Portfolio ID', example: '507f1f77bcf86cd799439011' })
+  id: string
+
+  @ApiProperty({ description: 'Portfolio name', example: 'Marriott Hotels Group' })
+  name: string
+}
+
+/**
+ * Response for portfolios list endpoint
+ */
+export class PortfoliosListResponseDto {
+  @ApiProperty({ type: [PortfolioListItemDto] })
+  data: PortfolioListItemDto[]
+}
+
+/**
+ * Single property item (id and name only)
+ */
+export class PropertyListItemDto {
+  @ApiProperty({ description: 'Property ID', example: '507f1f77bcf86cd799439012' })
+  id: string
+
+  @ApiProperty({ description: 'Property name', example: 'Marriott Downtown NYC' })
+  name: string
+}
+
+/**
+ * Response for properties list endpoint
+ */
+export class PropertiesListResponseDto {
+  @ApiProperty({ type: [PropertyListItemDto] })
+  data: PropertyListItemDto[]
+}

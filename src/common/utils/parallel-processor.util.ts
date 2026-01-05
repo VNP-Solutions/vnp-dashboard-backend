@@ -1,4 +1,4 @@
-import { Worker, isMainThread, parentPort, workerData } from 'worker_threads'
+import { Worker } from 'worker_threads'
 import * as os from 'os'
 
 /**

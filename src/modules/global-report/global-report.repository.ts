@@ -6,7 +6,9 @@ import type {
   AggregationResult,
   OtaIdItem,
   PortfolioContactEmailItem,
-  OtaUsernameItem
+  OtaUsernameItem,
+  PortfolioListItem,
+  PropertyListItem
 } from './global-report.interface'
 
 interface CacheEntry<T> {
@@ -31,6 +33,12 @@ export class GlobalReportRepository implements IGlobalReportRepository {
   /** In-memory cache for OTA passwords */
   private otaPasswordsCache: CacheEntry<{ password: string; otaType: string }[]> | null = null
 
+  /** In-memory cache for portfolios list */
+  private portfoliosCache: CacheEntry<PortfolioListItem[]> | null = null
+
+  /** In-memory cache for properties list */
+  private propertiesCache: CacheEntry<PropertyListItem[]> | null = null
+
   constructor(private prisma: PrismaService) {}
 
   /**
@@ -48,6 +56,8 @@ export class GlobalReportRepository implements IGlobalReportRepository {
     this.portfolioEmailsCache = null
     this.otaUsernamesCache = null
     this.otaPasswordsCache = null
+    this.portfoliosCache = null
+    this.propertiesCache = null
   }
 
   /**
@@ -367,6 +377,74 @@ export class GlobalReportRepository implements IGlobalReportRepository {
 
     // Cache the result
     this.otaPasswordsCache = { data, timestamp: Date.now() }
+
+    return data
+  }
+
+  /**
+   * Get all portfolios (id and name only)
+   * Uses MongoDB aggregation for efficient projection and in-memory caching
+   */
+  async findAllPortfolios(): Promise<PortfolioListItem[]> {
+    // Return cached data if valid
+    if (this.isCacheValid(this.portfoliosCache)) {
+      return this.portfoliosCache.data
+    }
+
+    // Use MongoDB aggregation for efficient projection at DB level
+    const result = await this.prisma.portfolio.aggregateRaw({
+      pipeline: [
+        // Project only id and name fields
+        {
+          $project: {
+            _id: 0,
+            id: { $toString: '$_id' },
+            name: 1
+          }
+        },
+        // Sort by name
+        { $sort: { name: 1 } }
+      ]
+    })
+
+    const data = result as unknown as PortfolioListItem[]
+
+    // Cache the result
+    this.portfoliosCache = { data, timestamp: Date.now() }
+
+    return data
+  }
+
+  /**
+   * Get all properties (id and name only)
+   * Uses MongoDB aggregation for efficient projection and in-memory caching
+   */
+  async findAllProperties(): Promise<PropertyListItem[]> {
+    // Return cached data if valid
+    if (this.isCacheValid(this.propertiesCache)) {
+      return this.propertiesCache.data
+    }
+
+    // Use MongoDB aggregation for efficient projection at DB level
+    const result = await this.prisma.property.aggregateRaw({
+      pipeline: [
+        // Project only id and name fields
+        {
+          $project: {
+            _id: 0,
+            id: { $toString: '$_id' },
+            name: 1
+          }
+        },
+        // Sort by name
+        { $sort: { name: 1 } }
+      ]
+    })
+
+    const data = result as unknown as PropertyListItem[]
+
+    // Cache the result
+    this.propertiesCache = { data, timestamp: Date.now() }
 
     return data
   }

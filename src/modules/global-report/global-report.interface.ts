@@ -7,7 +7,9 @@ import {
   OtaIdsResponseDto,
   PortfolioContactEmailsResponseDto,
   OtaUsernamesResponseDto,
-  OtaPasswordsResponseDto
+  OtaPasswordsResponseDto,
+  PortfoliosListResponseDto,
+  PropertiesListResponseDto
 } from './global-report.dto'
 import { ColumnFilter, SortConfig } from './aggregation-builder'
 
@@ -63,6 +65,22 @@ export interface OtaPasswordItem {
 }
 
 /**
+ * Portfolio list item (id and name only)
+ */
+export interface PortfolioListItem {
+  id: string
+  name: string
+}
+
+/**
+ * Property list item (id and name only)
+ */
+export interface PropertyListItem {
+  id: string
+  name: string
+}
+
+/**
  * Global Report Repository Interface
  */
 export interface IGlobalReportRepository {
@@ -97,6 +115,16 @@ export interface IGlobalReportRepository {
    * Get all OTA passwords from PropertyCredentials (encrypted)
    */
   findAllOtaPasswords(): Promise<{ password: string; otaType: string }[]>
+
+  /**
+   * Get all portfolios (id and name only)
+   */
+  findAllPortfolios(): Promise<PortfolioListItem[]>
+
+  /**
+   * Get all properties (id and name only)
+   */
+  findAllProperties(): Promise<PropertyListItem[]>
 
   /**
    * Invalidate all cached data (call when credentials/portfolios are modified)
@@ -148,4 +176,14 @@ export interface IGlobalReportService {
    * Get all OTA passwords for filtering
    */
   getOtaPasswords(user: IUserWithPermissions): Promise<OtaPasswordsResponseDto>
+
+  /**
+   * Get all portfolios (id and name only) for filtering
+   */
+  getPortfolios(user: IUserWithPermissions): Promise<PortfoliosListResponseDto>
+
+  /**
+   * Get all properties (id and name only) for filtering
+   */
+  getProperties(user: IUserWithPermissions): Promise<PropertiesListResponseDto>
 }
