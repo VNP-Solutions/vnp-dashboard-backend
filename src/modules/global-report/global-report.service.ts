@@ -103,8 +103,8 @@ export class GlobalReportService implements IGlobalReportService {
       excludeArchived: !query.includeArchived
     })
 
-    // Transform raw MongoDB documents to response DTOs
-    const transformedData = data.map(doc => this.transformToReportRow(doc))
+    // Transform raw MongoDB documents to response DTOs with parallel password decryption
+    const transformedData = await this.transformReportDataWithParallelDecryption(data)
 
     return {
       data: transformedData,
@@ -141,8 +141,8 @@ export class GlobalReportService implements IGlobalReportService {
       excludeArchived: !query.includeArchived
     })
 
-    // Transform data
-    const transformedData = data.map(doc => this.transformToReportRow(doc))
+    // Transform data with parallel password decryption
+    const transformedData = await this.transformReportDataWithParallelDecryption(data)
 
     // Determine columns to export
     const columnsToExport = query.columns?.length
@@ -330,13 +330,154 @@ export class GlobalReportService implements IGlobalReportService {
   }
 
   /**
-   * Transform raw MongoDB document to ReportRowDto
+   * Transform report data with parallel password decryption
    *
-   * Returns the following fields:
-   * - audit id (unique identifier), portfolio, property, service type, billing type,
-   * - ota type, ota id, ota review status, start date, end date, next due date,
-   * - currency, amount collectable, amount confirmed, portfolio contact email,
-   * - ota username, ota password
+   * This method optimizes the transformation by:
+   * 1. Extracting all unique encrypted passwords from the data
+   * 2. Decrypting them in parallel using worker threads
+   * 3. Using the pre-decrypted passwords during row transformation
+   *
+   * This is significantly faster than decrypting passwords one-by-one for each row.
+   */
+  private async transformReportDataWithParallelDecryption(data: any[]): Promise<ReportRowDto[]> {
+    // Step 1: Extract all unique encrypted passwords
+    const encryptedPasswordsMap = new Map<string, string>() // encrypted -> placeholder
+    const passwordsToDecrypt: { password: string; index: number }[] = []
+
+    for (const doc of data) {
+      const otaType = doc.type_of_ota?.toLowerCase()
+      const credentials = doc.credentials || {}
+
+      if (otaType && credentials) {
+        const passwordField = `${otaType}_password`
+        const encryptedPassword = credentials[passwordField]
+
+        if (encryptedPassword && !encryptedPasswordsMap.has(encryptedPassword)) {
+          encryptedPasswordsMap.set(encryptedPassword, '')
+          passwordsToDecrypt.push({
+            password: encryptedPassword,
+            index: passwordsToDecrypt.length
+          })
+        }
+      }
+    }
+
+    // Step 2: Decrypt all passwords in parallel
+    if (passwordsToDecrypt.length > 0) {
+      const decryptedPasswords = await ParallelProcessor.processWithWorkers<
+        { password: string; index: number },
+        { password: string; decrypted: string; index: number }
+      >(
+        passwordsToDecrypt,
+        `
+          const crypto = require('crypto');
+          const ALGORITHM = 'aes-256-cbc';
+          const secret = context.secret;
+
+          try {
+            const parts = item.password.split(':');
+            const iv = Buffer.from(parts[0], 'hex');
+            const encrypted = parts[1];
+
+            const key = crypto.scryptSync(secret, 'salt', 32);
+            const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+
+            let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+
+            return {
+              password: item.password,
+              decrypted: decrypted,
+              index: item.index
+            };
+          } catch (err) {
+            return null;
+          }
+        `,
+        { secret: this.encryptionSecret },
+        { workerCount: this.parallelWorkers }
+      )
+
+      // Build the decryption map
+      for (const result of decryptedPasswords) {
+        if (result) {
+          encryptedPasswordsMap.set(result.password, result.decrypted)
+        }
+      }
+    }
+
+    // Step 3: Transform data using pre-decrypted passwords
+    return data.map(doc => this.transformToReportRowWithDecryptedPasswords(doc, encryptedPasswordsMap))
+  }
+
+  /**
+   * Transform raw MongoDB document to ReportRowDto using pre-decrypted passwords
+   */
+  private transformToReportRowWithDecryptedPasswords(
+    doc: any,
+    decryptedPasswordsMap: Map<string, string>
+  ): ReportRowDto {
+    const otaType = doc.type_of_ota || null
+    const credentials = doc.credentials || {}
+
+    // Compute OTA ID and Username
+    const otaId = this.getOtaFieldValue(otaType, credentials, 'id')
+    const otaUsername = this.getOtaFieldValue(otaType, credentials, 'username')
+
+    // Get password from pre-decrypted map
+    let otaPassword: string | null = null
+    if (otaType && credentials) {
+      const passwordField = `${otaType.toLowerCase()}_password`
+      const encryptedPassword = credentials[passwordField]
+      if (encryptedPassword) {
+        otaPassword = decryptedPasswordsMap.get(encryptedPassword) || null
+      }
+    }
+
+    // Extract audit ID from MongoDB document
+    const auditId = this.extractObjectId(doc._id)
+
+    return {
+      auditId,
+      portfolioName: doc.portfolio?.name || '',
+      propertyName: doc.property?.name || '',
+      serviceType: doc.serviceType?.type || null,
+      billingType: doc.billing_type || null,
+      otaType,
+      otaId,
+      auditStatus: doc.auditStatus?.status || null,
+      startDate: this.extractDate(doc.start_date),
+      endDate: this.extractDate(doc.end_date),
+      nextDueDate: this.extractDate(doc.property?.next_due_date),
+      currency: doc.currency?.code || '',
+      amountCollectable: doc.amount_collectable ?? null,
+      amountConfirmed: doc.amount_confirmed ?? null,
+      portfolioContactEmail: doc.portfolio?.contact_email || null,
+      otaUsername,
+      otaPassword
+    }
+  }
+
+  /**
+   * Get OTA-specific field value (id or username) based on otaType
+   * Does NOT decrypt - use for non-password fields only
+   */
+  private getOtaFieldValue(
+    otaType: string | null,
+    credentials: any,
+    fieldType: 'id' | 'username'
+  ): string | null {
+    if (!otaType) return null
+
+    const otaLower = otaType.toLowerCase()
+    const fieldName = `${otaLower}_${fieldType}`
+
+    return credentials[fieldName] || null
+  }
+
+  /**
+   * Transform raw MongoDB document to ReportRowDto
+   * @deprecated Use transformReportDataWithParallelDecryption for better performance
    */
   private transformToReportRow(doc: any): ReportRowDto {
     const otaType = doc.type_of_ota || null
