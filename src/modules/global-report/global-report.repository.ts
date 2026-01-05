@@ -168,38 +168,52 @@ export class GlobalReportRepository implements IGlobalReportRepository {
 
   /**
    * Get all unique portfolio contact emails
+   * Uses MongoDB aggregation for efficient deduplication and in-memory caching
    */
   async findAllPortfolioContactEmails(): Promise<PortfolioContactEmailItem[]> {
-    const portfolios = await this.prisma.portfolio.findMany({
-      where: {
-        contact_email: {
-          not: null
-        }
-      },
-      select: {
-        name: true,
-        contact_email: true
-      }
-    })
-
-    const emails: PortfolioContactEmailItem[] = []
-
-    for (const portfolio of portfolios) {
-      if (portfolio.contact_email) {
-        emails.push({
-          email: portfolio.contact_email,
-          portfolioName: portfolio.name
-        })
-      }
+    // Return cached data if valid
+    if (this.isCacheValid(this.portfolioEmailsCache)) {
+      return this.portfolioEmailsCache.data
     }
 
-    // Remove duplicates by email and sort
-    const uniqueEmails = emails.filter(
-      (item, index, self) =>
-        index === self.findIndex(t => t.email === item.email)
-    )
+    // Use MongoDB aggregation for efficient deduplication at DB level
+    const result = await this.prisma.portfolio.aggregateRaw({
+      pipeline: [
+        // Filter out null/empty contact emails
+        {
+          $match: {
+            $and: [
+              { contact_email: { $ne: null } },
+              { contact_email: { $ne: '' } }
+            ]
+          }
+        },
+        // Group by email to remove duplicates, keep first portfolio name
+        {
+          $group: {
+            _id: '$contact_email',
+            portfolioName: { $first: '$name' }
+          }
+        },
+        // Project to final format
+        {
+          $project: {
+            _id: 0,
+            email: '$_id',
+            portfolioName: 1
+          }
+        },
+        // Sort by email
+        { $sort: { email: 1 } }
+      ]
+    })
 
-    return uniqueEmails.sort((a, b) => a.email.localeCompare(b.email))
+    const data = result as unknown as PortfolioContactEmailItem[]
+
+    // Cache the result
+    this.portfolioEmailsCache = { data, timestamp: Date.now() }
+
+    return data
   }
 
   /**
