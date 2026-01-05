@@ -97,6 +97,11 @@ export interface IGlobalReportRepository {
    * Get all OTA passwords from PropertyCredentials (encrypted)
    */
   findAllOtaPasswords(): Promise<{ password: string; otaType: string }[]>
+
+  /**
+   * Invalidate all cached data (call when credentials/portfolios are modified)
+   */
+  invalidateCache(): void
 }
 
 /**
