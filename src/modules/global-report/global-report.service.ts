@@ -9,6 +9,10 @@ import * as XLSX from 'xlsx'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import {
+  ParallelProcessor,
+  createDecryptionProcessor
+} from '../../common/utils/parallel-processor.util'
 import { Configuration } from '../../config/configuration'
 import {
   REPORT_COLUMNS,
@@ -29,9 +33,21 @@ import {
 } from './global-report.dto'
 import type { IGlobalReportRepository, IGlobalReportService } from './global-report.interface'
 
+interface DecryptedPasswordsCacheEntry {
+  data: { password: string; otaType: string }[]
+  timestamp: number
+}
+
 @Injectable()
 export class GlobalReportService implements IGlobalReportService {
   private readonly encryptionSecret: string
+  private readonly parallelWorkers: number
+
+  /** Cache TTL in milliseconds (5 minutes) */
+  private readonly CACHE_TTL = 5 * 60 * 1000
+
+  /** Cache for decrypted passwords (decryption is expensive) */
+  private decryptedPasswordsCache: DecryptedPasswordsCacheEntry | null = null
 
   constructor(
     @Inject('IGlobalReportRepository')
@@ -42,6 +58,23 @@ export class GlobalReportService implements IGlobalReportService {
     this.encryptionSecret = this.configService.get('encryption.secret', {
       infer: true
     })!
+    this.parallelWorkers = this.configService.get('parallel.workers', {
+      infer: true
+    }) ?? 8
+  }
+
+  /**
+   * Check if cache entry is valid (exists and not expired)
+   */
+  private isCacheValid(cache: DecryptedPasswordsCacheEntry | null): cache is DecryptedPasswordsCacheEntry {
+    return cache !== null && Date.now() - cache.timestamp < this.CACHE_TTL
+  }
+
+  /**
+   * Invalidate decrypted passwords cache
+   */
+  invalidateDecryptedPasswordsCache(): void {
+    this.decryptedPasswordsCache = null
   }
 
   /**
@@ -204,7 +237,8 @@ export class GlobalReportService implements IGlobalReportService {
 
   /**
    * Get all OTA passwords for filtering
-   * Passwords are decrypted before returning
+   * Passwords are decrypted using parallel processing for performance
+   * Results are cached to avoid repeated decryption
    */
   async getOtaPasswords(user: IUserWithPermissions): Promise<OtaPasswordsResponseDto> {
     // Super admin only
@@ -212,22 +246,37 @@ export class GlobalReportService implements IGlobalReportService {
       throw new ForbiddenException('Only super admins can access OTA passwords')
     }
 
+    // Return cached decrypted passwords if valid
+    if (this.isCacheValid(this.decryptedPasswordsCache)) {
+      return { data: this.decryptedPasswordsCache.data }
+    }
+
     const encryptedPasswords = await this.globalReportRepository.findAllOtaPasswords()
 
-    // Decrypt passwords
-    const decryptedPasswords = encryptedPasswords
-      .map(item => {
-        try {
-          return {
-            password: EncryptionUtil.decrypt(item.password, this.encryptionSecret),
-            otaType: item.otaType
-          }
-        } catch {
-          // Skip passwords that fail to decrypt
-          return null
-        }
-      })
-      .filter((item): item is { password: string; otaType: string } => item !== null)
+    // Decrypt passwords using parallel processing for large datasets
+    const decryptedPasswords = await ParallelProcessor.processWithWorkers<
+      { password: string; otaType: string },
+      { password: string; otaType: string }
+    >(
+      encryptedPasswords,
+      createDecryptionProcessor(),
+      { secret: this.encryptionSecret },
+      { workerCount: this.parallelWorkers }
+    )
+
+    // Sort by otaType then password (to match previous behavior)
+    decryptedPasswords.sort((a, b) => {
+      if (a.otaType !== b.otaType) {
+        return a.otaType.localeCompare(b.otaType)
+      }
+      return a.password.localeCompare(b.password)
+    })
+
+    // Cache the decrypted results
+    this.decryptedPasswordsCache = {
+      data: decryptedPasswords,
+      timestamp: Date.now()
+    }
 
     return { data: decryptedPasswords }
   }

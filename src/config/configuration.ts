@@ -37,6 +37,9 @@ export interface Configuration {
   encryption: {
     secret: string
   }
+  parallel: {
+    workers: number
+  }
 }
 
 export default (): Configuration => ({
@@ -78,5 +81,8 @@ export default (): Configuration => ({
   },
   encryption: {
     secret: process.env.JWT_ACCESS_SECRET!
+  },
+  parallel: {
+    workers: parseInt(process.env.PARALLEL_WORKERS || '8', 10)
   }
 })

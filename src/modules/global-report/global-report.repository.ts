@@ -294,41 +294,80 @@ export class GlobalReportRepository implements IGlobalReportRepository {
 
   /**
    * Get all OTA passwords from PropertyCredentials (encrypted)
+   * Uses MongoDB aggregation for efficient deduplication and in-memory caching
+   *
+   * Note: Passwords are returned encrypted. Decryption happens in the service layer
+   * with parallel processing for performance.
    */
   async findAllOtaPasswords(): Promise<{ password: string; otaType: string }[]> {
-    const credentials = await this.prisma.propertyCredentials.findMany({
-      select: {
-        expedia_password: true,
-        agoda_password: true,
-        booking_password: true
-      }
-    })
-
-    const passwords: { password: string; otaType: string }[] = []
-
-    for (const cred of credentials) {
-      if (cred.expedia_password) {
-        passwords.push({ password: cred.expedia_password, otaType: 'expedia' })
-      }
-      if (cred.agoda_password) {
-        passwords.push({ password: cred.agoda_password, otaType: 'agoda' })
-      }
-      if (cred.booking_password) {
-        passwords.push({ password: cred.booking_password, otaType: 'booking' })
-      }
+    // Return cached data if valid
+    if (this.isCacheValid(this.otaPasswordsCache)) {
+      return this.otaPasswordsCache.data
     }
 
-    // Remove duplicates and sort
-    const uniquePasswords = passwords.filter(
-      (item, index, self) =>
-        index === self.findIndex(t => t.password === item.password && t.otaType === item.otaType)
-    )
-
-    return uniquePasswords.sort((a, b) => {
-      if (a.otaType !== b.otaType) {
-        return a.otaType.localeCompare(b.otaType)
-      }
-      return a.password.localeCompare(b.password)
+    // Use MongoDB aggregation for efficient deduplication at DB level
+    const result = await this.prisma.propertyCredentials.aggregateRaw({
+      pipeline: [
+        // Project each OTA password as separate documents
+        {
+          $project: {
+            items: {
+              $filter: {
+                input: [
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$expedia_password', null] }, { $ne: ['$expedia_password', ''] }] },
+                      { password: '$expedia_password', otaType: 'expedia' },
+                      null
+                    ]
+                  },
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$agoda_password', null] }, { $ne: ['$agoda_password', ''] }] },
+                      { password: '$agoda_password', otaType: 'agoda' },
+                      null
+                    ]
+                  },
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$booking_password', null] }, { $ne: ['$booking_password', ''] }] },
+                      { password: '$booking_password', otaType: 'booking' },
+                      null
+                    ]
+                  }
+                ],
+                as: 'item',
+                cond: { $ne: ['$$item', null] }
+              }
+            }
+          }
+        },
+        // Unwind the array to get individual documents
+        { $unwind: '$items' },
+        // Group by password and otaType to remove duplicates
+        {
+          $group: {
+            _id: { password: '$items.password', otaType: '$items.otaType' }
+          }
+        },
+        // Project to final format
+        {
+          $project: {
+            _id: 0,
+            password: '$_id.password',
+            otaType: '$_id.otaType'
+          }
+        },
+        // Sort by otaType, then password
+        { $sort: { otaType: 1, password: 1 } }
+      ]
     })
+
+    const data = result as unknown as { password: string; otaType: string }[]
+
+    // Cache the result
+    this.otaPasswordsCache = { data, timestamp: Date.now() }
+
+    return data
   }
 }
