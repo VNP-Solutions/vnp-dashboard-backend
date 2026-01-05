@@ -218,42 +218,78 @@ export class GlobalReportRepository implements IGlobalReportRepository {
 
   /**
    * Get all unique OTA usernames from PropertyCredentials
+   * Uses MongoDB aggregation for efficient deduplication and in-memory caching
    */
   async findAllOtaUsernames(): Promise<OtaUsernameItem[]> {
-    const credentials = await this.prisma.propertyCredentials.findMany({
-      select: {
-        expedia_username: true,
-        agoda_username: true,
-        booking_username: true
-      }
-    })
-
-    const usernames: OtaUsernameItem[] = []
-
-    for (const cred of credentials) {
-      if (cred.expedia_username) {
-        usernames.push({ username: cred.expedia_username, otaType: 'expedia' })
-      }
-      if (cred.agoda_username) {
-        usernames.push({ username: cred.agoda_username, otaType: 'agoda' })
-      }
-      if (cred.booking_username) {
-        usernames.push({ username: cred.booking_username, otaType: 'booking' })
-      }
+    // Return cached data if valid
+    if (this.isCacheValid(this.otaUsernamesCache)) {
+      return this.otaUsernamesCache.data
     }
 
-    // Remove duplicates and sort
-    const uniqueUsernames = usernames.filter(
-      (item, index, self) =>
-        index === self.findIndex(t => t.username === item.username && t.otaType === item.otaType)
-    )
-
-    return uniqueUsernames.sort((a, b) => {
-      if (a.otaType !== b.otaType) {
-        return a.otaType.localeCompare(b.otaType)
-      }
-      return a.username.localeCompare(b.username)
+    // Use MongoDB aggregation for efficient deduplication at DB level
+    const result = await this.prisma.propertyCredentials.aggregateRaw({
+      pipeline: [
+        // Project each OTA username as separate documents
+        {
+          $project: {
+            items: {
+              $filter: {
+                input: [
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$expedia_username', null] }, { $ne: ['$expedia_username', ''] }] },
+                      { username: '$expedia_username', otaType: 'expedia' },
+                      null
+                    ]
+                  },
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$agoda_username', null] }, { $ne: ['$agoda_username', ''] }] },
+                      { username: '$agoda_username', otaType: 'agoda' },
+                      null
+                    ]
+                  },
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$booking_username', null] }, { $ne: ['$booking_username', ''] }] },
+                      { username: '$booking_username', otaType: 'booking' },
+                      null
+                    ]
+                  }
+                ],
+                as: 'item',
+                cond: { $ne: ['$$item', null] }
+              }
+            }
+          }
+        },
+        // Unwind the array to get individual documents
+        { $unwind: '$items' },
+        // Group by username and otaType to remove duplicates
+        {
+          $group: {
+            _id: { username: '$items.username', otaType: '$items.otaType' }
+          }
+        },
+        // Project to final format
+        {
+          $project: {
+            _id: 0,
+            username: '$_id.username',
+            otaType: '$_id.otaType'
+          }
+        },
+        // Sort by otaType, then username
+        { $sort: { otaType: 1, username: 1 } }
+      ]
     })
+
+    const data = result as unknown as OtaUsernameItem[]
+
+    // Cache the result
+    this.otaUsernamesCache = { data, timestamp: Date.now() }
+
+    return data
   }
 
   /**
