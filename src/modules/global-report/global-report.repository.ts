@@ -6,12 +6,59 @@ import type {
   AggregationResult,
   OtaIdItem,
   PortfolioContactEmailItem,
-  OtaUsernameItem
+  OtaUsernameItem,
+  PortfolioListItem,
+  PropertyListItem
 } from './global-report.interface'
+
+interface CacheEntry<T> {
+  data: T
+  timestamp: number
+}
 
 @Injectable()
 export class GlobalReportRepository implements IGlobalReportRepository {
+  /** Cache TTL in milliseconds (5 minutes) */
+  private readonly CACHE_TTL = 5 * 60 * 1000
+
+  /** In-memory cache for OTA IDs */
+  private otaIdsCache: CacheEntry<OtaIdItem[]> | null = null
+
+  /** In-memory cache for portfolio contact emails */
+  private portfolioEmailsCache: CacheEntry<PortfolioContactEmailItem[]> | null = null
+
+  /** In-memory cache for OTA usernames */
+  private otaUsernamesCache: CacheEntry<OtaUsernameItem[]> | null = null
+
+  /** In-memory cache for OTA passwords */
+  private otaPasswordsCache: CacheEntry<{ password: string; otaType: string }[]> | null = null
+
+  /** In-memory cache for portfolios list */
+  private portfoliosCache: CacheEntry<PortfolioListItem[]> | null = null
+
+  /** In-memory cache for properties list */
+  private propertiesCache: CacheEntry<PropertyListItem[]> | null = null
+
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Check if cache entry is valid (exists and not expired)
+   */
+  private isCacheValid<T>(cache: CacheEntry<T> | null): cache is CacheEntry<T> {
+    return cache !== null && Date.now() - cache.timestamp < this.CACHE_TTL
+  }
+
+  /**
+   * Invalidate all caches (call when credentials are modified)
+   */
+  invalidateCache(): void {
+    this.otaIdsCache = null
+    this.portfolioEmailsCache = null
+    this.otaUsernamesCache = null
+    this.otaPasswordsCache = null
+    this.portfoliosCache = null
+    this.propertiesCache = null
+  }
 
   /**
    * Execute aggregation pipeline and return paginated results
@@ -55,158 +102,350 @@ export class GlobalReportRepository implements IGlobalReportRepository {
 
   /**
    * Get all unique OTA IDs from PropertyCredentials
+   * Uses MongoDB aggregation for efficient deduplication and in-memory caching
    */
   async findAllOtaIds(): Promise<OtaIdItem[]> {
-    const credentials = await this.prisma.propertyCredentials.findMany({
-      select: {
-        expedia_id: true,
-        agoda_id: true,
-        booking_id: true
-      }
-    })
-
-    const otaIds: OtaIdItem[] = []
-
-    for (const cred of credentials) {
-      if (cred.expedia_id) {
-        otaIds.push({ otaId: cred.expedia_id, otaType: 'expedia' })
-      }
-      if (cred.agoda_id) {
-        otaIds.push({ otaId: cred.agoda_id, otaType: 'agoda' })
-      }
-      if (cred.booking_id) {
-        otaIds.push({ otaId: cred.booking_id, otaType: 'booking' })
-      }
+    // Return cached data if valid
+    if (this.isCacheValid(this.otaIdsCache)) {
+      return this.otaIdsCache.data
     }
 
-    // Remove duplicates and sort
-    const uniqueOtaIds = otaIds.filter(
-      (item, index, self) =>
-        index === self.findIndex(t => t.otaId === item.otaId && t.otaType === item.otaType)
-    )
-
-    return uniqueOtaIds.sort((a, b) => {
-      // Sort by OTA type first, then by ID
-      if (a.otaType !== b.otaType) {
-        return a.otaType.localeCompare(b.otaType)
-      }
-      return a.otaId.localeCompare(b.otaId)
+    // Use MongoDB aggregation for efficient deduplication at DB level
+    const result = await this.prisma.propertyCredentials.aggregateRaw({
+      pipeline: [
+        // Project each OTA ID as separate documents
+        {
+          $project: {
+            items: {
+              $filter: {
+                input: [
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$expedia_id', null] }, { $ne: ['$expedia_id', ''] }] },
+                      { otaId: '$expedia_id', otaType: 'expedia' },
+                      null
+                    ]
+                  },
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$agoda_id', null] }, { $ne: ['$agoda_id', ''] }] },
+                      { otaId: '$agoda_id', otaType: 'agoda' },
+                      null
+                    ]
+                  },
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$booking_id', null] }, { $ne: ['$booking_id', ''] }] },
+                      { otaId: '$booking_id', otaType: 'booking' },
+                      null
+                    ]
+                  }
+                ],
+                as: 'item',
+                cond: { $ne: ['$$item', null] }
+              }
+            }
+          }
+        },
+        // Unwind the array to get individual documents
+        { $unwind: '$items' },
+        // Group by otaId and otaType to remove duplicates
+        {
+          $group: {
+            _id: { otaId: '$items.otaId', otaType: '$items.otaType' }
+          }
+        },
+        // Project to final format
+        {
+          $project: {
+            _id: 0,
+            otaId: '$_id.otaId',
+            otaType: '$_id.otaType'
+          }
+        },
+        // Sort by otaType, then otaId
+        { $sort: { otaType: 1, otaId: 1 } }
+      ]
     })
+
+    const data = result as unknown as OtaIdItem[]
+
+    // Cache the result
+    this.otaIdsCache = { data, timestamp: Date.now() }
+
+    return data
   }
 
   /**
    * Get all unique portfolio contact emails
+   * Uses MongoDB aggregation for efficient deduplication and in-memory caching
    */
   async findAllPortfolioContactEmails(): Promise<PortfolioContactEmailItem[]> {
-    const portfolios = await this.prisma.portfolio.findMany({
-      where: {
-        contact_email: {
-          not: null
-        }
-      },
-      select: {
-        name: true,
-        contact_email: true
-      }
-    })
-
-    const emails: PortfolioContactEmailItem[] = []
-
-    for (const portfolio of portfolios) {
-      if (portfolio.contact_email) {
-        emails.push({
-          email: portfolio.contact_email,
-          portfolioName: portfolio.name
-        })
-      }
+    // Return cached data if valid
+    if (this.isCacheValid(this.portfolioEmailsCache)) {
+      return this.portfolioEmailsCache.data
     }
 
-    // Remove duplicates by email and sort
-    const uniqueEmails = emails.filter(
-      (item, index, self) =>
-        index === self.findIndex(t => t.email === item.email)
-    )
+    // Use MongoDB aggregation for efficient deduplication at DB level
+    const result = await this.prisma.portfolio.aggregateRaw({
+      pipeline: [
+        // Filter out null/empty contact emails
+        {
+          $match: {
+            $and: [
+              { contact_email: { $ne: null } },
+              { contact_email: { $ne: '' } }
+            ]
+          }
+        },
+        // Group by email to remove duplicates, keep first portfolio name
+        {
+          $group: {
+            _id: '$contact_email',
+            portfolioName: { $first: '$name' }
+          }
+        },
+        // Project to final format
+        {
+          $project: {
+            _id: 0,
+            email: '$_id',
+            portfolioName: 1
+          }
+        },
+        // Sort by email
+        { $sort: { email: 1 } }
+      ]
+    })
 
-    return uniqueEmails.sort((a, b) => a.email.localeCompare(b.email))
+    const data = result as unknown as PortfolioContactEmailItem[]
+
+    // Cache the result
+    this.portfolioEmailsCache = { data, timestamp: Date.now() }
+
+    return data
   }
 
   /**
    * Get all unique OTA usernames from PropertyCredentials
+   * Uses MongoDB aggregation for efficient deduplication and in-memory caching
    */
   async findAllOtaUsernames(): Promise<OtaUsernameItem[]> {
-    const credentials = await this.prisma.propertyCredentials.findMany({
-      select: {
-        expedia_username: true,
-        agoda_username: true,
-        booking_username: true
-      }
-    })
-
-    const usernames: OtaUsernameItem[] = []
-
-    for (const cred of credentials) {
-      if (cred.expedia_username) {
-        usernames.push({ username: cred.expedia_username, otaType: 'expedia' })
-      }
-      if (cred.agoda_username) {
-        usernames.push({ username: cred.agoda_username, otaType: 'agoda' })
-      }
-      if (cred.booking_username) {
-        usernames.push({ username: cred.booking_username, otaType: 'booking' })
-      }
+    // Return cached data if valid
+    if (this.isCacheValid(this.otaUsernamesCache)) {
+      return this.otaUsernamesCache.data
     }
 
-    // Remove duplicates and sort
-    const uniqueUsernames = usernames.filter(
-      (item, index, self) =>
-        index === self.findIndex(t => t.username === item.username && t.otaType === item.otaType)
-    )
-
-    return uniqueUsernames.sort((a, b) => {
-      if (a.otaType !== b.otaType) {
-        return a.otaType.localeCompare(b.otaType)
-      }
-      return a.username.localeCompare(b.username)
+    // Use MongoDB aggregation for efficient deduplication at DB level
+    const result = await this.prisma.propertyCredentials.aggregateRaw({
+      pipeline: [
+        // Project each OTA username as separate documents
+        {
+          $project: {
+            items: {
+              $filter: {
+                input: [
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$expedia_username', null] }, { $ne: ['$expedia_username', ''] }] },
+                      { username: '$expedia_username', otaType: 'expedia' },
+                      null
+                    ]
+                  },
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$agoda_username', null] }, { $ne: ['$agoda_username', ''] }] },
+                      { username: '$agoda_username', otaType: 'agoda' },
+                      null
+                    ]
+                  },
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$booking_username', null] }, { $ne: ['$booking_username', ''] }] },
+                      { username: '$booking_username', otaType: 'booking' },
+                      null
+                    ]
+                  }
+                ],
+                as: 'item',
+                cond: { $ne: ['$$item', null] }
+              }
+            }
+          }
+        },
+        // Unwind the array to get individual documents
+        { $unwind: '$items' },
+        // Group by username and otaType to remove duplicates
+        {
+          $group: {
+            _id: { username: '$items.username', otaType: '$items.otaType' }
+          }
+        },
+        // Project to final format
+        {
+          $project: {
+            _id: 0,
+            username: '$_id.username',
+            otaType: '$_id.otaType'
+          }
+        },
+        // Sort by otaType, then username
+        { $sort: { otaType: 1, username: 1 } }
+      ]
     })
+
+    const data = result as unknown as OtaUsernameItem[]
+
+    // Cache the result
+    this.otaUsernamesCache = { data, timestamp: Date.now() }
+
+    return data
   }
 
   /**
    * Get all OTA passwords from PropertyCredentials (encrypted)
+   * Uses MongoDB aggregation for efficient deduplication and in-memory caching
+   *
+   * Note: Passwords are returned encrypted. Decryption happens in the service layer
+   * with parallel processing for performance.
    */
   async findAllOtaPasswords(): Promise<{ password: string; otaType: string }[]> {
-    const credentials = await this.prisma.propertyCredentials.findMany({
-      select: {
-        expedia_password: true,
-        agoda_password: true,
-        booking_password: true
-      }
-    })
-
-    const passwords: { password: string; otaType: string }[] = []
-
-    for (const cred of credentials) {
-      if (cred.expedia_password) {
-        passwords.push({ password: cred.expedia_password, otaType: 'expedia' })
-      }
-      if (cred.agoda_password) {
-        passwords.push({ password: cred.agoda_password, otaType: 'agoda' })
-      }
-      if (cred.booking_password) {
-        passwords.push({ password: cred.booking_password, otaType: 'booking' })
-      }
+    // Return cached data if valid
+    if (this.isCacheValid(this.otaPasswordsCache)) {
+      return this.otaPasswordsCache.data
     }
 
-    // Remove duplicates and sort
-    const uniquePasswords = passwords.filter(
-      (item, index, self) =>
-        index === self.findIndex(t => t.password === item.password && t.otaType === item.otaType)
-    )
-
-    return uniquePasswords.sort((a, b) => {
-      if (a.otaType !== b.otaType) {
-        return a.otaType.localeCompare(b.otaType)
-      }
-      return a.password.localeCompare(b.password)
+    // Use MongoDB aggregation for efficient deduplication at DB level
+    const result = await this.prisma.propertyCredentials.aggregateRaw({
+      pipeline: [
+        // Project each OTA password as separate documents
+        {
+          $project: {
+            items: {
+              $filter: {
+                input: [
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$expedia_password', null] }, { $ne: ['$expedia_password', ''] }] },
+                      { password: '$expedia_password', otaType: 'expedia' },
+                      null
+                    ]
+                  },
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$agoda_password', null] }, { $ne: ['$agoda_password', ''] }] },
+                      { password: '$agoda_password', otaType: 'agoda' },
+                      null
+                    ]
+                  },
+                  {
+                    $cond: [
+                      { $and: [{ $ne: ['$booking_password', null] }, { $ne: ['$booking_password', ''] }] },
+                      { password: '$booking_password', otaType: 'booking' },
+                      null
+                    ]
+                  }
+                ],
+                as: 'item',
+                cond: { $ne: ['$$item', null] }
+              }
+            }
+          }
+        },
+        // Unwind the array to get individual documents
+        { $unwind: '$items' },
+        // Group by password and otaType to remove duplicates
+        {
+          $group: {
+            _id: { password: '$items.password', otaType: '$items.otaType' }
+          }
+        },
+        // Project to final format
+        {
+          $project: {
+            _id: 0,
+            password: '$_id.password',
+            otaType: '$_id.otaType'
+          }
+        },
+        // Sort by otaType, then password
+        { $sort: { otaType: 1, password: 1 } }
+      ]
     })
+
+    const data = result as unknown as { password: string; otaType: string }[]
+
+    // Cache the result
+    this.otaPasswordsCache = { data, timestamp: Date.now() }
+
+    return data
+  }
+
+  /**
+   * Get all portfolios (id and name only)
+   * Uses MongoDB aggregation for efficient projection and in-memory caching
+   */
+  async findAllPortfolios(): Promise<PortfolioListItem[]> {
+    // Return cached data if valid
+    if (this.isCacheValid(this.portfoliosCache)) {
+      return this.portfoliosCache.data
+    }
+
+    // Use MongoDB aggregation for efficient projection at DB level
+    const result = await this.prisma.portfolio.aggregateRaw({
+      pipeline: [
+        // Project only id and name fields
+        {
+          $project: {
+            _id: 0,
+            id: { $toString: '$_id' },
+            name: 1
+          }
+        },
+        // Sort by name
+        { $sort: { name: 1 } }
+      ]
+    })
+
+    const data = result as unknown as PortfolioListItem[]
+
+    // Cache the result
+    this.portfoliosCache = { data, timestamp: Date.now() }
+
+    return data
+  }
+
+  /**
+   * Get all properties (id and name only)
+   * Uses MongoDB aggregation for efficient projection and in-memory caching
+   */
+  async findAllProperties(): Promise<PropertyListItem[]> {
+    // Return cached data if valid
+    if (this.isCacheValid(this.propertiesCache)) {
+      return this.propertiesCache.data
+    }
+
+    // Use MongoDB aggregation for efficient projection at DB level
+    const result = await this.prisma.property.aggregateRaw({
+      pipeline: [
+        // Project only id and name fields
+        {
+          $project: {
+            _id: 0,
+            id: { $toString: '$_id' },
+            name: 1
+          }
+        },
+        // Sort by name
+        { $sort: { name: 1 } }
+      ]
+    })
+
+    const data = result as unknown as PropertyListItem[]
+
+    // Cache the result
+    this.propertiesCache = { data, timestamp: Date.now() }
+
+    return data
   }
 }

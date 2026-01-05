@@ -25,7 +25,9 @@ import {
   OtaIdsResponseDto,
   PortfolioContactEmailsResponseDto,
   OtaUsernamesResponseDto,
-  OtaPasswordsResponseDto
+  OtaPasswordsResponseDto,
+  PortfoliosListResponseDto,
+  PropertiesListResponseDto
 } from './global-report.dto'
 import type { IGlobalReportService } from './global-report.interface'
 
@@ -136,6 +138,48 @@ export class GlobalReportController {
     @CurrentUser() user: IUserWithPermissions
   ): Promise<OtaPasswordsResponseDto> {
     return this.globalReportService.getOtaPasswords(user)
+  }
+
+  @Get('portfolios')
+  @ApiOperation({
+    summary: 'Get all portfolios (id and name only) for filtering (Super Admin only)',
+    description:
+      'Returns all portfolios with only id and name fields. Optimized for fast loading with in-memory caching. Use this to populate portfolio filter dropdowns.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Portfolios list retrieved successfully',
+    type: PortfoliosListResponseDto
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getPortfolios(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<PortfoliosListResponseDto> {
+    return await this.globalReportService.getPortfolios(user)
+  }
+
+  @Get('properties')
+  @ApiOperation({
+    summary: 'Get all properties (id and name only) for filtering (Super Admin only)',
+    description:
+      'Returns all properties with only id and name fields. Optimized for fast loading with in-memory caching. Use this to populate property filter dropdowns.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Properties list retrieved successfully',
+    type: PropertiesListResponseDto
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getProperties(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<PropertiesListResponseDto> {
+    return await this.globalReportService.getProperties(user)
   }
 
   @Post()
