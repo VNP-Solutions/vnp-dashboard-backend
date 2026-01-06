@@ -11,7 +11,8 @@ import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
   ParallelProcessor,
-  createDecryptionProcessor
+  createDecryptionProcessor,
+  deriveEncryptionKey
 } from '../../common/utils/parallel-processor.util'
 import { Configuration } from '../../config/configuration'
 import {
@@ -45,6 +46,12 @@ export class GlobalReportService implements IGlobalReportService {
   private readonly encryptionSecret: string
   private readonly parallelWorkers: number
 
+  /**
+   * Pre-derived encryption key (as hex string)
+   * Derived once at startup to avoid expensive scryptSync calls during decryption
+   */
+  private readonly derivedKey: string
+
   /** Cache TTL in milliseconds (5 minutes) */
   private readonly CACHE_TTL = 5 * 60 * 1000
 
@@ -63,6 +70,9 @@ export class GlobalReportService implements IGlobalReportService {
     this.parallelWorkers = this.configService.get('parallel.workers', {
       infer: true
     }) ?? 8
+
+    // Pre-derive the encryption key once at startup (scryptSync is expensive)
+    this.derivedKey = deriveEncryptionKey(this.encryptionSecret)
   }
 
   /**
@@ -256,13 +266,14 @@ export class GlobalReportService implements IGlobalReportService {
     const encryptedPasswords = await this.globalReportRepository.findAllOtaPasswords()
 
     // Decrypt passwords using parallel processing for large datasets
+    // Uses pre-derived key to avoid expensive scryptSync calls per password
     const decryptedPasswords = await ParallelProcessor.processWithWorkers<
       { password: string; otaType: string },
       { password: string; otaType: string }
     >(
       encryptedPasswords,
       createDecryptionProcessor(),
-      { secret: this.encryptionSecret },
+      { derivedKey: this.derivedKey },
       { workerCount: this.parallelWorkers }
     )
 
@@ -393,6 +404,7 @@ export class GlobalReportService implements IGlobalReportService {
     }
 
     // Step 2: Decrypt all passwords in parallel
+    // Uses pre-derived key to avoid expensive scryptSync calls per password
     if (passwordsToDecrypt.length > 0) {
       const decryptedPasswords = await ParallelProcessor.processWithWorkers<
         { password: string; index: number },
@@ -402,14 +414,15 @@ export class GlobalReportService implements IGlobalReportService {
         `
           const crypto = require('crypto');
           const ALGORITHM = 'aes-256-cbc';
-          const secret = context.secret;
+
+          // Use pre-derived key (major performance optimization)
+          const key = Buffer.from(context.derivedKey, 'hex');
 
           try {
             const parts = item.password.split(':');
             const iv = Buffer.from(parts[0], 'hex');
             const encrypted = parts[1];
 
-            const key = crypto.scryptSync(secret, 'salt', 32);
             const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
 
             let decrypted = decipher.update(encrypted, 'hex', 'utf8');
@@ -424,7 +437,7 @@ export class GlobalReportService implements IGlobalReportService {
             return null;
           }
         `,
-        { secret: this.encryptionSecret },
+        { derivedKey: this.derivedKey },
         { workerCount: this.parallelWorkers }
       )
 
