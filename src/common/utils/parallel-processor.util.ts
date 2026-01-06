@@ -240,19 +240,26 @@ export class ParallelProcessor {
 /**
  * Helper to create a processor code string for decryption
  * This is needed because worker threads can't directly share function references
+ *
+ * OPTIMIZATION: If context.derivedKey is provided (as hex string), uses it directly
+ * instead of calling scryptSync for each item. This avoids repeated expensive key derivation.
  */
 export function createDecryptionProcessor(): string {
   return `
     const crypto = require('crypto');
 
     const ALGORITHM = 'aes-256-cbc';
-    const secret = context.secret;
+
+    // Use pre-derived key if available (major performance optimization)
+    // Otherwise fall back to deriving key (for backwards compatibility)
+    const key = context.derivedKey
+      ? Buffer.from(context.derivedKey, 'hex')
+      : crypto.scryptSync(context.secret, 'salt', 32);
 
     const parts = item.password.split(':');
     const iv = Buffer.from(parts[0], 'hex');
     const encrypted = parts[1];
 
-    const key = crypto.scryptSync(secret, 'salt', 32);
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
 
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
@@ -263,4 +270,20 @@ export function createDecryptionProcessor(): string {
       otaType: item.otaType
     };
   `
+}
+
+/**
+ * Pre-derive the encryption key from a secret
+ * Call this ONCE and pass the result to workers via context.derivedKey
+ *
+ * This avoids calling scryptSync (expensive) for every single item being decrypted.
+ *
+ * @param secret - The encryption secret
+ * @returns The derived key as a hex string (can be passed to workers)
+ */
+export function deriveEncryptionKey(secret: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const crypto = require('crypto')
+  const key = crypto.scryptSync(secret, 'salt', 32)
+  return key.toString('hex')
 }
