@@ -38,7 +38,11 @@ interface DecryptedPasswordsCacheEntry {
 
 @Injectable()
 export class GlobalReportService implements IGlobalReportService {
-  private readonly encryptionSecret: string
+  /**
+   * Pre-derived encryption key for fast bulk decryption
+   * Derived once at startup to avoid expensive scryptSync calls
+   */
+  private readonly encryptionKey: Buffer
 
   /** Cache TTL in milliseconds (5 minutes) */
   private readonly CACHE_TTL = 5 * 60 * 1000
@@ -52,9 +56,11 @@ export class GlobalReportService implements IGlobalReportService {
     @Inject(ConfigService)
     private configService: ConfigService<Configuration>
   ) {
-    this.encryptionSecret = this.configService.get('encryption.secret', {
+    // Pre-derive the encryption key once at startup (scryptSync is expensive)
+    const encryptionSecret = this.configService.get('encryption.secret', {
       infer: true
     })!
+    this.encryptionKey = EncryptionUtil.deriveKey(encryptionSecret)
   }
 
   /**
@@ -247,11 +253,11 @@ export class GlobalReportService implements IGlobalReportService {
 
     const encryptedPasswords = await this.globalReportRepository.findAllOtaPasswords()
 
-    // Decrypt passwords using EncryptionUtil
+    // Decrypt passwords using pre-derived key (fast)
     const decryptedPasswords: { password: string; otaType: string }[] = []
     for (const item of encryptedPasswords) {
       try {
-        const decrypted = EncryptionUtil.decrypt(item.password, this.encryptionSecret)
+        const decrypted = EncryptionUtil.decryptWithKey(item.password, this.encryptionKey)
         decryptedPasswords.push({ password: decrypted, otaType: item.otaType })
       } catch {
         // If decryption fails, skip this password
@@ -370,9 +376,9 @@ export class GlobalReportService implements IGlobalReportService {
         const encryptedPassword = credentials[passwordField]
 
         if (encryptedPassword && !passwordMap.has(encryptedPassword)) {
-          // Decrypt the password
+          // Decrypt the password using pre-derived key (fast)
           try {
-            const decrypted = EncryptionUtil.decrypt(encryptedPassword, this.encryptionSecret)
+            const decrypted = EncryptionUtil.decryptWithKey(encryptedPassword, this.encryptionKey)
             passwordMap.set(encryptedPassword, decrypted)
           } catch {
             // If decryption fails, store empty string
