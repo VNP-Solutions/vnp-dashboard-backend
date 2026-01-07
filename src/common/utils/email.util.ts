@@ -14,6 +14,7 @@ import { PrismaService } from '../../modules/prisma/prisma.service'
 @Injectable()
 export class EmailUtil {
   private transporter: nodemailer.Transporter
+  private static smtpVerified = false
 
   constructor(
     private configService: ConfigService<Configuration>,
@@ -36,18 +37,21 @@ export class EmailUtil {
         rejectUnauthorized: true,
         minVersion: 'TLSv1.2'
       },
-      logger: process.env.NODE_ENV === 'development', // Enable logging in dev
-      debug: process.env.NODE_ENV === 'development'
+      logger: false,
+      debug: false
     })
 
-    // Verify transporter configuration on startup
-    this.transporter.verify((error) => {
-      if (error) {
-        console.error('SMTP configuration error:', error)
-      } else {
-        console.log('SMTP server is ready to send emails')
-      }
-    })
+    // Verify transporter configuration on startup (only log once)
+    if (!EmailUtil.smtpVerified) {
+      EmailUtil.smtpVerified = true
+      this.transporter.verify((error) => {
+        if (error) {
+          console.error('\x1b[31mSMTP connection failed: %s\x1b[0m', error instanceof Error ? error.message : String(error))
+        } else {
+          console.log('SMTP is ready to send emails')
+        }
+      })
+    }
   }
 
   async sendOtpEmail(email: string, otp: number): Promise<void> {
