@@ -9,11 +9,6 @@ import * as XLSX from 'xlsx'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
-import {
-  ParallelProcessor,
-  createDecryptionProcessor,
-  deriveEncryptionKey
-} from '../../common/utils/parallel-processor.util'
 import { Configuration } from '../../config/configuration'
 import {
   REPORT_COLUMNS,
@@ -44,13 +39,6 @@ interface DecryptedPasswordsCacheEntry {
 @Injectable()
 export class GlobalReportService implements IGlobalReportService {
   private readonly encryptionSecret: string
-  private readonly parallelWorkers: number
-
-  /**
-   * Pre-derived encryption key (as hex string)
-   * Derived once at startup to avoid expensive scryptSync calls during decryption
-   */
-  private readonly derivedKey: string
 
   /** Cache TTL in milliseconds (5 minutes) */
   private readonly CACHE_TTL = 5 * 60 * 1000
@@ -67,12 +55,6 @@ export class GlobalReportService implements IGlobalReportService {
     this.encryptionSecret = this.configService.get('encryption.secret', {
       infer: true
     })!
-    this.parallelWorkers = this.configService.get('parallel.workers', {
-      infer: true
-    }) ?? 8
-
-    // Pre-derive the encryption key once at startup (scryptSync is expensive)
-    this.derivedKey = deriveEncryptionKey(this.encryptionSecret)
   }
 
   /**
@@ -116,7 +98,7 @@ export class GlobalReportService implements IGlobalReportService {
     })
 
     // Transform raw MongoDB documents to response DTOs with parallel password decryption
-    const transformedData = await this.transformReportDataWithParallelDecryption(data)
+    const transformedData = this.transformReportDataWithDecryption(data)
 
     return {
       data: transformedData,
@@ -154,7 +136,7 @@ export class GlobalReportService implements IGlobalReportService {
     })
 
     // Transform data with parallel password decryption
-    const transformedData = await this.transformReportDataWithParallelDecryption(data)
+    const transformedData = this.transformReportDataWithDecryption(data)
 
     // Determine columns to export
     const columnsToExport = query.columns?.length
@@ -265,17 +247,16 @@ export class GlobalReportService implements IGlobalReportService {
 
     const encryptedPasswords = await this.globalReportRepository.findAllOtaPasswords()
 
-    // Decrypt passwords using parallel processing for large datasets
-    // Uses pre-derived key to avoid expensive scryptSync calls per password
-    const decryptedPasswords = await ParallelProcessor.processWithWorkers<
-      { password: string; otaType: string },
-      { password: string; otaType: string }
-    >(
-      encryptedPasswords,
-      createDecryptionProcessor(),
-      { derivedKey: this.derivedKey },
-      { workerCount: this.parallelWorkers }
-    )
+    // Decrypt passwords using EncryptionUtil
+    const decryptedPasswords: { password: string; otaType: string }[] = []
+    for (const item of encryptedPasswords) {
+      try {
+        const decrypted = EncryptionUtil.decrypt(item.password, this.encryptionSecret)
+        decryptedPasswords.push({ password: decrypted, otaType: item.otaType })
+      } catch {
+        // If decryption fails, skip this password
+      }
+    }
 
     // Sort by otaType then password (to match previous behavior)
     decryptedPasswords.sort((a, b) => {
@@ -371,19 +352,14 @@ export class GlobalReportService implements IGlobalReportService {
   }
 
   /**
-   * Transform report data with parallel password decryption
+   * Transform report data with password decryption
    *
-   * This method optimizes the transformation by:
-   * 1. Extracting all unique encrypted passwords from the data
-   * 2. Decrypting them in parallel using worker threads
-   * 3. Using the pre-decrypted passwords during row transformation
-   *
-   * This is significantly faster than decrypting passwords one-by-one for each row.
+   * Passwords are stored encrypted (iv:encrypted format).
+   * This method decrypts them using EncryptionUtil.
    */
-  private async transformReportDataWithParallelDecryption(data: any[]): Promise<ReportRowDto[]> {
+  private transformReportDataWithDecryption(data: any[]): ReportRowDto[] {
     // Step 1: Extract all unique encrypted passwords
-    const encryptedPasswordsMap = new Map<string, string>() // encrypted -> placeholder
-    const passwordsToDecrypt: { password: string; index: number }[] = []
+    const passwordMap = new Map<string, string>() // encrypted -> decrypted
 
     for (const doc of data) {
       const otaType = doc.type_of_ota?.toLowerCase()
@@ -393,64 +369,21 @@ export class GlobalReportService implements IGlobalReportService {
         const passwordField = `${otaType}_password`
         const encryptedPassword = credentials[passwordField]
 
-        if (encryptedPassword && !encryptedPasswordsMap.has(encryptedPassword)) {
-          encryptedPasswordsMap.set(encryptedPassword, '')
-          passwordsToDecrypt.push({
-            password: encryptedPassword,
-            index: passwordsToDecrypt.length
-          })
-        }
-      }
-    }
-
-    // Step 2: Decrypt all passwords in parallel
-    // Uses pre-derived key to avoid expensive scryptSync calls per password
-    if (passwordsToDecrypt.length > 0) {
-      const decryptedPasswords = await ParallelProcessor.processWithWorkers<
-        { password: string; index: number },
-        { password: string; decrypted: string; index: number }
-      >(
-        passwordsToDecrypt,
-        `
-          const crypto = require('crypto');
-          const ALGORITHM = 'aes-256-cbc';
-
-          // Use pre-derived key (major performance optimization)
-          const key = Buffer.from(context.derivedKey, 'hex');
-
+        if (encryptedPassword && !passwordMap.has(encryptedPassword)) {
+          // Decrypt the password
           try {
-            const parts = item.password.split(':');
-            const iv = Buffer.from(parts[0], 'hex');
-            const encrypted = parts[1];
-
-            const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-
-            let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-            decrypted += decipher.final('utf8');
-
-            return {
-              password: item.password,
-              decrypted: decrypted,
-              index: item.index
-            };
-          } catch (err) {
-            return null;
+            const decrypted = EncryptionUtil.decrypt(encryptedPassword, this.encryptionSecret)
+            passwordMap.set(encryptedPassword, decrypted)
+          } catch {
+            // If decryption fails, store empty string
+            passwordMap.set(encryptedPassword, '')
           }
-        `,
-        { derivedKey: this.derivedKey },
-        { workerCount: this.parallelWorkers }
-      )
-
-      // Build the decryption map
-      for (const result of decryptedPasswords) {
-        if (result) {
-          encryptedPasswordsMap.set(result.password, result.decrypted)
         }
       }
     }
 
-    // Step 3: Transform data using pre-decrypted passwords
-    return data.map(doc => this.transformToReportRowWithDecryptedPasswords(doc, encryptedPasswordsMap))
+    // Step 2: Transform data using password map
+    return data.map(doc => this.transformToReportRowWithDecryptedPasswords(doc, passwordMap))
   }
 
   /**
@@ -458,7 +391,7 @@ export class GlobalReportService implements IGlobalReportService {
    */
   private transformToReportRowWithDecryptedPasswords(
     doc: any,
-    decryptedPasswordsMap: Map<string, string>
+    passwordMap: Map<string, string>
   ): ReportRowDto {
     const otaType = doc.type_of_ota || null
     const credentials = doc.credentials || {}
@@ -467,15 +400,8 @@ export class GlobalReportService implements IGlobalReportService {
     const otaId = this.getOtaFieldValue(otaType, credentials, 'id')
     const otaUsername = this.getOtaFieldValue(otaType, credentials, 'username')
 
-    // Get password from pre-decrypted map
-    let otaPassword: string | null = null
-    if (otaType && credentials) {
-      const passwordField = `${otaType.toLowerCase()}_password`
-      const encryptedPassword = credentials[passwordField]
-      if (encryptedPassword) {
-        otaPassword = decryptedPasswordsMap.get(encryptedPassword) || null
-      }
-    }
+    // Get password - use the same field access pattern as username
+    const otaPassword = this.getOtaPassword(otaType, credentials, passwordMap)
 
     // Extract audit ID from MongoDB document
     const auditId = this.extractObjectId(doc._id)
@@ -519,58 +445,25 @@ export class GlobalReportService implements IGlobalReportService {
   }
 
   /**
-   * Transform raw MongoDB document to ReportRowDto
-   * @deprecated Use transformReportDataWithParallelDecryption for better performance
+   * Get OTA password based on otaType
+   * Handles both plain text and encrypted passwords via passwordMap
    */
-  private transformToReportRow(doc: any): ReportRowDto {
-    const otaType = doc.type_of_ota || null
-    const credentials = doc.credentials || {}
+  private getOtaPassword(
+    otaType: string | null,
+    credentials: any,
+    passwordMap: Map<string, string>
+  ): string | null {
+    if (!otaType || !credentials) return null
 
-    // Compute OTA ID, Username and Password based on otaType
-    const otaId = this.getOtaField(otaType, credentials, 'id')
-    const otaUsername = this.getOtaField(otaType, credentials, 'username')
-    const otaPassword = this.getOtaField(otaType, credentials, 'password')
+    const otaLower = otaType.toLowerCase()
+    const passwordField = `${otaLower}_password`
+    const rawPassword = credentials[passwordField]
 
-    // Extract audit ID from MongoDB document
-    // MongoDB aggregateRaw returns _id as { $oid: "..." } format
-    const auditId = this.extractObjectId(doc._id)
+    if (!rawPassword) return null
 
-    return {
-      // Unique identifier
-      auditId,
-      // 1. Portfolio
-      portfolioName: doc.portfolio?.name || '',
-      // 2. Property
-      propertyName: doc.property?.name || '',
-      // 3. Service Type
-      serviceType: doc.serviceType?.type || null,
-      // 4. Billing Type
-      billingType: doc.billing_type || null,
-      // 5. OTA Type
-      otaType,
-      // 6. OTA ID
-      otaId,
-      // 7. OTA Review Status
-      auditStatus: doc.auditStatus?.status || null,
-      // 8. Start Date
-      startDate: this.extractDate(doc.start_date),
-      // 9. End Date
-      endDate: this.extractDate(doc.end_date),
-      // 10. Next Due Date
-      nextDueDate: this.extractDate(doc.property?.next_due_date),
-      // 11. Currency
-      currency: doc.currency?.code || '',
-      // 12. Amount Collectable
-      amountCollectable: doc.amount_collectable ?? null,
-      // 13. Amount Confirmed
-      amountConfirmed: doc.amount_confirmed ?? null,
-      // 14. Portfolio Contact Email
-      portfolioContactEmail: doc.portfolio?.contact_email || null,
-      // 15. OTA Username
-      otaUsername,
-      // 16. OTA Password
-      otaPassword
-    }
+    // Look up in password map first (for decrypted passwords)
+    // Fall back to raw password (for plain text passwords not in map)
+    return passwordMap.get(rawPassword) ?? rawPassword
   }
 
   /**
@@ -621,43 +514,6 @@ export class GlobalReportService implements IGlobalReportService {
     }
 
     return null
-  }
-
-  /**
-   * Get OTA-specific field (id, username, or password) based on otaType
-   * Passwords are decrypted before returning
-   */
-  private getOtaField(otaType: string | null, credentials: any, fieldType: 'id' | 'username' | 'password'): string | null {
-    if (!otaType) return null
-
-    const otaLower = otaType.toLowerCase()
-    let value: string | null = null
-
-    switch (otaLower) {
-      case 'expedia':
-        value = credentials[`expedia_${fieldType}`] || null
-        break
-      case 'agoda':
-        value = credentials[`agoda_${fieldType}`] || null
-        break
-      case 'booking':
-        value = credentials[`booking_${fieldType}`] || null
-        break
-      default:
-        return null
-    }
-
-    // Decrypt password if it exists
-    if (fieldType === 'password' && value) {
-      try {
-        return EncryptionUtil.decrypt(value, this.encryptionSecret)
-      } catch {
-        // If decryption fails, return null
-        return null
-      }
-    }
-
-    return value
   }
 
   /**
