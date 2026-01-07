@@ -42,6 +42,31 @@ export class EncryptionUtil {
     return decrypted
   }
 
+  /**
+   * Derive the encryption key from a secret.
+   * Call this once and reuse the key for multiple decryptions.
+   * This avoids the expensive scryptSync call for each decryption.
+   */
+  static deriveKey(secret: string): Buffer {
+    return crypto.scryptSync(secret, 'salt', 32)
+  }
+
+  /**
+   * Decrypt using a pre-derived key (much faster for bulk operations)
+   */
+  static decryptWithKey(encryptedText: string, key: Buffer): string {
+    const parts = encryptedText.split(':')
+    const iv = Buffer.from(parts[0], 'hex')
+    const encrypted = parts[1]
+
+    const decipher = crypto.createDecipheriv(this.ALGORITHM, key, iv)
+
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8')
+    decrypted += decipher.final('utf8')
+
+    return decrypted
+  }
+
   static generateOtp(): number {
     return Math.floor(100000 + Math.random() * 900000)
   }
