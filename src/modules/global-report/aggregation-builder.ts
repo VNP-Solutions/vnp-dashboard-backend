@@ -160,106 +160,102 @@ export class AggregationBuilder {
 
   /**
    * Add $lookup stages for required collections
+   * Note: Some lookups depend on prior lookups being unwound first
    */
   private addLookupStages(): void {
-    // Define lookup order to handle dependencies
-    const lookupOrder = [
-      'auditStatus',
-      'property',
-      'credentials',
-      'portfolio',
-      'currency',
-      'serviceType'
-    ]
+    // Stage 1: Lookups that don't depend on other lookups
+    if (this.requiredLookups.has('auditStatus')) {
+      this.pipeline.push({
+        $lookup: {
+          from: 'AuditStatus',
+          localField: 'audit_status_id',
+          foreignField: '_id',
+          as: 'auditStatus'
+        }
+      })
+    }
 
-    for (const lookupName of lookupOrder) {
-      if (!this.requiredLookups.has(lookupName)) continue
+    if (this.requiredLookups.has('property')) {
+      this.pipeline.push({
+        $lookup: {
+          from: 'Property',
+          localField: 'property_id',
+          foreignField: '_id',
+          as: 'property'
+        }
+      })
+      // Unwind property immediately - needed for subsequent lookups
+      this.pipeline.push({
+        $unwind: {
+          path: '$property',
+          preserveNullAndEmptyArrays: true
+        }
+      })
+    }
 
-      switch (lookupName) {
-        case 'auditStatus':
-          this.pipeline.push({
-            $lookup: {
-              from: 'AuditStatus',
-              localField: 'audit_status_id',
-              foreignField: '_id',
-              as: 'auditStatus'
-            }
-          })
-          break
+    // Stage 2: Lookups that depend on property being unwound
+    if (this.requiredLookups.has('credentials')) {
+      this.pipeline.push({
+        $lookup: {
+          from: 'PropertyCredentials',
+          localField: 'property._id',
+          foreignField: 'property_id',
+          as: 'credentials'
+        }
+      })
+    }
 
-        case 'property':
-          this.pipeline.push({
-            $lookup: {
-              from: 'Property',
-              localField: 'property_id',
-              foreignField: '_id',
-              as: 'property'
-            }
-          })
-          break
+    if (this.requiredLookups.has('portfolio')) {
+      this.pipeline.push({
+        $lookup: {
+          from: 'Portfolio',
+          localField: 'property.portfolio_id',
+          foreignField: '_id',
+          as: 'portfolio'
+        }
+      })
+      // Unwind portfolio immediately - needed for serviceType lookup
+      this.pipeline.push({
+        $unwind: {
+          path: '$portfolio',
+          preserveNullAndEmptyArrays: true
+        }
+      })
+    }
 
-        case 'credentials':
-          // Credentials lookup uses property_id from the property subdocument
-          this.pipeline.push({
-            $lookup: {
-              from: 'PropertyCredentials',
-              localField: 'property._id',
-              foreignField: 'property_id',
-              as: 'credentials'
-            }
-          })
-          break
+    if (this.requiredLookups.has('currency')) {
+      this.pipeline.push({
+        $lookup: {
+          from: 'Currency',
+          localField: 'property.currency_id',
+          foreignField: '_id',
+          as: 'currency'
+        }
+      })
+    }
 
-        case 'portfolio':
-          this.pipeline.push({
-            $lookup: {
-              from: 'Portfolio',
-              localField: 'property.portfolio_id',
-              foreignField: '_id',
-              as: 'portfolio'
-            }
-          })
-          break
-
-        case 'currency':
-          this.pipeline.push({
-            $lookup: {
-              from: 'Currency',
-              localField: 'property.currency_id',
-              foreignField: '_id',
-              as: 'currency'
-            }
-          })
-          break
-
-        case 'serviceType':
-          this.pipeline.push({
-            $lookup: {
-              from: 'ServiceType',
-              localField: 'portfolio.service_type_id',
-              foreignField: '_id',
-              as: 'serviceType'
-            }
-          })
-          break
-      }
+    // Stage 3: Lookups that depend on portfolio being unwound
+    if (this.requiredLookups.has('serviceType')) {
+      this.pipeline.push({
+        $lookup: {
+          from: 'ServiceType',
+          localField: 'portfolio.service_type_id',
+          foreignField: '_id',
+          as: 'serviceType'
+        }
+      })
     }
   }
 
   /**
-   * Add $unwind stages to convert arrays to single objects
+   * Add $unwind stages for remaining arrays
+   * Note: property and portfolio are already unwound in addLookupStages
    */
   private addUnwindStages(): void {
-    const unwindFields = [
-      'auditStatus',
-      'property',
-      'credentials',
-      'portfolio',
-      'currency',
-      'serviceType'
-    ]
+    // Only unwind fields that weren't already unwound in addLookupStages
+    const fieldsToUnwind = ['auditStatus', 'credentials', 'currency', 'serviceType']
 
-    for (const field of unwindFields) {
+    for (const field of fieldsToUnwind) {
       if (this.requiredLookups.has(field)) {
         this.pipeline.push({
           $unwind: {
