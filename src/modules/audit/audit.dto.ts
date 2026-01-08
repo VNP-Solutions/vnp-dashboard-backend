@@ -147,8 +147,8 @@ export class AuditQueryDto extends QueryDto {
 
   @ApiPropertyOptional({
     description:
-      'Filter by status IDs. Multiple status IDs can be provided as comma-separated string, e.g., "507f1f77bcf86cd799439011,507f1f77bcf86cd799439012"',
-    example: '507f1f77bcf86cd799439011,507f1f77bcf86cd799439012'
+      'Filter by status category (pending, upcoming, completed) or by specific status IDs. For categories, use single values: "pending", "upcoming", or "completed". For status IDs, multiple IDs can be provided as comma-separated string, e.g., "507f1f77bcf86cd799439011,507f1f77bcf86cd799439012"',
+    example: 'upcoming'
   })
   @IsOptional()
   @IsString()

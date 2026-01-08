@@ -14,7 +14,12 @@
       "Bash(npx prisma generate:*)",
       "Bash(findstr:*)",
       "Bash(node -e:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(yarn start:dev:*)",
+      "Bash(timeout /t 15)",
+      "Bash(taskkill /F /PID 39956)",
+      "Bash(netstat:*)",
+      "Bash(taskkill //F //PID 39956)"
     ],
     "deny": [],
     "ask": []

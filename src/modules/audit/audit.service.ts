@@ -16,7 +16,8 @@ import { PermissionService } from '../../common/services/permission.service'
 import {
   COMPLETED_AUDIT_STATUSES,
   canArchiveAudit,
-  getArchiveErrorMessage
+  getArchiveErrorMessage,
+  getStatusesByCategory
 } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import {
@@ -63,6 +64,39 @@ export class AuditService implements IAuditService {
     @Inject(EmailUtil)
     private emailUtil: EmailUtil
   ) {}
+
+  /**
+   * Helper method to convert status category or status IDs to actual status IDs
+   * @param statusParam - Can be 'pending', 'upcoming', 'completed', or comma-separated status IDs
+   * @returns Array of status IDs or null if no valid status found
+   */
+  private async resolveStatusIds(statusParam: string): Promise<string[] | null> {
+    const trimmedStatus = statusParam.trim().toLowerCase()
+
+    // Check if it's a status category
+    const validCategories = ['pending', 'upcoming', 'completed'] as const
+    type StatusCategory = typeof validCategories[number]
+
+    if (validCategories.includes(trimmedStatus as StatusCategory)) {
+      const statusNames = getStatusesByCategory(trimmedStatus as StatusCategory)
+
+      // Fetch all audit statuses and filter by names (case-insensitive)
+      const allStatuses = await this.auditStatusRepository.findAll()
+      const matchingStatuses = allStatuses.filter(status =>
+        statusNames.some(name => name.toLowerCase() === status.status.toLowerCase())
+      )
+
+      return matchingStatuses.length > 0 ? matchingStatuses.map(s => s.id) : []
+    }
+
+    // Otherwise, treat as comma-separated status IDs
+    const statusIds = statusParam
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => s)
+
+    return statusIds.length > 0 ? statusIds : null
+  }
 
   async create(data: CreateAuditDto, _user: IUserWithPermissions) {
     // Validate date range only if both dates are provided
@@ -279,14 +313,11 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Add status ID filter if provided (supports comma-separated values)
+    // Add status filter if provided (supports categories: pending/upcoming/completed or comma-separated status IDs)
     if (query.status) {
-      const statusIds = query.status
-        .split(',')
-        .map(s => s.trim())
-        .filter(s => s)
+      const statusIds = await this.resolveStatusIds(query.status)
 
-      if (statusIds.length > 0) {
+      if (statusIds && statusIds.length > 0) {
         finalWhere = {
           ...finalWhere,
           audit_status_id: {
@@ -535,14 +566,11 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Add status ID filter if provided (supports comma-separated values)
+    // Add status filter if provided (supports categories: pending/upcoming/completed or comma-separated status IDs)
     if (query.status) {
-      const statusIds = query.status
-        .split(',')
-        .map(s => s.trim())
-        .filter(s => s)
+      const statusIds = await this.resolveStatusIds(query.status)
 
-      if (statusIds.length > 0) {
+      if (statusIds && statusIds.length > 0) {
         finalWhere = {
           ...finalWhere,
           audit_status_id: {
