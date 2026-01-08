@@ -80,7 +80,7 @@ export class AuditController {
   @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get all audits accessible to the user with pagination, search, filter, and sort. Filter by status IDs: Multiple status IDs can be provided as comma-separated values (e.g., status=507f1f77bcf86cd799439011,507f1f77bcf86cd799439012)'
+      'Get all audits accessible to the user with pagination, search, filter, and sort. Filter by status: Use category names (pending, upcoming, completed) or comma-separated status IDs (e.g., status=upcoming or status=507f1f77bcf86cd799439011,507f1f77bcf86cd799439012)'
   })
   @ApiResponse({
     status: 200,
@@ -97,7 +97,7 @@ export class AuditController {
   @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get all audits without pagination for export purposes (supports search, filter, and sort). Filter by status IDs: Multiple status IDs can be provided as comma-separated values (e.g., status=507f1f77bcf86cd799439011,507f1f77bcf86cd799439012)'
+      'Get all audits without pagination for export purposes (supports search, filter, and sort). Filter by status: Use category names (pending, upcoming, completed) or comma-separated status IDs (e.g., status=upcoming or status=507f1f77bcf86cd799439011,507f1f77bcf86cd799439012)'
   })
   @ApiResponse({
     status: 200,
