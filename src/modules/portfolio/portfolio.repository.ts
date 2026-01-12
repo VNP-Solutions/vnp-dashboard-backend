@@ -12,8 +12,17 @@ export class PortfolioRepository implements IPortfolioRepository {
     _userId?: string,
     _isSuperAdmin?: boolean
   ) {
+    const { service_type_id, ...portfolioData } = data
+
     return this.prisma.portfolio.create({
-      data,
+      data: {
+        ...portfolioData,
+        serviceType: {
+          connect: {
+            id: service_type_id
+          }
+        }
+      },
       include: {
         serviceType: {
           select: {
@@ -172,9 +181,24 @@ export class PortfolioRepository implements IPortfolioRepository {
     userId?: string,
     isSuperAdmin?: boolean
   ) {
+    const { service_type_id, ...portfolioData } = data
+
+    const updateData: any = {
+      ...portfolioData
+    }
+
+    // Only include serviceType relation if service_type_id is provided
+    if (service_type_id) {
+      updateData.serviceType = {
+        connect: {
+          id: service_type_id
+        }
+      }
+    }
+
     return this.prisma.portfolio.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         serviceType: {
           select: {
