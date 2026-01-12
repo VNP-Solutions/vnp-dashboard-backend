@@ -1633,6 +1633,20 @@ export class PropertyService implements IPropertyService {
             continue
           }
 
+          // Extract credentials first - Expedia ID is REQUIRED
+          // If no Expedia ID is provided, skip the entire property import
+          const expediaId = findHeaderValue(row, [
+            'Expedia ID',
+            'Expedia Id',
+            'Expedia id',
+            'ExpediaID'
+          ])
+
+          if (!expediaId) {
+            addError(rowNumber, propertyName, 'Expedia ID is required')
+            continue
+          }
+
           // Find or create portfolio
           let portfolio =
             await this.portfolioRepository.findByName(portfolioName)
@@ -1698,24 +1712,7 @@ export class PropertyService implements IPropertyService {
             propertyId = createdProperty.id
           }
 
-          // Extract and create credentials
-          // Expedia ID is REQUIRED for credentials creation
-          // If no Expedia ID is provided, skip credentials creation entirely
-          const expediaId = findHeaderValue(row, [
-            'Expedia ID',
-            'Expedia Id',
-            'Expedia id',
-            'ExpediaID'
-          ])
-
-          // Skip credentials creation if Expedia ID is not provided
-          if (!expediaId) {
-            // Property was created successfully, just skip credentials
-            result.successCount++
-            result.successfulImports.push(propertyName)
-            continue
-          }
-
+          // Extract remaining credentials fields
           const expediaUsername = findHeaderValue(row, [
             'Expedia Username',
             'Expedia username',
