@@ -1404,6 +1404,24 @@ export class PropertyService implements IPropertyService {
 
       result.totalRows = data.length
 
+      console.log(`📊 Starting bulk import of ${result.totalRows} properties...`)
+
+      // Helper function to add error and log it
+      const addError = (row: number, property: string, errorMessage: string) => {
+        result.errors.push({
+          row,
+          property,
+          error: errorMessage
+        })
+        result.failureCount++
+        console.error(`❌ Row ${row} - Property "${property}": ${errorMessage}`)
+      }
+
+      // Helper function to log success
+      const logSuccess = (row: number, property: string, action: 'created' | 'updated') => {
+        console.log(`✅ Row ${row} - Property "${property}" ${action} successfully`)
+      }
+
       // Helper function to clean column name - removes asterisks and other markers, trims whitespace
       const cleanColumnName = (name: string): string => {
         return name
@@ -1545,12 +1563,7 @@ export class PropertyService implements IPropertyService {
           ])
 
           if (!propertyName) {
-            result.errors.push({
-              row: rowNumber,
-              property: 'Unknown',
-              error: 'Property Name is required'
-            })
-            result.failureCount++
+            addError(rowNumber, 'Unknown', 'Property Name is required')
             continue
           }
 
@@ -1569,12 +1582,7 @@ export class PropertyService implements IPropertyService {
             'Currency Code'
           ])
           if (!currencyCode) {
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'Property Currency is required'
-            })
-            result.failureCount++
+            addError(rowNumber, propertyName, 'Property Currency is required')
             continue
           }
 
@@ -1609,13 +1617,7 @@ export class PropertyService implements IPropertyService {
           if (nextDueDateValue) {
             nextDueDate = parseDate(nextDueDateValue)
             if (!nextDueDate) {
-              result.errors.push({
-                row: rowNumber,
-                property: propertyName,
-                error:
-                  'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
+              addError(rowNumber, propertyName, 'Invalid date format for Next Due Date (expected mm/dd/yyyy)')
               continue
             }
           }
@@ -1627,12 +1629,7 @@ export class PropertyService implements IPropertyService {
             'Portfolio name'
           ])
           if (!portfolioName) {
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'Portfolio is required'
-            })
-            result.failureCount++
+            addError(rowNumber, propertyName, 'Portfolio is required')
             continue
           }
 
@@ -1702,7 +1699,8 @@ export class PropertyService implements IPropertyService {
           }
 
           // Extract and create credentials
-          // Expedia ID is REQUIRED, username and password are optional
+          // Expedia ID is REQUIRED for credentials creation
+          // If no Expedia ID is provided, skip credentials creation entirely
           const expediaId = findHeaderValue(row, [
             'Expedia ID',
             'Expedia Id',
@@ -1710,13 +1708,11 @@ export class PropertyService implements IPropertyService {
             'ExpediaID'
           ])
 
+          // Skip credentials creation if Expedia ID is not provided
           if (!expediaId) {
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'Expedia ID is required'
-            })
-            result.failureCount++
+            // Property was created successfully, just skip credentials
+            result.successCount++
+            result.successfulImports.push(propertyName)
             continue
           }
 
@@ -1769,36 +1765,21 @@ export class PropertyService implements IPropertyService {
           const hasExpediaUsername = !!expediaUsername
           const hasExpediaPassword = !!expediaPassword
           if (hasExpediaUsername !== hasExpediaPassword) {
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'Expedia username and password must be provided together'
-            })
-            result.failureCount++
+            addError(rowNumber, propertyName, 'Expedia username and password must be provided together')
             continue
           }
 
-          const hasAgodaUsername = !!agodaUsername
-          const hasAgodaPassword = !!agodaPassword
-          if (hasAgodaUsername !== hasAgodaPassword) {
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'Agoda username and password must be provided together'
-            })
-            result.failureCount++
+          // Validate Agoda credentials: username can be provided alone,
+          // but if password is provided, username must also be provided
+          if (agodaPassword && !agodaUsername) {
+            addError(rowNumber, propertyName, 'Agoda username is required when Agoda password is provided')
             continue
           }
 
           const hasBookingUsername = !!bookingUsername
           const hasBookingPassword = !!bookingPassword
           if (hasBookingUsername !== hasBookingPassword) {
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'Booking username and password must be provided together'
-            })
-            result.failureCount++
+            addError(rowNumber, propertyName, 'Booking username and password must be provided together')
             continue
           }
 
@@ -1852,6 +1833,7 @@ export class PropertyService implements IPropertyService {
           if (!canCreateBankDetails(user)) {
             result.successCount++
             result.successfulImports.push(propertyName)
+            logSuccess(rowNumber, propertyName, existingProperty ? 'updated' : 'created')
             continue
           }
 
@@ -1865,12 +1847,7 @@ export class PropertyService implements IPropertyService {
           ])
 
           if (!bankTypeRaw) {
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'Bank Type is required (None / Stripe / Bank)'
-            })
-            result.failureCount++
+            addError(rowNumber, propertyName, 'Bank Type is required (None / Stripe / Bank)')
             continue
           }
 
@@ -1881,6 +1858,7 @@ export class PropertyService implements IPropertyService {
             // Successfully created property without bank details
             result.successCount++
             result.successfulImports.push(propertyName)
+            logSuccess(rowNumber, propertyName, existingProperty ? 'updated' : 'created')
             continue
           }
 
@@ -2004,13 +1982,7 @@ export class PropertyService implements IPropertyService {
           if (bankTypeNormalized === 'stripe') {
             // Validate Stripe Account Email is provided
             if (!stripeAccountEmail || !stripeAccountEmail.trim()) {
-              result.errors.push({
-                row: rowNumber,
-                property: propertyName,
-                error:
-                  'Stripe Account Email is required when Bank Type is Stripe'
-              })
-              result.failureCount++
+              addError(rowNumber, propertyName, 'Stripe Account Email is required when Bank Type is Stripe')
               continue
             }
 
@@ -2033,13 +2005,7 @@ export class PropertyService implements IPropertyService {
           } else if (bankTypeNormalized === 'bank') {
             // Bank account - validate bank_sub_type is provided
             if (!bankSubTypeRaw) {
-              result.errors.push({
-                row: rowNumber,
-                property: propertyName,
-                error:
-                  'Bank Sub Type is required when Bank Type is Bank (ACH / Domestic US Wire / International Wire)'
-              })
-              result.failureCount++
+              addError(rowNumber, propertyName, 'Bank Sub Type is required when Bank Type is Bank (ACH / Domestic US Wire / International Wire)')
               continue
             }
 
@@ -2067,12 +2033,7 @@ export class PropertyService implements IPropertyService {
             ) {
               mappedBankSubType = 'international_wire'
             } else {
-              result.errors.push({
-                row: rowNumber,
-                property: propertyName,
-                error: `Invalid Bank Sub Type '${bankSubTypeRaw}'. Must be one of: ACH, Domestic US Wire, International Wire`
-              })
-              result.failureCount++
+              addError(rowNumber, propertyName, `Invalid Bank Sub Type '${bankSubTypeRaw}'. Must be one of: ACH, Domestic US Wire, International Wire`)
               continue
             }
 
@@ -2106,11 +2067,7 @@ export class PropertyService implements IPropertyService {
             if (routingNumber !== undefined) {
               // Validate routing number has at least 9 digits
               if (routingNumber.trim().length < 9) {
-                result.errors.push({
-                  row: rowNumber,
-                  property: propertyName,
-                  error: `Property ${existingProperty ? 'updated' : 'created'} but routing number '${routingNumber}' has less than 9 digits. Routing number was not saved.`
-                })
+                console.warn(`⚠️  Row ${rowNumber} - Property "${propertyName}": routing number '${routingNumber}' has less than 9 digits. Routing number was not saved.`)
                 // Don't set routing number, but continue processing other fields
               } else {
                 bankDetailsData.routing_number = routingNumber
@@ -2119,13 +2076,10 @@ export class PropertyService implements IPropertyService {
             if (bankAccountType !== undefined) {
               const normalizedAccountType = bankAccountType.toLowerCase()
               if (!['checking', 'savings'].includes(normalizedAccountType)) {
-                result.errors.push({
-                  row: rowNumber,
-                  property: propertyName,
-                  error: `Property ${existingProperty ? 'updated' : 'created'} but invalid bank account type '${bankAccountType}'. Must be one of: checking, savings`
-                })
+                console.warn(`⚠️  Row ${rowNumber} - Property "${propertyName}": Invalid bank account type '${bankAccountType}'. Property was ${existingProperty ? 'updated' : 'created'} but bank account type was not saved.`)
                 result.successCount++
                 result.successfulImports.push(propertyName)
+                logSuccess(rowNumber, propertyName, existingProperty ? 'updated' : 'created')
                 continue
               }
               bankDetailsData.bank_account_type = normalizedAccountType
@@ -2135,12 +2089,7 @@ export class PropertyService implements IPropertyService {
             }
           } else {
             // Invalid bank type
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: `Invalid Bank Type '${bankTypeRaw}'. Must be one of: None, Stripe, Bank`
-            })
-            result.failureCount++
+            addError(rowNumber, propertyName, `Invalid Bank Type '${bankTypeRaw}'. Must be one of: None, Stripe, Bank`)
             continue
           }
 
@@ -2156,19 +2105,18 @@ export class PropertyService implements IPropertyService {
 
           result.successCount++
           result.successfulImports.push(propertyName)
+
+          logSuccess(rowNumber, propertyName, existingProperty ? 'updated' : 'created')
         } catch (error) {
           const propertyName =
             findHeaderValue(row, ['Property Name', 'Property name', 'Name']) ||
             'Unknown'
 
-          result.errors.push({
-            row: rowNumber,
-            property: propertyName,
-            error: error.message || 'Unknown error occurred'
-          })
-          result.failureCount++
+          addError(rowNumber, propertyName, error.message || 'Unknown error occurred')
         }
       }
+
+      console.log(`📊 Bulk import completed: ${result.successCount} succeeded, ${result.failureCount} failed out of ${result.totalRows} total`)
 
       return result
     } catch (error) {
@@ -2615,13 +2563,13 @@ export class PropertyService implements IPropertyService {
             continue
           }
 
-          const hasAgodaUsername = !!agodaUsername
-          const hasAgodaPassword = !!agodaPassword
-          if (hasAgodaUsername !== hasAgodaPassword) {
+          // Validate Agoda credentials: username can be provided alone,
+          // but if password is provided, username must also be provided
+          if (agodaPassword && !agodaUsername) {
             result.errors.push({
               row: rowNumber,
               propertyId: propertyIdValue,
-              error: 'Agoda username and password must be provided together'
+              error: 'Agoda username is required when Agoda password is provided'
             })
             result.failureCount++
             continue
