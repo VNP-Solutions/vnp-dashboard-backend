@@ -10,6 +10,7 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { canInviteRole } from '../../common/utils/permission.util'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateUserRoleDto, ReorderUserRoleDto, UpdateUserRoleDto } from './user-role.dto'
 import type {
@@ -55,7 +56,7 @@ export class UserRoleService implements IUserRoleService {
     return this.userRoleRepository.create(data)
   }
 
-  async findAll(user: IUserWithPermissions) {
+  async findAll(user: IUserWithPermissions, invitableOnly?: boolean) {
     // Check user's access level for USER module
     // USER module doesn't support partial access, so this will return either 'all' or []
     const accessibleIds = await this.permissionService.getAccessibleResourceIds(
@@ -63,14 +64,22 @@ export class UserRoleService implements IUserRoleService {
       ModuleType.USER
     )
 
-    if (accessibleIds === 'all') {
-      // User has full access - return all roles
-      return this.userRoleRepository.findAll()
+    if (accessibleIds !== 'all') {
+      // User has 'partial' or 'none' access
+      // Since USER module doesn't support partial access, return empty array
+      return []
     }
 
-    // User has 'partial' or 'none' access
-    // Since USER module doesn't support partial access, return empty array
-    return []
+    // User has full access - get all roles
+    const allRoles = await this.userRoleRepository.findAll()
+
+    // If invitableOnly is true, filter roles based on current user's permissions
+    if (invitableOnly === true) {
+      return allRoles.filter(role => canInviteRole(user, role))
+    }
+
+    // Return all roles
+    return allRoles
   }
 
   async findOne(id: string, _user: IUserWithPermissions) {

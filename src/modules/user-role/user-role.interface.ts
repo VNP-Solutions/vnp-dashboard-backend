@@ -22,7 +22,7 @@ export interface IUserRoleRepository {
 
 export interface IUserRoleService {
   create(data: CreateUserRoleDto, user: IUserWithPermissions): Promise<UserRole>
-  findAll(user: IUserWithPermissions): Promise<UserRoleWithUsers[]>
+  findAll(user: IUserWithPermissions, invitableOnly?: boolean): Promise<UserRoleWithUsers[]>
   findOne(id: string, user: IUserWithPermissions): Promise<UserRoleWithUsers>
   update(
     id: string,

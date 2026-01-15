@@ -125,10 +125,10 @@ export class AuthService implements IAuthService {
     inviterId: string,
     inviterRolePermissionLevel: string | undefined
   ): Promise<{ message: string }> {
-    // Check if user has permission to invite (permission_level must be 'all')
-    if (inviterRolePermissionLevel !== 'all') {
+    // Check if user has permission to invite (permission_level must be 'all' or 'update' for CREATE permission)
+    if (inviterRolePermissionLevel !== 'all' && inviterRolePermissionLevel !== 'update') {
       throw new ForbiddenException(
-        'You do not have permission to invite users. Only users with full user management permission can invite.'
+        'You do not have permission to invite users. Only users with CREATE permission (all or update) can invite.'
       )
     }
 
@@ -194,10 +194,10 @@ export class AuthService implements IAuthService {
     email: string,
     inviterRolePermissionLevel: string | undefined
   ): Promise<{ message: string }> {
-    // Check if user has permission to resend invitation (permission_level must be 'all')
-    if (inviterRolePermissionLevel !== 'all') {
+    // Check if user has permission to resend invitation (permission_level must be 'all' or 'update' for CREATE permission)
+    if (inviterRolePermissionLevel !== 'all' && inviterRolePermissionLevel !== 'update') {
       throw new ForbiddenException(
-        'You do not have permission to resend invitations. Only users with full user management permission can resend.'
+        'You do not have permission to resend invitations. Only users with CREATE permission (all or update) can resend.'
       )
     }
 
