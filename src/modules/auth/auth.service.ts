@@ -8,8 +8,11 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
+import { ModuleType } from '../../common/interfaces/permission.interface'
+import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { canInviteRole } from '../../common/utils/permission.util'
 import { Configuration } from '../../config/configuration'
 import { PrismaService } from '../prisma/prisma.service'
 import {
@@ -56,7 +59,9 @@ export class AuthService implements IAuthService {
     @Inject(EmailUtil)
     private emailUtil: EmailUtil,
     @Inject(PrismaService)
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    @Inject(PermissionService)
+    private permissionService: PermissionService
   ) {}
 
   async requestLoginOtp(
@@ -138,6 +143,75 @@ export class AuthService implements IAuthService {
       throw new ConflictException('User with this email already exists')
     }
 
+    // Fetch inviter's full user object with permissions for validation
+    const inviterUser = await this.prisma.user.findUnique({
+      where: { id: inviterId },
+      include: { role: true }
+    })
+
+    if (!inviterUser || !inviterUser.role) {
+      throw new ForbiddenException('Inviter user or role not found')
+    }
+
+    // Fetch target role with full permissions
+    const targetRole = await this.prisma.userRole.findUnique({
+      where: { id: data.role_id }
+    })
+
+    if (!targetRole) {
+      throw new BadRequestException('Selected role not found')
+    }
+
+    // Validate role hierarchy: Can inviter assign this role?
+    if (!canInviteRole(inviterUser as any, targetRole)) {
+      throw new ForbiddenException(
+        'You cannot invite users with this role. The role has permissions equal to or higher than yours, or you cannot invite this user type (internal/external).'
+      )
+    }
+
+    // Validate portfolio/property access constraints for partial access users
+    if (data.portfolio_ids && data.portfolio_ids.length > 0) {
+      const accessiblePortfolioIds = await this.permissionService.getAccessibleResourceIds(
+        inviterUser as any,
+        ModuleType.PORTFOLIO
+      )
+      
+      if (Array.isArray(accessiblePortfolioIds)) {
+        // Inviter has partial access - validate they can only assign portfolios they have access to
+        const invalidPortfolioIds = data.portfolio_ids.filter(
+          id => !accessiblePortfolioIds.includes(id)
+        )
+        
+        if (invalidPortfolioIds.length > 0) {
+          throw new ForbiddenException(
+            `You cannot assign access to portfolios you don't have access to: ${invalidPortfolioIds.join(', ')}`
+          )
+        }
+      }
+      // If accessiblePortfolioIds === 'all', inviter can assign any portfolio
+    }
+
+    if (data.property_ids && data.property_ids.length > 0) {
+      const accessiblePropertyIds = await this.permissionService.getAccessibleResourceIds(
+        inviterUser as any,
+        ModuleType.PROPERTY
+      )
+      
+      if (Array.isArray(accessiblePropertyIds)) {
+        // Inviter has partial access - validate they can only assign properties they have access to
+        const invalidPropertyIds = data.property_ids.filter(
+          id => !accessiblePropertyIds.includes(id)
+        )
+        
+        if (invalidPropertyIds.length > 0) {
+          throw new ForbiddenException(
+            `You cannot assign access to properties you don't have access to: ${invalidPropertyIds.join(', ')}`
+          )
+        }
+      }
+      // If accessiblePropertyIds === 'all', inviter can assign any property
+    }
+
     const tempPassword = EncryptionUtil.generateTempPassword()
     const hashedPassword = await EncryptionUtil.hashPassword(tempPassword)
     const expiryDays = this.configService.get('auth.tempPasswordExpiryDays', {
@@ -165,22 +239,12 @@ export class AuthService implements IAuthService {
       )
     }
 
-    // Fetch role details to get is_external flag
-    const role = await this.prisma.userRole.findUnique({
-      where: { id: data.role_id },
-      select: { name: true, is_external: true }
-    })
-
-    if (!role) {
-      throw new Error('Role not found')
-    }
-
     await this.emailUtil.sendInvitationEmail(
       data.email,
       tempPassword,
-      role.name,
+      targetRole.name,
       data.first_name,
-      role.is_external
+      targetRole.is_external
     )
 
     console.log(`Invitation sent to ${data.email}. Temp password: ${tempPassword}`)

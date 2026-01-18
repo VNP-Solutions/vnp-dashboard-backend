@@ -58,24 +58,42 @@ export class UserRoleService implements IUserRoleService {
 
   async findAll(user: IUserWithPermissions, invitableOnly?: boolean) {
     // Check user's access level for USER module
-    // USER module doesn't support partial access, so this will return either 'all' or []
     const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.USER
     )
 
-    if (accessibleIds !== 'all') {
-      // User has 'partial' or 'none' access
-      // Since USER module doesn't support partial access, return empty array
+    // For invitable_only requests, we need to show roles even for partial access users
+    // because they need to see which roles they can invite
+    const hasUserAccess = accessibleIds === 'all' || (invitableOnly && Array.isArray(accessibleIds))
+    
+    if (!hasUserAccess) {
+      // User has no access to USER module
       return []
     }
 
-    // User has full access - get all roles
+    // Get all roles (needed for invitation filtering)
     const allRoles = await this.userRoleRepository.findAll()
 
     // If invitableOnly is true, filter roles based on current user's permissions
     if (invitableOnly === true) {
-      return allRoles.filter(role => canInviteRole(user, role))
+      this.logger.debug('Filtering roles for invitability')
+      this.logger.debug(`User role: ${user.role.name} (external: ${user.role.is_external})`)
+      
+      const invitableRoles = allRoles.filter(role => {
+        const canInvite = canInviteRole(user, role)
+        this.logger.debug(`Can invite "${role.name}" (external: ${role.is_external}): ${canInvite}`)
+        return canInvite
+      })
+      
+      this.logger.debug(`Total roles: ${allRoles.length}, Invitable: ${invitableRoles.length}`)
+      return invitableRoles
+    }
+
+    // For regular list requests with partial access, return empty
+    // (partial access users can only see users they invited, not all roles)
+    if (accessibleIds !== 'all') {
+      return []
     }
 
     // Return all roles

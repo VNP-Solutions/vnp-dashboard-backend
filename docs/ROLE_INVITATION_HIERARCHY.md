@@ -21,6 +21,19 @@ The role invitation system implements a **hierarchical permission-based access c
 
 For **each module**, the inviter's permissions must be **equal to or higher** than the target role's permissions.
 
+### 3. Partial Access Resource Constraint ⭐ NEW
+
+If the inviter has **partial access** to Portfolio or Property modules, they can **only** assign access to portfolios/properties **they have access to**.
+
+| Inviter's Access Level | Can Assign                      |
+| ---------------------- | ------------------------------- |
+| **Portfolio: ALL**     | Any portfolio                   |
+| **Portfolio: PARTIAL** | Only portfolios they can access |
+| **Property: ALL**      | Any property                    |
+| **Property: PARTIAL**  | Only properties they can access |
+
+**Example:** If User A has partial access to Portfolio X and Y, they can only invite User B with access to Portfolio X, Y, or both—not Portfolio Z.
+
 #### Permission Level Hierarchy (What actions can be performed)
 
 ```
@@ -432,24 +445,34 @@ Response includes only external roles with permissions ≤ External Auditor's pe
 1. Fetch invitable roles: `GET /user-role?invitable_only=true`
 2. Display only these roles in the invite form
 3. User selects a role from the filtered list
+4. If role requires partial access, only show portfolios/properties the inviter has access to
 
-### Backend Validation (Required - Coming Next)
+### Backend Validation (Fully Implemented ✅)
 
 When the invite request is submitted:
 
 ```http
 POST /auth/invite
 {
+  "email": "newuser@example.com",
   "role_id": "selected_role_id",
-  // ... other fields
+  "first_name": "John",
+  "last_name": "Doe",
+  "language": "en",
+  "portfolio_ids": ["portfolio1", "portfolio2"],  // Optional
+  "property_ids": ["property1", "property2"]      // Optional
 }
 ```
 
-**Backend will verify:**
+**Backend validates:**
 
-1. ✅ Inviter has CREATE permission for USER module
+1. ✅ Inviter has CREATE permission for USER module (permission_level: 'update' or 'all')
 2. ✅ Selected role is invitable by current user (using `canInviteRole()`)
-3. ❌ Reject if role is not invitable
+   - Checks internal/external restriction
+   - Checks permission hierarchy for ALL modules
+3. ✅ If inviter has partial portfolio access, validates all `portfolio_ids` are accessible to inviter
+4. ✅ If inviter has partial property access, validates all `property_ids` are accessible to inviter
+5. ❌ Rejects if any validation fails with specific error message
 
 ---
 
