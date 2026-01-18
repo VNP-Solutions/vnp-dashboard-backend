@@ -19,7 +19,8 @@
       "Bash(timeout /t 15)",
       "Bash(taskkill /F /PID 39956)",
       "Bash(netstat:*)",
-      "Bash(taskkill //F //PID 39956)"
+      "Bash(taskkill //F //PID 39956)",
+      "Bash(yarn seed:test:*)"
     ],
     "deny": [],
     "ask": []
