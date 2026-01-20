@@ -886,4 +886,82 @@ export class EmailUtil {
       }
     }
   }
+
+  async sendAuditReportUrlUpdatedEmail(
+    recipientEmails: string[],
+    auditName: string,
+    propertyName: string,
+    portfolioName: string,
+    reportUrl: string,
+    updatedDate: Date
+  ): Promise<void> {
+    // Remove duplicates and filter out empty emails
+    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+
+    if (uniqueEmails.length === 0) {
+      console.warn('No valid recipient emails provided for audit report URL update notification')
+      return
+    }
+
+    // Format the update date
+    const formattedDate = updatedDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    // Get dashboard URL from config
+    const dashboardUrl = String(this.configService.get('dashboardUrl', { infer: true }) || 'https://new.dashboardvnps.com/')
+
+    // Send individual emails to each recipient for personalization
+    for (const userEmail of uniqueEmails) {
+      try {
+        // Fetch user's first name from database
+        const user = await this.prisma.user.findUnique({
+          where: { email: userEmail },
+          select: { first_name: true }
+        })
+
+        const firstName = user?.first_name?.split(' ')[0] || ''
+        const greeting = firstName ? `Hi ${firstName},` : 'Dear user,'
+
+        const mailOptions = {
+          from: this.configService.get('smtp.email', { infer: true }),
+          to: userEmail,
+          subject: 'Audit Report URL Updated – VNP Solutions',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <p><strong>${greeting}</strong></p>
+              <p>We wanted to inform you that the report URL has been updated for your <strong>${auditName}</strong> audit.</p>
+              <p><strong>📊 Audit Details:</strong></p>
+              <ul style="list-style: none; padding-left: 0;">
+                <li>📁 <strong>Property:</strong> ${propertyName}</li>
+                <li>🏢 <strong>Portfolio:</strong> ${portfolioName}</li>
+                <li>📅 <strong>Update Date:</strong> ${formattedDate}</li>
+                <li>🔗 <strong>Report URL:</strong> <a href="${reportUrl}" style="color: #007bff;">${reportUrl}</a></li>
+              </ul>
+              <p>You can log in to your dashboard at any time to view the updated report and audit details.</p>
+              <div style="margin: 30px 0;">
+                <a href="${dashboardUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Access Dashboard →</a>
+              </div>
+              <p>Thank you for your continued partnership with <strong>VNP Solutions</strong>.</p>
+              <div style="margin-top: 30px; color: #666;">
+                <p>Warm regards,<br><strong>VNP Solutions Team</strong></p>
+              </div>
+            </div>
+          `,
+          text: `${greeting}\\n\\nWe wanted to inform you that the report URL has been updated for your ${auditName} audit.\\n\\n📊 Audit Details:\\n📁 Property: ${propertyName}\\n🏢 Portfolio: ${portfolioName}\\n📅 Update Date: ${formattedDate}\\n🔗 Report URL: ${reportUrl}\\n\\nYou can log in to your dashboard at any time to view the updated report and audit details.\\n\\nAccess Dashboard: ${dashboardUrl}\\n\\nThank you for your continued partnership with VNP Solutions.\\n\\nWarm regards,\\nVNP Solutions Team`
+        }
+
+        const info = await this.transporter.sendMail(mailOptions)
+        console.log('✓ Audit report URL update email sent:', {
+          to: userEmail,
+          messageId: info.messageId
+        })
+      } catch (error) {
+        console.error(`✗ Failed to send audit report URL update email to ${userEmail}:`, error)
+        // Continue sending to other recipients even if one fails
+      }
+    }
+  }
 }
