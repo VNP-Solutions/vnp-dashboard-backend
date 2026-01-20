@@ -964,4 +964,103 @@ export class EmailUtil {
       }
     }
   }
+
+  async sendConsolidatedReportUploadedEmail(
+    recipientEmails: string[],
+    portfolioName: string,
+    reportUrls: string[],
+    uploadedDate: Date
+  ): Promise<void> {
+    // Remove duplicates and filter out empty emails
+    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+
+    if (uniqueEmails.length === 0) {
+      console.warn('No valid recipient emails provided for consolidated report upload notification')
+      return
+    }
+
+    // Format the upload date
+    const formattedDate = uploadedDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    // Get dashboard URL from config
+    const dashboardUrl = String(this.configService.get('dashboardUrl', { infer: true }) || 'https://new.dashboardvnps.com/')
+
+    // Limit report URLs to first 5 to avoid email being too long
+    const displayUrls = reportUrls.slice(0, 5)
+    const hasMoreUrls = reportUrls.length > 5
+
+    // Send individual emails to each recipient for personalization
+    for (const userEmail of uniqueEmails) {
+      try {
+        // Fetch user's first name from database
+        const user = await this.prisma.user.findUnique({
+          where: { email: userEmail },
+          select: { first_name: true }
+        })
+
+        const firstName = user?.first_name?.split(' ')[0] || ''
+        const greeting = firstName ? `Hi ${firstName},` : 'Dear user,'
+
+        // Generate report URLs HTML
+        const urlsHtml = displayUrls
+          .map(
+            (url, index) => `
+            <li>
+              <strong>Report ${index + 1}:</strong>
+              <a href="${url}" style="color: #007bff; word-break: break-all;">${url.length > 60 ? url.substring(0, 60) + '...' : url}</a>
+            </li>`
+          )
+          .join('')
+
+        const moreText = hasMoreUrls
+          ? `<p><em>...and ${reportUrls.length - 5} more report(s). Please check your dashboard for the complete list.</em></p>`
+          : ''
+
+        const mailOptions = {
+          from: this.configService.get('smtp.email', { infer: true }),
+          to: userEmail,
+          subject: 'New Consolidated Reports Uploaded – VNP Solutions',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <p><strong>${greeting}</strong></p>
+              <p>We wanted to inform you that <strong>${reportUrls.length} new consolidated report(s)</strong> have been uploaded for your portfolio.</p>
+              <p><strong>📊 Portfolio Details:</strong></p>
+              <ul style="list-style: none; padding-left: 0;">
+                <li>🏢 <strong>Portfolio:</strong> ${portfolioName}</li>
+                <li>📅 <strong>Upload Date:</strong> ${formattedDate}</li>
+                <li>📄 <strong>Total Reports:</strong> ${reportUrls.length}</li>
+              </ul>
+              <p><strong>🔗 Report Links:</strong></p>
+              <ul style="padding-left: 20px; line-height: 1.8;">
+                ${urlsHtml}
+              </ul>
+              ${moreText}
+              <p>You can log in to your dashboard at any time to view all consolidated reports and download them.</p>
+              <div style="margin: 30px 0;">
+                <a href="${dashboardUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Access Dashboard →</a>
+              </div>
+              <p>Thank you for your continued partnership with <strong>VNP Solutions</strong>.</p>
+              <div style="margin-top: 30px; color: #666;">
+                <p>Warm regards,<br><strong>VNP Solutions Team</strong></p>
+              </div>
+            </div>
+          `,
+          text: `${greeting}\\n\\nWe wanted to inform you that ${reportUrls.length} new consolidated report(s) have been uploaded for your portfolio.\\n\\n📊 Portfolio Details:\\n🏢 Portfolio: ${portfolioName}\\n📅 Upload Date: ${formattedDate}\\n📄 Total Reports: ${reportUrls.length}\\n\\n🔗 Report Links:\\n${displayUrls.map((url, i) => `Report ${i + 1}: ${url}`).join('\\n')}\\n${hasMoreUrls ? `\\n...and ${reportUrls.length - 5} more report(s). Please check your dashboard for the complete list.` : ''}\\n\\nYou can log in to your dashboard at any time to view all consolidated reports and download them.\\n\\nAccess Dashboard: ${dashboardUrl}\\n\\nThank you for your continued partnership with VNP Solutions.\\n\\nWarm regards,\\nVNP Solutions Team`
+        }
+
+        const info = await this.transporter.sendMail(mailOptions)
+        console.log('✓ Consolidated report upload email sent:', {
+          to: userEmail,
+          messageId: info.messageId
+        })
+      } catch (error) {
+        console.error(`✗ Failed to send consolidated report upload email to ${userEmail}:`, error)
+        // Continue sending to other recipients even if one fails
+      }
+    }
+  }
 }

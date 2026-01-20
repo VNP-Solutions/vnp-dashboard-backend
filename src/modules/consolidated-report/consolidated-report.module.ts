@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { PermissionService } from '../../common/services/permission.service'
+import { EmailUtil } from '../../common/utils/email.util'
 import { PrismaService } from '../prisma/prisma.service'
 import { ConsolidatedReportController } from './consolidated-report.controller'
 import { ConsolidatedReportRepository } from './consolidated-report.repository'
@@ -17,7 +18,8 @@ import { ConsolidatedReportService } from './consolidated-report.service'
       useClass: ConsolidatedReportRepository
     },
     PermissionService,
-    PrismaService
+    PrismaService,
+    EmailUtil
   ],
   exports: [
     {

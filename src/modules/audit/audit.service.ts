@@ -2116,7 +2116,7 @@ export class AuditService implements IAuditService {
   async updateReportUrl(
     id: string,
     data: UpdateReportUrlDto,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ): Promise<any> {
     const audit = await this.auditRepository.findById(id)
 
@@ -2135,7 +2135,7 @@ export class AuditService implements IAuditService {
     }
 
     // Send email notification to external portfolio managers
-    await this.sendReportUrlUpdateNotification(updatedAudit, data.report_url)
+    await this.sendReportUrlUpdateNotification(updatedAudit, data.report_url, user.id)
 
     return updatedAudit
   }
@@ -2143,10 +2143,12 @@ export class AuditService implements IAuditService {
   /**
    * Send email notification when report URL is updated
    * Finds all external portfolio managers for the audit's portfolio and sends them notification
+   * Excludes the user who performed the update (self-mailing prevention)
    */
   private async sendReportUrlUpdateNotification(
     audit: any,
-    reportUrl: string
+    reportUrl: string,
+    updaterUserId: string
   ) {
     try {
       const portfolioId = audit.property.portfolio.id
@@ -2174,6 +2176,11 @@ export class AuditService implements IAuditService {
 
       // Filter users who have access to this portfolio
       const eligibleUsers = users.filter(user => {
+        // Exclude the updater (self-mailing prevention)
+        if (user.id === updaterUserId) {
+          return false
+        }
+
         const portfolioPermission = user.role.portfolio_permission
 
         if (!portfolioPermission) return false
