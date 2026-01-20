@@ -438,3 +438,137 @@ export function hasPartialBankDetailsAccess(
   const permission = getBankDetailsPermission(user)
   return requiresPartialCheck(permission)
 }
+
+/**
+ * Get permission level hierarchy value (higher = more permissions)
+ * all (3) > update (2) > view (1)
+ */
+export function getPermissionLevelHierarchyValue(
+  level: PermissionLevel | undefined | null
+): number {
+  if (!level) return 0
+  
+  const hierarchy: Record<PermissionLevel, number> = {
+    [PermissionLevel.all]: 3,
+    [PermissionLevel.update]: 2,
+    [PermissionLevel.view]: 1
+  }
+  
+  return hierarchy[level] ?? 0
+}
+
+/**
+ * Get access level hierarchy value (higher = more access)
+ * all (3) > partial (2) > none (1)
+ */
+export function getAccessLevelHierarchyValue(
+  level: AccessLevel | undefined | null
+): number {
+  if (!level) return 0
+  
+  const hierarchy: Record<AccessLevel, number> = {
+    [AccessLevel.all]: 3,
+    [AccessLevel.partial]: 2,
+    [AccessLevel.none]: 1
+  }
+  
+  return hierarchy[level] ?? 0
+}
+
+/**
+ * Compare two permissions and check if permission1 is >= permission2 in hierarchy
+ * Returns true if permission1 has equal or higher privileges than permission2
+ */
+export function isPermissionEqualOrHigher(
+  permission1: IPermission | null | undefined,
+  permission2: IPermission | null | undefined
+): boolean {
+  // If permission2 is null, always return true (no permission to beat)
+  if (!permission2) return true
+  
+  // If permission1 is null but permission2 exists, return false
+  if (!permission1) return false
+  
+  const level1 = getPermissionLevelHierarchyValue(permission1.permission_level)
+  const level2 = getPermissionLevelHierarchyValue(permission2.permission_level)
+  
+  const access1 = getAccessLevelHierarchyValue(permission1.access_level)
+  const access2 = getAccessLevelHierarchyValue(permission2.access_level)
+  
+  // Both permission level AND access level must be equal or higher
+  return level1 >= level2 && access1 >= access2
+}
+
+/**
+ * Check if a user can invite another user with a specific role
+ * 
+ * Rules:
+ * 1. Internal users can invite both internal and external users
+ * 2. External users can only invite external users
+ * 3. For each module permission, inviter's permission must be >= target role's permission
+ */
+export function canInviteRole(
+  inviterUser: IUserWithPermissions,
+  targetRole: {
+    is_external: boolean
+    portfolio_permission: IPermission | null
+    property_permission: IPermission | null
+    audit_permission: IPermission | null
+    user_permission: IPermission | null
+    system_settings_permission: IPermission | null
+    bank_details_permission: IPermission | null
+  }
+): boolean {
+  if (!inviterUser || !inviterUser.role || !targetRole) return false
+  
+  const inviterRole = inviterUser.role
+  
+  // Rule 1 & 2: Check internal/external restriction
+  if (inviterRole.is_external && !targetRole.is_external) {
+    // External users cannot invite internal users
+    return false
+  }
+  
+  // Rule 3: Check permission hierarchy for all modules
+  const permissionChecks = [
+    {
+      name: 'portfolio',
+      inviter: inviterRole.portfolio_permission,
+      target: targetRole.portfolio_permission
+    },
+    {
+      name: 'property',
+      inviter: inviterRole.property_permission,
+      target: targetRole.property_permission
+    },
+    {
+      name: 'audit',
+      inviter: inviterRole.audit_permission,
+      target: targetRole.audit_permission
+    },
+    {
+      name: 'user',
+      inviter: inviterRole.user_permission,
+      target: targetRole.user_permission
+    },
+    {
+      name: 'system_settings',
+      inviter: inviterRole.system_settings_permission,
+      target: targetRole.system_settings_permission
+    },
+    {
+      name: 'bank_details',
+      inviter: inviterRole.bank_details_permission,
+      target: targetRole.bank_details_permission
+    }
+  ]
+  
+  // For each module, inviter's permission must be >= target's permission
+  for (const check of permissionChecks) {
+    if (!isPermissionEqualOrHigher(check.inviter, check.target)) {
+      return false
+    }
+  }
+  
+  return true
+}

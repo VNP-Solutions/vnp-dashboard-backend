@@ -69,7 +69,7 @@ export class AuthController {
   @Public(false)
   @HttpCode(HttpStatus.CREATED)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Invite a new user (requires authentication and user_permission.permission_level = all)' })
+  @ApiOperation({ summary: 'Invite a new user (requires authentication and user_permission.permission_level = all or update)' })
   @ApiResponse({ status: 201, description: 'User invited successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden - insufficient permission to invite users' })
   async inviteUser(
@@ -93,7 +93,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({
     summary:
-      'Resend invitation email (requires authentication and user_permission.permission_level = all)'
+      'Resend invitation email (requires authentication and user_permission.permission_level = all or update)'
   })
   @ApiResponse({ status: 200, description: 'Invitation resent successfully' })
   @ApiResponse({

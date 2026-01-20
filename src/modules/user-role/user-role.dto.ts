@@ -150,3 +150,15 @@ export class DeleteUserRoleDto {
   @IsNotEmpty()
   password: string
 }
+
+export class UserRoleQueryDto {
+  @ApiPropertyOptional({
+    example: true,
+    description: 'If true, return only roles the current user can assign when inviting new users',
+    default: false
+  })
+  @IsBoolean()
+  @IsOptional()
+  @Type(() => Boolean)
+  invitable_only?: boolean
+}

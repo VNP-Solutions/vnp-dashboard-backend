@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards
 } from '@nestjs/common'
 import {
@@ -27,7 +28,8 @@ import {
   CreateUserRoleDto,
   DeleteUserRoleDto,
   ReorderUserRoleDto,
-  UpdateUserRoleDto
+  UpdateUserRoleDto,
+  UserRoleQueryDto
 } from './user-role.dto'
 import type { IUserRoleService } from './user-role.interface'
 
@@ -58,13 +60,19 @@ export class UserRoleController {
 
   @Get()
   @RequirePermission(ModuleType.USER, PermissionAction.READ)
-  @ApiOperation({ summary: 'Get all roles' })
+  @ApiOperation({ 
+    summary: 'Get all roles',
+    description: 'Get all user roles. Use invitable_only=true to get only roles the current user can assign when inviting new users.'
+  })
   @ApiResponse({
     status: 200,
     description: 'List of roles retrieved successfully'
   })
-  findAll(@CurrentUser() user: IUserWithPermissions) {
-    return this.userRoleService.findAll(user)
+  findAll(
+    @Query() query: UserRoleQueryDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.userRoleService.findAll(user, query.invitable_only)
   }
 
   @Get(':id')

@@ -10,6 +10,7 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { canInviteRole } from '../../common/utils/permission.util'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateUserRoleDto, ReorderUserRoleDto, UpdateUserRoleDto } from './user-role.dto'
 import type {
@@ -55,22 +56,48 @@ export class UserRoleService implements IUserRoleService {
     return this.userRoleRepository.create(data)
   }
 
-  async findAll(user: IUserWithPermissions) {
+  async findAll(user: IUserWithPermissions, invitableOnly?: boolean) {
     // Check user's access level for USER module
-    // USER module doesn't support partial access, so this will return either 'all' or []
     const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.USER
     )
 
-    if (accessibleIds === 'all') {
-      // User has full access - return all roles
-      return this.userRoleRepository.findAll()
+    // For invitable_only requests, we need to show roles even for partial access users
+    // because they need to see which roles they can invite
+    const hasUserAccess = accessibleIds === 'all' || (invitableOnly && Array.isArray(accessibleIds))
+    
+    if (!hasUserAccess) {
+      // User has no access to USER module
+      return []
     }
 
-    // User has 'partial' or 'none' access
-    // Since USER module doesn't support partial access, return empty array
-    return []
+    // Get all roles (needed for invitation filtering)
+    const allRoles = await this.userRoleRepository.findAll()
+
+    // If invitableOnly is true, filter roles based on current user's permissions
+    if (invitableOnly === true) {
+      this.logger.debug('Filtering roles for invitability')
+      this.logger.debug(`User role: ${user.role.name} (external: ${user.role.is_external})`)
+      
+      const invitableRoles = allRoles.filter(role => {
+        const canInvite = canInviteRole(user, role)
+        this.logger.debug(`Can invite "${role.name}" (external: ${role.is_external}): ${canInvite}`)
+        return canInvite
+      })
+      
+      this.logger.debug(`Total roles: ${allRoles.length}, Invitable: ${invitableRoles.length}`)
+      return invitableRoles
+    }
+
+    // For regular list requests with partial access, return empty
+    // (partial access users can only see users they invited, not all roles)
+    if (accessibleIds !== 'all') {
+      return []
+    }
+
+    // Return all roles
+    return allRoles
   }
 
   async findOne(id: string, _user: IUserWithPermissions) {
