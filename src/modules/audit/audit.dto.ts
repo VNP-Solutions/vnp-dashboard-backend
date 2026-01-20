@@ -341,3 +341,13 @@ export class RequestUpdateAmountConfirmedDto {
   @IsOptional()
   reason?: string
 }
+
+export class UpdateReportUrlDto {
+  @ApiProperty({
+    example: 'https://example.com/report.pdf',
+    description: 'Report URL to update'
+  })
+  @IsString()
+  @IsNotEmpty()
+  report_url: string
+}

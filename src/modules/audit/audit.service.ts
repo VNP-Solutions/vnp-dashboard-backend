@@ -27,8 +27,8 @@ import {
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IAuditBatchRepository } from '../audit-batch/audit-batch.interface'
 import type { IAuditStatusRepository } from '../audit-status/audit-status.interface'
-import { PrismaService } from '../prisma/prisma.service'
 import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
+import { PrismaService } from '../prisma/prisma.service'
 import type { IPropertyRepository } from '../property/property.interface'
 import {
   AuditQueryDto,
@@ -40,7 +40,8 @@ import {
   CreateAuditDto,
   GlobalStatsResponseDto,
   RequestUpdateAmountConfirmedDto,
-  UpdateAuditDto
+  UpdateAuditDto,
+  UpdateReportUrlDto
 } from './audit.dto'
 import type { IAuditRepository, IAuditService } from './audit.interface'
 
@@ -70,12 +71,14 @@ export class AuditService implements IAuditService {
    * @param statusParam - Can be 'pending', 'upcoming', 'completed', or comma-separated status IDs
    * @returns Array of status IDs or null if no valid status found
    */
-  private async resolveStatusIds(statusParam: string): Promise<string[] | null> {
+  private async resolveStatusIds(
+    statusParam: string
+  ): Promise<string[] | null> {
     const trimmedStatus = statusParam.trim().toLowerCase()
 
     // Check if it's a status category
     const validCategories = ['pending', 'upcoming', 'completed'] as const
-    type StatusCategory = typeof validCategories[number]
+    type StatusCategory = (typeof validCategories)[number]
 
     if (validCategories.includes(trimmedStatus as StatusCategory)) {
       const statusNames = getStatusesByCategory(trimmedStatus as StatusCategory)
@@ -83,7 +86,9 @@ export class AuditService implements IAuditService {
       // Fetch all audit statuses and filter by names (case-insensitive)
       const allStatuses = await this.auditStatusRepository.findAll()
       const matchingStatuses = allStatuses.filter(status =>
-        statusNames.some(name => name.toLowerCase() === status.status.toLowerCase())
+        statusNames.some(
+          name => name.toLowerCase() === status.status.toLowerCase()
+        )
       )
 
       return matchingStatuses.length > 0 ? matchingStatuses.map(s => s.id) : []
@@ -226,7 +231,18 @@ export class AuditService implements IAuditService {
 
     // Configuration for query builder - remove nested fields for MongoDB compatibility
     const queryConfig = {
-      searchFields: ['id', 'property_id', 'batch.batch_no', 'batch_id', 'type_of_ota', 'audit_status_id', 'auditStatus.status', 'property.name', 'property.portfolio_id', 'property.portfolio.name'],
+      searchFields: [
+        'id',
+        'property_id',
+        'batch.batch_no',
+        'batch_id',
+        'type_of_ota',
+        'audit_status_id',
+        'auditStatus.status',
+        'property.name',
+        'property.portfolio_id',
+        'property.portfolio.name'
+      ],
       filterableFields: [
         'batch_id',
         'type_of_ota',
@@ -285,16 +301,6 @@ export class AuditService implements IAuditService {
       mergedQuery,
       queryConfig,
       baseWhere
-    )
-
-    console.log(
-      'Audit findAll - mergedQuery.filters:',
-      JSON.stringify(mergedQuery.filters)
-    )
-    console.log('Audit findAll - baseWhere:', JSON.stringify(baseWhere))
-    console.log(
-      'Audit findAll - where after buildPrismaQuery:',
-      JSON.stringify(where)
     )
 
     // Add expedia_id filter if provided
@@ -489,7 +495,18 @@ export class AuditService implements IAuditService {
 
     // Configuration for query builder - remove nested fields for MongoDB compatibility
     const queryConfig = {
-      searchFields: ['id', 'property_id', 'batch.batch_no', 'batch_id', 'type_of_ota', 'audit_status_id', 'auditStatus.status', 'property.name', 'property.portfolio_id', 'property.portfolio.name'],
+      searchFields: [
+        'id',
+        'property_id',
+        'batch.batch_no',
+        'batch_id',
+        'type_of_ota',
+        'audit_status_id',
+        'auditStatus.status',
+        'property.name',
+        'property.portfolio_id',
+        'property.portfolio.name'
+      ],
       filterableFields: [
         'batch_id',
         'type_of_ota',
@@ -704,7 +721,10 @@ export class AuditService implements IAuditService {
     }
 
     // Check if amount_confirmed is already set
-    if (audit.amount_confirmed !== null && audit.amount_confirmed !== undefined) {
+    if (
+      audit.amount_confirmed !== null &&
+      audit.amount_confirmed !== undefined
+    ) {
       throw new BadRequestException(
         'Amount confirmed is already set for this audit. You cannot request an update.'
       )
@@ -2109,6 +2129,128 @@ export class AuditService implements IAuditService {
       successfully_deleted: deletedCount,
       failed_to_delete: failedAudits.length,
       failed_audits: failedAudits
+    }
+  }
+
+  async updateReportUrl(
+    id: string,
+    data: UpdateReportUrlDto,
+    user: IUserWithPermissions
+  ): Promise<any> {
+    const audit = await this.auditRepository.findById(id)
+
+    if (!audit) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    // Update the report URL
+    await this.auditRepository.update(id, { report_url: data.report_url })
+
+    // Return full details by fetching again with full relations
+    const updatedAudit = await this.auditRepository.findById(id)
+
+    if (!updatedAudit) {
+      throw new NotFoundException('Audit not found after update')
+    }
+
+    // Send email notification to external portfolio managers
+    await this.sendReportUrlUpdateNotification(
+      updatedAudit,
+      data.report_url,
+      user.id
+    )
+
+    return updatedAudit
+  }
+
+  /**
+   * Send email notification when report URL is updated
+   * Finds all external portfolio managers for the audit's portfolio and sends them notification
+   * Excludes the user who performed the update (self-mailing prevention)
+   */
+  private async sendReportUrlUpdateNotification(
+    audit: any,
+    reportUrl: string,
+    updaterUserId: string
+  ) {
+    try {
+      const portfolioId = audit.property.portfolio.id
+
+      // Find all users with external role who have portfolio access
+      const users = await this.prisma.user.findMany({
+        where: {
+          role: {
+            is_external: true,
+            is_active: true
+          }
+        },
+        include: {
+          role: {
+            select: {
+              portfolio_permission: true,
+              property_permission: true,
+              audit_permission: true,
+              is_external: true
+            }
+          },
+          userAccessedProperties: true
+        }
+      })
+
+      // Filter users who have access to this portfolio
+      const eligibleUsers = users.filter(user => {
+        // Exclude the updater (self-mailing prevention)
+        if (user.id === updaterUserId) {
+          return false
+        }
+
+        const portfolioPermission = user.role.portfolio_permission
+
+        if (!portfolioPermission) return false
+
+        // Check if user has 'all' access level
+        if (portfolioPermission.access_level === 'all') {
+          return true
+        }
+
+        // Check if user has 'partial' access level and this portfolio is in their accessible list
+        if (portfolioPermission.access_level === 'partial') {
+          // userAccessedProperties is an array, get the first element's portfolio_id array
+          const accessedPortfolios =
+            user.userAccessedProperties?.[0]?.portfolio_id || []
+          return accessedPortfolios.includes(portfolioId)
+        }
+
+        return false
+      })
+
+      if (eligibleUsers.length === 0) {
+        console.log(
+          'No eligible external portfolio managers found for report URL update notification'
+        )
+        return
+      }
+
+      // Extract email addresses
+      const recipientEmails = eligibleUsers.map(user => user.email)
+
+      // Generate audit name (type_of_ota + " Audit")
+      const auditName = audit.type_of_ota
+        ? `${audit.type_of_ota.charAt(0).toUpperCase() + audit.type_of_ota.slice(1)} Audit`
+        : 'Audit'
+
+      // Send the email
+      await this.emailUtil.sendAuditReportUrlUpdatedEmail(
+        recipientEmails,
+        auditName,
+        audit.property.name,
+        audit.property.portfolio.name,
+        reportUrl,
+        new Date()
+      )
+    } catch (error) {
+      // Log the error but don't fail the update operation
+      console.error('Failed to send report URL update notification:', error)
     }
   }
 }

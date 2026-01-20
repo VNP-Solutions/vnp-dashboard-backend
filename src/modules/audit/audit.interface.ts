@@ -11,7 +11,8 @@ import {
   CreateAuditDto,
   GlobalStatsResponseDto,
   RequestUpdateAmountConfirmedDto,
-  UpdateAuditDto
+  UpdateAuditDto,
+  UpdateReportUrlDto
 } from './audit.dto'
 
 type AuditWithRelations = Prisma.AuditGetPayload<{
@@ -202,4 +203,9 @@ export interface IAuditService {
     message: string
     pending_action: any
   }>
+  updateReportUrl(
+    id: string,
+    data: UpdateReportUrlDto,
+    user: IUserWithPermissions
+  ): Promise<AuditWithFullDetails>
 }
