@@ -39,7 +39,8 @@ import {
   DeleteAuditDto,
   GlobalStatsResponseDto,
   RequestUpdateAmountConfirmedDto,
-  UpdateAuditDto
+  UpdateAuditDto,
+  UpdateReportUrlDto
 } from './audit.dto'
 import type { IAuditService } from './audit.interface'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
@@ -643,5 +644,29 @@ export class AuditController {
     }
 
     return this.auditService.requestUpdateAmountConfirmed(id, data, user)
+  }
+
+  @Patch(':id/report-url')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Update report URL for an audit',
+    description: 'Updates the report URL field for a specific audit. This is a dedicated endpoint for updating only the report URL.'
+  })
+  @ApiResponse({ status: 200, description: 'Report URL updated successfully' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid data'
+  })
+  updateReportUrl(
+    @Param('id') id: string,
+    @Body() updateReportUrlDto: UpdateReportUrlDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.auditService.updateReportUrl(id, updateReportUrlDto, user)
   }
 }

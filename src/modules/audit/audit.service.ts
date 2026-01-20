@@ -40,7 +40,8 @@ import {
   CreateAuditDto,
   GlobalStatsResponseDto,
   RequestUpdateAmountConfirmedDto,
-  UpdateAuditDto
+  UpdateAuditDto,
+  UpdateReportUrlDto
 } from './audit.dto'
 import type { IAuditRepository, IAuditService } from './audit.interface'
 
@@ -2110,5 +2111,29 @@ export class AuditService implements IAuditService {
       failed_to_delete: failedAudits.length,
       failed_audits: failedAudits
     }
+  }
+
+  async updateReportUrl(
+    id: string,
+    data: UpdateReportUrlDto,
+    _user: IUserWithPermissions
+  ): Promise<any> {
+    const audit = await this.auditRepository.findById(id)
+
+    if (!audit) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    // Update the report URL
+    await this.auditRepository.update(id, { report_url: data.report_url })
+
+    // Return full details by fetching again with full relations
+    const updatedAudit = await this.auditRepository.findById(id)
+
+    if (!updatedAudit) {
+      throw new NotFoundException('Audit not found after update')
+    }
+
+    return updatedAudit
   }
 }
