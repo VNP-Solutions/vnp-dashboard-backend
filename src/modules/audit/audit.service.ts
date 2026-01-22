@@ -25,6 +25,7 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import { roundAmount, roundToDecimals } from '../../common/utils/amount.util'
 import type { IAuditBatchRepository } from '../audit-batch/audit-batch.interface'
 import type { IAuditStatusRepository } from '../audit-status/audit-status.interface'
 import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
@@ -1102,7 +1103,7 @@ export class AuditService implements IAuditService {
           if (amountCollectableValue) {
             const amountCollectable = parseFloat(amountCollectableValue)
             if (!isNaN(amountCollectable)) {
-              updateData.amount_collectable = amountCollectable
+              updateData.amount_collectable = roundToDecimals(amountCollectable)
             }
           }
 
@@ -1116,7 +1117,7 @@ export class AuditService implements IAuditService {
           if (amountConfirmedValue) {
             const amountConfirmed = parseFloat(amountConfirmedValue)
             if (!isNaN(amountConfirmed)) {
-              updateData.amount_confirmed = amountConfirmed
+              updateData.amount_confirmed = roundToDecimals(amountConfirmed)
             }
           }
 
@@ -1952,9 +1953,20 @@ export class AuditService implements IAuditService {
       }
     })
 
+    // Round all amounts to 2 decimal places
     return {
-      amount_collectable: amountCollectable,
-      amount_confirmed: amountConfirmed,
+      amount_collectable: {
+        total: roundAmount(amountCollectable.total),
+        expedia: roundAmount(amountCollectable.expedia),
+        booking: roundAmount(amountCollectable.booking),
+        agoda: roundAmount(amountCollectable.agoda)
+      },
+      amount_confirmed: {
+        total: roundAmount(amountConfirmed.total),
+        expedia: roundAmount(amountConfirmed.expedia),
+        booking: roundAmount(amountConfirmed.booking),
+        agoda: roundAmount(amountConfirmed.agoda)
+      },
       completed_audit_count: completedAuditCount
     }
   }
