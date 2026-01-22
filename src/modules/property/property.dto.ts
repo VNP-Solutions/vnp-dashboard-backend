@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger'
-import { Type } from 'class-transformer'
+import { Transform, Type } from 'class-transformer'
 import {
   IsArray,
   IsBoolean,
@@ -11,6 +11,7 @@ import {
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
 import { ExpediaCredentialsDto, OtaCredentialsDto } from '../property-credentials/property-credentials.dto'
+import { normalizeDateTransform } from '../../common/utils/date.util'
 
 export type AccessType = 'owned' | 'shared'
 
@@ -61,7 +62,8 @@ export class CreatePropertyDto {
   })
   @IsDateString()
   @IsOptional()
-  next_due_date?: string
+  @Transform(({ value }) => normalizeDateTransform(value))
+  next_due_date?: Date
 
   @ApiProperty({
     example: '507f1f77bcf86cd799439012',

@@ -12,6 +12,7 @@ import {
   IsString
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
+import { normalizeDateTransform } from '../../common/utils/date.util'
 
 export class CreateAuditDto {
   @ApiPropertyOptional({
@@ -53,7 +54,8 @@ export class CreateAuditDto {
   })
   @IsDateString()
   @IsOptional()
-  start_date?: string
+  @Transform(({ value }) => normalizeDateTransform(value))
+  start_date?: Date
 
   @ApiPropertyOptional({
     example: '2024-01-31T23:59:59Z',
@@ -61,7 +63,8 @@ export class CreateAuditDto {
   })
   @IsDateString()
   @IsOptional()
-  end_date?: string
+  @Transform(({ value }) => normalizeDateTransform(value))
+  end_date?: Date
 
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',

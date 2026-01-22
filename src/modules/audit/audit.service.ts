@@ -932,7 +932,7 @@ export class AuditService implements IAuditService {
           if (typeof dateValue === 'number') {
             // Excel stores dates as days since January 1, 1900
             // Excel has a bug where it considers 1900 a leap year, so we use December 30, 1899 as epoch
-            const excelEpoch = new Date(1899, 11, 30) // December 30, 1899
+            const excelEpoch = new Date(Date.UTC(1899, 11, 30)) // December 30, 1899 UTC
             const date = new Date(
               excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000
             )
@@ -963,7 +963,8 @@ export class AuditService implements IAuditService {
               year >= 1900 &&
               year <= 2100
             ) {
-              return new Date(year, month - 1, day)
+              // Create date in UTC to avoid timezone issues
+              return new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
             }
           }
 
@@ -1473,7 +1474,7 @@ export class AuditService implements IAuditService {
           if (typeof dateValue === 'number') {
             // Excel stores dates as days since January 1, 1900
             // Excel has a bug where it considers 1900 a leap year, so we use December 30, 1899 as epoch
-            const excelEpoch = new Date(1899, 11, 30) // December 30, 1899
+            const excelEpoch = new Date(Date.UTC(1899, 11, 30)) // December 30, 1899 UTC
             const date = new Date(
               excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000
             )
@@ -1504,7 +1505,8 @@ export class AuditService implements IAuditService {
               year >= 1900 &&
               year <= 2100
             ) {
-              return new Date(year, month - 1, day)
+              // Create date in UTC to avoid timezone issues
+              return new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
             }
           }
 
@@ -1780,8 +1782,8 @@ export class AuditService implements IAuditService {
           const auditData: CreateAuditDto = {
             property_id: property.id,
             audit_status_id: auditStatus.id,
-            start_date: startDate ? startDate.toISOString() : undefined,
-            end_date: endDate ? endDate.toISOString() : undefined,
+            start_date: startDate || undefined,
+            end_date: endDate || undefined,
             type_of_ota: typeOfOta || undefined,
             amount_collectable: amountCollectable,
             amount_confirmed: amountConfirmed,

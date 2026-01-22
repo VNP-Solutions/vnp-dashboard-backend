@@ -1,5 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { Transform } from 'class-transformer'
 import {
   IsBoolean,
   IsDateString,
@@ -8,6 +9,7 @@ import {
   IsOptional,
   IsString
 } from 'class-validator'
+import { normalizeDateTransform } from '../../common/utils/date.util'
 
 export enum TaskEntityType {
   ALL = 'all',
@@ -48,7 +50,8 @@ export class CreateTaskDto {
   })
   @IsDateString()
   @IsOptional()
-  due_date?: string
+  @Transform(({ value }) => normalizeDateTransform(value))
+  due_date?: Date
 
   @ApiPropertyOptional({
     example: '507f1f77bcf86cd799439011',
@@ -134,7 +137,8 @@ export class TaskQueryDto {
   })
   @IsOptional()
   @IsDateString()
-  due_date?: string
+  @Transform(({ value }) => normalizeDateTransform(value))
+  due_date?: Date
 
   @ApiPropertyOptional({
     description: 'Sort field (created_at/due_date)',
