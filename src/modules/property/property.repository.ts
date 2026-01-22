@@ -268,9 +268,18 @@ export class PropertyRepository implements IPropertyRepository {
           where: { property_id: propertyId }
         })
 
-        const bankData: any = {
-          bank_type: bankDetailsData.bank_type as BankType
-        }
+        // If bank_type is "none", delete existing bank details
+        if (bankDetailsData.bank_type === 'none') {
+          if (existingBankDetails) {
+            await tx.propertyBankDetails.delete({
+              where: { property_id: propertyId }
+            })
+          }
+          // Skip the rest of bank details processing
+        } else {
+          const bankData: any = {
+            bank_type: bankDetailsData.bank_type as BankType
+          }
 
         // Add optional fields if provided
         if (bankDetailsData.bank_sub_type) {
@@ -312,22 +321,23 @@ export class PropertyRepository implements IPropertyRepository {
         if (bankDetailsData.stripe_account_email) {
           bankData.stripe_account_email = bankDetailsData.stripe_account_email
         }
-        if (userId) {
-          bankData.associated_user_id = userId
-        }
+          if (userId) {
+            bankData.associated_user_id = userId
+          }
 
-        if (existingBankDetails) {
-          await tx.propertyBankDetails.update({
-            where: { property_id: propertyId },
-            data: bankData
-          })
-        } else {
-          await tx.propertyBankDetails.create({
-            data: {
-              property_id: propertyId,
-              ...bankData
-            }
-          })
+          if (existingBankDetails) {
+            await tx.propertyBankDetails.update({
+              where: { property_id: propertyId },
+              data: bankData
+            })
+          } else {
+            await tx.propertyBankDetails.create({
+              data: {
+                property_id: propertyId,
+                ...bankData
+              }
+            })
+          }
         }
       }
 

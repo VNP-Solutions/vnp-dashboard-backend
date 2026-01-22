@@ -13,15 +13,15 @@ export class CreatePropertyBankDetailsDto {
   property_id: string
 
   @ApiProperty({
-    enum: BankType,
-    example: BankType.bank,
+    enum: ['bank', 'stripe', 'none'],
+    example: 'bank',
     description:
-      'Type of bank account (bank or stripe). Note: This will be automatically determined based on whether stripe_account_email is provided.',
-    default: BankType.bank
+      'Type of bank account (bank, stripe, or none). Use "none" to remove existing bank details. Note: This will be automatically determined based on whether stripe_account_email is provided.',
+    default: 'bank'
   })
-  @IsEnum(BankType)
+  @IsString()
   @IsNotEmpty()
-  bank_type: BankType
+  bank_type: string
 
   @ApiPropertyOptional({
     enum: BankSubType,

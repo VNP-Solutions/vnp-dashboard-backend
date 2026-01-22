@@ -38,7 +38,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
    */
   private validateAndNormalizeBankDetails(
     data: CreatePropertyBankDetailsDto | UpdatePropertyBankDetailsDto
-  ): CreatePropertyBankDetailsDto | UpdatePropertyBankDetailsDto {
+  ): CreatePropertyBankDetailsDto | UpdatePropertyBankDetailsDto | null {
+    // Check if bank_type is "none" - this means remove bank details
+    if (data.bank_type === 'none') {
+      return null
+    }
+
     // Check if stripe_account_email is provided
     if (data.stripe_account_email && data.stripe_account_email.trim()) {
       // This is a Stripe account - override bank_type and validate
@@ -196,6 +201,30 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       PermissionAction.CREATE
     )
 
+    // Validate and normalize bank details based on type
+    const normalizedData = this.validateAndNormalizeBankDetails(data)
+
+    // If bank_type is "none", check if bank details exist and return appropriate response
+    if (normalizedData === null) {
+      const existingBankDetails =
+        await this.propertyBankDetailsRepository.findByPropertyId(
+          data.property_id
+        )
+
+      if (existingBankDetails) {
+        throw new ConflictException(
+          'Bank details already exist for this property'
+        )
+      }
+
+      // No bank details to create - return success
+      return {
+        id: data.property_id,
+        message: 'No bank details to create'
+      } as any
+    }
+
+    // For other bank types, check if bank details already exist
     const existingBankDetails =
       await this.propertyBankDetailsRepository.findByPropertyId(
         data.property_id
@@ -207,15 +236,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       )
     }
 
-    // Validate and normalize bank details based on type
-    const normalizedData = this.validateAndNormalizeBankDetails(
-      data
-    ) as CreatePropertyBankDetailsDto
-
     // Set associated_user_id to current user
-    normalizedData.associated_user_id = user.id
+    (normalizedData as CreatePropertyBankDetailsDto).associated_user_id = user.id
 
-    return this.propertyBankDetailsRepository.create(normalizedData)
+    return this.propertyBankDetailsRepository.create(
+      normalizedData as CreatePropertyBankDetailsDto
+    )
   }
 
   async findByPropertyId(propertyId: string, _user: IUserWithPermissions) {
@@ -241,6 +267,31 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       PermissionAction.UPDATE
     )
 
+    // Validate and normalize bank details based on type
+    const normalizedData = this.validateAndNormalizeBankDetails(data)
+
+    // If bank_type is "none", delete existing bank details if they exist
+    if (normalizedData === null) {
+      const bankDetails =
+        await this.propertyBankDetailsRepository.findByPropertyId(propertyId)
+
+      if (bankDetails) {
+        // Bank details exist, delete them
+        const deleted = await this.prisma.propertyBankDetails.delete({
+          where: { property_id: propertyId }
+        })
+        return deleted
+      } else {
+        // Bank details don't exist, return a success response
+        // This is idempotent - trying to delete something that doesn't exist is a success
+        return {
+          id: propertyId,
+          message: 'No bank details to remove'
+        } as any
+      }
+    }
+
+    // For other bank types, check if bank details exist
     const bankDetails =
       await this.propertyBankDetailsRepository.findByPropertyId(propertyId)
 
@@ -248,15 +299,13 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       throw new NotFoundException('Bank details not found for this property')
     }
 
-    // Validate and normalize bank details based on type
-    const normalizedData = this.validateAndNormalizeBankDetails(
-      data
-    ) as UpdatePropertyBankDetailsDto
-
     // Update associated_user_id to current user
-    normalizedData.associated_user_id = user.id
+    (normalizedData as UpdatePropertyBankDetailsDto).associated_user_id = user.id
 
-    return this.propertyBankDetailsRepository.update(propertyId, normalizedData)
+    return this.propertyBankDetailsRepository.update(
+      propertyId,
+      normalizedData as UpdatePropertyBankDetailsDto
+    )
   }
 
   async bulkUpdate(

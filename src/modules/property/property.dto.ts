@@ -400,9 +400,9 @@ export class CompletePropertyCredentialsDto {
 
 export class CompleteBankDetailsDto {
   @ApiProperty({
-    enum: ['bank', 'stripe'],
+    enum: ['bank', 'stripe', 'none'],
     example: 'bank',
-    description: 'Type of bank account (bank or stripe)',
+    description: 'Type of bank account (bank, stripe, or none). Use "none" to remove existing bank details.',
     default: 'bank'
   })
   @IsString()
