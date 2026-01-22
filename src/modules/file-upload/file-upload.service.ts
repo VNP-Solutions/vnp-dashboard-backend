@@ -38,9 +38,8 @@ export class FileUploadService implements IFileUploadService {
       throw new BadRequestException('No file provided')
     }
 
-    const timestamp = Date.now()
     const sanitizedFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const key = `uploads/${timestamp}-${sanitizedFileName}`
+    const key = `uploads/${sanitizedFileName}`
 
     try {
       const upload = new Upload({
@@ -83,13 +82,12 @@ export class FileUploadService implements IFileUploadService {
     const errors: string[] = []
 
     // Upload files in parallel using Promise.allSettled
-    const uploadPromises = files.map(async (file, index) => {
-      const timestamp = Date.now()
+    const uploadPromises = files.map(async (file) => {
       const sanitizedFileName = file.originalname.replace(
         /[^a-zA-Z0-9.-]/g,
         '_'
       )
-      const key = `uploads/${timestamp}-${index}-${sanitizedFileName}`
+      const key = `uploads/${sanitizedFileName}`
 
       try {
         const upload = new Upload({
