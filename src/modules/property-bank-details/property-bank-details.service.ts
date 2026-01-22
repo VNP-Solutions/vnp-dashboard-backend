@@ -38,7 +38,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
    */
   private validateAndNormalizeBankDetails(
     data: CreatePropertyBankDetailsDto | UpdatePropertyBankDetailsDto
-  ): CreatePropertyBankDetailsDto | UpdatePropertyBankDetailsDto {
+  ): CreatePropertyBankDetailsDto | UpdatePropertyBankDetailsDto | null {
+    // Check if bank_type is "none" - this means remove bank details
+    if (data.bank_type === 'none') {
+      return null
+    }
+
     // Check if stripe_account_email is provided
     if (data.stripe_account_email && data.stripe_account_email.trim()) {
       // This is a Stripe account - override bank_type and validate
@@ -249,14 +254,23 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     }
 
     // Validate and normalize bank details based on type
-    const normalizedData = this.validateAndNormalizeBankDetails(
-      data
-    ) as UpdatePropertyBankDetailsDto
+    const normalizedData = this.validateAndNormalizeBankDetails(data)
+
+    // If bank_type is "none", delete existing bank details and return the deleted record
+    if (normalizedData === null) {
+      const deleted = await this.prisma.propertyBankDetails.delete({
+        where: { property_id: propertyId }
+      })
+      return deleted
+    }
 
     // Update associated_user_id to current user
-    normalizedData.associated_user_id = user.id
+    (normalizedData as UpdatePropertyBankDetailsDto).associated_user_id = user.id
 
-    return this.propertyBankDetailsRepository.update(propertyId, normalizedData)
+    return this.propertyBankDetailsRepository.update(
+      propertyId,
+      normalizedData as UpdatePropertyBankDetailsDto
+    )
   }
 
   async bulkUpdate(
