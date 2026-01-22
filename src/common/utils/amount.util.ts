@@ -51,7 +51,7 @@ export function roundAuditAmounts<T extends {
  * @returns The sum rounded to 2 decimal places
  */
 export function roundSum(values: (number | null | undefined)[]): number {
-  const sum = values.reduce((acc, val) => acc + (val || 0), 0)
+  const sum = values.reduce((acc: number, val) => acc + (val || 0), 0)
   return roundToDecimals(sum) || 0
 }
 

@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { roundToDecimals } from '../../common/utils/amount.util'
 import { Configuration } from '../../config/configuration'
 import {
   REPORT_COLUMNS,
@@ -412,7 +413,8 @@ export class GlobalReportService implements IGlobalReportService {
     // Extract audit ID from MongoDB document
     const auditId = this.extractObjectId(doc._id)
 
-    return {
+    // Build result with amounts
+    const result = {
       auditId,
       portfolioName: doc.portfolio?.name || '',
       propertyName: doc.property?.name || '',
@@ -425,12 +427,14 @@ export class GlobalReportService implements IGlobalReportService {
       endDate: this.extractDate(doc.end_date),
       nextDueDate: this.extractDate(doc.property?.next_due_date),
       currency: doc.currency?.code || '',
-      amountCollectable: doc.amount_collectable ?? null,
-      amountConfirmed: doc.amount_confirmed ?? null,
+      amountCollectable: roundToDecimals(doc.amount_collectable) ?? null,
+      amountConfirmed: roundToDecimals(doc.amount_confirmed) ?? null,
       portfolioContactEmail: doc.portfolio?.contact_email || null,
       otaUsername,
       otaPassword
     }
+
+    return result
   }
 
   /**
