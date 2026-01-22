@@ -20,6 +20,7 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import { roundAmount } from '../../common/utils/amount.util'
 import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
 import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import { PrismaService } from '../prisma/prisma.service'
@@ -1681,10 +1682,28 @@ export class PortfolioService implements IPortfolioService {
     }))
 
     return {
-      amount_collectable: amountCollectable,
-      amount_confirmed: amountConfirmed,
+      amount_collectable: {
+        total: roundAmount(amountCollectable.total),
+        expedia: roundAmount(amountCollectable.expedia),
+        booking: roundAmount(amountCollectable.booking),
+        agoda: roundAmount(amountCollectable.agoda)
+      },
+      amount_confirmed: {
+        total: roundAmount(amountConfirmed.total),
+        expedia: roundAmount(amountConfirmed.expedia),
+        booking: roundAmount(amountConfirmed.booking),
+        agoda: roundAmount(amountConfirmed.agoda)
+      },
       completed_audit_count: completedAuditCount,
-      recent_audits: formattedRecentAudits
+      recent_audits: formattedRecentAudits.map(audit => ({
+        ...audit,
+        amount_collectable: audit.amount_collectable !== null && audit.amount_collectable !== undefined
+          ? roundAmount(audit.amount_collectable)
+          : null,
+        amount_confirmed: audit.amount_confirmed !== null && audit.amount_confirmed !== undefined
+          ? roundAmount(audit.amount_confirmed)
+          : null
+      }))
     }
   }
 }

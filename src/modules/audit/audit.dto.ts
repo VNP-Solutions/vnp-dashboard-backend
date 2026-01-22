@@ -32,7 +32,7 @@ export class CreateAuditDto {
   audit_status_id: string
 
   @ApiPropertyOptional({
-    example: 5000,
+    example: 5000.50,
     description: 'Amount collectable'
   })
   @IsNumber()
@@ -40,7 +40,7 @@ export class CreateAuditDto {
   amount_collectable?: number
 
   @ApiPropertyOptional({
-    example: 4500,
+    example: 4500.75,
     description: 'Amount confirmed'
   })
   @IsNumber()
@@ -327,7 +327,7 @@ export class RequestUpdateAmountConfirmedDto {
   password: string
 
   @ApiProperty({
-    example: 5000,
+    example: 5000.50,
     description: 'New amount confirmed value'
   })
   @IsNumber()

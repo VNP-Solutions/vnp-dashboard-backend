@@ -27,6 +27,7 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import { roundAmount } from '../../common/utils/amount.util'
 import { Configuration } from '../../config/configuration'
 import type { ICurrencyRepository } from '../currency/currency.interface'
 import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
@@ -2836,8 +2837,8 @@ export class PropertyService implements IPropertyService {
     })
 
     return {
-      total_amount_collectable: auditAggregates._sum.amount_collectable || 0,
-      total_amount_confirmed: auditAggregates._sum.amount_confirmed || 0,
+      total_amount_collectable: roundAmount(auditAggregates._sum.amount_collectable),
+      total_amount_confirmed: roundAmount(auditAggregates._sum.amount_confirmed),
       property: {
         id: property.id,
         name: property.name,

@@ -25,6 +25,7 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import { roundAmount, roundToDecimals } from '../../common/utils/amount.util'
 import type { IAuditBatchRepository } from '../audit-batch/audit-batch.interface'
 import type { IAuditStatusRepository } from '../audit-status/audit-status.interface'
 import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
@@ -114,7 +115,18 @@ export class AuditService implements IAuditService {
       }
     }
 
-    return this.auditRepository.create(data)
+    // Round amount fields to 2 decimal places
+    const createData = {
+      ...data,
+      amount_collectable: data.amount_collectable !== undefined && data.amount_collectable !== null
+        ? (roundToDecimals(data.amount_collectable) ?? undefined)
+        : undefined,
+      amount_confirmed: data.amount_confirmed !== undefined && data.amount_confirmed !== null
+        ? (roundToDecimals(data.amount_confirmed) ?? undefined)
+        : undefined
+    }
+
+    return this.auditRepository.create(createData)
   }
 
   async findAll(query: AuditQueryDto, user: IUserWithPermissions) {
@@ -698,7 +710,18 @@ export class AuditService implements IAuditService {
       await this.sendAuditStatusChangeNotification(audit, data.audit_status_id)
     }
 
-    return this.auditRepository.update(id, data)
+    // Round amount fields to 2 decimal places if provided
+    const updateData = {
+      ...data,
+      amount_collectable: data.amount_collectable !== undefined && data.amount_collectable !== null
+        ? (roundToDecimals(data.amount_collectable) ?? undefined)
+        : data.amount_collectable,
+      amount_confirmed: data.amount_confirmed !== undefined && data.amount_confirmed !== null
+        ? (roundToDecimals(data.amount_confirmed) ?? undefined)
+        : data.amount_confirmed
+    }
+
+    return this.auditRepository.update(id, updateData)
   }
 
   async requestUpdateAmountConfirmed(
@@ -739,14 +762,14 @@ export class AuditService implements IAuditService {
       )
     }
 
-    // Create the pending action
+    // Create the pending action with rounded amount
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'audit',
       audit_id: id,
       action_type: PendingActionType.AUDIT_UPDATE_AMOUNT_CONFIRMED,
       requested_user_id: user.id,
       audit_update_data: {
-        amount_confirmed: data.amount_confirmed
+        amount_confirmed: roundToDecimals(data.amount_confirmed) ?? data.amount_confirmed
       },
       reason: data.reason
     })
@@ -1102,7 +1125,7 @@ export class AuditService implements IAuditService {
           if (amountCollectableValue) {
             const amountCollectable = parseFloat(amountCollectableValue)
             if (!isNaN(amountCollectable)) {
-              updateData.amount_collectable = amountCollectable
+              updateData.amount_collectable = roundToDecimals(amountCollectable)
             }
           }
 
@@ -1116,7 +1139,7 @@ export class AuditService implements IAuditService {
           if (amountConfirmedValue) {
             const amountConfirmed = parseFloat(amountConfirmedValue)
             if (!isNaN(amountConfirmed)) {
-              updateData.amount_confirmed = amountConfirmed
+              updateData.amount_confirmed = roundToDecimals(amountConfirmed)
             }
           }
 
@@ -1635,8 +1658,11 @@ export class AuditService implements IAuditService {
             'amount_collectable',
             'Collectable'
           ])
-          const amountCollectable = amountCollectableValue
+          const parsedCollectable = amountCollectableValue
             ? parseFloat(amountCollectableValue)
+            : NaN
+          const amountCollectable = !isNaN(parsedCollectable)
+            ? roundToDecimals(parsedCollectable) ?? undefined
             : undefined
 
           // Extract amount confirmed
@@ -1646,8 +1672,11 @@ export class AuditService implements IAuditService {
             'amount_confirmed',
             'Confirmed'
           ])
-          const amountConfirmed = amountConfirmedValue
+          const parsedConfirmed = amountConfirmedValue
             ? parseFloat(amountConfirmedValue)
+            : NaN
+          const amountConfirmed = !isNaN(parsedConfirmed)
+            ? roundToDecimals(parsedConfirmed) ?? undefined
             : undefined
 
           // Extract start date (use raw value to preserve Excel date format) - optional
@@ -1952,9 +1981,20 @@ export class AuditService implements IAuditService {
       }
     })
 
+    // Round all amounts to 2 decimal places
     return {
-      amount_collectable: amountCollectable,
-      amount_confirmed: amountConfirmed,
+      amount_collectable: {
+        total: roundAmount(amountCollectable.total),
+        expedia: roundAmount(amountCollectable.expedia),
+        booking: roundAmount(amountCollectable.booking),
+        agoda: roundAmount(amountCollectable.agoda)
+      },
+      amount_confirmed: {
+        total: roundAmount(amountConfirmed.total),
+        expedia: roundAmount(amountConfirmed.expedia),
+        booking: roundAmount(amountConfirmed.booking),
+        agoda: roundAmount(amountConfirmed.agoda)
+      },
       completed_audit_count: completedAuditCount
     }
   }

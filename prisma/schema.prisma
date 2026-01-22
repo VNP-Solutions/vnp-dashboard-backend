@@ -124,8 +124,8 @@ model Audit {
   billing_type       BillingType?
   audit_status_id    String       @db.ObjectId
   auditStatus        AuditStatus  @relation(fields: [audit_status_id], references: [id])
-  amount_collectable Int?
-  amount_confirmed   Int?
+  amount_collectable Float?
+  amount_confirmed   Float?
   is_archived        Boolean      @default(false)
   start_date         DateTime?
   end_date           DateTime?
@@ -480,7 +480,7 @@ type PortfolioInfo {
 }
 
 type AuditUpdateData {
-  amount_confirmed Int
+  amount_confirmed Float
 }
 
 model PendingAction {

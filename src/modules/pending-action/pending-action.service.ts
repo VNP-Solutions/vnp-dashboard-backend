@@ -12,6 +12,7 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import { isUserSuperAdmin, isInternalUser } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import { EmailUtil } from '../../common/utils/email.util'
+import { roundToDecimals } from '../../common/utils/amount.util'
 import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import type { IPropertyService } from '../property/property.interface'
 import { PrismaService } from '../prisma/prisma.service'
@@ -367,7 +368,7 @@ export class PendingActionService
         await this.prisma.audit.update({
           where: { id: pendingAction.audit_id },
           data: {
-            amount_confirmed: pendingAction.audit_update_data.amount_confirmed
+            amount_confirmed: roundToDecimals(pendingAction.audit_update_data.amount_confirmed)
           }
         })
         break
