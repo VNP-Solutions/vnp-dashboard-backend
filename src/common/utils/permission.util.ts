@@ -435,6 +435,38 @@ export function canRequestBulkPropertyTransfer(user: IUserWithPermissions): bool
 }
 
 /**
+ * Check if a user can request property deletion
+ * Requirements:
+ * - Property permission level must be 'update' or 'all'
+ * - Property access level must be 'partial' or 'all'
+ * - Both internal and external users can request (no user type restriction)
+ * - Super admins bypass these checks
+ */
+export function canRequestPropertyDelete(user: IUserWithPermissions): boolean {
+  if (!user || !user.role) return false
+
+  // Super admin can always request deletion
+  if (isUserSuperAdmin(user)) return true
+
+  const propertyPermission = user.role.property_permission
+  if (!propertyPermission) return false
+
+  // Check permission level: must be 'update' or 'all'
+  const hasRequiredPermissionLevel =
+    propertyPermission.permission_level === PermissionLevel.all ||
+    propertyPermission.permission_level === PermissionLevel.update
+
+  if (!hasRequiredPermissionLevel) return false
+
+  // Check access level: must be 'partial' or 'all'
+  const hasRequiredAccessLevel =
+    propertyPermission.access_level === AccessLevel.all ||
+    propertyPermission.access_level === AccessLevel.partial
+
+  return hasRequiredAccessLevel
+}
+
+/**
  * Get the bank details permission for a user
  */
 export function getBankDetailsPermission(
