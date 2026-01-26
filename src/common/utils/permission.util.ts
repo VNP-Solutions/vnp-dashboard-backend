@@ -350,8 +350,8 @@ export function isInternalUser(user: IUserWithPermissions): boolean {
  * Check if a user can perform bulk transfer operations
  * Bulk transfer is allowed for:
  * - Super admins (regardless of internal/external status)
- * - Internal property managers (permission_level 'all' for property module)
- * - Internal portfolio managers (permission_level 'all' for portfolio module)
+ * - Internal users with property permission 'all' and access 'partial' or 'all'
+ * - Internal users with portfolio permission 'all' and access 'partial' or 'all'
  */
 export function canPerformBulkTransfer(user: IUserWithPermissions): boolean {
   if (!user || !user.role) return false
@@ -364,6 +364,74 @@ export function canPerformBulkTransfer(user: IUserWithPermissions): boolean {
 
   // Check if user is a property manager or portfolio manager
   return isPropertyManager(user) || isPortfolioManager(user)
+}
+
+/**
+ * Check if a user can request a single property transfer
+ * Requirements:
+ * - Must be internal user
+ * - Property permission level must be 'update' or 'all'
+ * - Property access level must be 'partial' or 'all'
+ * - Super admins bypass these checks
+ */
+export function canRequestPropertyTransfer(user: IUserWithPermissions): boolean {
+  if (!user || !user.role) return false
+
+  // Super admin can always request transfer
+  if (isUserSuperAdmin(user)) return true
+
+  // Must be internal user
+  if (!isInternalUser(user)) return false
+
+  const propertyPermission = user.role.property_permission
+  if (!propertyPermission) return false
+
+  // Check permission level: must be 'update' or 'all'
+  const hasRequiredPermissionLevel =
+    propertyPermission.permission_level === PermissionLevel.all ||
+    propertyPermission.permission_level === PermissionLevel.update
+
+  if (!hasRequiredPermissionLevel) return false
+
+  // Check access level: must be 'partial' or 'all'
+  const hasRequiredAccessLevel =
+    propertyPermission.access_level === AccessLevel.all ||
+    propertyPermission.access_level === AccessLevel.partial
+
+  return hasRequiredAccessLevel
+}
+
+/**
+ * Check if a user can request bulk property transfer
+ * Requirements:
+ * - Must be internal user
+ * - Property permission level must be 'all'
+ * - Property access level must be 'partial' or 'all'
+ * - Super admins bypass these checks
+ */
+export function canRequestBulkPropertyTransfer(user: IUserWithPermissions): boolean {
+  if (!user || !user.role) return false
+
+  // Super admin can always request bulk transfer
+  if (isUserSuperAdmin(user)) return true
+
+  // Must be internal user
+  if (!isInternalUser(user)) return false
+
+  const propertyPermission = user.role.property_permission
+  if (!propertyPermission) return false
+
+  // Check permission level: must be 'all'
+  if (propertyPermission.permission_level !== PermissionLevel.all) {
+    return false
+  }
+
+  // Check access level: must be 'partial' or 'all'
+  const hasRequiredAccessLevel =
+    propertyPermission.access_level === AccessLevel.all ||
+    propertyPermission.access_level === AccessLevel.partial
+
+  return hasRequiredAccessLevel
 }
 
 /**
