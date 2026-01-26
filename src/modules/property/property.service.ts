@@ -22,6 +22,7 @@ import {
   canCreateBankDetails,
   canReadBankDetails,
   canRequestBulkPropertyTransfer,
+  canRequestPropertyDelete,
   canRequestPropertyTransfer,
   canUpdateBankDetails,
   isInternalUser,
@@ -1261,10 +1262,18 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Property not found')
     }
 
-    // Only super admins can delete properties
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only super admins can delete properties')
+    // Check if user has permission to request property deletion
+    // Requirements: property permission level 'update' or 'all', access level 'partial' or 'all'
+    if (!canRequestPropertyDelete(user)) {
+      throw new ForbiddenException(
+        'You do not have permission to delete properties. Property deletion requires: (1) property permission level "update" or "all", and (2) property access level "partial" or "all".'
+      )
     }
+
+    // Check ownership: Only the owner portfolio can delete the property
+    await this.validatePropertyOwnership(property, user)
+
+    const isSuperAdmin = isUserSuperAdmin(user)
 
     // Check if there are any unarchived audits
     const unarchivedAuditCount = await this.prisma.audit.count({
@@ -1280,9 +1289,27 @@ export class PropertyService implements IPropertyService {
       )
     }
 
-    // Delete the property
-    await this.propertyRepository.delete(id)
-    return { message: 'Property deleted successfully' }
+    // Super admin can directly delete
+    if (isSuperAdmin) {
+      // Delete the property
+      await this.propertyRepository.delete(id)
+      return { message: 'Property deleted successfully' }
+    }
+
+    // Property manager (with ownership rights) creates pending action for approval
+    const pendingAction = await this.pendingActionRepository.create({
+      resource_type: 'property',
+      property_id: id,
+      action_type: 'PROPERTY_DELETE',
+      requested_user_id: user.id,
+      reason: 'Property deletion requested'
+    })
+
+    return {
+      message:
+        'Deletion request submitted for approval. A super admin will review your request.',
+      pending_action: pendingAction
+    }
   }
 
   async deactivate(id: string, user: IUserWithPermissions, reason?: string) {
