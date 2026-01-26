@@ -21,8 +21,9 @@ import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
   canCreateBankDetails,
   canReadBankDetails,
+  canRequestBulkPropertyTransfer,
+  canRequestPropertyTransfer,
   canUpdateBankDetails,
-  canPerformBulkTransfer,
   isInternalUser,
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
@@ -1045,6 +1046,14 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Property not found')
     }
 
+    // Check if user has permission to request property transfer
+    // Requirements: internal user, property permission level 'update' or 'all', access level 'partial' or 'all'
+    if (!canRequestPropertyTransfer(user)) {
+      throw new ForbiddenException(
+        'You do not have permission to transfer properties. Property transfer requires: (1) internal user account, (2) property permission level "update" or "all", and (3) property access level "partial" or "all".'
+      )
+    }
+
     // Check ownership: Only the owner portfolio can transfer the property
     await this.validatePropertyOwnership(property, user)
 
@@ -1167,10 +1176,11 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('At least one property ID is required')
     }
 
-    // Only super admins or internal property/portfolio managers can perform bulk transfers
-    if (!canPerformBulkTransfer(user)) {
+    // Check if user has permission to request bulk property transfer
+    // Requirements: internal user, property permission level 'all', access level 'partial' or 'all'
+    if (!canRequestBulkPropertyTransfer(user)) {
       throw new ForbiddenException(
-        'Only super admins or internal property/portfolio managers can perform bulk transfers. Please transfer properties one at a time or contact a super admin.'
+        'You do not have permission to perform bulk property transfers. Bulk transfer requires: (1) internal user account, (2) property permission level "all", and (3) property access level "partial" or "all".'
       )
     }
 
