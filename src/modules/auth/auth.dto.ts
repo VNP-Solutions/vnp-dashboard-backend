@@ -226,6 +226,7 @@ export class AuthResponseDto {
         name: 'Admin',
         description: 'Administrator role with full access',
         is_external: false,
+        can_access_mis: true,
         portfolio_permission: { permission_level: 'all', access_level: 'all' },
         property_permission: { permission_level: 'all', access_level: 'all' },
         audit_permission: { permission_level: 'all', access_level: 'all' },
@@ -248,6 +249,7 @@ export class AuthResponseDto {
       name: string
       description: string
       is_external: boolean
+      can_access_mis: boolean
       portfolio_permission: any
       property_permission: any
       audit_permission: any

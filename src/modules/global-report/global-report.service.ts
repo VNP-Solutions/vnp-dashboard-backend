@@ -1,36 +1,36 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Inject,
-  Injectable,
-  BadRequestException
+  Injectable
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import * as XLSX from 'xlsx'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { isUserSuperAdmin } from '../../common/utils/permission.util'
-import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { roundToDecimals } from '../../common/utils/amount.util'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { canAccessGlobalReport } from '../../common/utils/permission.util'
 import { Configuration } from '../../config/configuration'
+import { REPORT_COLUMNS, getAllColumnKeys } from './column-metadata'
 import {
-  REPORT_COLUMNS,
-  getAllColumnKeys
-} from './column-metadata'
-import {
-  GlobalReportQueryDto,
-  GlobalReportExportDto,
-  GlobalReportResponseDto,
+  ColumnFilterDto,
   ColumnsMetadataResponseDto,
+  GlobalReportExportDto,
+  GlobalReportQueryDto,
+  GlobalReportResponseDto,
   OtaIdsResponseDto,
-  PortfolioContactEmailsResponseDto,
-  OtaUsernamesResponseDto,
   OtaPasswordsResponseDto,
+  OtaUsernamesResponseDto,
+  PortfolioContactEmailsResponseDto,
   PortfoliosListResponseDto,
   PropertiesListResponseDto,
   ReportRowDto,
-  ColumnFilterDto,
   SortDto
 } from './global-report.dto'
-import type { IGlobalReportRepository, IGlobalReportService } from './global-report.interface'
+import type {
+  IGlobalReportRepository,
+  IGlobalReportService
+} from './global-report.interface'
 
 interface DecryptedPasswordsCacheEntry {
   data: { password: string; otaType: string }[]
@@ -67,7 +67,9 @@ export class GlobalReportService implements IGlobalReportService {
   /**
    * Check if cache entry is valid (exists and not expired)
    */
-  private isCacheValid(cache: DecryptedPasswordsCacheEntry | null): cache is DecryptedPasswordsCacheEntry {
+  private isCacheValid(
+    cache: DecryptedPasswordsCacheEntry | null
+  ): cache is DecryptedPasswordsCacheEntry {
     return cache !== null && Date.now() - cache.timestamp < this.CACHE_TTL
   }
 
@@ -86,8 +88,11 @@ export class GlobalReportService implements IGlobalReportService {
     user: IUserWithPermissions
   ): Promise<GlobalReportResponseDto> {
     // Super admin only
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only super admins can access global reports')
+    // Check access permissions
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException(
+        'You do not have permission to access global reports'
+      )
     }
 
     // Validate filters
@@ -126,8 +131,11 @@ export class GlobalReportService implements IGlobalReportService {
     user: IUserWithPermissions
   ): Promise<Buffer> {
     // Super admin only
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only super admins can export global reports')
+    // Check access permissions
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException(
+        'You do not have permission to export global reports'
+      )
     }
 
     // Validate filters
@@ -201,9 +209,11 @@ export class GlobalReportService implements IGlobalReportService {
    * Get all OTA IDs for filtering
    */
   async getOtaIds(user: IUserWithPermissions): Promise<OtaIdsResponseDto> {
-    // Super admin only
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only super admins can access OTA IDs')
+    // Check access permissions
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException(
+        'You do not have permission to access OTA IDs'
+      )
     }
 
     const otaIds = await this.globalReportRepository.findAllOtaIds()
@@ -213,23 +223,33 @@ export class GlobalReportService implements IGlobalReportService {
   /**
    * Get all portfolio contact emails for filtering
    */
-  async getPortfolioContactEmails(user: IUserWithPermissions): Promise<PortfolioContactEmailsResponseDto> {
+  async getPortfolioContactEmails(
+    user: IUserWithPermissions
+  ): Promise<PortfolioContactEmailsResponseDto> {
     // Super admin only
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only super admins can access portfolio contact emails')
+    // Check access permissions
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException(
+        'You do not have permission to access portfolio contact emails'
+      )
     }
 
-    const emails = await this.globalReportRepository.findAllPortfolioContactEmails()
+    const emails =
+      await this.globalReportRepository.findAllPortfolioContactEmails()
     return { data: emails }
   }
 
   /**
    * Get all OTA usernames for filtering
    */
-  async getOtaUsernames(user: IUserWithPermissions): Promise<OtaUsernamesResponseDto> {
-    // Super admin only
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only super admins can access OTA usernames')
+  async getOtaUsernames(
+    user: IUserWithPermissions
+  ): Promise<OtaUsernamesResponseDto> {
+    // Check access permissions
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException(
+        'You do not have permission to access OTA usernames'
+      )
     }
 
     const usernames = await this.globalReportRepository.findAllOtaUsernames()
@@ -241,10 +261,14 @@ export class GlobalReportService implements IGlobalReportService {
    * Passwords are decrypted using parallel processing for performance
    * Results are cached to avoid repeated decryption
    */
-  async getOtaPasswords(user: IUserWithPermissions): Promise<OtaPasswordsResponseDto> {
-    // Super admin only
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only super admins can access OTA passwords')
+  async getOtaPasswords(
+    user: IUserWithPermissions
+  ): Promise<OtaPasswordsResponseDto> {
+    // Check access permissions
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException(
+        'You do not have permission to access OTA passwords'
+      )
     }
 
     // Return cached decrypted passwords if valid
@@ -252,13 +276,17 @@ export class GlobalReportService implements IGlobalReportService {
       return { data: this.decryptedPasswordsCache.data }
     }
 
-    const encryptedPasswords = await this.globalReportRepository.findAllOtaPasswords()
+    const encryptedPasswords =
+      await this.globalReportRepository.findAllOtaPasswords()
 
     // Decrypt passwords using pre-derived key (fast)
     const decryptedPasswords: { password: string; otaType: string }[] = []
     for (const item of encryptedPasswords) {
       try {
-        const decrypted = EncryptionUtil.decryptWithKey(item.password, this.encryptionKey)
+        const decrypted = EncryptionUtil.decryptWithKey(
+          item.password,
+          this.encryptionKey
+        )
         decryptedPasswords.push({ password: decrypted, otaType: item.otaType })
       } catch {
         // If decryption fails, skip this password
@@ -286,10 +314,15 @@ export class GlobalReportService implements IGlobalReportService {
    * Get all portfolios (id and name only) for filtering
    * Uses optimized repository method with caching
    */
-  async getPortfolios(user: IUserWithPermissions): Promise<PortfoliosListResponseDto> {
+  async getPortfolios(
+    user: IUserWithPermissions
+  ): Promise<PortfoliosListResponseDto> {
     // Super admin only
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only super admins can access portfolios list')
+    // Check access permissions
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException(
+        'You do not have permission to access portfolios list'
+      )
     }
 
     const portfolios = await this.globalReportRepository.findAllPortfolios()
@@ -300,10 +333,15 @@ export class GlobalReportService implements IGlobalReportService {
    * Get all properties (id and name only) for filtering
    * Uses optimized repository method with caching
    */
-  async getProperties(user: IUserWithPermissions): Promise<PropertiesListResponseDto> {
+  async getProperties(
+    user: IUserWithPermissions
+  ): Promise<PropertiesListResponseDto> {
     // Super admin only
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only super admins can access properties list')
+    // Check access permissions
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException(
+        'You do not have permission to access properties list'
+      )
     }
 
     const properties = await this.globalReportRepository.findAllProperties()
@@ -320,7 +358,9 @@ export class GlobalReportService implements IGlobalReportService {
         throw new BadRequestException(`Unknown column: ${filter.column}`)
       }
       if (!col.filterable) {
-        throw new BadRequestException(`Column ${filter.column} is not filterable`)
+        throw new BadRequestException(
+          `Column ${filter.column} is not filterable`
+        )
       }
       if (!col.allowedOperators.includes(filter.operator)) {
         throw new BadRequestException(
@@ -328,7 +368,11 @@ export class GlobalReportService implements IGlobalReportService {
         )
       }
       // Validate enum values
-      if (col.enumValues && filter.value !== null && filter.value !== undefined) {
+      if (
+        col.enumValues &&
+        filter.value !== null &&
+        filter.value !== undefined
+      ) {
         const valuesToCheck = Array.isArray(filter.value)
           ? filter.value
           : [filter.value]
@@ -379,7 +423,10 @@ export class GlobalReportService implements IGlobalReportService {
         if (encryptedPassword && !passwordMap.has(encryptedPassword)) {
           // Decrypt the password using pre-derived key (fast)
           try {
-            const decrypted = EncryptionUtil.decryptWithKey(encryptedPassword, this.encryptionKey)
+            const decrypted = EncryptionUtil.decryptWithKey(
+              encryptedPassword,
+              this.encryptionKey
+            )
             passwordMap.set(encryptedPassword, decrypted)
           } catch {
             // If decryption fails, store empty string
@@ -390,7 +437,9 @@ export class GlobalReportService implements IGlobalReportService {
     }
 
     // Step 2: Transform data using password map
-    return data.map(doc => this.transformToReportRowWithDecryptedPasswords(doc, passwordMap))
+    return data.map(doc =>
+      this.transformToReportRowWithDecryptedPasswords(doc, passwordMap)
+    )
   }
 
   /**

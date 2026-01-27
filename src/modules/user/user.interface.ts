@@ -37,6 +37,7 @@ export type UserWithRole = Prisma.UserGetPayload<{
         name: true
         description: true
         is_external: true
+        can_access_mis: true
         portfolio_permission: true
         property_permission: true
         audit_permission: true
@@ -76,6 +77,7 @@ export type UserWithDetailsBase = Prisma.UserGetPayload<{
         name: true
         description: true
         is_external: true
+        can_access_mis: true
         portfolio_permission: true
         property_permission: true
         audit_permission: true
@@ -110,7 +112,10 @@ export type AccessedProperty = {
   name: string
 }
 
-export type UserWithDetails = Omit<UserWithDetailsBase, 'userAccessedProperties'> & {
+export type UserWithDetails = Omit<
+  UserWithDetailsBase,
+  'userAccessedProperties'
+> & {
   userAccessedProperties: {
     portfolios: AccessedPortfolio[]
     properties: AccessedProperty[]
