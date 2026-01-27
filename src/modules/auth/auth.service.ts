@@ -39,6 +39,7 @@ interface UserWithRole {
     name: string
     description: string
     is_external: boolean
+    can_access_mis: boolean
     portfolio_permission: any
     property_permission: any
     audit_permission: any
@@ -131,7 +132,10 @@ export class AuthService implements IAuthService {
     inviterRolePermissionLevel: string | undefined
   ): Promise<{ message: string }> {
     // Check if user has permission to invite (permission_level must be 'all' or 'update' for CREATE permission)
-    if (inviterRolePermissionLevel !== 'all' && inviterRolePermissionLevel !== 'update') {
+    if (
+      inviterRolePermissionLevel !== 'all' &&
+      inviterRolePermissionLevel !== 'update'
+    ) {
       throw new ForbiddenException(
         'You do not have permission to invite users. Only users with CREATE permission (all or update) can invite.'
       )
@@ -171,17 +175,18 @@ export class AuthService implements IAuthService {
 
     // Validate portfolio/property access constraints for partial access users
     if (data.portfolio_ids && data.portfolio_ids.length > 0) {
-      const accessiblePortfolioIds = await this.permissionService.getAccessibleResourceIds(
-        inviterUser as any,
-        ModuleType.PORTFOLIO
-      )
-      
+      const accessiblePortfolioIds =
+        await this.permissionService.getAccessibleResourceIds(
+          inviterUser as any,
+          ModuleType.PORTFOLIO
+        )
+
       if (Array.isArray(accessiblePortfolioIds)) {
         // Inviter has partial access - validate they can only assign portfolios they have access to
         const invalidPortfolioIds = data.portfolio_ids.filter(
           id => !accessiblePortfolioIds.includes(id)
         )
-        
+
         if (invalidPortfolioIds.length > 0) {
           throw new ForbiddenException(
             `You cannot assign access to portfolios you don't have access to: ${invalidPortfolioIds.join(', ')}`
@@ -192,17 +197,18 @@ export class AuthService implements IAuthService {
     }
 
     if (data.property_ids && data.property_ids.length > 0) {
-      const accessiblePropertyIds = await this.permissionService.getAccessibleResourceIds(
-        inviterUser as any,
-        ModuleType.PROPERTY
-      )
-      
+      const accessiblePropertyIds =
+        await this.permissionService.getAccessibleResourceIds(
+          inviterUser as any,
+          ModuleType.PROPERTY
+        )
+
       if (Array.isArray(accessiblePropertyIds)) {
         // Inviter has partial access - validate they can only assign properties they have access to
         const invalidPropertyIds = data.property_ids.filter(
           id => !accessiblePropertyIds.includes(id)
         )
-        
+
         if (invalidPropertyIds.length > 0) {
           throw new ForbiddenException(
             `You cannot assign access to properties you don't have access to: ${invalidPropertyIds.join(', ')}`
@@ -247,7 +253,9 @@ export class AuthService implements IAuthService {
       targetRole.is_external
     )
 
-    console.log(`Invitation sent to ${data.email}. Temp password: ${tempPassword}`)
+    console.log(
+      `Invitation sent to ${data.email}. Temp password: ${tempPassword}`
+    )
 
     return {
       message: `Invitation sent successfully. Temporary password is valid for ${expiryDays} days.`
@@ -259,7 +267,10 @@ export class AuthService implements IAuthService {
     inviterRolePermissionLevel: string | undefined
   ): Promise<{ message: string }> {
     // Check if user has permission to resend invitation (permission_level must be 'all' or 'update' for CREATE permission)
-    if (inviterRolePermissionLevel !== 'all' && inviterRolePermissionLevel !== 'update') {
+    if (
+      inviterRolePermissionLevel !== 'all' &&
+      inviterRolePermissionLevel !== 'update'
+    ) {
       throw new ForbiddenException(
         'You do not have permission to resend invitations. Only users with CREATE permission (all or update) can resend.'
       )
@@ -415,9 +426,7 @@ export class AuthService implements IAuthService {
     return { message: 'Password reset successfully' }
   }
 
-  async refreshAccessToken(
-    refreshToken: string
-  ): Promise<AuthResponseDto> {
+  async refreshAccessToken(refreshToken: string): Promise<AuthResponseDto> {
     try {
       const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
         secret: this.configService.get('jwt.refreshSecret', { infer: true })

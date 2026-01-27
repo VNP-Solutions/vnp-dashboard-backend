@@ -8,31 +8,31 @@ generator client {
 }
 
 model User {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  first_name     String
-  last_name      String
-  email          String   @unique
-  language       String
-  user_role_id   String   @db.ObjectId
-  role           UserRole @relation(fields: [user_role_id], references: [id])
-  password       String
-  display_image  String?
-  contact_number String?
-  is_verified          Boolean
-  temp_password        String?
-  invitation_sent_at   DateTime?
-  invited_by_id        String?  @db.ObjectId
-  invitedBy      User?    @relation("UserInvitedBy", fields: [invited_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  invitedUsers   User[]   @relation("UserInvitedBy")
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  first_name         String
+  last_name          String
+  email              String    @unique
+  language           String
+  user_role_id       String    @db.ObjectId
+  role               UserRole  @relation(fields: [user_role_id], references: [id])
+  password           String
+  display_image      String?
+  contact_number     String?
+  is_verified        Boolean
+  temp_password      String?
+  invitation_sent_at DateTime?
+  invited_by_id      String?   @db.ObjectId
+  invitedBy          User?     @relation("UserInvitedBy", fields: [invited_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  invitedUsers       User[]    @relation("UserInvitedBy")
 
-  otps                      Otp[]
-  userAccessedProperties    UserAccessedProperty[]
-  notes                     Note[]
-  tasks                     Task[]
-  contractUrls              ContractUrl[]
-  consolidatedReports       ConsolidatedReport[]
-  requestedPendingActions   PendingAction[]            @relation("PendingActionRequestedBy")
-  approvedPendingActions    PendingAction[]            @relation("PendingActionApprovedBy")
+  otps                    Otp[]
+  userAccessedProperties  UserAccessedProperty[]
+  notes                   Note[]
+  tasks                   Task[]
+  contractUrls            ContractUrl[]
+  consolidatedReports     ConsolidatedReport[]
+  requestedPendingActions PendingAction[]        @relation("PendingActionRequestedBy")
+  approvedPendingActions  PendingAction[]        @relation("PendingActionApprovedBy")
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -71,18 +71,18 @@ model Portfolio {
 }
 
 model Property {
-  id                     String    @id @default(auto()) @map("_id") @db.ObjectId
-  name                   String    @unique
-  address                String
-  currency_id            String    @db.ObjectId
-  currency               Currency  @relation(fields: [currency_id], references: [id])
-  card_descriptor        String?
-  is_active              Boolean   @default(true)
-  next_due_date          DateTime?
-  portfolio_id           String    @db.ObjectId
-  portfolio              Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
-  previous_portfolio_id  String?   @db.ObjectId
-  show_in_portfolio      String[]  @db.ObjectId
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  name                  String    @unique
+  address               String
+  currency_id           String    @db.ObjectId
+  currency              Currency  @relation(fields: [currency_id], references: [id])
+  card_descriptor       String?
+  is_active             Boolean   @default(true)
+  next_due_date         DateTime?
+  portfolio_id          String    @db.ObjectId
+  portfolio             Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  previous_portfolio_id String?   @db.ObjectId
+  show_in_portfolio     String[]  @db.ObjectId
 
   audits         Audit[]
   credentials    PropertyCredentials?
@@ -239,6 +239,7 @@ model UserRole {
   name                       String                    @unique
   description                String
   is_external                Boolean
+  can_access_mis             Boolean                   @default(false)
   is_active                  Boolean                   @default(true)
   order                      Int                       @default(0)
   portfolio_permission       PortfolioPermission?
@@ -469,9 +470,9 @@ enum PendingActionStatus {
 }
 
 type TransferData {
-  new_portfolio_id   String
-  portfolio_from     PortfolioInfo?
-  portfolio_to       PortfolioInfo?
+  new_portfolio_id String
+  portfolio_from   PortfolioInfo?
+  portfolio_to     PortfolioInfo?
 }
 
 type PortfolioInfo {
@@ -484,26 +485,26 @@ type AuditUpdateData {
 }
 
 model PendingAction {
-  id                String               @id @default(auto()) @map("_id") @db.ObjectId
-  resource_type     String               // 'property', 'portfolio', or 'audit'
-  property_id       String?              @db.ObjectId
-  property          Property?            @relation(fields: [property_id], references: [id], onDelete: Cascade)
-  portfolio_id      String?              @db.ObjectId
-  portfolio         Portfolio?           @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
-  audit_id          String?              @db.ObjectId
-  audit             Audit?               @relation(fields: [audit_id], references: [id], onDelete: Cascade)
+  id                String              @id @default(auto()) @map("_id") @db.ObjectId
+  resource_type     String // 'property', 'portfolio', or 'audit'
+  property_id       String?             @db.ObjectId
+  property          Property?           @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  portfolio_id      String?             @db.ObjectId
+  portfolio         Portfolio?          @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  audit_id          String?             @db.ObjectId
+  audit             Audit?              @relation(fields: [audit_id], references: [id], onDelete: Cascade)
   action_type       PendingActionType
-  status            PendingActionStatus  @default(PENDING)
-  requested_user_id String               @db.ObjectId
-  requestedBy       User                 @relation("PendingActionRequestedBy", fields: [requested_user_id], references: [id], onDelete: Cascade)
-  transfer_data     TransferData?        // Stores new_portfolio_id for transfer actions
-  audit_update_data AuditUpdateData?     // Stores amount_confirmed for audit update actions
-  reason            String?              // Reason provided by requester for the action
-  approval_user_id  String?              @db.ObjectId
-  approvedBy        User?                @relation("PendingActionApprovedBy", fields: [approval_user_id], references: [id], onDelete: SetNull)
+  status            PendingActionStatus @default(PENDING)
+  requested_user_id String              @db.ObjectId
+  requestedBy       User                @relation("PendingActionRequestedBy", fields: [requested_user_id], references: [id], onDelete: Cascade)
+  transfer_data     TransferData? // Stores new_portfolio_id for transfer actions
+  audit_update_data AuditUpdateData? // Stores amount_confirmed for audit update actions
+  reason            String? // Reason provided by requester for the action
+  approval_user_id  String?             @db.ObjectId
+  approvedBy        User?               @relation("PendingActionApprovedBy", fields: [approval_user_id], references: [id], onDelete: SetNull)
   rejection_reason  String?
-  created_at        DateTime             @default(now())
-  updated_at        DateTime             @updatedAt
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
   approved_at       DateTime?
 
   @@index([property_id])

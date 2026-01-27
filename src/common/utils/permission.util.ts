@@ -347,6 +347,15 @@ export function isInternalUser(user: IUserWithPermissions): boolean {
 }
 
 /**
+ * Check if a user can access global report
+ * Super admins and users with can_access_mis=true can access
+ */
+export function canAccessGlobalReport(user: IUserWithPermissions): boolean {
+  if (!user || !user.role) return false
+  return isUserSuperAdmin(user) || user.role.can_access_mis === true
+}
+
+/**
  * Check if a user can perform bulk transfer operations
  * Bulk transfer is allowed for:
  * - Super admins (regardless of internal/external status)
@@ -374,7 +383,9 @@ export function canPerformBulkTransfer(user: IUserWithPermissions): boolean {
  * - Property access level must be 'partial' or 'all'
  * - Super admins bypass these checks
  */
-export function canRequestPropertyTransfer(user: IUserWithPermissions): boolean {
+export function canRequestPropertyTransfer(
+  user: IUserWithPermissions
+): boolean {
   if (!user || !user.role) return false
 
   // Super admin can always request transfer
@@ -409,7 +420,9 @@ export function canRequestPropertyTransfer(user: IUserWithPermissions): boolean 
  * - Property access level must be 'partial' or 'all'
  * - Super admins bypass these checks
  */
-export function canRequestBulkPropertyTransfer(user: IUserWithPermissions): boolean {
+export function canRequestBulkPropertyTransfer(
+  user: IUserWithPermissions
+): boolean {
   if (!user || !user.role) return false
 
   // Super admin can always request bulk transfer
@@ -547,13 +560,13 @@ export function getPermissionLevelHierarchyValue(
   level: PermissionLevel | undefined | null
 ): number {
   if (!level) return 0
-  
+
   const hierarchy: Record<PermissionLevel, number> = {
     [PermissionLevel.all]: 3,
     [PermissionLevel.update]: 2,
     [PermissionLevel.view]: 1
   }
-  
+
   return hierarchy[level] ?? 0
 }
 
@@ -565,13 +578,13 @@ export function getAccessLevelHierarchyValue(
   level: AccessLevel | undefined | null
 ): number {
   if (!level) return 0
-  
+
   const hierarchy: Record<AccessLevel, number> = {
     [AccessLevel.all]: 3,
     [AccessLevel.partial]: 2,
     [AccessLevel.none]: 1
   }
-  
+
   return hierarchy[level] ?? 0
 }
 
@@ -585,23 +598,23 @@ export function isPermissionEqualOrHigher(
 ): boolean {
   // If permission2 is null, always return true (no permission to beat)
   if (!permission2) return true
-  
+
   // If permission1 is null but permission2 exists, return false
   if (!permission1) return false
-  
+
   const level1 = getPermissionLevelHierarchyValue(permission1.permission_level)
   const level2 = getPermissionLevelHierarchyValue(permission2.permission_level)
-  
+
   const access1 = getAccessLevelHierarchyValue(permission1.access_level)
   const access2 = getAccessLevelHierarchyValue(permission2.access_level)
-  
+
   // Both permission level AND access level must be equal or higher
   return level1 >= level2 && access1 >= access2
 }
 
 /**
  * Check if a user can invite another user with a specific role
- * 
+ *
  * Rules:
  * 1. Internal users can invite both internal and external users
  * 2. External users can only invite external users
@@ -620,15 +633,15 @@ export function canInviteRole(
   }
 ): boolean {
   if (!inviterUser || !inviterUser.role || !targetRole) return false
-  
+
   const inviterRole = inviterUser.role
-  
+
   // Rule 1 & 2: Check internal/external restriction
   if (inviterRole.is_external && !targetRole.is_external) {
     // External users cannot invite internal users
     return false
   }
-  
+
   // Rule 3: Check permission hierarchy for all modules
   const permissionChecks = [
     {
@@ -662,13 +675,13 @@ export function canInviteRole(
       target: targetRole.bank_details_permission
     }
   ]
-  
+
   // For each module, inviter's permission must be >= target's permission
   for (const check of permissionChecks) {
     if (!isPermissionEqualOrHigher(check.inviter, check.target)) {
       return false
     }
   }
-  
+
   return true
 }

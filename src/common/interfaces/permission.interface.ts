@@ -51,6 +51,7 @@ export interface IUserWithPermissions {
     id: string
     name: string
     is_external: boolean
+    can_access_mis: boolean
     portfolio_permission: IPermission | null
     property_permission: IPermission | null
     audit_permission: IPermission | null

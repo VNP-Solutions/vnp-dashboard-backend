@@ -61,6 +61,15 @@ export class CreateUserRoleDto {
   is_external: boolean
 
   @ApiPropertyOptional({
+    example: false,
+    description: 'Whether the role can access global reports',
+    default: false
+  })
+  @IsBoolean()
+  @IsOptional()
+  can_access_mis?: boolean
+
+  @ApiPropertyOptional({
     example: true,
     description: 'Whether the role is active',
     default: true
@@ -154,7 +163,8 @@ export class DeleteUserRoleDto {
 export class UserRoleQueryDto {
   @ApiPropertyOptional({
     example: true,
-    description: 'If true, return only roles the current user can assign when inviting new users',
+    description:
+      'If true, return only roles the current user can assign when inviting new users',
     default: false
   })
   @IsBoolean()
