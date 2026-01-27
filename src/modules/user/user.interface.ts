@@ -43,6 +43,7 @@ export type UserWithRole = Prisma.UserGetPayload<{
         audit_permission: true
         user_permission: true
         system_settings_permission: true
+        bank_details_permission: true
       }
     }
     invitedBy: {
@@ -83,6 +84,7 @@ export type UserWithDetailsBase = Prisma.UserGetPayload<{
         audit_permission: true
         user_permission: true
         system_settings_permission: true
+        bank_details_permission: true
       }
     }
     invitedBy: {
@@ -153,7 +155,17 @@ export interface IUserService {
     query: UserQueryDto,
     user: IUserWithPermissions
   ): Promise<PaginatedResult<UserWithRole>>
-  getProfile(userId: string): Promise<UserWithDetails>
+  getProfile(
+    userId: string
+  ): Promise<{
+    user: {
+      id: string
+      email: string
+      first_name: string
+      last_name: string
+      role: UserWithDetails['role']
+    }
+  }>
   updateProfile(
     userId: string,
     data: UpdateOwnProfileDto

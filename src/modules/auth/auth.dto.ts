@@ -234,6 +234,10 @@ export class AuthResponseDto {
         system_settings_permission: {
           permission_level: 'all',
           access_level: 'all'
+        },
+        bank_details_permission: {
+          permission_level: 'all',
+          access_level: 'all'
         }
       }
     },
@@ -255,6 +259,7 @@ export class AuthResponseDto {
       audit_permission: any
       user_permission: any
       system_settings_permission: any
+      bank_details_permission: any
     }
   }
 }
