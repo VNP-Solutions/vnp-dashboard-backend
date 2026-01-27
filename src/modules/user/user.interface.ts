@@ -153,7 +153,17 @@ export interface IUserService {
     query: UserQueryDto,
     user: IUserWithPermissions
   ): Promise<PaginatedResult<UserWithRole>>
-  getProfile(userId: string): Promise<UserWithDetails>
+  getProfile(
+    userId: string
+  ): Promise<{
+    user: {
+      id: string
+      email: string
+      first_name: string
+      last_name: string
+      role: UserWithDetails['role']
+    }
+  }>
   updateProfile(
     userId: string,
     data: UpdateOwnProfileDto

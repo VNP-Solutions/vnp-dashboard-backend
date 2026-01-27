@@ -226,3 +226,48 @@ export class DeleteUserDto {
   @IsNotEmpty()
   password: string
 }
+
+export class UserProfileResponseDto {
+  @ApiProperty({
+    example: {
+      id: '507f1f77bcf86cd799439011',
+      email: 'user@example.com',
+      first_name: 'John',
+      last_name: 'Doe',
+      role: {
+        id: '507f1f77bcf86cd799439012',
+        name: 'Admin',
+        description: 'Administrator role with full access',
+        is_external: false,
+        can_access_mis: true,
+        portfolio_permission: { permission_level: 'all', access_level: 'all' },
+        property_permission: { permission_level: 'all', access_level: 'all' },
+        audit_permission: { permission_level: 'all', access_level: 'all' },
+        user_permission: { permission_level: 'all', access_level: 'all' },
+        system_settings_permission: {
+          permission_level: 'all',
+          access_level: 'all'
+        }
+      }
+    },
+    description: 'User information'
+  })
+  user: {
+    id: string
+    email: string
+    first_name: string
+    last_name: string
+    role: {
+      id: string
+      name: string
+      description: string
+      is_external: boolean
+      can_access_mis: boolean
+      portfolio_permission: any
+      property_permission: any
+      audit_permission: any
+      user_permission: any
+      system_settings_permission: any
+    }
+  }
+}

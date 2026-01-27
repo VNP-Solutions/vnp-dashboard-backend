@@ -38,7 +38,16 @@ export class UserService implements IUserService {
       throw new NotFoundException('User not found')
     }
 
-    return user
+    // Return user data with role in the same format as auth response
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        role: user.role
+      }
+    }
   }
 
   async updateProfile(userId: string, data: UpdateOwnProfileDto) {
