@@ -417,7 +417,7 @@ export class AuthService implements IAuthService {
 
   async refreshAccessToken(
     refreshToken: string
-  ): Promise<{ access_token: string }> {
+  ): Promise<AuthResponseDto> {
     try {
       const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
         secret: this.configService.get('jwt.refreshSecret', { infer: true })
@@ -429,20 +429,13 @@ export class AuthService implements IAuthService {
         throw new UnauthorizedException('Invalid token')
       }
 
-      const newPayload: JwtPayload = {
-        sub: user.id,
-        email: user.email,
-        role_id: user.user_role_id
+      // Ensure user has role info for response generation
+      const userWithRole = await this.authRepository.findUserByEmail(user.email)
+      if (!userWithRole) {
+        throw new UnauthorizedException('User not found')
       }
 
-      const accessToken = this.jwtService.sign(newPayload, {
-        secret: this.configService.get('jwt.accessSecret', { infer: true }),
-        expiresIn: this.configService.get('jwt.accessExpiresIn', {
-          infer: true
-        })
-      })
-
-      return { access_token: accessToken }
+      return this.generateAuthResponse(userWithRole as unknown as UserWithRole)
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token')
     }

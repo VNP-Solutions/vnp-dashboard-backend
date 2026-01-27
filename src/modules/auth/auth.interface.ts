@@ -61,7 +61,7 @@ export interface IAuthService {
   verifyInvitation(data: VerifyInvitationDto): Promise<AuthResponseDto>
   requestPasswordReset(email: string): Promise<{ message: string }>
   resetPassword(data: ResetPasswordDto): Promise<{ message: string }>
-  refreshAccessToken(refreshToken: string): Promise<{ access_token: string }>
+  refreshAccessToken(refreshToken: string): Promise<AuthResponseDto>
 }
 
 export interface JwtPayload {

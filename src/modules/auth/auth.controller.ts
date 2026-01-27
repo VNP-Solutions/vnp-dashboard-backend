@@ -6,7 +6,12 @@ import {
   Inject,
   Post
 } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags
+} from '@nestjs/swagger'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AuthResponseDto,
@@ -69,9 +74,15 @@ export class AuthController {
   @Public(false)
   @HttpCode(HttpStatus.CREATED)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Invite a new user (requires authentication and user_permission.permission_level = all or update)' })
+  @ApiOperation({
+    summary:
+      'Invite a new user (requires authentication and user_permission.permission_level = all or update)'
+  })
   @ApiResponse({ status: 201, description: 'User invited successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permission to invite users' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permission to invite users'
+  })
   async inviteUser(
     @Body() body: InviteUserDto,
     @CurrentUser() user: IUserWithPermissions
@@ -165,7 +176,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({
     status: 200,
-    description: 'Access token refreshed successfully'
+    description: 'Access token refreshed successfully',
+    type: AuthResponseDto
   })
   async refreshToken(@Body() body: RefreshTokenDto) {
     const result = await this.authService.refreshAccessToken(body.refresh_token)
