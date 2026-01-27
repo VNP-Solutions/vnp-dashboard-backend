@@ -45,6 +45,7 @@ interface UserWithRole {
     audit_permission: any
     user_permission: any
     system_settings_permission: any
+    bank_details_permission: any
   }
 }
 
