@@ -20,7 +20,8 @@
       "Bash(taskkill /F /PID 39956)",
       "Bash(netstat:*)",
       "Bash(taskkill //F //PID 39956)",
-      "Bash(yarn seed:test:*)"
+      "Bash(yarn seed:test:*)",
+      "Bash(git show:*)"
     ],
     "deny": [],
     "ask": []
