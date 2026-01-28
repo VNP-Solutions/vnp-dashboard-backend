@@ -3,6 +3,7 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
+  Header,
   Inject,
   Post
 } from '@nestjs/common'
@@ -54,6 +55,7 @@ export class AuthController {
 
   @Post('login/verify-otp')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
   @ApiOperation({ summary: 'Verify OTP and login' })
   @ApiResponse({
     status: 200,
@@ -131,6 +133,7 @@ export class AuthController {
 
   @Post('verify-invitation')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
   @ApiOperation({ summary: 'Verify invitation and set password' })
   @ApiResponse({
     status: 200,
@@ -173,6 +176,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({
     status: 200,

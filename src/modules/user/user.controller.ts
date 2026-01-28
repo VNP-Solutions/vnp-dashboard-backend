@@ -7,7 +7,8 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards
+  UseGuards,
+  Header
 } from '@nestjs/common'
 import {
   ApiBearerAuth,
@@ -46,6 +47,7 @@ export class UserController {
   ) {}
 
   @Get('profile')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
   @ApiOperation({ summary: 'Get own profile' })
   @ApiResponse({
     status: 200,
