@@ -59,12 +59,15 @@ export class AuditController {
   ) {}
 
   @Post()
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.CREATE)
-  @ApiOperation({ summary: 'Create a new audit' })
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({ 
+    summary: 'Create a new audit (Internal users only)',
+    description: 'Only internal users can create audits. Requires audit UPDATE permission.'
+  })
   @ApiResponse({ status: 201, description: 'Audit created successfully' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   @ApiResponse({
     status: 400,
@@ -167,7 +170,7 @@ export class AuditController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk update audits from Excel file',
+    summary: 'Bulk update audits from Excel file (Internal users only)',
     description: `
     Upload an Excel file (.xlsx or .xls) to bulk update existing audits.
     
@@ -228,7 +231,7 @@ export class AuditController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   bulkUpdate(
     @UploadedFile() file: Express.Multer.File,
@@ -263,7 +266,7 @@ export class AuditController {
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
   @ApiOperation({
     summary:
-      'Bulk archive multiple audits. Checks each audit for archivability and returns success/failure counts'
+      'Bulk archive multiple audits (Internal users only). Checks each audit for archivability and returns success/failure counts'
   })
   @ApiBody({
     type: BulkArchiveAuditDto,
@@ -310,7 +313,7 @@ export class AuditController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   bulkArchive(
     @Body() bulkArchiveDto: BulkArchiveAuditDto,
@@ -320,11 +323,11 @@ export class AuditController {
   }
 
   @Post('bulk-import')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk import audits from Excel file',
+    summary: 'Bulk import audits from Excel file (Internal users only)',
     description: `
     Upload an Excel file (.xlsx or .xls) to bulk import audits.
 
@@ -384,7 +387,7 @@ export class AuditController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   bulkImport(
     @UploadedFile() file: Express.Multer.File,
@@ -396,7 +399,7 @@ export class AuditController {
   @Patch('bulk-upload-report')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Bulk upload report URL for multiple audits',
+    summary: 'Bulk upload report URL for multiple audits (Internal users only)',
     description: `
     Update multiple audits with the same report URL at once.
     
@@ -457,7 +460,7 @@ export class AuditController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   bulkUploadReport(
     @Body() bulkUploadReportDto: BulkUploadReportDto,
@@ -587,12 +590,15 @@ export class AuditController {
 
   @Patch(':id')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
-  @ApiOperation({ summary: 'Update an audit' })
+  @ApiOperation({ 
+    summary: 'Update an audit (Internal users only)',
+    description: 'Only internal users can update audits. This includes editing audit details and adding audits to batches.'
+  })
   @ApiResponse({ status: 200, description: 'Audit updated successfully' })
   @ApiResponse({ status: 404, description: 'Audit not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   @ApiResponse({
     status: 400,
@@ -649,14 +655,14 @@ export class AuditController {
   @Patch(':id/report-url')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Update report URL for an audit',
-    description: 'Updates the report URL field for a specific audit. This is a dedicated endpoint for updating only the report URL.'
+    summary: 'Update report URL for an audit (Internal users only)',
+    description: 'Updates the report URL field for a specific audit. Only internal users can upload report URLs. This is a dedicated endpoint for updating only the report URL.'
   })
   @ApiResponse({ status: 200, description: 'Report URL updated successfully' })
   @ApiResponse({ status: 404, description: 'Audit not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   @ApiResponse({
     status: 400,
