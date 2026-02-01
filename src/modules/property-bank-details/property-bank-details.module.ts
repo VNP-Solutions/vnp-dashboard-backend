@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { PermissionService } from '../../common/services/permission.service'
+import { EmailUtil } from '../../common/utils/email.util'
 import { PrismaService } from '../prisma/prisma.service'
 import { PropertyBankDetailsController } from './property-bank-details.controller'
 import { PropertyBankDetailsRepository } from './property-bank-details.repository'
@@ -17,7 +18,8 @@ import { PropertyBankDetailsService } from './property-bank-details.service'
       useClass: PropertyBankDetailsRepository
     },
     PermissionService,
-    PrismaService
+    PrismaService,
+    EmailUtil
   ],
   exports: [
     {
