@@ -1,0 +1,90 @@
+[
+  {
+    "action": "Bulk Upload Portfolio",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Bulk Update Portfolio",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Download",
+    "permissionLevel": null,
+    "accessLevel": null,
+    "internal": false,
+    "onlyForSuperAdmin": true,
+    "comment": null
+  },
+  {
+    "action": "Add New Portfolio",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Deactivate Switch",
+    "permissionLevel": null,
+    "accessLevel": null,
+    "internal": false,
+    "onlyForSuperAdmin": true,
+    "comment": "No reason needed; super admin–only, password protected"
+  },
+  {
+    "action": "Delete",
+    "permissionLevel": null,
+    "accessLevel": null,
+    "internal": false,
+    "onlyForSuperAdmin": true,
+    "comment": null
+  },
+  {
+    "action": "Edit Portfolio",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Deactivate Request",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Contact",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Notes and Tasks",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": "Internal only; informal/internal remarks allowed"
+  },
+  {
+    "action": "Sales Agent Show",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  }
+]

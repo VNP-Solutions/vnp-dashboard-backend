@@ -57,6 +57,13 @@ export class PortfolioService implements IPortfolioService {
   ) {}
 
   async create(data: CreatePortfolioDto, user: IUserWithPermissions) {
+    // Only internal users can create portfolios
+    if (!isInternalUser(user)) {
+      throw new BadRequestException(
+        'Only internal users can create portfolios'
+      )
+    }
+
     const existingPortfolio = await this.portfolioRepository.findByName(
       data.name
     )
@@ -231,11 +238,20 @@ export class PortfolioService implements IPortfolioService {
         ...portfolioWithoutPendingActions
       } = portfolio
 
-      return {
+      // Conditionally hide sales_agent for external users
+      const isInternal = userIsInternal || userIsSuperAdmin
+      const portfolioData = {
         ...portfolioWithoutPendingActions,
         has_pending_action: pendingActions.length > 0,
         pending_actions: pendingActions
       }
+
+      // Remove sales_agent field if user is not internal
+      if (!isInternal) {
+        delete portfolioData.sales_agent
+      }
+
+      return portfolioData
     })
 
     return QueryBuilder.buildPaginatedResult(
@@ -247,6 +263,12 @@ export class PortfolioService implements IPortfolioService {
   }
 
   async findAllForExport(query: PortfolioQueryDto, user: IUserWithPermissions) {
+    // Only super admin can export portfolios
+    const userIsSuperAdmin = isUserSuperAdmin(user)
+    if (!userIsSuperAdmin) {
+      throw new BadRequestException('Only Super Admin can export portfolios')
+    }
+
     const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PORTFOLIO
@@ -256,7 +278,6 @@ export class PortfolioService implements IPortfolioService {
       return []
     }
 
-    const userIsSuperAdmin = isUserSuperAdmin(user)
     const userIsInternal = isInternalUser(user)
 
     // Build additional filters from query params
@@ -348,11 +369,20 @@ export class PortfolioService implements IPortfolioService {
         ...portfolioWithoutPendingActions
       } = portfolio
 
-      return {
+      // Conditionally hide sales_agent for external users (though only super admin can export)
+      const isInternal = userIsInternal || userIsSuperAdmin
+      const portfolioData = {
         ...portfolioWithoutPendingActions,
         has_pending_action: pendingActions.length > 0,
         pending_actions: pendingActions
       }
+
+      // Remove sales_agent field if user is not internal
+      if (!isInternal) {
+        delete portfolioData.sales_agent
+      }
+
+      return portfolioData
     })
 
     return enrichedData
@@ -376,6 +406,12 @@ export class PortfolioService implements IPortfolioService {
       throw new NotFoundException('Portfolio not found')
     }
 
+    // Conditionally hide sales_agent for external users
+    if (!isInternal && !isSuperAdmin) {
+      const { sales_agent: _sales_agent, ...portfolioWithoutSalesAgent } = portfolio as any
+      return portfolioWithoutSalesAgent
+    }
+
     return portfolio
   }
 
@@ -384,6 +420,13 @@ export class PortfolioService implements IPortfolioService {
     data: UpdatePortfolioDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can update portfolios
+    if (!isInternalUser(user)) {
+      throw new BadRequestException(
+        'Only internal users can update portfolios'
+      )
+    }
+
     const isSuperAdmin = isUserSuperAdmin(user)
     const portfolio = await this.portfolioRepository.findById(
       id,
@@ -501,10 +544,10 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
-    // Internal users (non-super admin) must provide a reason
+    // Internal users (non-super admin) must provide a reason for pending request
     if (!isSuperAdmin && isInternal && !reason) {
       throw new BadRequestException(
-        'Reason is required for internal users to deactivate portfolios'
+        'Reason is required for internal users to submit deactivation request'
       )
     }
 
@@ -543,7 +586,7 @@ export class PortfolioService implements IPortfolioService {
       throw new BadRequestException('Portfolio is already deactivated')
     }
 
-    // Super admin can deactivate directly
+    // Super admin can deactivate directly (no reason required)
     if (isSuperAdmin) {
       await this.prisma.portfolio.update({
         where: { id },
@@ -602,10 +645,10 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
-    // Internal users (non-super admin) must provide a reason
+    // Internal users (non-super admin) must provide a reason for pending request
     if (!isSuperAdmin && isInternal && !reason) {
       throw new BadRequestException(
-        'Reason is required for internal users to activate portfolios'
+        'Reason is required for internal users to submit activation request'
       )
     }
 
@@ -644,7 +687,7 @@ export class PortfolioService implements IPortfolioService {
       throw new BadRequestException('Portfolio is already active')
     }
 
-    // Super admin can activate directly
+    // Super admin can activate directly (no reason required)
     if (isSuperAdmin) {
       await this.prisma.portfolio.update({
         where: { id },
@@ -754,6 +797,13 @@ export class PortfolioService implements IPortfolioService {
     file: Express.Multer.File,
     _user: IUserWithPermissions
   ): Promise<BulkImportResultDto> {
+    // Only internal users can bulk import portfolios
+    if (!isInternalUser(_user)) {
+      throw new BadRequestException(
+        'Only internal users can bulk import portfolios'
+      )
+    }
+
     if (!file) {
       throw new BadRequestException('No file provided')
     }
@@ -1076,13 +1126,13 @@ export class PortfolioService implements IPortfolioService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<BulkUpdateResultDto> {
-    // Only super admins and internal users can bulk update portfolios
+    // Only internal users can bulk update portfolios
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
 
-    if (!isSuperAdmin && !isInternal) {
+    if (!isInternal) {
       throw new BadRequestException(
-        'Only Super Admin and internal users can bulk update portfolios'
+        'Only internal users can bulk update portfolios'
       )
     }
 
