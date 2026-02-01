@@ -72,7 +72,7 @@ export class PropertyBankDetailsController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only super admin, property manager, or portfolio manager can edit bank details'
+      'Forbidden - Insufficient permissions'
   })
   create(
     @Body() createPropertyBankDetailsDto: CreatePropertyBankDetailsDto,
@@ -134,7 +134,7 @@ export class PropertyBankDetailsController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only super admin, property manager, or portfolio manager can edit bank details'
+      'Forbidden - Insufficient permissions'
   })
   update(
     @Param('propertyId') propertyId: string,
@@ -153,16 +153,17 @@ export class PropertyBankDetailsController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk update property bank details from Excel file',
+    summary: 'Bulk update property bank details from Excel file (Requires password verification)',
     description:
-      'Updates bank details for multiple properties from an Excel file. Requires bank_details UPDATE permission. ' +
+      'Updates bank details for multiple properties from an Excel file. Requires bank_details UPDATE permission and password verification. ' +
       'The first column must be "Property Name" to identify the property. ' +
       'For Stripe: Include "Stripe Account Email" column. ' +
       'For Bank: Include "Bank Sub Type" column (ach, domestic_wire, or international_wire). ' +
       'Common columns: Hotel Portfolio Name, Account Number, Bank Name. ' +
       'ACH: Beneficiary Name, Routing Number, Bank Account Type (checking/savings). ' +
       'Domestic Wire: Beneficiary Name, Beneficiary Address, Routing Number. ' +
-      'International Wire: Beneficiary Name, Beneficiary Address, Swift or BIC or IBAN, Currency.'
+      'International Wire: Beneficiary Name, Beneficiary Address, Swift or BIC or IBAN, Currency. ' +
+      'After successful update, all users with access to the affected properties will be notified via email.'
   })
   @ApiBody({
     schema: {
@@ -176,28 +177,34 @@ export class PropertyBankDetailsController {
             'Required columns: Property Name. ' +
             'Stripe: Stripe Account Email. ' +
             'Bank: Bank Sub Type, Hotel Portfolio Name, Account Number, Bank Name + sub-type specific fields.'
+        },
+        password: {
+          type: 'string',
+          description: 'User password for verification (required)'
         }
-      }
+      },
+      required: ['file', 'password']
     }
   })
   @ApiResponse({
     status: 200,
     description:
-      'Bulk update completed. Returns summary with success/failure counts and details.'
+      'Bulk update completed. Returns summary with success/failure counts and details. Email notifications sent to users with property access.'
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid file or file format'
+    description: 'Bad Request - Invalid file, file format, or invalid password'
   })
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only super admin, property manager, or portfolio manager can edit bank details'
+      'Forbidden - Insufficient permissions'
   })
   bulkUpdate(
     @UploadedFile() file: Express.Multer.File,
+    @Body('password') password: string,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    return this.propertyBankDetailsService.bulkUpdate(file, user)
+    return this.propertyBankDetailsService.bulkUpdate(file, password, user)
   }
 }

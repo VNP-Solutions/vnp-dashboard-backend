@@ -64,12 +64,12 @@ export class PropertyController {
   ) {}
 
   @Post()
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
-  @ApiOperation({ summary: 'Create a new property' })
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
+  @ApiOperation({ summary: 'Create a new property (Internal users only)' })
   @ApiResponse({ status: 201, description: 'Property created successfully' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   create(
     @Body() createPropertyDto: CreatePropertyDto,
@@ -79,9 +79,9 @@ export class PropertyController {
   }
 
   @Post('complete-create')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Create a property with credentials and bank details in a single transaction',
+    summary: 'Create a property with credentials and bank details in a single transaction (Internal users only)',
     description:
       'Creates a property along with optional credentials and bank details. All operations are performed in a transaction and will be rolled back if any operation fails. ' +
       'Property data is required, while credentials and bank details are optional.'
@@ -96,7 +96,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   @ApiResponse({
     status: 409,
@@ -223,12 +223,12 @@ export class PropertyController {
 
   @Patch(':id')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
-  @ApiOperation({ summary: 'Update a property' })
+  @ApiOperation({ summary: 'Update a property (Internal users only)' })
   @ApiResponse({ status: 200, description: 'Property updated successfully' })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   update(
     @Param('id') id: string,
@@ -241,8 +241,8 @@ export class PropertyController {
   @Patch(':id/transfer')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Transfer a property to another portfolio (requires ownership and password verification)',
-    description: 'Super admins can directly transfer properties. Internal and external users with portfolio ownership can create transfer requests that require super admin approval. Password verification is required for all users.'
+    summary: 'Transfer a property to another portfolio or submit transfer request',
+    description: 'Super Admin can directly transfer with password (no reason required). All other users with UPDATE permission can submit transfer request with password and reason.'
   })
   @ApiResponse({
     status: 200,
@@ -252,11 +252,11 @@ export class PropertyController {
   @ApiResponse({
     status: 400,
     description:
-      'Property is already in the target portfolio or invalid password'
+      'Property is already in the target portfolio or invalid password or reason required for non-super admin users'
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - User does not have ownership of the property portfolio or insufficient permissions'
+    description: 'Forbidden - Insufficient permissions'
   })
   async transfer(
     @Param('id') id: string,
@@ -285,7 +285,7 @@ export class PropertyController {
   @Patch(':id/share')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Share a property with other portfolios (view-only access)'
+    summary: 'Share a property with other portfolios (Internal users only, view-only access)'
   })
   @ApiResponse({
     status: 200,
@@ -301,7 +301,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only property owner can share'
+    description: 'Forbidden - Only internal users can share properties'
   })
   share(
     @Param('id') id: string,
@@ -314,7 +314,7 @@ export class PropertyController {
   @Patch(':id/unshare')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Remove property sharing from specified portfolios'
+    summary: 'Remove property sharing from specified portfolios (Internal users only)'
   })
   @ApiResponse({
     status: 200,
@@ -326,7 +326,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only property owner can unshare'
+    description: 'Forbidden - Only internal users can unshare properties'
   })
   unshare(
     @Param('id') id: string,
@@ -339,8 +339,8 @@ export class PropertyController {
   @Post('bulk-transfer')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Bulk transfer multiple properties to another portfolio (Super admin or internal property/portfolio manager only, requires password verification)',
-    description: 'Allows bulk transfer of multiple properties to a target portfolio. Only super admins or internal property/portfolio managers can perform this operation. Password verification is required.'
+    summary: 'Bulk transfer multiple properties to another portfolio (Internal users only, requires password verification)',
+    description: 'Allows bulk transfer of multiple properties to a target portfolio. Only internal users can perform this operation. Password verification is required.'
   })
   @ApiResponse({
     status: 200,
@@ -353,7 +353,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only super admins or internal property/portfolio managers can perform bulk transfers'
+    description: 'Forbidden - Only internal users can perform bulk transfers'
   })
   async bulkTransfer(
     @Body() bulkTransferPropertyDto: BulkTransferPropertyDto,
@@ -460,14 +460,14 @@ export class PropertyController {
   @Post(':id/deactivate')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Deactivate a property (requires password verification)',
-    description: 'Super admins can directly deactivate. All other users (internal and external) create a pending action for approval. Password verification is required for all.'
+    summary: 'Deactivate a property or submit deactivation request',
+    description: 'Super Admin can directly deactivate with password (no reason required). All other users with UPDATE permission submit a deactivation request with password and reason.'
   })
   @ApiResponse({ status: 200, description: 'Property deactivated successfully or deactivation request submitted for approval' })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
-    description: 'Invalid password or property already deactivated'
+    description: 'Invalid password or property already deactivated or reason required for non-super admin users'
   })
   async deactivate(
     @Param('id') id: string,
@@ -496,14 +496,14 @@ export class PropertyController {
   @Post(':id/activate')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Activate a property (requires password verification)',
-    description: 'Super admins can directly activate. All other users (internal and external) create a pending action for approval. Password verification is required for all.'
+    summary: 'Activate a property or submit activation request',
+    description: 'Super Admin can directly activate with password (no reason required). All other users with UPDATE permission submit an activation request with password and reason.'
   })
   @ApiResponse({ status: 200, description: 'Property activated successfully or activation request submitted for approval' })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
-    description: 'Invalid password or property already active'
+    description: 'Invalid password or property already active or reason required for non-super admin users'
   })
   async activate(
     @Param('id') id: string,
@@ -530,10 +530,10 @@ export class PropertyController {
   }
 
   @Post('bulk-import')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Bulk import properties from Excel file' })
+  @ApiOperation({ summary: 'Bulk import properties from Excel file (Internal users only)' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -556,7 +556,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   bulkImport(
     @UploadedFile() file: Express.Multer.File,
@@ -570,10 +570,10 @@ export class PropertyController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk update properties from Excel file',
+    summary: 'Bulk update properties from Excel file (Internal users only)',
     description: `
     Upload an Excel file (.xlsx or .xls) to bulk update existing properties.
-    Only Super Admin and internal users can use this endpoint.
+    Only internal users can use this endpoint.
     
     Required column:
     - Property ID/Property Id/Property id/property_id/ID/Id/id: ID of the property to update (must exist)
@@ -648,11 +648,11 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid file or file format or only Super Admin and internal users can bulk update'
+    description: 'Bad Request - Invalid file or file format or only internal users can bulk update'
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   bulkUpdate(
     @UploadedFile() file: Express.Multer.File,

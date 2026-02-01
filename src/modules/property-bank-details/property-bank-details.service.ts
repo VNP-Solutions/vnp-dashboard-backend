@@ -13,6 +13,8 @@ import {
   PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { EmailUtil } from '../../common/utils/email.util'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   BulkUpdateBankDetailsResultDto,
@@ -30,7 +32,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     @Inject('IPropertyBankDetailsRepository')
     private propertyBankDetailsRepository: IPropertyBankDetailsRepository,
     @Inject(PrismaService) private prisma: PrismaService,
-    @Inject(PermissionService) private permissionService: PermissionService
+    @Inject(PermissionService) private permissionService: PermissionService,
+    @Inject(EmailUtil) private emailUtil: EmailUtil
   ) {}
 
   /**
@@ -310,8 +313,32 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
   async bulkUpdate(
     file: Express.Multer.File,
+    password: string,
     user: IUserWithPermissions
   ): Promise<BulkUpdateBankDetailsResultDto> {
+    // Verify password first
+    if (!password) {
+      throw new BadRequestException('Password is required for bulk bank update')
+    }
+
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
     if (!file) {
       throw new BadRequestException('No file provided')
     }
@@ -332,6 +359,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       errors: [],
       successfulUpdates: []
     }
+
+    // Track properties that were successfully updated for alert notifications
+    const updatedPropertyIds: string[] = []
 
     try {
       // Parse Excel file
@@ -993,6 +1023,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               '\x1b[32m%s\x1b[0m',
               `✅ Row ${rowNumber} SUCCESS: Updated bank details for '${propertyName}'`
             )
+            updatedPropertyIds.push(property.id)
           } else {
             // Create new bank details
             updateData.property_id = property.id
@@ -1001,6 +1032,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               '\x1b[32m%s\x1b[0m',
               `✅ Row ${rowNumber} SUCCESS: Created bank details for '${propertyName}'`
             )
+            updatedPropertyIds.push(property.id)
           }
 
           result.successCount++
@@ -1065,11 +1097,106 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         '========================================\n'
       )
 
+      // Send alert notifications to all users with access to updated properties
+      if (updatedPropertyIds.length > 0) {
+        await this.sendBulkUpdateAlerts(updatedPropertyIds)
+      }
+
       return result
     } catch (error) {
       throw new BadRequestException(
         `Failed to process Excel file: ${error.message}`
       )
+    }
+  }
+
+  /**
+   * Send email alerts to all users with access to properties that had bank details updated
+   */
+  private async sendBulkUpdateAlerts(propertyIds: string[]): Promise<void> {
+    try {
+      console.log(
+        `📧 Sending bank update alerts for ${propertyIds.length} properties...`
+      )
+
+      // Get all properties with their names
+      const properties = await this.prisma.property.findMany({
+        where: {
+          id: {
+            in: propertyIds
+          }
+        },
+        select: {
+          id: true,
+          name: true
+        }
+      })
+
+      // Get all users who have access to these properties
+      const userAccesses = await this.prisma.userAccessedProperty.findMany({
+        where: {
+          property_id: {
+            hasSome: propertyIds
+          }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              first_name: true,
+              last_name: true
+            }
+          }
+        }
+      })
+
+      // Create a map of propertyId -> users with access
+      const propertyUserMap = new Map<string, Set<string>>()
+
+      for (const access of userAccesses) {
+        for (const propertyId of access.property_id) {
+          if (propertyIds.includes(propertyId)) {
+            if (!propertyUserMap.has(propertyId)) {
+              propertyUserMap.set(propertyId, new Set())
+            }
+            propertyUserMap.get(propertyId)!.add(access.user.email)
+          }
+        }
+      }
+
+      // Send email for each property to all users with access
+      for (const property of properties) {
+        const userEmails = propertyUserMap.get(property.id)
+
+        if (userEmails && userEmails.size > 0) {
+          const recipients = Array.from(userEmails)
+
+          try {
+            await this.emailUtil.sendEmail(
+              recipients,
+              `Bank Details Updated - ${property.name}`,
+              `Bank details have been updated for property "${property.name}".\n\nPlease review the changes in the system.\n\nThis is an automated notification.`
+            )
+
+            console.log(
+              `✅ Sent bank update alert for "${property.name}" to ${recipients.length} user(s)`
+            )
+          } catch (emailError) {
+            console.error(
+              `❌ Failed to send alert for "${property.name}":`,
+              emailError
+            )
+          }
+        }
+      }
+
+      console.log(
+        `✅ Completed sending bank update alerts for ${properties.length} properties`
+      )
+    } catch (error) {
+      console.error('❌ Error sending bulk update alerts:', error)
+      // Don't throw - alerts are non-critical
     }
   }
 }

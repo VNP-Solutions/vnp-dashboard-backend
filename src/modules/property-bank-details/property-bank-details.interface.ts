@@ -46,6 +46,7 @@ export interface IPropertyBankDetailsService {
   ): Promise<PropertyBankDetails>
   bulkUpdate(
     file: Express.Multer.File,
+    password: string,
     user: IUserWithPermissions
   ): Promise<BulkUpdateBankDetailsResultDto>
 }
