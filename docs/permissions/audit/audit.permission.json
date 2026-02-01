@@ -1,0 +1,130 @@
+[
+  {
+    "action": "Download",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Bulk Upload",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Email Report",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": "Send every single email (manual and automated). Assigned to Parvez for fixing."
+  },
+  {
+    "action": "Add to Batch",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Upload Report",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Add Audit",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Archive Audits (Bulk)",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Bulk Update",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Archived Reports",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Archive",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Delete",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": "Password protected"
+  },
+  {
+    "action": "Upload Report URL",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Download Report URL",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Edit Audit",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Edit Amount Confirmed",
+    "permissionLevel": null,
+    "accessLevel": null,
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Edit Amount Confirmed Request",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  }
+]

@@ -104,7 +104,12 @@ export class AuditService implements IAuditService {
     return statusIds.length > 0 ? statusIds : null
   }
 
-  async create(data: CreateAuditDto, _user: IUserWithPermissions) {
+  async create(data: CreateAuditDto, user: IUserWithPermissions) {
+    // Only internal users can create audits
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can create audits')
+    }
+
     // Validate date range only if both dates are provided
     if (data.start_date && data.end_date) {
       const startDate = new Date(data.start_date)
@@ -1292,7 +1297,12 @@ export class AuditService implements IAuditService {
     return this.auditRepository.unarchive(id)
   }
 
-  async bulkArchive(data: BulkArchiveAuditDto, _user: IUserWithPermissions) {
+  async bulkArchive(data: BulkArchiveAuditDto, user: IUserWithPermissions) {
+    // Only internal users can bulk archive audits
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can bulk archive audits')
+    }
+
     const { audit_ids } = data
 
     if (!audit_ids || audit_ids.length === 0) {
@@ -1359,8 +1369,13 @@ export class AuditService implements IAuditService {
 
   async bulkImport(
     file: Express.Multer.File,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ): Promise<BulkImportResultDto> {
+    // Only internal users can bulk import audits
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can bulk import audits')
+    }
+
     if (!file) {
       throw new BadRequestException('No file provided')
     }
@@ -2001,8 +2016,13 @@ export class AuditService implements IAuditService {
 
   async bulkUploadReport(
     data: BulkUploadReportDto,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ) {
+    // Only internal users can bulk upload report URLs
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can bulk upload report URLs')
+    }
+
     const { audit_ids, report_url } = data
 
     if (!audit_ids || audit_ids.length === 0) {
@@ -2177,6 +2197,11 @@ export class AuditService implements IAuditService {
     data: UpdateReportUrlDto,
     user: IUserWithPermissions
   ): Promise<any> {
+    // Only internal users can update report URLs
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can update report URLs')
+    }
+
     const audit = await this.auditRepository.findById(id)
 
     if (!audit) {
