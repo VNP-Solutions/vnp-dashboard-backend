@@ -1,0 +1,186 @@
+[
+  {
+    "action": "Download",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Email Report",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Bulk Upload",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Bulk Update",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Bulk Bank Update",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": "Same permission needed for bank details and property. Password confirmation required. Add alert to all super admins and hotel admins. Super admin action is allowed."
+  },
+  {
+    "action": "Access Level Download",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": "Only downloads missing-access properties. All green properties are excluded."
+  },
+  {
+    "action": "Bulk Transfer",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Bulk Update Credentials",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Show in Portfolio (Bulk)",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": "Ensure no change ability when shown in another portfolio."
+  },
+  {
+    "action": "View Archived Report",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Consolidated Report - View",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Consolidated Report - Upload/Remove",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Add New Property",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "View Details",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "See All Audits",
+    "permissionLevel": "View",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Show in Portfolio",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": "Ensure no change ability when shown in another portfolio."
+  },
+  {
+    "action": "Edit Property",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Deactivate",
+    "permissionLevel": null,
+    "accessLevel": null,
+    "internal": false,
+    "onlyForSuperAdmin": true,
+    "comment": null
+  },
+  {
+    "action": "Request Deactivate",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": false,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Delete",
+    "permissionLevel": null,
+    "accessLevel": null,
+    "internal": false,
+    "onlyForSuperAdmin": true,
+    "comment": null
+  },
+  {
+    "action": "Request Delete",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  },
+  {
+    "action": "Transfer",
+    "permissionLevel": null,
+    "accessLevel": null,
+    "internal": false,
+    "onlyForSuperAdmin": true,
+    "comment": null
+  },
+  {
+    "action": "Request Transfer",
+    "permissionLevel": "Update",
+    "accessLevel": "Partial",
+    "internal": true,
+    "onlyForSuperAdmin": false,
+    "comment": null
+  }
+]

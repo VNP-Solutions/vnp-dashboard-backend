@@ -13,7 +13,8 @@ import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
-  ModuleType
+  ModuleType,
+  PermissionLevel
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
@@ -21,9 +22,6 @@ import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
   canCreateBankDetails,
   canReadBankDetails,
-  canRequestBulkPropertyTransfer,
-  canRequestPropertyDelete,
-  canRequestPropertyTransfer,
   canUpdateBankDetails,
   isInternalUser,
   isUserSuperAdmin
@@ -80,6 +78,11 @@ export class PropertyService implements IPropertyService {
   ) {}
 
   async create(data: CreatePropertyDto, user: IUserWithPermissions) {
+    // Only internal users can create properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can create properties')
+    }
+
     const existingProperty = await this.propertyRepository.findByName(data.name)
 
     if (existingProperty) {
@@ -111,6 +114,11 @@ export class PropertyService implements IPropertyService {
     data: CompleteCreatePropertyDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can create properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can create properties')
+    }
+
     // Validate property name is unique
     const existingProperty = await this.propertyRepository.findByName(
       data.property.name
@@ -168,6 +176,11 @@ export class PropertyService implements IPropertyService {
     data: CompleteUpdatePropertyDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can update properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can update properties')
+    }
+
     // Validate property exists
     const property = await this.propertyRepository.findById(id)
     if (!property) {
@@ -1004,6 +1017,11 @@ export class PropertyService implements IPropertyService {
     data: UpdatePropertyDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can update properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can update properties')
+    }
+
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
@@ -1048,15 +1066,19 @@ export class PropertyService implements IPropertyService {
     }
 
     // Check if user has permission to request property transfer
-    // Requirements: internal user, property permission level 'update' or 'all', access level 'partial' or 'all'
-    if (!canRequestPropertyTransfer(user)) {
+    // All users with UPDATE permission can request transfer
+    const propertyPermission = user.role.property_permission
+    if (
+      !propertyPermission ||
+      (propertyPermission.permission_level !== PermissionLevel.update &&
+        propertyPermission.permission_level !== PermissionLevel.all)
+    ) {
       throw new ForbiddenException(
-        'You do not have permission to transfer properties. Property transfer requires: (1) internal user account, (2) property permission level "update" or "all", and (3) property access level "partial" or "all".'
+        'You do not have permission to transfer properties. Property transfer requires UPDATE or ALL permission level.'
       )
     }
 
-    // Check ownership: Only the owner portfolio can transfer the property
-    await this.validatePropertyOwnership(property, user)
+    // No ownership validation needed - any user with UPDATE permission and property access can request transfer
 
     // Validate the new portfolio exists
     const newPortfolio = await this.portfolioRepository.findById(
@@ -1128,7 +1150,7 @@ export class PropertyService implements IPropertyService {
       return updatedProperty
     }
 
-    // Property manager (with ownership rights) creates pending action for approval
+    // All other users with UPDATE permission create pending action for approval
     // Get current portfolio details for history
     const currentPortfolio = property.portfolio
       ? {
@@ -1164,6 +1186,13 @@ export class PropertyService implements IPropertyService {
     data: BulkTransferPropertyDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can bulk transfer properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException(
+        'Only internal users can bulk transfer properties'
+      )
+    }
+
     // Validate the target portfolio exists
     const targetPortfolio = await this.portfolioRepository.findById(
       data.new_portfolio_id
@@ -1177,14 +1206,7 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('At least one property ID is required')
     }
 
-    // Check if user has permission to request bulk property transfer
-    // Requirements: internal user, property permission level 'all', access level 'partial' or 'all'
-    if (!canRequestBulkPropertyTransfer(user)) {
-      throw new ForbiddenException(
-        'You do not have permission to perform bulk property transfers. Bulk transfer requires: (1) internal user account, (2) property permission level "all", and (3) property access level "partial" or "all".'
-      )
-    }
-
+    // Bulk transfer is restricted to internal users only (already checked at the beginning)
     // Perform bulk transfer
     const results: Array<{
       property_id: string
@@ -1262,18 +1284,8 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Property not found')
     }
 
-    // Check if user has permission to request property deletion
-    // Requirements: property permission level 'update' or 'all', access level 'partial' or 'all'
-    if (!canRequestPropertyDelete(user)) {
-      throw new ForbiddenException(
-        'You do not have permission to delete properties. Property deletion requires: (1) property permission level "update" or "all", and (2) property access level "partial" or "all".'
-      )
-    }
-
-    // Check ownership: Only the owner portfolio can delete the property
-    await this.validatePropertyOwnership(property, user)
-
     const isSuperAdmin = isUserSuperAdmin(user)
+    const isInternal = isInternalUser(user)
 
     // Check if there are any unarchived audits
     const unarchivedAuditCount = await this.prisma.audit.count({
@@ -1296,7 +1308,14 @@ export class PropertyService implements IPropertyService {
       return { message: 'Property deleted successfully' }
     }
 
-    // Property manager (with ownership rights) creates pending action for approval
+    // Only internal users can request property deletion
+    if (!isInternal) {
+      throw new ForbiddenException(
+        'Only internal users can request property deletion'
+      )
+    }
+
+    // Internal users create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'property',
       property_id: id,
@@ -1408,6 +1427,13 @@ export class PropertyService implements IPropertyService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<BulkImportResultDto> {
+    // Only internal users can bulk import properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException(
+        'Only internal users can bulk import properties'
+      )
+    }
+
     if (!file) {
       throw new BadRequestException('No file provided')
     }
@@ -2165,13 +2191,10 @@ export class PropertyService implements IPropertyService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<BulkUpdateResultDto> {
-    // Only super admins and internal users can bulk update properties
-    const isSuperAdmin = isUserSuperAdmin(user)
-    const isInternal = isInternalUser(user)
-
-    if (!isSuperAdmin && !isInternal) {
+    // Only internal users can bulk update properties
+    if (!isInternalUser(user)) {
       throw new BadRequestException(
-        'Only Super Admin and internal users can bulk update properties'
+        'Only internal users can bulk update properties'
       )
     }
 
@@ -2738,6 +2761,11 @@ export class PropertyService implements IPropertyService {
   }
 
   async share(id: string, data: SharePropertyDto, user: IUserWithPermissions) {
+    // Only internal users can share properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can share properties')
+    }
+
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
@@ -2783,6 +2811,11 @@ export class PropertyService implements IPropertyService {
     data: UnsharePropertyDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can unshare properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can unshare properties')
+    }
+
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
