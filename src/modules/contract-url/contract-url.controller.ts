@@ -56,7 +56,7 @@ export class ContractUrlController {
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get all contract URLs accessible to the user with pagination, search, filter, and sort (Portfolio Manager only)'
+      'Get all contract URLs accessible to the user with pagination, search, filter, and sort (Super Admin only)'
   })
   @ApiResponse({
     status: 200,
@@ -64,7 +64,7 @@ export class ContractUrlController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only Portfolio Managers can access contracts'
+    description: 'Forbidden - Only Super Admin can access contracts'
   })
   findAll(
     @Query() query: ContractUrlQueryDto,

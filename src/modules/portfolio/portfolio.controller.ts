@@ -54,12 +54,12 @@ export class PortfolioController {
   ) {}
 
   @Post()
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
-  @ApiOperation({ summary: 'Create a new portfolio' })
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE)
+  @ApiOperation({ summary: 'Create a new portfolio (Internal users only)' })
   @ApiResponse({ status: 201, description: 'Portfolio created successfully' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   create(
     @Body() createPortfolioDto: CreatePortfolioDto,
@@ -89,11 +89,15 @@ export class PortfolioController {
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get all portfolios without pagination for export purposes (supports search, filter, and sort)'
+      'Get all portfolios without pagination for export purposes (Super Admin only)'
   })
   @ApiResponse({
     status: 200,
     description: 'All portfolios retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super Admin only'
   })
   findAllForExport(
     @Query() query: PortfolioQueryDto,
@@ -117,12 +121,12 @@ export class PortfolioController {
 
   @Patch(':id')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
-  @ApiOperation({ summary: 'Update a portfolio' })
+  @ApiOperation({ summary: 'Update a portfolio (Internal users only)' })
   @ApiResponse({ status: 200, description: 'Portfolio updated successfully' })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   update(
     @Param('id') id: string,
@@ -160,9 +164,9 @@ export class PortfolioController {
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
   @ApiOperation({
     summary:
-      'Deactivate a portfolio (Super Admin and internal users with password verification)',
+      'Deactivate a portfolio or submit deactivation request',
     description:
-      'Super Admin can deactivate directly. Internal users create a pending action for approval.'
+      'Super Admin can deactivate directly with password (no reason required). Internal users submit a pending action for approval with password and reason.'
   })
   @ApiResponse({
     status: 200,
@@ -173,7 +177,7 @@ export class PortfolioController {
   @ApiResponse({
     status: 400,
     description:
-      'Portfolio already deactivated or pending request exists or only Super Admin and internal users can deactivate or invalid password'
+      'Portfolio already deactivated or pending request exists or only Super Admin and internal users can deactivate or invalid password or reason required for internal users'
   })
   @ApiResponse({
     status: 403,
@@ -196,9 +200,9 @@ export class PortfolioController {
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
   @ApiOperation({
     summary:
-      'Activate a portfolio (Super Admin and internal users with password verification)',
+      'Activate a portfolio or submit activation request',
     description:
-      'Super Admin can activate directly. Internal users create a pending action for approval.'
+      'Super Admin can activate directly with password (no reason required). Internal users submit a pending action for approval with password and reason.'
   })
   @ApiResponse({
     status: 200,
@@ -209,7 +213,7 @@ export class PortfolioController {
   @ApiResponse({
     status: 400,
     description:
-      'Portfolio already active or pending request exists or only Super Admin and internal users can activate or invalid password'
+      'Portfolio already active or pending request exists or only Super Admin and internal users can activate or invalid password or reason required for internal users'
   })
   @ApiResponse({
     status: 403,
@@ -324,10 +328,10 @@ export class PortfolioController {
   }
 
   @Post('bulk-import')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Bulk import portfolios from Excel file' })
+  @ApiOperation({ summary: 'Bulk import portfolios from Excel file (Internal users only)' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -350,7 +354,7 @@ export class PortfolioController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   bulkImport(
     @UploadedFile() file: Express.Multer.File,
