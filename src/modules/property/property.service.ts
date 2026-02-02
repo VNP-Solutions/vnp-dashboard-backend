@@ -2311,7 +2311,11 @@ export class PropertyService implements IPropertyService {
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
-            return String(value).trim()
+            const trimmed = String(value).trim()
+            // Return only if trimmed value is not empty
+            if (trimmed !== '') {
+              return trimmed
+            }
           }
         }
 
@@ -2324,7 +2328,11 @@ export class PropertyService implements IPropertyService {
             if (cleanKey.toLowerCase() === name.toLowerCase()) {
               const value = row[key]
               if (value !== undefined && value !== null && value !== '') {
-                return String(value).trim()
+                const trimmed = String(value).trim()
+                // Return only if trimmed value is not empty
+                if (trimmed !== '') {
+                  return trimmed
+                }
               }
             }
           }
@@ -2699,8 +2707,9 @@ export class PropertyService implements IPropertyService {
             bookingPassword
 
           // Validate username/password pairs - if one is provided, both must be provided
-          const hasExpediaUsername = !!expediaUsername
-          const hasExpediaPassword = !!expediaPassword
+          // Check for non-empty trimmed values
+          const hasExpediaUsername = !!expediaUsername?.trim()
+          const hasExpediaPassword = !!expediaPassword?.trim()
           if (hasExpediaUsername !== hasExpediaPassword) {
             result.errors.push({
               row: rowNumber,
@@ -2713,7 +2722,9 @@ export class PropertyService implements IPropertyService {
 
           // Validate Agoda credentials: username can be provided alone,
           // but if password is provided, username must also be provided
-          if (agodaPassword && !agodaUsername) {
+          const hasAgodaUsername = !!agodaUsername?.trim()
+          const hasAgodaPassword = !!agodaPassword?.trim()
+          if (hasAgodaPassword && !hasAgodaUsername) {
             result.errors.push({
               row: rowNumber,
               propertyId: propertyIdValue,
@@ -2724,8 +2735,8 @@ export class PropertyService implements IPropertyService {
             continue
           }
 
-          const hasBookingUsername = !!bookingUsername
-          const hasBookingPassword = !!bookingPassword
+          const hasBookingUsername = !!bookingUsername?.trim()
+          const hasBookingPassword = !!bookingPassword?.trim()
           if (hasBookingUsername !== hasBookingPassword) {
             result.errors.push({
               row: rowNumber,
