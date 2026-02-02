@@ -9,13 +9,16 @@ import {
 import { PendingActionStatus, PendingActionType } from '@prisma/client'
 import type { PaginatedResult } from '../../common/dto/query.dto'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { isUserSuperAdmin, isInternalUser } from '../../common/utils/permission.util'
-import { QueryBuilder } from '../../common/utils/query-builder.util'
-import { EmailUtil } from '../../common/utils/email.util'
 import { roundToDecimals } from '../../common/utils/amount.util'
+import { EmailUtil } from '../../common/utils/email.util'
+import {
+  isInternalUser,
+  isUserSuperAdmin
+} from '../../common/utils/permission.util'
+import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
-import type { IPropertyService } from '../property/property.interface'
 import { PrismaService } from '../prisma/prisma.service'
+import type { IPropertyService } from '../property/property.interface'
 import {
   ApprovePendingActionDto,
   CreatePendingActionDto,
@@ -27,9 +30,7 @@ import type {
 } from './pending-action.interface'
 
 @Injectable()
-export class PendingActionService
-  implements IPendingActionService
-{
+export class PendingActionService implements IPendingActionService {
   constructor(
     @Inject('IPendingActionRepository')
     private repository: IPendingActionRepository,
@@ -43,10 +44,7 @@ export class PendingActionService
     private prisma: PrismaService
   ) {}
 
-  async create(
-    data: CreatePendingActionDto,
-    user: IUserWithPermissions
-  ) {
+  async create(data: CreatePendingActionDto, user: IUserWithPermissions) {
     // Only internal users can create pending actions
     if (!isInternalUser(user)) {
       throw new ForbiddenException(
@@ -199,9 +197,7 @@ export class PendingActionService
   async findOne(id: string, user: IUserWithPermissions) {
     // Only super admins can access this endpoint
     if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException(
-        'Only super admins can access this resource'
-      )
+      throw new ForbiddenException('Only super admins can access this resource')
     }
 
     const pendingAction = await this.repository.findById(id)
@@ -243,9 +239,17 @@ export class PendingActionService
     // Execute the actual action based on type
     await this.executeAction(pendingAction, user)
 
-    // Send email notification for transfer actions
+    // Send email notification based on action type
     if (pendingAction.action_type === PendingActionType.PROPERTY_TRANSFER) {
       await this.sendTransferNotificationEmail(pendingAction)
+    } else if (
+      pendingAction.action_type === PendingActionType.PORTFOLIO_DEACTIVATE
+    ) {
+      await this.sendPortfolioDeactivateNotificationEmail(pendingAction)
+    } else if (
+      pendingAction.action_type === PendingActionType.PORTFOLIO_ACTIVATE
+    ) {
+      await this.sendPortfolioActivateNotificationEmail(pendingAction)
     }
 
     // Update the pending action status
@@ -283,7 +287,10 @@ export class PendingActionService
     }
 
     // Send rejection notification email
-    await this.sendRejectionNotificationEmail(pendingAction, data.rejection_reason)
+    await this.sendRejectionNotificationEmail(
+      pendingAction,
+      data.rejection_reason
+    )
 
     // Update the pending action status
     return this.repository.update(id, {
@@ -348,10 +355,29 @@ export class PendingActionService
 
       case PendingActionType.PORTFOLIO_DEACTIVATE:
         // Deactivate the portfolio
-        // Note: This will be implemented when portfolio deactivation is added
-        throw new BadRequestException(
-          'Portfolio deactivation is not yet implemented'
-        )
+        if (!pendingAction.portfolio_id) {
+          throw new BadRequestException(
+            'Portfolio ID is missing for PORTFOLIO_DEACTIVATE action'
+          )
+        }
+        await this.prisma.portfolio.update({
+          where: { id: pendingAction.portfolio_id },
+          data: { is_active: false }
+        })
+        break
+
+      case PendingActionType.PORTFOLIO_ACTIVATE:
+        // Activate the portfolio
+        if (!pendingAction.portfolio_id) {
+          throw new BadRequestException(
+            'Portfolio ID is missing for PORTFOLIO_ACTIVATE action'
+          )
+        }
+        await this.prisma.portfolio.update({
+          where: { id: pendingAction.portfolio_id },
+          data: { is_active: true }
+        })
+        break
 
       case PendingActionType.AUDIT_UPDATE_AMOUNT_CONFIRMED:
         // Update the audit's amount_confirmed field
@@ -368,7 +394,9 @@ export class PendingActionService
         await this.prisma.audit.update({
           where: { id: pendingAction.audit_id },
           data: {
-            amount_confirmed: roundToDecimals(pendingAction.audit_update_data.amount_confirmed)
+            amount_confirmed: roundToDecimals(
+              pendingAction.audit_update_data.amount_confirmed
+            )
           }
         })
         break
@@ -387,21 +415,21 @@ export class PendingActionService
     // Get all unique target portfolio IDs from transfer actions that don't have stored portfolio data
     const targetPortfolioIds = pendingActions
       .filter(
-        (action) =>
+        action =>
           action.action_type === PendingActionType.PROPERTY_TRANSFER &&
           action.transfer_data?.new_portfolio_id &&
           !action.transfer_data?.portfolio_to // Only fetch if not already stored
       )
-      .map((action) => action.transfer_data.new_portfolio_id)
+      .map(action => action.transfer_data.new_portfolio_id)
       .filter((id, index, self) => self.indexOf(id) === index) // Remove duplicates
 
     // Fetch all target portfolios in one query
     const targetPortfolios = new Map()
     if (targetPortfolioIds.length > 0) {
       const portfolios = await Promise.all(
-        targetPortfolioIds.map((id) => this.portfolioRepository.findById(id))
+        targetPortfolioIds.map(id => this.portfolioRepository.findById(id))
       )
-      portfolios.forEach((portfolio) => {
+      portfolios.forEach(portfolio => {
         if (portfolio) {
           targetPortfolios.set(portfolio.id, {
             id: portfolio.id,
@@ -412,7 +440,7 @@ export class PendingActionService
     }
 
     // Enrich the pending actions with portfolio data
-    return pendingActions.map((action) => {
+    return pendingActions.map(action => {
       const enrichedAction: any = {
         ...action
       }
@@ -424,7 +452,10 @@ export class PendingActionService
       ) {
         // Use stored portfolio_from and portfolio_to if available (for approved/rejected actions)
         // Otherwise, use current property.portfolio and fetch target portfolio (for pending actions)
-        if (action.transfer_data.portfolio_from && action.transfer_data.portfolio_to) {
+        if (
+          action.transfer_data.portfolio_from &&
+          action.transfer_data.portfolio_to
+        ) {
           // Already have stored history, just use it
           enrichedAction.transfer_data = {
             ...action.transfer_data
@@ -450,7 +481,8 @@ export class PendingActionService
         }
 
         // Also add current_portfolio for backward compatibility
-        enrichedAction.current_portfolio = enrichedAction.transfer_data.portfolio_from
+        enrichedAction.current_portfolio =
+          enrichedAction.transfer_data.portfolio_from
       } else {
         // For non-transfer actions, add current_portfolio from property relation
         enrichedAction.current_portfolio = action.property?.portfolio
@@ -525,7 +557,102 @@ export class PendingActionService
       )
     } catch (error) {
       // Log the error but don't fail the approval process
-      console.error('Failed to send property transfer notification email:', error)
+      console.error(
+        'Failed to send property transfer notification email:',
+        error
+      )
+    }
+  }
+
+  /**
+   * Send email notification for portfolio deactivation approval
+   */
+  private async sendPortfolioDeactivateNotificationEmail(pendingAction: any) {
+    try {
+      const recipientEmails: string[] = []
+
+      // Get the requesting user's email
+      const requestingUser = await this.prisma.user.findUnique({
+        where: { id: pendingAction.requested_user_id },
+        select: { email: true }
+      })
+
+      if (requestingUser?.email) {
+        recipientEmails.push(requestingUser.email)
+      }
+
+      // Get portfolio details
+      const portfolio = await this.portfolioRepository.findById(
+        pendingAction.portfolio_id
+      )
+
+      if (!portfolio) {
+        console.error('Portfolio not found for deactivation email notification')
+        return
+      }
+
+      if (portfolio.contact_email) {
+        recipientEmails.push(portfolio.contact_email)
+      }
+
+      // Send the email to all recipients
+      await this.emailUtil.sendPortfolioDeactivateEmail(
+        recipientEmails,
+        portfolio.name,
+        new Date()
+      )
+    } catch (error) {
+      // Log the error but don't fail the approval process
+      console.error(
+        'Failed to send portfolio deactivation notification email:',
+        error
+      )
+    }
+  }
+
+  /**
+   * Send email notification for portfolio activation approval
+   */
+  private async sendPortfolioActivateNotificationEmail(pendingAction: any) {
+    try {
+      const recipientEmails: string[] = []
+
+      // Get the requesting user's email
+      const requestingUser = await this.prisma.user.findUnique({
+        where: { id: pendingAction.requested_user_id },
+        select: { email: true }
+      })
+
+      if (requestingUser?.email) {
+        recipientEmails.push(requestingUser.email)
+      }
+
+      // Get portfolio details
+      const portfolio = await this.portfolioRepository.findById(
+        pendingAction.portfolio_id
+      )
+
+      if (!portfolio) {
+        console.error('Portfolio not found for activation email notification')
+        return
+      }
+
+      if (portfolio.contact_email) {
+        recipientEmails.push(portfolio.contact_email)
+      }
+
+      // Send the email to all recipients
+      await this.emailUtil.sendPortfolioActivateEmail(
+        recipientEmails,
+        portfolio.name,
+        new Date()
+      )
+    } catch (error) {
+      // Log the error but don't fail the approval process
+      console.error(
+        'Failed to send portfolio activation notification email:',
+        error
+      )
     }
   }
 
@@ -568,7 +695,9 @@ export class PendingActionService
           )
 
           if (!currentPortfolio) {
-            console.error('Current portfolio not found for rejection email notification')
+            console.error(
+              'Current portfolio not found for rejection email notification'
+            )
             return
           }
 
@@ -582,7 +711,9 @@ export class PendingActionService
           )
 
           if (!targetPortfolio) {
-            console.error('Target portfolio not found for rejection email notification')
+            console.error(
+              'Target portfolio not found for rejection email notification'
+            )
             return
           }
 
@@ -620,7 +751,9 @@ export class PendingActionService
           )
 
           if (!portfolio) {
-            console.error('Portfolio not found for rejection email notification')
+            console.error(
+              'Portfolio not found for rejection email notification'
+            )
             return
           }
 
@@ -657,7 +790,9 @@ export class PendingActionService
           )
 
           if (!portfolio) {
-            console.error('Portfolio not found for rejection email notification')
+            console.error(
+              'Portfolio not found for rejection email notification'
+            )
             return
           }
 
@@ -683,7 +818,9 @@ export class PendingActionService
           )
 
           if (!portfolio) {
-            console.error('Portfolio not found for rejection email notification')
+            console.error(
+              'Portfolio not found for rejection email notification'
+            )
             return
           }
 
@@ -693,6 +830,33 @@ export class PendingActionService
 
           // Send rejection email
           await this.emailUtil.sendPortfolioDeactivateRejectionEmail(
+            recipientEmails,
+            portfolio.name,
+            rejectionReason,
+            pendingAction.created_at
+          )
+          break
+        }
+
+        case PendingActionType.PORTFOLIO_ACTIVATE: {
+          // Get portfolio details and contact email
+          const portfolio = await this.portfolioRepository.findById(
+            pendingAction.portfolio_id
+          )
+
+          if (!portfolio) {
+            console.error(
+              'Portfolio not found for rejection email notification'
+            )
+            return
+          }
+
+          if (portfolio.contact_email) {
+            recipientEmails.push(portfolio.contact_email)
+          }
+
+          // Send rejection email
+          await this.emailUtil.sendPortfolioActivateRejectionEmail(
             recipientEmails,
             portfolio.name,
             rejectionReason,
@@ -733,7 +897,9 @@ export class PendingActionService
         }
 
         default:
-          console.warn(`Unknown action type for rejection email: ${pendingAction.action_type}`)
+          console.warn(
+            `Unknown action type for rejection email: ${pendingAction.action_type}`
+          )
       }
     } catch (error) {
       // Log the error but don't fail the rejection process

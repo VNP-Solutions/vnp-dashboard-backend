@@ -535,17 +535,44 @@ export class PortfolioService implements IPortfolioService {
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
 
-    // Only super admin and internal users can deactivate portfolios
-    if (!isSuperAdmin && !isInternal) {
+    // Check if user has at least update permission for portfolio module
+    const portfolioPermission = user.role.portfolio_permission
+
+    if (!portfolioPermission) {
       throw new BadRequestException(
-        'Only Super Admin and internal users can deactivate portfolios'
+        'No portfolio permission found for this user'
       )
     }
 
-    // Internal users (non-super admin) must provide a reason for pending request
-    if (!isSuperAdmin && isInternal && !reason) {
+    const hasUpdatePermission =
+      portfolioPermission.permission_level === 'all' ||
+      portfolioPermission.permission_level === 'update'
+
+    const hasAccess =
+      portfolioPermission.access_level === 'all' ||
+      portfolioPermission.access_level === 'partial'
+
+    // Only internal users with update (or all) permission and partial (or all) access can request deactivation
+    if (!isInternal || !hasUpdatePermission || !hasAccess) {
       throw new BadRequestException(
-        'Reason is required for internal users to submit deactivation request'
+        'Only internal users with at least update permission and partial access for portfolio module can deactivate portfolios'
+      )
+    }
+
+    // For partial access, verify user has access to this portfolio
+    if (portfolioPermission.access_level === 'partial' && !isSuperAdmin) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PORTFOLIO,
+        PermissionAction.UPDATE,
+        id
+      )
+    }
+
+    // Non-super admin users must provide a reason for pending request
+    if (!isSuperAdmin && !reason) {
+      throw new BadRequestException(
+        'Reason is required for non-super admin users to submit deactivation request'
       )
     }
 
@@ -593,7 +620,7 @@ export class PortfolioService implements IPortfolioService {
       return { message: 'Portfolio deactivated successfully' }
     }
 
-    // Internal users (non-super admin) need to create a pending action
+    // Non-super admin users need to create a pending action
     // Check if there's already a pending deactivation request
     const existingPendingAction = await this.prisma.pendingAction.findFirst({
       where: {
@@ -636,17 +663,44 @@ export class PortfolioService implements IPortfolioService {
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
 
-    // Only super admin and internal users can activate portfolios
-    if (!isSuperAdmin && !isInternal) {
+    // Check if user has at least update permission for portfolio module
+    const portfolioPermission = user.role.portfolio_permission
+
+    if (!portfolioPermission) {
       throw new BadRequestException(
-        'Only Super Admin and internal users can activate portfolios'
+        'No portfolio permission found for this user'
       )
     }
 
-    // Internal users (non-super admin) must provide a reason for pending request
-    if (!isSuperAdmin && isInternal && !reason) {
+    const hasUpdatePermission =
+      portfolioPermission.permission_level === 'all' ||
+      portfolioPermission.permission_level === 'update'
+
+    const hasAccess =
+      portfolioPermission.access_level === 'all' ||
+      portfolioPermission.access_level === 'partial'
+
+    // Only internal users with update (or all) permission and partial (or all) access can request activation
+    if (!isInternal || !hasUpdatePermission || !hasAccess) {
       throw new BadRequestException(
-        'Reason is required for internal users to submit activation request'
+        'Only internal users with at least update permission and partial access for portfolio module can activate portfolios'
+      )
+    }
+
+    // For partial access, verify user has access to this portfolio
+    if (portfolioPermission.access_level === 'partial' && !isSuperAdmin) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PORTFOLIO,
+        PermissionAction.UPDATE,
+        id
+      )
+    }
+
+    // Non-super admin users must provide a reason for pending request
+    if (!isSuperAdmin && !reason) {
+      throw new BadRequestException(
+        'Reason is required for non-super admin users to submit activation request'
       )
     }
 
@@ -694,7 +748,7 @@ export class PortfolioService implements IPortfolioService {
       return { message: 'Portfolio activated successfully' }
     }
 
-    // Internal users (non-super admin) need to create a pending action
+    // Non-super admin users need to create a pending action
     // Check if there's already a pending activation request
     const existingPendingAction = await this.prisma.pendingAction.findFirst({
       where: {
