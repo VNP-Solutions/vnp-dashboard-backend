@@ -9,7 +9,8 @@ import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
-  ModuleType
+  ModuleType,
+  PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount } from '../../common/utils/amount.util'
@@ -1279,6 +1280,26 @@ export class PortfolioService implements IPortfolioService {
               row: rowNumber,
               portfolioId: portfolioIdValue,
               error: 'Portfolio not found'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Check if user has permission to update this portfolio
+          try {
+            await this.permissionService.requirePermission(
+              user,
+              ModuleType.PORTFOLIO,
+              PermissionAction.UPDATE,
+              portfolioIdValue
+            )
+          } catch (error) {
+            result.errors.push({
+              row: rowNumber,
+              portfolioId: portfolioIdValue,
+              error:
+                error.message ||
+                'You do not have permission to update this portfolio'
             })
             result.failureCount++
             continue

@@ -14,6 +14,7 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import {
   AccessLevel,
   ModuleType,
+  PermissionAction,
   PermissionLevel
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
@@ -2494,6 +2495,26 @@ export class PropertyService implements IPropertyService {
               row: rowNumber,
               propertyId: propertyIdValue,
               error: 'Property not found'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Check if user has permission to update this property
+          try {
+            await this.permissionService.requirePermission(
+              user,
+              ModuleType.PROPERTY,
+              PermissionAction.UPDATE,
+              propertyIdValue
+            )
+          } catch (error) {
+            result.errors.push({
+              row: rowNumber,
+              propertyId: propertyIdValue,
+              error:
+                error.message ||
+                'You do not have permission to update this property'
             })
             result.failureCount++
             continue
