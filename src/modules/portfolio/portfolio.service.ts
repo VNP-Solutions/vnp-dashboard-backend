@@ -12,6 +12,7 @@ import {
   ModuleType
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { roundAmount } from '../../common/utils/amount.util'
 import { COMPLETED_AUDIT_STATUSES } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
@@ -20,7 +21,6 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
-import { roundAmount } from '../../common/utils/amount.util'
 import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
 import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import { PrismaService } from '../prisma/prisma.service'
@@ -59,9 +59,7 @@ export class PortfolioService implements IPortfolioService {
   async create(data: CreatePortfolioDto, user: IUserWithPermissions) {
     // Only internal users can create portfolios
     if (!isInternalUser(user)) {
-      throw new BadRequestException(
-        'Only internal users can create portfolios'
-      )
+      throw new BadRequestException('Only internal users can create portfolios')
     }
 
     const existingPortfolio = await this.portfolioRepository.findByName(
@@ -408,7 +406,8 @@ export class PortfolioService implements IPortfolioService {
 
     // Conditionally hide sales_agent for external users
     if (!isInternal && !isSuperAdmin) {
-      const { sales_agent: _sales_agent, ...portfolioWithoutSalesAgent } = portfolio as any
+      const { sales_agent: _sales_agent, ...portfolioWithoutSalesAgent } =
+        portfolio as any
       return portfolioWithoutSalesAgent
     }
 
@@ -422,9 +421,7 @@ export class PortfolioService implements IPortfolioService {
   ) {
     // Only internal users can update portfolios
     if (!isInternalUser(user)) {
-      throw new BadRequestException(
-        'Only internal users can update portfolios'
-      )
+      throw new BadRequestException('Only internal users can update portfolios')
     }
 
     const isSuperAdmin = isUserSuperAdmin(user)
@@ -1075,6 +1072,16 @@ export class PortfolioService implements IPortfolioService {
             portfolioData,
             _user.id
           )
+
+          // If user has partial access, grant them access to the created portfolio
+          const permission = _user.role.portfolio_permission
+          if (permission?.access_level === AccessLevel.partial) {
+            await this.permissionService.grantResourceAccess(
+              _user.id,
+              ModuleType.PORTFOLIO,
+              newPortfolio.id
+            )
+          }
 
           // If contract URL is provided, create contract URL entries for the user
           // Handle comma-separated values
@@ -1747,12 +1754,16 @@ export class PortfolioService implements IPortfolioService {
       completed_audit_count: completedAuditCount,
       recent_audits: formattedRecentAudits.map(audit => ({
         ...audit,
-        amount_collectable: audit.amount_collectable !== null && audit.amount_collectable !== undefined
-          ? roundAmount(audit.amount_collectable)
-          : null,
-        amount_confirmed: audit.amount_confirmed !== null && audit.amount_confirmed !== undefined
-          ? roundAmount(audit.amount_confirmed)
-          : null
+        amount_collectable:
+          audit.amount_collectable !== null &&
+          audit.amount_collectable !== undefined
+            ? roundAmount(audit.amount_collectable)
+            : null,
+        amount_confirmed:
+          audit.amount_confirmed !== null &&
+          audit.amount_confirmed !== undefined
+            ? roundAmount(audit.amount_confirmed)
+            : null
       }))
     }
   }
