@@ -5,6 +5,7 @@ import {
   PrismaClient,
   Property
 } from '@prisma/client'
+import { EncryptionUtil } from '../src/common/utils/encryption.util'
 
 const prisma = new PrismaClient()
 
@@ -372,7 +373,9 @@ function generateUsername(propertyName: string, ota: string): string {
 
 // Encrypted password placeholder (in real scenario, use EncryptionUtil)
 function generateEncryptedPassword(): string {
-  return `encrypted_${Math.random().toString(36).substring(2, 15)}`
+  const plainPassword = `TestPass${Math.random().toString(36).substring(2, 10)}!1`
+  const encryptionSecret = process.env.JWT_ACCESS_SECRET || 'default-secret-key'
+  return EncryptionUtil.encrypt(plainPassword, encryptionSecret)
 }
 
 function generateBankAccountNumber(): string {
