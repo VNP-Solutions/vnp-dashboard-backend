@@ -28,6 +28,8 @@ import {
   ModuleType,
   PermissionAction
 } from '../../common/interfaces/permission.interface'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import type { IAuthRepository } from '../auth/auth.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
@@ -43,8 +45,6 @@ import {
   UpdateReportUrlDto
 } from './audit.dto'
 import type { IAuditService } from './audit.interface'
-import { EncryptionUtil } from '../../common/utils/encryption.util'
-import type { IAuthRepository } from '../auth/auth.interface'
 
 @ApiTags('Audit')
 @ApiBearerAuth('JWT-auth')
@@ -60,9 +60,10 @@ export class AuditController {
 
   @Post()
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Create a new audit (Internal users only)',
-    description: 'Only internal users can create audits. Requires audit UPDATE permission.'
+    description:
+      'Only internal users can create audits. Requires audit UPDATE permission.'
   })
   @ApiResponse({ status: 201, description: 'Audit created successfully' })
   @ApiResponse({
@@ -148,18 +149,22 @@ export class AuditController {
   @Patch(':id/archive')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Archive an audit (Super admins and internal users only, no password required)',
-    description: 'Super admins and internal users can archive audits. Allowed statuses: "OTA POST Completed", "VCC Invoiced", "MOR completed and Invoiced", "Direct Bill Invoiced", "Nothing To Report". External users cannot archive audits.'
+    summary:
+      'Archive an audit (Super admins and internal users only, no password required)',
+    description:
+      'Super admins and internal users can archive audits. Allowed statuses: "OTA POST Completed", "VCC Invoiced", "MOR completed and Invoiced", "Direct Bill Invoiced", "Nothing To Report". External users cannot archive audits.'
   })
   @ApiResponse({ status: 200, description: 'Audit archived successfully' })
   @ApiResponse({ status: 404, description: 'Audit not found' })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Cannot archive audit due to validation failure or audit already archived'
+    description:
+      'Bad Request - Cannot archive audit due to validation failure or audit already archived'
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - External users cannot archive audits or insufficient permissions'
+    description:
+      'Forbidden - External users cannot archive audits or insufficient permissions'
   })
   archive(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.auditService.archive(id, user)
@@ -182,7 +187,7 @@ export class AuditController {
     - OTA/OTA Type/Ota Type/Ota type: OTA type (expedia, agoda, booking)
     - Audit Status/Audit status/Status: Status name (will be created if doesn't exist)
     - Amount Collectable/Amount collectable/amount_collectable: Collectable amount
-    - Amount Confirmed/Amount confirmed/amount_confirmed: Confirmed amount  
+    - Amount Confirmed/Amount confirmed/amount_confirmed: Confirmed amount (Note: Non-super-admin internal users can only set this once. Once it has been set, only super admins can update it.)
     - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
     - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)
     - Report URL/Report url/report_url/Report/URL: Report URL
@@ -472,7 +477,8 @@ export class AuditController {
   @Post('bulk-delete')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE)
   @ApiOperation({
-    summary: 'Bulk delete multiple audits (Super admin only, requires password verification)',
+    summary:
+      'Bulk delete multiple audits (Super admin only, requires password verification)',
     description:
       'Only super admins can delete audits. Password verification is required. The audits will be permanently deleted and this action cannot be undone.'
   })
@@ -518,7 +524,8 @@ export class AuditController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid data, no audit IDs provided, or invalid password'
+    description:
+      'Bad Request - Invalid data, no audit IDs provided, or invalid password'
   })
   @ApiResponse({
     status: 403,
@@ -550,7 +557,8 @@ export class AuditController {
   @Post(':id/delete')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE, true)
   @ApiOperation({
-    summary: 'Delete an audit (Super admin only, requires password verification)',
+    summary:
+      'Delete an audit (Super admin only, requires password verification)',
     description:
       'Only super admins can delete audits. Password verification is required. The audit will be permanently deleted and this action cannot be undone.'
   })
@@ -590,9 +598,10 @@ export class AuditController {
 
   @Patch(':id')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update an audit (Internal users only)',
-    description: 'Only internal users can update audits. This includes editing audit details and adding audits to batches.'
+    description:
+      'Only internal users can update audits. This includes editing audit details and adding audits to batches. Note: Non-super-admin internal users can only set amount_confirmed once. Once it has been set, only super admins can update it.'
   })
   @ApiResponse({ status: 200, description: 'Audit updated successfully' })
   @ApiResponse({ status: 404, description: 'Audit not found' })
@@ -602,7 +611,8 @@ export class AuditController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid data'
+    description:
+      'Bad Request - Invalid data or attempting to update amount_confirmed when it is already set (non-super-admin users only)'
   })
   update(
     @Param('id') id: string,
@@ -656,7 +666,8 @@ export class AuditController {
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
   @ApiOperation({
     summary: 'Update report URL for an audit (Internal users only)',
-    description: 'Updates the report URL field for a specific audit. Only internal users can upload report URLs. This is a dedicated endpoint for updating only the report URL.'
+    description:
+      'Updates the report URL field for a specific audit. Only internal users can upload report URLs. This is a dedicated endpoint for updating only the report URL.'
   })
   @ApiResponse({ status: 200, description: 'Report URL updated successfully' })
   @ApiResponse({ status: 404, description: 'Audit not found' })

@@ -683,6 +683,23 @@ export class AuditService implements IAuditService {
       throw new ForbiddenException('External users cannot update audits')
     }
 
+    // Check amount_confirmed update restriction for non-super-admin internal users
+    if (
+      data.amount_confirmed !== undefined &&
+      data.amount_confirmed !== null &&
+      !isUserSuperAdmin(user)
+    ) {
+      // If amount_confirmed is already set, non-super-admin internal users cannot update it
+      if (
+        audit.amount_confirmed !== null &&
+        audit.amount_confirmed !== undefined
+      ) {
+        throw new BadRequestException(
+          'Amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
+        )
+      }
+    }
+
     // Validate batch_id if provided
     if (data.batch_id !== undefined && data.batch_id !== null) {
       const batch = await this.auditBatchRepository.findById(data.batch_id)
@@ -1171,6 +1188,23 @@ export class AuditService implements IAuditService {
           if (amountConfirmedValue) {
             const amountConfirmed = parseFloat(amountConfirmedValue)
             if (!isNaN(amountConfirmed)) {
+              // Check amount_confirmed update restriction for non-super-admin internal users
+              if (!isUserSuperAdmin(user)) {
+                // If amount_confirmed is already set, non-super-admin internal users cannot update it
+                if (
+                  existingAudit.amount_confirmed !== null &&
+                  existingAudit.amount_confirmed !== undefined
+                ) {
+                  result.errors.push({
+                    row: rowNumber,
+                    auditId: auditIdValue,
+                    error:
+                      'Amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
+                  })
+                  result.failureCount++
+                  continue
+                }
+              }
               updateData.amount_confirmed = roundToDecimals(amountConfirmed)
             }
           }
