@@ -33,19 +33,31 @@ export class PropertyCredentialsRepository
       infer: true
     })!
 
-    return {
-      ...credentials,
-      // Expedia password is now optional - decrypt only if present
-      expedia_password: credentials.expedia_password
-        ? EncryptionUtil.decrypt(credentials.expedia_password, encryptionSecret)
-        : null,
-      // Optional fields - decrypt only if present
-      agoda_password: credentials.agoda_password
-        ? EncryptionUtil.decrypt(credentials.agoda_password, encryptionSecret)
-        : null,
-      booking_password: credentials.booking_password
-        ? EncryptionUtil.decrypt(credentials.booking_password, encryptionSecret)
-        : null
+    try {
+      return {
+        ...credentials,
+        // Expedia password is now optional - decrypt only if present
+        expedia_password: credentials.expedia_password
+          ? EncryptionUtil.decrypt(
+              credentials.expedia_password,
+              encryptionSecret
+            )
+          : null,
+        // Optional fields - decrypt only if present
+        agoda_password: credentials.agoda_password
+          ? EncryptionUtil.decrypt(credentials.agoda_password, encryptionSecret)
+          : null,
+        booking_password: credentials.booking_password
+          ? EncryptionUtil.decrypt(
+              credentials.booking_password,
+              encryptionSecret
+            )
+          : null
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to decrypt credentials for property ${propertyId}: ${error.message}`
+      )
     }
   }
 
@@ -65,19 +77,27 @@ export class PropertyCredentialsRepository
       infer: true
     })!
 
-    return credentials.map(cred => ({
-      ...cred,
-      // Expedia password is now optional - decrypt only if present
-      expedia_password: cred.expedia_password
-        ? EncryptionUtil.decrypt(cred.expedia_password, encryptionSecret)
-        : null,
-      agoda_password: cred.agoda_password
-        ? EncryptionUtil.decrypt(cred.agoda_password, encryptionSecret)
-        : null,
-      booking_password: cred.booking_password
-        ? EncryptionUtil.decrypt(cred.booking_password, encryptionSecret)
-        : null
-    }))
+    return credentials.map(cred => {
+      try {
+        return {
+          ...cred,
+          // Expedia password is now optional - decrypt only if present
+          expedia_password: cred.expedia_password
+            ? EncryptionUtil.decrypt(cred.expedia_password, encryptionSecret)
+            : null,
+          agoda_password: cred.agoda_password
+            ? EncryptionUtil.decrypt(cred.agoda_password, encryptionSecret)
+            : null,
+          booking_password: cred.booking_password
+            ? EncryptionUtil.decrypt(cred.booking_password, encryptionSecret)
+            : null
+        }
+      } catch (error) {
+        throw new Error(
+          `Failed to decrypt credentials for property ${cred.property_id}: ${error.message}`
+        )
+      }
+    })
   }
 
   async bulkUpdate(propertyIds: string[], data: any) {

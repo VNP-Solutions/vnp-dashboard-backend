@@ -18,6 +18,7 @@
     "seed:portfolios": "ts-node prisma/seed-portfolios.ts",
     "seed:properties": "ts-node prisma/seed-properties.ts",
     "seed:audits": "ts-node prisma/seed-audits.ts",
+    "fix:passwords": "ts-node scripts/fix-encrypted-passwords.ts",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "push": "prisma db push",

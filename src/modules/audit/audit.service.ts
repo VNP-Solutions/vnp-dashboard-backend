@@ -13,6 +13,7 @@ import {
   PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { roundAmount, roundToDecimals } from '../../common/utils/amount.util'
 import {
   COMPLETED_AUDIT_STATUSES,
   canArchiveAudit,
@@ -25,7 +26,6 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
-import { roundAmount, roundToDecimals } from '../../common/utils/amount.util'
 import type { IAuditBatchRepository } from '../audit-batch/audit-batch.interface'
 import type { IAuditStatusRepository } from '../audit-status/audit-status.interface'
 import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
@@ -123,12 +123,15 @@ export class AuditService implements IAuditService {
     // Round amount fields to 2 decimal places
     const createData = {
       ...data,
-      amount_collectable: data.amount_collectable !== undefined && data.amount_collectable !== null
-        ? (roundToDecimals(data.amount_collectable) ?? undefined)
-        : undefined,
-      amount_confirmed: data.amount_confirmed !== undefined && data.amount_confirmed !== null
-        ? (roundToDecimals(data.amount_confirmed) ?? undefined)
-        : undefined
+      amount_collectable:
+        data.amount_collectable !== undefined &&
+        data.amount_collectable !== null
+          ? (roundToDecimals(data.amount_collectable) ?? undefined)
+          : undefined,
+      amount_confirmed:
+        data.amount_confirmed !== undefined && data.amount_confirmed !== null
+          ? (roundToDecimals(data.amount_confirmed) ?? undefined)
+          : undefined
     }
 
     return this.auditRepository.create(createData)
@@ -680,6 +683,23 @@ export class AuditService implements IAuditService {
       throw new ForbiddenException('External users cannot update audits')
     }
 
+    // Check amount_confirmed update restriction for non-super-admin internal users
+    if (
+      data.amount_confirmed !== undefined &&
+      data.amount_confirmed !== null &&
+      !isUserSuperAdmin(user)
+    ) {
+      // If amount_confirmed is already set, non-super-admin internal users cannot update it
+      if (
+        audit.amount_confirmed !== null &&
+        audit.amount_confirmed !== undefined
+      ) {
+        throw new BadRequestException(
+          'Amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
+        )
+      }
+    }
+
     // Validate batch_id if provided
     if (data.batch_id !== undefined && data.batch_id !== null) {
       const batch = await this.auditBatchRepository.findById(data.batch_id)
@@ -718,12 +738,15 @@ export class AuditService implements IAuditService {
     // Round amount fields to 2 decimal places if provided
     const updateData = {
       ...data,
-      amount_collectable: data.amount_collectable !== undefined && data.amount_collectable !== null
-        ? (roundToDecimals(data.amount_collectable) ?? undefined)
-        : data.amount_collectable,
-      amount_confirmed: data.amount_confirmed !== undefined && data.amount_confirmed !== null
-        ? (roundToDecimals(data.amount_confirmed) ?? undefined)
-        : data.amount_confirmed
+      amount_collectable:
+        data.amount_collectable !== undefined &&
+        data.amount_collectable !== null
+          ? (roundToDecimals(data.amount_collectable) ?? undefined)
+          : data.amount_collectable,
+      amount_confirmed:
+        data.amount_confirmed !== undefined && data.amount_confirmed !== null
+          ? (roundToDecimals(data.amount_confirmed) ?? undefined)
+          : data.amount_confirmed
     }
 
     return this.auditRepository.update(id, updateData)
@@ -774,7 +797,8 @@ export class AuditService implements IAuditService {
       action_type: PendingActionType.AUDIT_UPDATE_AMOUNT_CONFIRMED,
       requested_user_id: user.id,
       audit_update_data: {
-        amount_confirmed: roundToDecimals(data.amount_confirmed) ?? data.amount_confirmed
+        amount_confirmed:
+          roundToDecimals(data.amount_confirmed) ?? data.amount_confirmed
       },
       reason: data.reason
     })
@@ -1060,6 +1084,26 @@ export class AuditService implements IAuditService {
             continue
           }
 
+          // Check if user has permission to update this audit
+          try {
+            await this.permissionService.requirePermission(
+              user,
+              ModuleType.AUDIT,
+              PermissionAction.UPDATE,
+              auditIdValue
+            )
+          } catch (error) {
+            result.errors.push({
+              row: rowNumber,
+              auditId: auditIdValue,
+              error:
+                error.message ||
+                'You do not have permission to update this audit'
+            })
+            result.failureCount++
+            continue
+          }
+
           // Prepare update data (only include fields that have values)
           const updateData: any = {}
 
@@ -1144,6 +1188,23 @@ export class AuditService implements IAuditService {
           if (amountConfirmedValue) {
             const amountConfirmed = parseFloat(amountConfirmedValue)
             if (!isNaN(amountConfirmed)) {
+              // Check amount_confirmed update restriction for non-super-admin internal users
+              if (!isUserSuperAdmin(user)) {
+                // If amount_confirmed is already set, non-super-admin internal users cannot update it
+                if (
+                  existingAudit.amount_confirmed !== null &&
+                  existingAudit.amount_confirmed !== undefined
+                ) {
+                  result.errors.push({
+                    row: rowNumber,
+                    auditId: auditIdValue,
+                    error:
+                      'Amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
+                  })
+                  result.failureCount++
+                  continue
+                }
+              }
               updateData.amount_confirmed = roundToDecimals(amountConfirmed)
             }
           }
@@ -1300,7 +1361,9 @@ export class AuditService implements IAuditService {
   async bulkArchive(data: BulkArchiveAuditDto, user: IUserWithPermissions) {
     // Only internal users can bulk archive audits
     if (!isInternalUser(user)) {
-      throw new BadRequestException('Only internal users can bulk archive audits')
+      throw new BadRequestException(
+        'Only internal users can bulk archive audits'
+      )
     }
 
     const { audit_ids } = data
@@ -1373,7 +1436,9 @@ export class AuditService implements IAuditService {
   ): Promise<BulkImportResultDto> {
     // Only internal users can bulk import audits
     if (!isInternalUser(user)) {
-      throw new BadRequestException('Only internal users can bulk import audits')
+      throw new BadRequestException(
+        'Only internal users can bulk import audits'
+      )
     }
 
     if (!file) {
@@ -1677,7 +1742,7 @@ export class AuditService implements IAuditService {
             ? parseFloat(amountCollectableValue)
             : NaN
           const amountCollectable = !isNaN(parsedCollectable)
-            ? roundToDecimals(parsedCollectable) ?? undefined
+            ? (roundToDecimals(parsedCollectable) ?? undefined)
             : undefined
 
           // Extract amount confirmed
@@ -1691,7 +1756,7 @@ export class AuditService implements IAuditService {
             ? parseFloat(amountConfirmedValue)
             : NaN
           const amountConfirmed = !isNaN(parsedConfirmed)
-            ? roundToDecimals(parsedConfirmed) ?? undefined
+            ? (roundToDecimals(parsedConfirmed) ?? undefined)
             : undefined
 
           // Extract start date (use raw value to preserve Excel date format) - optional
@@ -2020,7 +2085,9 @@ export class AuditService implements IAuditService {
   ) {
     // Only internal users can bulk upload report URLs
     if (!isInternalUser(user)) {
-      throw new BadRequestException('Only internal users can bulk upload report URLs')
+      throw new BadRequestException(
+        'Only internal users can bulk upload report URLs'
+      )
     }
 
     const { audit_ids, report_url } = data
@@ -2199,7 +2266,9 @@ export class AuditService implements IAuditService {
   ): Promise<any> {
     // Only internal users can update report URLs
     if (!isInternalUser(user)) {
-      throw new BadRequestException('Only internal users can update report URLs')
+      throw new BadRequestException(
+        'Only internal users can update report URLs'
+      )
     }
 
     const audit = await this.auditRepository.findById(id)
