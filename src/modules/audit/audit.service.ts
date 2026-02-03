@@ -661,11 +661,28 @@ export class AuditService implements IAuditService {
     return data
   }
 
-  async findOne(id: string, _user: IUserWithPermissions) {
+  async findOne(id: string, user: IUserWithPermissions) {
     const audit = await this.auditRepository.findById(id)
 
     if (!audit) {
       throw new NotFoundException('Audit not found')
+    }
+
+    // Check if user has permission to view this audit
+    // For partial access, check property ownership instead of audit ownership
+    const auditPermission = user.role.audit_permission
+    if (auditPermission?.access_level === 'partial') {
+      const hasPropertyAccess = await this.permissionService.canAccessResource(
+        user,
+        ModuleType.PROPERTY,
+        audit.property_id
+      )
+
+      if (!hasPropertyAccess) {
+        throw new ForbiddenException(
+          'Access denied: You do not have access to the property associated with this audit'
+        )
+      }
     }
 
     return audit
@@ -681,6 +698,23 @@ export class AuditService implements IAuditService {
     // Only super admins and internal users can update audits
     if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
       throw new ForbiddenException('External users cannot update audits')
+    }
+
+    // Check if user has permission to update this audit
+    // For partial access, check property ownership instead of audit ownership
+    const auditPermission = user.role.audit_permission
+    if (auditPermission?.access_level === 'partial') {
+      const hasPropertyAccess = await this.permissionService.canAccessResource(
+        user,
+        ModuleType.PROPERTY,
+        audit.property_id
+      )
+
+      if (!hasPropertyAccess) {
+        throw new ForbiddenException(
+          'Access denied: You do not have access to the property associated with this audit'
+        )
+      }
     }
 
     // Check amount_confirmed update restriction for non-super-admin internal users
@@ -771,6 +805,23 @@ export class AuditService implements IAuditService {
       )
     }
 
+    // Check if user has permission to request update for this audit
+    // For partial access, check property ownership instead of audit ownership
+    const auditPermission = user.role.audit_permission
+    if (auditPermission?.access_level === 'partial') {
+      const hasPropertyAccess = await this.permissionService.canAccessResource(
+        user,
+        ModuleType.PROPERTY,
+        audit.property_id
+      )
+
+      if (!hasPropertyAccess) {
+        throw new ForbiddenException(
+          'Access denied: You do not have access to the property associated with this audit'
+        )
+      }
+    }
+
     // Check if amount_confirmed is already set
     if (
       audit.amount_confirmed !== null &&
@@ -820,6 +871,23 @@ export class AuditService implements IAuditService {
     // Only super admins and internal users can archive audits
     if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
       throw new ForbiddenException('External users cannot archive audits')
+    }
+
+    // Check if user has permission to archive this audit
+    // For partial access, check property ownership instead of audit ownership
+    const auditPermission = user.role.audit_permission
+    if (auditPermission?.access_level === 'partial') {
+      const hasPropertyAccess = await this.permissionService.canAccessResource(
+        user,
+        ModuleType.PROPERTY,
+        audit.property_id
+      )
+
+      if (!hasPropertyAccess) {
+        throw new ForbiddenException(
+          'Access denied: You do not have access to the property associated with this audit'
+        )
+      }
     }
 
     // Check if audit is already archived
@@ -1085,13 +1153,38 @@ export class AuditService implements IAuditService {
           }
 
           // Check if user has permission to update this audit
+          // For partial access, check property ownership instead of audit ownership
           try {
-            await this.permissionService.requirePermission(
-              user,
-              ModuleType.AUDIT,
-              PermissionAction.UPDATE,
-              auditIdValue
-            )
+            const auditPermission = user.role.audit_permission
+
+            // If user has partial audit access, check if they have access to the property
+            if (auditPermission?.access_level === 'partial') {
+              const propertyId = existingAudit.property_id
+              const hasPropertyAccess =
+                await this.permissionService.canAccessResource(
+                  user,
+                  ModuleType.PROPERTY,
+                  propertyId
+                )
+
+              if (!hasPropertyAccess) {
+                result.errors.push({
+                  row: rowNumber,
+                  auditId: auditIdValue,
+                  error:
+                    'Access denied: You do not have access to the property associated with this audit'
+                })
+                result.failureCount++
+                continue
+              }
+            } else {
+              // For non-partial access, use standard permission check
+              await this.permissionService.requirePermission(
+                user,
+                ModuleType.AUDIT,
+                PermissionAction.UPDATE
+              )
+            }
           } catch (error) {
             result.errors.push({
               row: rowNumber,
@@ -1342,11 +1435,28 @@ export class AuditService implements IAuditService {
     }
   }
 
-  async unarchive(id: string, _user: IUserWithPermissions) {
+  async unarchive(id: string, user: IUserWithPermissions) {
     const audit = await this.auditRepository.findById(id)
 
     if (!audit) {
       throw new NotFoundException('Audit not found')
+    }
+
+    // Check if user has permission to unarchive this audit
+    // For partial access, check property ownership instead of audit ownership
+    const auditPermission = user.role.audit_permission
+    if (auditPermission?.access_level === 'partial') {
+      const hasPropertyAccess = await this.permissionService.canAccessResource(
+        user,
+        ModuleType.PROPERTY,
+        audit.property_id
+      )
+
+      if (!hasPropertyAccess) {
+        throw new ForbiddenException(
+          'Access denied: You do not have access to the property associated with this audit'
+        )
+      }
     }
 
     // Check if audit is not archived
@@ -1389,6 +1499,27 @@ export class AuditService implements IAuditService {
           reason: 'Audit not found'
         })
         continue
+      }
+
+      // Check if user has permission to archive this audit
+      // For partial access, check property ownership
+      const auditPermission = user.role.audit_permission
+      if (auditPermission?.access_level === 'partial') {
+        const hasPropertyAccess =
+          await this.permissionService.canAccessResource(
+            user,
+            ModuleType.PROPERTY,
+            audit.property_id
+          )
+
+        if (!hasPropertyAccess) {
+          failedAudits.push({
+            id: auditId,
+            reason:
+              'Access denied: You do not have access to the property associated with this audit'
+          })
+          continue
+        }
       }
 
       // Already archived
@@ -2100,7 +2231,7 @@ export class AuditService implements IAuditService {
       throw new BadRequestException('Report URL is required')
     }
 
-    // Validate all audit IDs exist
+    // Validate all audit IDs exist and user has access to them
     const audits = await this.auditRepository.findByIds(audit_ids)
     const foundIds = audits.map(a => a.id)
     const notFoundIds = audit_ids.filter((id: string) => !foundIds.includes(id))
@@ -2109,6 +2240,32 @@ export class AuditService implements IAuditService {
       throw new NotFoundException(
         `Audits not found with IDs: ${notFoundIds.join(', ')}`
       )
+    }
+
+    // Check if user has permission to update all audits
+    // For partial access, check property ownership
+    const auditPermission = user.role.audit_permission
+    if (auditPermission?.access_level === 'partial') {
+      const inaccessibleAuditIds: string[] = []
+
+      for (const audit of audits) {
+        const hasPropertyAccess =
+          await this.permissionService.canAccessResource(
+            user,
+            ModuleType.PROPERTY,
+            audit.property_id
+          )
+
+        if (!hasPropertyAccess) {
+          inaccessibleAuditIds.push(audit.id)
+        }
+      }
+
+      if (inaccessibleAuditIds.length > 0) {
+        throw new ForbiddenException(
+          `Access denied: You do not have access to the properties associated with these audits: ${inaccessibleAuditIds.join(', ')}`
+        )
+      }
     }
 
     // Update all audits with the report URL
@@ -2195,13 +2352,29 @@ export class AuditService implements IAuditService {
       throw new NotFoundException('Audit not found')
     }
 
-    // Check permission to access this audit (using requirePermission which is async)
-    await this.permissionService.requirePermission(
-      user,
-      ModuleType.AUDIT,
-      PermissionAction.DELETE,
-      audit.property_id
-    )
+    // Check permission to access this audit
+    // For partial access, check property ownership instead of audit ownership
+    const auditPermission = user.role.audit_permission
+    if (auditPermission?.access_level === 'partial') {
+      const hasPropertyAccess = await this.permissionService.canAccessResource(
+        user,
+        ModuleType.PROPERTY,
+        audit.property_id
+      )
+
+      if (!hasPropertyAccess) {
+        throw new ForbiddenException(
+          'Access denied: You do not have access to the property associated with this audit'
+        )
+      }
+    } else {
+      // For non-partial access, use standard permission check
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.AUDIT,
+        PermissionAction.DELETE
+      )
+    }
 
     // Delete the audit
     await this.auditRepository.delete(id)
@@ -2240,6 +2413,27 @@ export class AuditService implements IAuditService {
         continue
       }
 
+      // Check if user has permission to delete this audit
+      // For partial access, check property ownership
+      const auditPermission = user.role.audit_permission
+      if (auditPermission?.access_level === 'partial') {
+        const hasPropertyAccess =
+          await this.permissionService.canAccessResource(
+            user,
+            ModuleType.PROPERTY,
+            audit.property_id
+          )
+
+        if (!hasPropertyAccess) {
+          failedAudits.push({
+            id: auditId,
+            reason:
+              'Access denied: You do not have access to the property associated with this audit'
+          })
+          continue
+        }
+      }
+
       // Passed all validations
       successfulIds.push(auditId)
     }
@@ -2275,6 +2469,23 @@ export class AuditService implements IAuditService {
 
     if (!audit) {
       throw new NotFoundException('Audit not found')
+    }
+
+    // Check if user has permission to update this audit's report URL
+    // For partial access, check property ownership instead of audit ownership
+    const auditPermission = user.role.audit_permission
+    if (auditPermission?.access_level === 'partial') {
+      const hasPropertyAccess = await this.permissionService.canAccessResource(
+        user,
+        ModuleType.PROPERTY,
+        audit.property_id
+      )
+
+      if (!hasPropertyAccess) {
+        throw new ForbiddenException(
+          'Access denied: You do not have access to the property associated with this audit'
+        )
+      }
     }
 
     // Update the report URL
