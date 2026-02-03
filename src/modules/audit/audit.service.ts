@@ -9,6 +9,7 @@ import { OtaType, PendingActionType } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
+  AccessLevel,
   ModuleType,
   PermissionAction
 } from '../../common/interfaces/permission.interface'
@@ -671,7 +672,7 @@ export class AuditService implements IAuditService {
     // Check if user has permission to view this audit
     // For partial access, check property ownership instead of audit ownership
     const auditPermission = user.role.audit_permission
-    if (auditPermission?.access_level === 'partial') {
+    if (auditPermission?.access_level === AccessLevel.partial) {
       const hasPropertyAccess = await this.permissionService.canAccessResource(
         user,
         ModuleType.PROPERTY,
@@ -703,7 +704,7 @@ export class AuditService implements IAuditService {
     // Check if user has permission to update this audit
     // For partial access, check property ownership instead of audit ownership
     const auditPermission = user.role.audit_permission
-    if (auditPermission?.access_level === 'partial') {
+    if (auditPermission?.access_level === AccessLevel.partial) {
       const hasPropertyAccess = await this.permissionService.canAccessResource(
         user,
         ModuleType.PROPERTY,
@@ -808,7 +809,7 @@ export class AuditService implements IAuditService {
     // Check if user has permission to request update for this audit
     // For partial access, check property ownership instead of audit ownership
     const auditPermission = user.role.audit_permission
-    if (auditPermission?.access_level === 'partial') {
+    if (auditPermission?.access_level === AccessLevel.partial) {
       const hasPropertyAccess = await this.permissionService.canAccessResource(
         user,
         ModuleType.PROPERTY,
@@ -876,7 +877,7 @@ export class AuditService implements IAuditService {
     // Check if user has permission to archive this audit
     // For partial access, check property ownership instead of audit ownership
     const auditPermission = user.role.audit_permission
-    if (auditPermission?.access_level === 'partial') {
+    if (auditPermission?.access_level === AccessLevel.partial) {
       const hasPropertyAccess = await this.permissionService.canAccessResource(
         user,
         ModuleType.PROPERTY,
@@ -1158,7 +1159,7 @@ export class AuditService implements IAuditService {
             const auditPermission = user.role.audit_permission
 
             // If user has partial audit access, check if they have access to the property
-            if (auditPermission?.access_level === 'partial') {
+            if (auditPermission?.access_level === AccessLevel.partial) {
               const propertyId = existingAudit.property_id
               const hasPropertyAccess =
                 await this.permissionService.canAccessResource(
@@ -1445,7 +1446,7 @@ export class AuditService implements IAuditService {
     // Check if user has permission to unarchive this audit
     // For partial access, check property ownership instead of audit ownership
     const auditPermission = user.role.audit_permission
-    if (auditPermission?.access_level === 'partial') {
+    if (auditPermission?.access_level === AccessLevel.partial) {
       const hasPropertyAccess = await this.permissionService.canAccessResource(
         user,
         ModuleType.PROPERTY,
@@ -1504,7 +1505,7 @@ export class AuditService implements IAuditService {
       // Check if user has permission to archive this audit
       // For partial access, check property ownership
       const auditPermission = user.role.audit_permission
-      if (auditPermission?.access_level === 'partial') {
+      if (auditPermission?.access_level === AccessLevel.partial) {
         const hasPropertyAccess =
           await this.permissionService.canAccessResource(
             user,
@@ -2245,7 +2246,7 @@ export class AuditService implements IAuditService {
     // Check if user has permission to update all audits
     // For partial access, check property ownership
     const auditPermission = user.role.audit_permission
-    if (auditPermission?.access_level === 'partial') {
+    if (auditPermission?.access_level === AccessLevel.partial) {
       const inaccessibleAuditIds: string[] = []
 
       for (const audit of audits) {
@@ -2355,7 +2356,7 @@ export class AuditService implements IAuditService {
     // Check permission to access this audit
     // For partial access, check property ownership instead of audit ownership
     const auditPermission = user.role.audit_permission
-    if (auditPermission?.access_level === 'partial') {
+    if (auditPermission?.access_level === AccessLevel.partial) {
       const hasPropertyAccess = await this.permissionService.canAccessResource(
         user,
         ModuleType.PROPERTY,
@@ -2416,7 +2417,7 @@ export class AuditService implements IAuditService {
       // Check if user has permission to delete this audit
       // For partial access, check property ownership
       const auditPermission = user.role.audit_permission
-      if (auditPermission?.access_level === 'partial') {
+      if (auditPermission?.access_level === AccessLevel.partial) {
         const hasPropertyAccess =
           await this.permissionService.canAccessResource(
             user,
@@ -2474,7 +2475,7 @@ export class AuditService implements IAuditService {
     // Check if user has permission to update this audit's report URL
     // For partial access, check property ownership instead of audit ownership
     const auditPermission = user.role.audit_permission
-    if (auditPermission?.access_level === 'partial') {
+    if (auditPermission?.access_level === AccessLevel.partial) {
       const hasPropertyAccess = await this.permissionService.canAccessResource(
         user,
         ModuleType.PROPERTY,
@@ -2559,7 +2560,7 @@ export class AuditService implements IAuditService {
         }
 
         // Check if user has 'partial' access level and this portfolio is in their accessible list
-        if (portfolioPermission.access_level === 'partial') {
+        if (portfolioPermission.access_level === AccessLevel.partial) {
           // userAccessedProperties is an array, get the first element's portfolio_id array
           const accessedPortfolios =
             user.userAccessedProperties?.[0]?.portfolio_id || []
