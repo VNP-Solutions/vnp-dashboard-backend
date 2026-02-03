@@ -1743,6 +1743,7 @@ export class PropertyService implements IPropertyService {
 
           // Create or update property
           let propertyId: string
+          let isNewProperty = false
 
           if (existingProperty) {
             // Update existing property - use Prisma directly since bulk import
@@ -1776,16 +1777,7 @@ export class PropertyService implements IPropertyService {
             const createdProperty =
               await this.propertyRepository.create(propertyData)
             propertyId = createdProperty.id
-
-            // If user has partial access, grant them access to the created property
-            const permission = user.role.property_permission
-            if (permission?.access_level === AccessLevel.partial) {
-              await this.permissionService.grantResourceAccess(
-                user.id,
-                ModuleType.PROPERTY,
-                createdProperty.id
-              )
-            }
+            isNewProperty = true
           }
 
           // Extract remaining credentials fields
@@ -1916,6 +1908,18 @@ export class PropertyService implements IPropertyService {
           // Check if user has permission to create bank details
           // If not, silently skip bank details creation and mark as success
           if (!canCreateBankDetails(user)) {
+            // If this was a new property and user has partial access, grant them access
+            if (isNewProperty) {
+              const permission = user.role.property_permission
+              if (permission?.access_level === AccessLevel.partial) {
+                await this.permissionService.grantResourceAccess(
+                  user.id,
+                  ModuleType.PROPERTY,
+                  propertyId
+                )
+              }
+            }
+
             result.successCount++
             result.successfulImports.push(propertyName)
             logSuccess(
@@ -1948,6 +1952,18 @@ export class PropertyService implements IPropertyService {
 
           // If bank type is "None", skip bank details processing
           if (bankTypeNormalized === 'none') {
+            // If this was a new property and user has partial access, grant them access
+            if (isNewProperty) {
+              const permission = user.role.property_permission
+              if (permission?.access_level === AccessLevel.partial) {
+                await this.permissionService.grantResourceAccess(
+                  user.id,
+                  ModuleType.PROPERTY,
+                  propertyId
+                )
+              }
+            }
+
             // Successfully created property without bank details
             result.successCount++
             result.successfulImports.push(propertyName)
@@ -2222,6 +2238,18 @@ export class PropertyService implements IPropertyService {
             // Create new bank details
             bankDetailsData.property_id = propertyId
             await this.bankDetailsRepository.create(bankDetailsData)
+          }
+
+          // If this was a new property and user has partial access, grant them access
+          if (isNewProperty) {
+            const permission = user.role.property_permission
+            if (permission?.access_level === AccessLevel.partial) {
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PROPERTY,
+                propertyId
+              )
+            }
           }
 
           result.successCount++
