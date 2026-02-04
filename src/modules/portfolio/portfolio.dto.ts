@@ -1,5 +1,6 @@
 import { OmitType, PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { Type } from 'class-transformer'
 import {
   IsArray,
   IsBoolean,
@@ -10,7 +11,6 @@ import {
   ValidateIf,
   ValidateNested
 } from 'class-validator'
-import { Type } from 'class-transformer'
 import { QueryDto } from '../../common/dto/query.dto'
 import { AttachmentUrlDto } from '../email/email.dto'
 
@@ -33,7 +33,8 @@ export class CreatePortfolioDto {
 
   @ApiPropertyOptional({
     example: 'USD',
-    description: 'Currency code for the portfolio (defaults to USD if not provided)'
+    description:
+      'Currency code for the portfolio (defaults to USD if not provided)'
   })
   @IsString()
   @IsOptional()
@@ -41,7 +42,8 @@ export class CreatePortfolioDto {
 
   @ApiPropertyOptional({
     example: 'https://example.com/contract.pdf',
-    description: 'Contract document URL (will be saved as user-specific contract URL)'
+    description:
+      'Contract document URL (will be saved as user-specific contract URL)'
   })
   @IsString()
   @IsOptional()
@@ -73,10 +75,12 @@ export class CreatePortfolioDto {
     example: 'John Doe',
     description: 'Sales agent name (required if is_commissionable is true)'
   })
-  @ValidateIf((o) => o.is_commissionable === true)
-  @IsNotEmpty({ message: 'Sales agent is required when portfolio is commissionable' })
+  @ValidateIf(o => o.is_commissionable === true)
+  @IsNotEmpty({
+    message: 'Sales agent is required when portfolio is commissionable'
+  })
   @IsString()
-  @ValidateIf((o) => o.is_commissionable === false || o.sales_agent !== undefined)
+  @ValidateIf(o => o.is_commissionable === false || o.sales_agent !== undefined)
   @IsOptional()
   sales_agent?: string
 
@@ -204,7 +208,11 @@ export class BulkUpdateResultDto {
 
   @ApiProperty({
     example: [
-      { row: 3, portfolioId: '507f1f77bcf86cd799439011', error: 'Portfolio not found' }
+      {
+        row: 3,
+        portfolioId: '507f1f77bcf86cd799439011',
+        error: 'Portfolio not found'
+      }
     ],
     description: 'List of errors encountered during update'
   })
@@ -295,7 +303,29 @@ export class PortfolioStatsResponseDto {
 export class DeletePortfolioDto {
   @ApiProperty({
     example: 'MySecureP@ssw0rd',
-    description: 'User password for verification (required for super admin to delete portfolio)'
+    description:
+      'User password for verification (required for super admin to delete portfolio)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
+export class BulkDeletePortfolioDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of Portfolio IDs to delete',
+    type: [String]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  portfolio_ids: string[]
+
+  @ApiProperty({
+    example: 'MySecureP@ssw0rd',
+    description:
+      'User password for verification (required for super admin to bulk delete portfolios)'
   })
   @IsString()
   @IsNotEmpty()
@@ -305,7 +335,8 @@ export class DeletePortfolioDto {
 export class DeactivatePortfolioDto {
   @ApiProperty({
     example: 'MySecureP@ssw0rd',
-    description: 'User password for verification (required for super admin and internal users to deactivate portfolio)'
+    description:
+      'User password for verification (required for super admin and internal users to deactivate portfolio)'
   })
   @IsString()
   @IsNotEmpty()
@@ -313,7 +344,8 @@ export class DeactivatePortfolioDto {
 
   @ApiPropertyOptional({
     example: 'Portfolio being consolidated with another portfolio',
-    description: 'Reason for deactivating the portfolio (required for internal users, optional for super admin)'
+    description:
+      'Reason for deactivating the portfolio (required for internal users, optional for super admin)'
   })
   @IsString()
   @IsOptional()
@@ -323,7 +355,8 @@ export class DeactivatePortfolioDto {
 export class ActivatePortfolioDto {
   @ApiProperty({
     example: 'MySecureP@ssw0rd',
-    description: 'User password for verification (required for super admin and internal users to activate portfolio)'
+    description:
+      'User password for verification (required for super admin and internal users to activate portfolio)'
   })
   @IsString()
   @IsNotEmpty()
@@ -331,7 +364,8 @@ export class ActivatePortfolioDto {
 
   @ApiPropertyOptional({
     example: 'Portfolio is ready for operations again',
-    description: 'Reason for activating the portfolio (required for internal users, optional for super admin)'
+    description:
+      'Reason for activating the portfolio (required for internal users, optional for super admin)'
   })
   @IsString()
   @IsOptional()

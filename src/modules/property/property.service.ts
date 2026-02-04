@@ -1332,6 +1332,112 @@ export class PropertyService implements IPropertyService {
     }
   }
 
+  async bulkDelete(
+    property_ids: string[],
+    password: string,
+    user: IUserWithPermissions
+  ) {
+    const isSuperAdmin = isUserSuperAdmin(user)
+
+    // Only super admin can bulk delete properties
+    if (!isSuperAdmin) {
+      throw new BadRequestException(
+        'Only Super Admin can bulk delete properties'
+      )
+    }
+
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    // Validate at least one property ID is provided
+    if (!property_ids || property_ids.length === 0) {
+      throw new BadRequestException('At least one property ID is required')
+    }
+
+    const results: Array<{
+      property_id: string
+      success: boolean
+      message?: string
+    }> = []
+    let successCount = 0
+    let failedCount = 0
+
+    // Process each property
+    for (const propertyId of property_ids) {
+      try {
+        // Find the property
+        const property = await this.propertyRepository.findById(propertyId)
+
+        if (!property) {
+          results.push({
+            property_id: propertyId,
+            success: false,
+            message: 'Property not found'
+          })
+          failedCount++
+          continue
+        }
+
+        // Check if there are any unarchived audits
+        const unarchivedAuditCount = await this.prisma.audit.count({
+          where: {
+            property_id: propertyId,
+            is_archived: false
+          }
+        })
+
+        if (unarchivedAuditCount > 0) {
+          results.push({
+            property_id: propertyId,
+            success: false,
+            message: `Cannot delete property. It has ${unarchivedAuditCount} unarchived audit${unarchivedAuditCount === 1 ? '' : 's'}. Please archive all audits before deleting the property.`
+          })
+          failedCount++
+          continue
+        }
+
+        // Delete the property
+        await this.propertyRepository.delete(propertyId)
+
+        results.push({
+          property_id: propertyId,
+          success: true
+        })
+        successCount++
+      } catch (error) {
+        results.push({
+          property_id: propertyId,
+          success: false,
+          message: error.message || 'Unknown error occurred'
+        })
+        failedCount++
+      }
+    }
+
+    return {
+      success: successCount,
+      failed: failedCount,
+      results
+    }
+  }
+
   async deactivate(id: string, user: IUserWithPermissions, reason?: string) {
     const property = await this.propertyRepository.findById(id)
 

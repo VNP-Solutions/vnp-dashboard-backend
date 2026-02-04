@@ -35,6 +35,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   ActivatePropertyDto,
+  BulkDeletePropertyDto,
   BulkTransferPropertyDto,
   CompleteCreatePropertyDto,
   CompleteUpdatePropertyDto,
@@ -81,14 +82,16 @@ export class PropertyController {
   @Post('complete-create')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Create a property with credentials and bank details in a single transaction (Internal users only)',
+    summary:
+      'Create a property with credentials and bank details in a single transaction (Internal users only)',
     description:
       'Creates a property along with optional credentials and bank details. All operations are performed in a transaction and will be rolled back if any operation fails. ' +
       'Property data is required, while credentials and bank details are optional.'
   })
   @ApiResponse({
     status: 201,
-    description: 'Property with credentials and bank details created successfully'
+    description:
+      'Property with credentials and bank details created successfully'
   })
   @ApiResponse({
     status: 400,
@@ -112,14 +115,16 @@ export class PropertyController {
   @Patch(':id/complete-update')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Update a property with credentials and bank details in a single transaction',
+    summary:
+      'Update a property with credentials and bank details in a single transaction',
     description:
       'Updates a property along with optional credentials and bank details. All operations are performed in a transaction and will be rolled back if any operation fails. ' +
       'All fields are optional - only provided fields will be updated.'
   })
   @ApiResponse({
     status: 200,
-    description: 'Property with credentials and bank details updated successfully'
+    description:
+      'Property with credentials and bank details updated successfully'
   })
   @ApiResponse({
     status: 400,
@@ -241,12 +246,15 @@ export class PropertyController {
   @Patch(':id/transfer')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Transfer a property to another portfolio or submit transfer request',
-    description: 'Super Admin can directly transfer with password (no reason required). All other users with UPDATE permission can submit transfer request with password and reason.'
+    summary:
+      'Transfer a property to another portfolio or submit transfer request',
+    description:
+      'Super Admin can directly transfer with password (no reason required). All other users with UPDATE permission can submit transfer request with password and reason.'
   })
   @ApiResponse({
     status: 200,
-    description: 'Property transferred successfully or transfer request submitted for approval'
+    description:
+      'Property transferred successfully or transfer request submitted for approval'
   })
   @ApiResponse({ status: 404, description: 'Property or Portfolio not found' })
   @ApiResponse({
@@ -285,7 +293,8 @@ export class PropertyController {
   @Patch(':id/share')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Share a property with other portfolios (Internal users only, view-only access)'
+    summary:
+      'Share a property with other portfolios (Internal users only, view-only access)'
   })
   @ApiResponse({
     status: 200,
@@ -314,7 +323,8 @@ export class PropertyController {
   @Patch(':id/unshare')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Remove property sharing from specified portfolios (Internal users only)'
+    summary:
+      'Remove property sharing from specified portfolios (Internal users only)'
   })
   @ApiResponse({
     status: 200,
@@ -339,8 +349,10 @@ export class PropertyController {
   @Post('bulk-transfer')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Bulk transfer multiple properties to another portfolio (Internal users only, requires password verification)',
-    description: 'Allows bulk transfer of multiple properties to a target portfolio. Only internal users can perform this operation. Password verification is required.'
+    summary:
+      'Bulk transfer multiple properties to another portfolio (Internal users only, requires password verification)',
+    description:
+      'Allows bulk transfer of multiple properties to a target portfolio. Only internal users can perform this operation. Password verification is required.'
   })
   @ApiResponse({
     status: 200,
@@ -377,11 +389,77 @@ export class PropertyController {
     return this.propertyService.bulkTransfer(bulkTransferPropertyDto, user)
   }
 
+  @Post('bulk-delete')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE)
+  @ApiOperation({
+    summary:
+      'Bulk delete multiple properties (Super Admin only with password verification)',
+    description:
+      'Allows bulk deletion of multiple properties. Only super admin can perform this operation. ' +
+      'Will skip properties that have unarchived audits and add them to the error list. ' +
+      'Password verification is required.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk delete completed with results',
+    schema: {
+      example: {
+        success: 3,
+        failed: 2,
+        results: [
+          { property_id: '507f1f77bcf86cd799439011', success: true },
+          {
+            property_id: '507f1f77bcf86cd799439012',
+            success: false,
+            message:
+              'Cannot delete property. It has 3 unarchived audits. Please archive all audits before deleting the property.'
+          }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid password or validation errors'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only Super Admin can bulk delete properties'
+  })
+  async bulkDelete(
+    @Body() bulkDeleteDto: BulkDeletePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // Password validation
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      bulkDeleteDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    return this.propertyService.bulkDelete(
+      bulkDeleteDto.property_ids,
+      bulkDeleteDto.password,
+      user
+    )
+  }
+
   @Delete(':id')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE, true)
   @ApiOperation({
-    summary: 'Delete a property (Super admin only, requires password verification)',
-    description: 'Only super admins can delete properties. The property must not have any unarchived audits. Password verification is required.'
+    summary:
+      'Delete a property (Super admin only, requires password verification)',
+    description:
+      'Only super admins can delete properties. The property must not have any unarchived audits. Password verification is required.'
   })
   @ApiResponse({ status: 200, description: 'Property deleted successfully' })
   @ApiResponse({ status: 404, description: 'Property not found' })
@@ -420,8 +498,10 @@ export class PropertyController {
   @Post(':id/delete')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE, true)
   @ApiOperation({
-    summary: 'Delete a property via POST (Super admin only, requires password verification)',
-    description: 'Alternative endpoint for deletion using POST method. Only super admins can delete properties. The property must not have any unarchived audits. Password verification is required.'
+    summary:
+      'Delete a property via POST (Super admin only, requires password verification)',
+    description:
+      'Alternative endpoint for deletion using POST method. Only super admins can delete properties. The property must not have any unarchived audits. Password verification is required.'
   })
   @ApiResponse({ status: 200, description: 'Property deleted successfully' })
   @ApiResponse({ status: 404, description: 'Property not found' })
@@ -461,13 +541,19 @@ export class PropertyController {
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
     summary: 'Deactivate a property or submit deactivation request',
-    description: 'Super Admin can directly deactivate with password (no reason required). All other users with UPDATE permission submit a deactivation request with password and reason.'
+    description:
+      'Super Admin can directly deactivate with password (no reason required). All other users with UPDATE permission submit a deactivation request with password and reason.'
   })
-  @ApiResponse({ status: 200, description: 'Property deactivated successfully or deactivation request submitted for approval' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Property deactivated successfully or deactivation request submitted for approval'
+  })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
-    description: 'Invalid password or property already deactivated or reason required for non-super admin users'
+    description:
+      'Invalid password or property already deactivated or reason required for non-super admin users'
   })
   async deactivate(
     @Param('id') id: string,
@@ -490,20 +576,30 @@ export class PropertyController {
       throw new BadRequestException('Invalid password')
     }
 
-    return this.propertyService.deactivate(id, user, deactivatePropertyDto.reason)
+    return this.propertyService.deactivate(
+      id,
+      user,
+      deactivatePropertyDto.reason
+    )
   }
 
   @Post(':id/activate')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
     summary: 'Activate a property or submit activation request',
-    description: 'Super Admin can directly activate with password (no reason required). All other users with UPDATE permission submit an activation request with password and reason.'
+    description:
+      'Super Admin can directly activate with password (no reason required). All other users with UPDATE permission submit an activation request with password and reason.'
   })
-  @ApiResponse({ status: 200, description: 'Property activated successfully or activation request submitted for approval' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Property activated successfully or activation request submitted for approval'
+  })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
-    description: 'Invalid password or property already active or reason required for non-super admin users'
+    description:
+      'Invalid password or property already active or reason required for non-super admin users'
   })
   async activate(
     @Param('id') id: string,
@@ -533,7 +629,9 @@ export class PropertyController {
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Bulk import properties from Excel file (Internal users only)' })
+  @ApiOperation({
+    summary: 'Bulk import properties from Excel file (Internal users only)'
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -648,7 +746,8 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid file or file format or only internal users can bulk update'
+    description:
+      'Bad Request - Invalid file or file format or only internal users can bulk update'
   })
   @ApiResponse({
     status: 403,

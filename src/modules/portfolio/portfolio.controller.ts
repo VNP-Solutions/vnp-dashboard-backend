@@ -33,6 +33,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { EmailAttachment } from '../email/email.dto'
 import {
   ActivatePortfolioDto,
+  BulkDeletePortfolioDto,
   CreatePortfolioDto,
   DeactivatePortfolioDto,
   DeletePortfolioDto,
@@ -160,11 +161,58 @@ export class PortfolioController {
     return this.portfolioService.remove(id, deletePortfolioDto.password, user)
   }
 
+  @Post('bulk-delete')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE)
+  @ApiOperation({
+    summary:
+      'Bulk delete multiple portfolios (Super Admin only with password verification)',
+    description:
+      'Allows bulk deletion of multiple portfolios. Only super admin can perform this operation. ' +
+      'Will skip portfolios that have associated properties and add them to the error list. ' +
+      'Password verification is required.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk delete completed with results',
+    schema: {
+      example: {
+        success: 3,
+        failed: 2,
+        results: [
+          { portfolio_id: '507f1f77bcf86cd799439011', success: true },
+          {
+            portfolio_id: '507f1f77bcf86cd799439012',
+            success: false,
+            message:
+              'Cannot delete portfolio with 5 associated properties. Please delete or reassign the properties first.'
+          }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid password or validation errors'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only Super Admin can bulk delete portfolios'
+  })
+  async bulkDelete(
+    @Body() bulkDeleteDto: BulkDeletePortfolioDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.bulkDelete(
+      bulkDeleteDto.portfolio_ids,
+      bulkDeleteDto.password,
+      user
+    )
+  }
+
   @Post(':id/deactivate')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary:
-      'Deactivate a portfolio or submit deactivation request',
+    summary: 'Deactivate a portfolio or submit deactivation request',
     description:
       'Super Admin can deactivate directly with password (no reason required). Internal users submit a pending action for approval with password and reason.'
   })
@@ -199,8 +247,7 @@ export class PortfolioController {
   @Post(':id/activate')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary:
-      'Activate a portfolio or submit activation request',
+    summary: 'Activate a portfolio or submit activation request',
     description:
       'Super Admin can activate directly with password (no reason required). Internal users submit a pending action for approval with password and reason.'
   })
@@ -331,7 +378,9 @@ export class PortfolioController {
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Bulk import portfolios from Excel file (Internal users only)' })
+  @ApiOperation({
+    summary: 'Bulk import portfolios from Excel file (Internal users only)'
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -426,7 +475,8 @@ export class PortfolioController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid file or file format or only Super Admin and internal users can bulk update'
+    description:
+      'Bad Request - Invalid file or file format or only Super Admin and internal users can bulk update'
   })
   @ApiResponse({
     status: 403,
