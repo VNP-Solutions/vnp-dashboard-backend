@@ -36,6 +36,7 @@ type PortfolioWithRelations = Prisma.PortfolioGetPayload<{
 }> & {
   total_properties: number
   total_contract_urls: number
+  total_notes: number
 }
 
 type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
@@ -51,6 +52,7 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
 }> & {
   total_properties: number
   total_contract_urls: number
+  total_notes: number
 }
 
 export interface IPortfolioRepository {
@@ -104,9 +106,23 @@ export interface IPortfolioService {
     data: UpdatePortfolioDto,
     user: IUserWithPermissions
   ): Promise<PortfolioWithServiceType>
-  remove(id: string, password: string, user: IUserWithPermissions): Promise<{ message: string }>
-  deactivate(id: string, password: string, user: IUserWithPermissions, reason?: string): Promise<{ message: string }>
-  activate(id: string, password: string, user: IUserWithPermissions, reason?: string): Promise<{ message: string }>
+  remove(
+    id: string,
+    password: string,
+    user: IUserWithPermissions
+  ): Promise<{ message: string }>
+  deactivate(
+    id: string,
+    password: string,
+    user: IUserWithPermissions,
+    reason?: string
+  ): Promise<{ message: string }>
+  activate(
+    id: string,
+    password: string,
+    user: IUserWithPermissions,
+    reason?: string
+  ): Promise<{ message: string }>
   sendEmail(
     id: string,
     subject: string,
