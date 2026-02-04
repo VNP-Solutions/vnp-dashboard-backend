@@ -8,7 +8,6 @@ import {
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
-import { EmailUtil } from '../../common/utils/email.util'
 import {
   isInternalUser,
   isUserSuperAdmin
@@ -37,9 +36,7 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
     @Inject(PermissionService)
     private permissionService: PermissionService,
     @Inject(PrismaService)
-    private prisma: PrismaService,
-    @Inject(EmailUtil)
-    private emailUtil: EmailUtil
+    private prisma: PrismaService
   ) {}
 
   async create(data: CreateConsolidatedReportDto, user: IUserWithPermissions) {
@@ -107,8 +104,6 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
       successfulReportIds: []
     }
 
-    const successfulUrls: string[] = []
-
     // Process each report
     for (let i = 0; i < data.reports.length; i++) {
       const reportItem = data.reports[i]
@@ -123,7 +118,6 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
 
         result.successCount++
         result.successfulReportIds.push(consolidatedReport.id)
-        successfulUrls.push(reportItem.url)
       } catch (error) {
         result.failureCount++
         result.errors.push({
@@ -134,112 +128,12 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
       }
     }
 
-    // Send email notification if at least one report was successfully created
-    if (result.successCount > 0) {
-      await this.sendBulkCreateNotification(
-        data.portfolio_id,
-        successfulUrls,
-        user.id
-      )
-    }
+    // Email notification removed - no longer sending emails for consolidated report uploads
 
     return result
   }
 
-  /**
-   * Send email notification when consolidated reports are bulk uploaded
-   * Finds all external portfolio managers for the portfolio and sends them notification
-   * Excludes the user who performed the upload (self-mailing prevention)
-   */
-  private async sendBulkCreateNotification(
-    portfolioId: string,
-    reportUrls: string[],
-    uploaderUserId: string
-  ) {
-    try {
-      // Find portfolio details
-      const portfolio = await this.prisma.portfolio.findUnique({
-        where: { id: portfolioId },
-        select: { name: true }
-      })
-
-      if (!portfolio) {
-        console.log('Portfolio not found for consolidated report notification')
-        return
-      }
-
-      // Find all users with external role who have portfolio access
-      const users = await this.prisma.user.findMany({
-        where: {
-          role: {
-            is_external: true,
-            is_active: true
-          }
-        },
-        include: {
-          role: {
-            select: {
-              portfolio_permission: true,
-              property_permission: true,
-              audit_permission: true,
-              is_external: true
-            }
-          },
-          userAccessedProperties: true
-        }
-      })
-
-      // Filter users who have access to this portfolio
-      const eligibleUsers = users.filter(user => {
-        // Exclude the uploader (self-mailing prevention)
-        if (user.id === uploaderUserId) {
-          return false
-        }
-
-        const portfolioPermission = user.role.portfolio_permission
-
-        if (!portfolioPermission) return false
-
-        // Check if user has 'all' access level
-        if (portfolioPermission.access_level === 'all') {
-          return true
-        }
-
-        // Check if user has 'partial' access level and this portfolio is in their accessible list
-        if (portfolioPermission.access_level === 'partial') {
-          // userAccessedProperties is an array, get the first element's portfolio_id array
-          const accessedPortfolios = user.userAccessedProperties?.[0]?.portfolio_id || []
-          return accessedPortfolios.includes(portfolioId)
-        }
-
-        return false
-      })
-
-      if (eligibleUsers.length === 0) {
-        console.log('No eligible external portfolio managers found for consolidated report notification')
-        return
-      }
-
-      // Extract email addresses
-      const recipientEmails = eligibleUsers.map(user => user.email)
-
-      // Send the email
-      await this.emailUtil.sendConsolidatedReportUploadedEmail(
-        recipientEmails,
-        portfolio.name,
-        reportUrls,
-        new Date()
-      )
-    } catch (error) {
-      // Log the error but don't fail the upload operation
-      console.error('Failed to send consolidated report upload notification:', error)
-    }
-  }
-
-  async findAll(
-    query: ConsolidatedReportQueryDto,
-    user: IUserWithPermissions
-  ) {
+  async findAll(query: ConsolidatedReportQueryDto, user: IUserWithPermissions) {
     const accessiblePortfolioIds =
       await this.permissionService.getAccessibleResourceIds(
         user,
