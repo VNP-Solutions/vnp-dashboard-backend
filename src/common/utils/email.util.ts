@@ -988,19 +988,18 @@ export class EmailUtil {
         const mailOptions = {
           from: this.configService.get('smtp.email', { infer: true }),
           to: userEmail,
-          subject: 'Audit Report URL Updated – VNP Solutions',
+          subject: 'Audit Report Uploaded – VNP Solutions',
           html: `
             <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
               <p><strong>${greeting}</strong></p>
-              <p>We wanted to inform you that the report URL has been updated for your <strong>${auditName}</strong> audit.</p>
+              <p>We wanted to inform you that the audit report has been uploaded for your <strong>${auditName}</strong> audit.</p>
               <p><strong>📊 Audit Details:</strong></p>
               <ul style="list-style: none; padding-left: 0;">
                 <li>📁 <strong>Property:</strong> ${propertyName}</li>
                 <li>🏢 <strong>Portfolio:</strong> ${portfolioName}</li>
-                <li>📅 <strong>Update Date:</strong> ${formattedDate}</li>
-                <li>🔗 <strong>Report URL:</strong> <a href="${reportUrl}" style="color: #007bff;">${reportUrl}</a></li>
+                <li>📅 <strong>Upload Date:</strong> ${formattedDate}</li>
               </ul>
-              <p>You can log in to your dashboard at any time to view the updated report and audit details.</p>
+              <p>Please log in to your dashboard to view the report and audit details.</p>
               <div style="margin: 30px 0;">
                 <a href="${dashboardUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Access Dashboard →</a>
               </div>
@@ -1010,17 +1009,17 @@ export class EmailUtil {
               </div>
             </div>
           `,
-          text: `${greeting}\\n\\nWe wanted to inform you that the report URL has been updated for your ${auditName} audit.\\n\\n📊 Audit Details:\\n📁 Property: ${propertyName}\\n🏢 Portfolio: ${portfolioName}\\n📅 Update Date: ${formattedDate}\\n🔗 Report URL: ${reportUrl}\\n\\nYou can log in to your dashboard at any time to view the updated report and audit details.\\n\\nAccess Dashboard: ${dashboardUrl}\\n\\nThank you for your continued partnership with VNP Solutions.\\n\\nWarm regards,\\nVNP Solutions Team`
+          text: `${greeting}\\n\\nWe wanted to inform you that the audit report has been uploaded for your ${auditName} audit.\\n\\n📊 Audit Details:\\n📁 Property: ${propertyName}\\n🏢 Portfolio: ${portfolioName}\\n📅 Upload Date: ${formattedDate}\\n\\nPlease log in to your dashboard to view the report and audit details.\\n\\nAccess Dashboard: ${dashboardUrl}\\n\\nThank you for your continued partnership with VNP Solutions.\\n\\nWarm regards,\\nVNP Solutions Team`
         }
 
         const info = await this.transporter.sendMail(mailOptions)
-        console.log('✓ Audit report URL update email sent:', {
+        console.log('✓ Audit report upload email sent:', {
           to: userEmail,
           messageId: info.messageId
         })
       } catch (error) {
         console.error(
-          `✗ Failed to send audit report URL update email to ${userEmail}:`,
+          `✗ Failed to send audit report upload email to ${userEmail}:`,
           error
         )
         // Continue sending to other recipients even if one fails
