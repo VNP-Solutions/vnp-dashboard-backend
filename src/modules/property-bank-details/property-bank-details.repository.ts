@@ -21,7 +21,7 @@ export class PropertyBankDetailsRepository
 
     // Add optional fields if provided
     if (data.bank_sub_type) {
-      createData.bank_sub_type = data.bank_sub_type as BankSubType
+      createData.bank_sub_type = data.bank_sub_type
     }
     if (data.hotel_portfolio_name) {
       createData.hotel_portfolio_name = data.hotel_portfolio_name
@@ -51,7 +51,7 @@ export class PropertyBankDetailsRepository
       createData.routing_number = data.routing_number
     }
     if (data.bank_account_type) {
-      createData.bank_account_type = data.bank_account_type as BankAccountType
+      createData.bank_account_type = data.bank_account_type
     }
     if (data.currency) {
       createData.currency = data.currency
@@ -91,7 +91,7 @@ export class PropertyBankDetailsRepository
       updateData.bank_type = data.bank_type as BankType
     }
     if (data.bank_sub_type !== undefined) {
-      updateData.bank_sub_type = data.bank_sub_type as BankSubType
+      updateData.bank_sub_type = data.bank_sub_type
     }
     if (data.hotel_portfolio_name !== undefined) {
       updateData.hotel_portfolio_name = data.hotel_portfolio_name
@@ -121,7 +121,7 @@ export class PropertyBankDetailsRepository
       updateData.routing_number = data.routing_number
     }
     if (data.bank_account_type !== undefined) {
-      updateData.bank_account_type = data.bank_account_type as BankAccountType
+      updateData.bank_account_type = data.bank_account_type
     }
     if (data.currency !== undefined) {
       updateData.currency = data.currency
