@@ -526,6 +526,112 @@ export class PortfolioService implements IPortfolioService {
     return { message: 'Portfolio deleted successfully' }
   }
 
+  async bulkDelete(
+    portfolio_ids: string[],
+    password: string,
+    user: IUserWithPermissions
+  ) {
+    const isSuperAdmin = isUserSuperAdmin(user)
+
+    // Only super admin can bulk delete portfolios
+    if (!isSuperAdmin) {
+      throw new BadRequestException(
+        'Only Super Admin can bulk delete portfolios'
+      )
+    }
+
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    // Validate at least one portfolio ID is provided
+    if (!portfolio_ids || portfolio_ids.length === 0) {
+      throw new BadRequestException('At least one portfolio ID is required')
+    }
+
+    const results: Array<{
+      portfolio_id: string
+      success: boolean
+      message?: string
+    }> = []
+    let successCount = 0
+    let failedCount = 0
+
+    // Process each portfolio
+    for (const portfolioId of portfolio_ids) {
+      try {
+        // Find the portfolio
+        const portfolio = await this.portfolioRepository.findById(
+          portfolioId,
+          user.id,
+          isSuperAdmin
+        )
+
+        if (!portfolio) {
+          results.push({
+            portfolio_id: portfolioId,
+            success: false,
+            message: 'Portfolio not found'
+          })
+          failedCount++
+          continue
+        }
+
+        // Check if portfolio has properties
+        const propertyCount =
+          await this.portfolioRepository.countProperties(portfolioId)
+
+        if (propertyCount > 0) {
+          results.push({
+            portfolio_id: portfolioId,
+            success: false,
+            message: `Cannot delete portfolio with ${propertyCount} associated properties. Please delete or reassign the properties first.`
+          })
+          failedCount++
+          continue
+        }
+
+        // Delete the portfolio
+        await this.portfolioRepository.delete(portfolioId)
+
+        results.push({
+          portfolio_id: portfolioId,
+          success: true
+        })
+        successCount++
+      } catch (error) {
+        results.push({
+          portfolio_id: portfolioId,
+          success: false,
+          message: error.message || 'Unknown error occurred'
+        })
+        failedCount++
+      }
+    }
+
+    return {
+      success: successCount,
+      failed: failedCount,
+      results
+    }
+  }
+
   async deactivate(
     id: string,
     password: string,

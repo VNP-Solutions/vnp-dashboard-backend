@@ -225,6 +225,19 @@ export interface IPropertyService {
     id: string,
     user: IUserWithPermissions
   ): Promise<{ message: string; pending_action?: any }>
+  bulkDelete(
+    property_ids: string[],
+    password: string,
+    user: IUserWithPermissions
+  ): Promise<{
+    success: number
+    failed: number
+    results: Array<{
+      property_id: string
+      success: boolean
+      message?: string
+    }>
+  }>
   deactivate(
     id: string,
     user: IUserWithPermissions,

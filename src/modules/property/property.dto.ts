@@ -1,4 +1,9 @@
-import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger'
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  OmitType,
+  PartialType
+} from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
   IsArray,
@@ -10,7 +15,10 @@ import {
   ValidateNested
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
-import { ExpediaCredentialsDto, OtaCredentialsDto } from '../property-credentials/property-credentials.dto'
+import {
+  ExpediaCredentialsDto,
+  OtaCredentialsDto
+} from '../property-credentials/property-credentials.dto'
 
 export type AccessType = 'owned' | 'shared'
 
@@ -115,7 +123,8 @@ export class TransferPropertyDto {
 
   @ApiPropertyOptional({
     example: 'Transferring to consolidate portfolio management',
-    description: 'Reason for transferring the property (required for non-super admin users, optional for super admin)'
+    description:
+      'Reason for transferring the property (required for non-super admin users, optional for super admin)'
   })
   @IsString()
   @IsOptional()
@@ -255,7 +264,11 @@ export class BulkUpdateResultDto {
 
   @ApiProperty({
     example: [
-      { row: 3, propertyId: '507f1f77bcf86cd799439011', error: 'Property not found' }
+      {
+        row: 3,
+        propertyId: '507f1f77bcf86cd799439011',
+        error: 'Property not found'
+      }
     ],
     description: 'List of errors encountered during update'
   })
@@ -333,6 +346,26 @@ export class DeletePropertyDto {
   password: string
 }
 
+export class BulkDeletePropertyDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of Property IDs to delete',
+    type: [String]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  property_ids: string[]
+
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
 export class DeactivatePropertyDto {
   @ApiProperty({
     example: 'MyPassword123!',
@@ -344,7 +377,8 @@ export class DeactivatePropertyDto {
 
   @ApiPropertyOptional({
     example: 'Property no longer operational due to renovations',
-    description: 'Reason for deactivating the property (required for internal users, optional for super admin)'
+    description:
+      'Reason for deactivating the property (required for internal users, optional for super admin)'
   })
   @IsString()
   @IsOptional()
@@ -362,7 +396,8 @@ export class ActivatePropertyDto {
 
   @ApiPropertyOptional({
     example: 'Property is ready for operations again',
-    description: 'Reason for activating the property (required for internal users, optional for super admin)'
+    description:
+      'Reason for activating the property (required for internal users, optional for super admin)'
   })
   @IsString()
   @IsOptional()
@@ -402,7 +437,8 @@ export class CompleteBankDetailsDto {
   @ApiProperty({
     enum: ['bank', 'stripe', 'none'],
     example: 'bank',
-    description: 'Type of bank account (bank, stripe, or none). Use "none" to remove existing bank details.',
+    description:
+      'Type of bank account (bank, stripe, or none). Use "none" to remove existing bank details.',
     default: 'bank'
   })
   @IsString()
