@@ -6,7 +6,11 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { ModuleType } from '../../common/interfaces/permission.interface'
+import {
+  AccessLevel,
+  ModuleType,
+  PermissionLevel
+} from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
@@ -28,6 +32,36 @@ export class ContractUrlService implements IContractUrlService {
     @Inject(PermissionService)
     private permissionService: PermissionService
   ) {}
+
+  /**
+   * Check if user can view contract URLs
+   * - Super admin can always view
+   * - Users with portfolio permission level 'update' or 'all' and access level 'partial' or 'all' can view
+   */
+  private canViewContractUrls(user: IUserWithPermissions): boolean {
+    // Super admin can always view
+    if (isUserSuperAdmin(user)) {
+      return true
+    }
+
+    const portfolioPermission = user.role.portfolio_permission
+
+    if (!portfolioPermission) {
+      return false
+    }
+
+    // Check permission level: must be 'update' or 'all'
+    const hasUpdatePermission =
+      portfolioPermission.permission_level === PermissionLevel.update ||
+      portfolioPermission.permission_level === PermissionLevel.all
+
+    // Check access level: must be 'partial' or 'all'
+    const hasPartialAccess =
+      portfolioPermission.access_level === AccessLevel.partial ||
+      portfolioPermission.access_level === AccessLevel.all
+
+    return hasUpdatePermission && hasPartialAccess
+  }
 
   async create(data: CreateContractUrlDto, user: IUserWithPermissions) {
     // Only super admin can upload/create contract URLs
@@ -61,9 +95,11 @@ export class ContractUrlService implements IContractUrlService {
   }
 
   async findAll(query: ContractUrlQueryDto, user: IUserWithPermissions) {
-    // Only super admin can access contract URLs
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only Super Admin can access contract URLs')
+    // Check if user can view contract URLs
+    if (!this.canViewContractUrls(user)) {
+      throw new ForbiddenException(
+        'Only Super Admin or users with portfolio update permission and partial access can view contract URLs'
+      )
     }
 
     const accessiblePortfolioIds =
@@ -159,9 +195,11 @@ export class ContractUrlService implements IContractUrlService {
     query: ContractUrlQueryDto,
     user: IUserWithPermissions
   ) {
-    // Only super admin can access contract URLs
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only Super Admin can access contract URLs')
+    // Check if user can view contract URLs
+    if (!this.canViewContractUrls(user)) {
+      throw new ForbiddenException(
+        'Only Super Admin or users with portfolio update permission and partial access can view contract URLs'
+      )
     }
 
     const accessiblePortfolioIds =
@@ -241,9 +279,11 @@ export class ContractUrlService implements IContractUrlService {
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
-    // Only super admin can access contract URLs
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only Super Admin can access contract URLs')
+    // Check if user can view contract URLs
+    if (!this.canViewContractUrls(user)) {
+      throw new ForbiddenException(
+        'Only Super Admin or users with portfolio update permission and partial access can view contract URLs'
+      )
     }
 
     const contractUrl = await this.contractUrlRepository.findById(id)
@@ -271,9 +311,11 @@ export class ContractUrlService implements IContractUrlService {
   }
 
   async findByPortfolio(portfolioId: string, user: IUserWithPermissions) {
-    // Only super admin can access contract URLs
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only Super Admin can access contract URLs')
+    // Check if user can view contract URLs
+    if (!this.canViewContractUrls(user)) {
+      throw new ForbiddenException(
+        'Only Super Admin or users with portfolio update permission and partial access can view contract URLs'
+      )
     }
 
     // Verify user has access to the portfolio

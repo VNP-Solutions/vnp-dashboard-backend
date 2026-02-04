@@ -10,7 +10,12 @@ import {
   Query,
   UseGuards
 } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags
+} from '@nestjs/swagger'
 import { RequirePermission } from '../../common/decorators/require-permission.decorator'
 import { PermissionGuard } from '../../common/guards/permission.guard'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -21,8 +26,8 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
-  CreateContractUrlDto,
   ContractUrlQueryDto,
+  CreateContractUrlDto,
   UpdateContractUrlDto
 } from './contract-url.dto'
 import type { IContractUrlService } from './contract-url.interface'
@@ -40,7 +45,10 @@ export class ContractUrlController {
   @Post()
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
   @ApiOperation({ summary: 'Create a new contract URL (Super Admin only)' })
-  @ApiResponse({ status: 201, description: 'Contract URL created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Contract URL created successfully'
+  })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Only Super Admin can upload contracts'
@@ -56,7 +64,7 @@ export class ContractUrlController {
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get all contract URLs accessible to the user with pagination, search, filter, and sort (Super Admin only)'
+      'Get all contract URLs accessible to the user with pagination, search, filter, and sort'
   })
   @ApiResponse({
     status: 200,
@@ -64,7 +72,8 @@ export class ContractUrlController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only Super Admin can access contracts'
+    description:
+      'Forbidden - Only Super Admin or users with portfolio update permission and partial access can view contracts'
   })
   findAll(
     @Query() query: ContractUrlQueryDto,
@@ -83,6 +92,11 @@ export class ContractUrlController {
     status: 200,
     description: 'All contract URLs retrieved successfully'
   })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden - Only Super Admin or users with portfolio update permission and partial access can view contracts'
+  })
   findAllForExport(
     @Query() query: ContractUrlQueryDto,
     @CurrentUser() user: IUserWithPermissions
@@ -92,7 +106,9 @@ export class ContractUrlController {
 
   @Get('portfolio/:portfolioId')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
-  @ApiOperation({ summary: 'Get all contract URLs for a specific portfolio' })
+  @ApiOperation({
+    summary: 'Get all contract URLs for a specific portfolio'
+  })
   @ApiResponse({
     status: 200,
     description: 'Contract URLs retrieved successfully'
@@ -100,7 +116,8 @@ export class ContractUrlController {
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - No access to this portfolio'
+    description:
+      'Forbidden - Only Super Admin or users with portfolio update permission and partial access can view contracts'
   })
   findByPortfolio(
     @Param('portfolioId') portfolioId: string,
@@ -119,7 +136,8 @@ export class ContractUrlController {
   @ApiResponse({ status: 404, description: 'Contract URL not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - No access to this contract URL'
+    description:
+      'Forbidden - Only Super Admin or users with portfolio update permission and partial access can view contracts'
   })
   findOne(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.contractUrlService.findOne(id, user)
@@ -161,4 +179,3 @@ export class ContractUrlController {
     return this.contractUrlService.remove(id, user)
   }
 }
-
