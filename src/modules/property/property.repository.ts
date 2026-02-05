@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { BankType, BankSubType, BankAccountType } from '@prisma/client'
+import { BankAccountType, BankSubType, BankType } from '@prisma/client'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { PrismaService } from '../prisma/prisma.service'
 import {
@@ -51,7 +51,7 @@ export class PropertyRepository implements IPropertyRepository {
   ) {
     const encryptionSecret = process.env.JWT_ACCESS_SECRET || ''
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async tx => {
       // Create property data
       const createData: any = { ...propertyData }
       if (propertyData.next_due_date) {
@@ -72,19 +72,28 @@ export class PropertyRepository implements IPropertyRepository {
             expedia_id: credentialsData.expedia.id,
             expedia_username: credentialsData.expedia.username || null,
             expedia_password: credentialsData.expedia.password
-              ? EncryptionUtil.encrypt(credentialsData.expedia.password, encryptionSecret)
+              ? EncryptionUtil.encrypt(
+                  credentialsData.expedia.password,
+                  encryptionSecret
+                )
               : null,
             // All agoda fields are optional
             agoda_id: credentialsData.agoda?.id || null,
             agoda_username: credentialsData.agoda?.username || null,
             agoda_password: credentialsData.agoda?.password
-              ? EncryptionUtil.encrypt(credentialsData.agoda.password, encryptionSecret)
+              ? EncryptionUtil.encrypt(
+                  credentialsData.agoda.password,
+                  encryptionSecret
+                )
               : null,
             // All booking fields are optional
             booking_id: credentialsData.booking?.id || null,
             booking_username: credentialsData.booking?.username || null,
             booking_password: credentialsData.booking?.password
-              ? EncryptionUtil.encrypt(credentialsData.booking.password, encryptionSecret)
+              ? EncryptionUtil.encrypt(
+                  credentialsData.booking.password,
+                  encryptionSecret
+                )
               : null
           }
         })
@@ -129,7 +138,8 @@ export class PropertyRepository implements IPropertyRepository {
           bankData.routing_number = bankDetailsData.routing_number
         }
         if (bankDetailsData.bank_account_type) {
-          bankData.bank_account_type = bankDetailsData.bank_account_type as BankAccountType
+          bankData.bank_account_type =
+            bankDetailsData.bank_account_type as BankAccountType
         }
         if (bankDetailsData.currency) {
           bankData.currency = bankDetailsData.currency
@@ -206,196 +216,213 @@ export class PropertyRepository implements IPropertyRepository {
     const encryptionSecret = process.env.JWT_ACCESS_SECRET || ''
 
     return this.prisma.$transaction(
-      async (tx) => {
-      // Update property data if provided
-      if (propertyData && Object.keys(propertyData).length > 0) {
-        const updateData: any = { ...propertyData }
-        if (propertyData.next_due_date) {
-          updateData.next_due_date = new Date(propertyData.next_due_date)
-        }
+      async tx => {
+        // Update property data if provided
+        if (propertyData && Object.keys(propertyData).length > 0) {
+          const updateData: any = { ...propertyData }
+          if (propertyData.next_due_date) {
+            updateData.next_due_date = new Date(propertyData.next_due_date)
+          }
 
-        await tx.property.update({
-          where: { id: propertyId },
-          data: updateData
-        })
-      }
-
-      // Update or create credentials if provided
-      if (credentialsData) {
-        const existingCredentials = await tx.propertyCredentials.findUnique({
-          where: { property_id: propertyId }
-        })
-
-        const credentialsPayload: any = {
-          // Only expedia_id is required, username and password are optional
-          expedia_id: credentialsData.expedia.id,
-          expedia_username: credentialsData.expedia.username || null,
-          expedia_password: credentialsData.expedia.password
-            ? EncryptionUtil.encrypt(credentialsData.expedia.password, encryptionSecret)
-            : null,
-          // All agoda fields are optional
-          agoda_id: credentialsData.agoda?.id || null,
-          agoda_username: credentialsData.agoda?.username || null,
-          agoda_password: credentialsData.agoda?.password
-            ? EncryptionUtil.encrypt(credentialsData.agoda.password, encryptionSecret)
-            : null,
-          // All booking fields are optional
-          booking_id: credentialsData.booking?.id || null,
-          booking_username: credentialsData.booking?.username || null,
-          booking_password: credentialsData.booking?.password
-            ? EncryptionUtil.encrypt(credentialsData.booking.password, encryptionSecret)
-            : null
-        }
-
-        if (existingCredentials) {
-          await tx.propertyCredentials.update({
-            where: { property_id: propertyId },
-            data: credentialsPayload
-          })
-        } else {
-          await tx.propertyCredentials.create({
-            data: {
-              property_id: propertyId,
-              ...credentialsPayload
-            }
+          await tx.property.update({
+            where: { id: propertyId },
+            data: updateData
           })
         }
-      }
 
-      // Update or create bank details if provided
-      if (bankDetailsData) {
-        const existingBankDetails = await tx.propertyBankDetails.findUnique({
-          where: { property_id: propertyId }
-        })
+        // Update or create credentials if provided
+        if (credentialsData) {
+          const existingCredentials = await tx.propertyCredentials.findUnique({
+            where: { property_id: propertyId }
+          })
 
-        // If bank_type is "none", delete existing bank details
-        if (bankDetailsData.bank_type === 'none') {
-          if (existingBankDetails) {
-            await tx.propertyBankDetails.delete({
-              where: { property_id: propertyId }
-            })
-          }
-          // Skip the rest of bank details processing
-        } else {
-          const bankData: any = {
-            bank_type: bankDetailsData.bank_type as BankType
-          }
-
-        // Add optional fields if provided
-        if (bankDetailsData.bank_sub_type) {
-          bankData.bank_sub_type = bankDetailsData.bank_sub_type as BankSubType
-        }
-        if (bankDetailsData.hotel_portfolio_name) {
-          bankData.hotel_portfolio_name = bankDetailsData.hotel_portfolio_name
-        }
-        if (bankDetailsData.beneficiary_name) {
-          bankData.beneficiary_name = bankDetailsData.beneficiary_name
-        }
-        if (bankDetailsData.beneficiary_address) {
-          bankData.beneficiary_address = bankDetailsData.beneficiary_address
-        }
-        if (bankDetailsData.account_number) {
-          bankData.account_number = bankDetailsData.account_number
-        }
-        if (bankDetailsData.account_name) {
-          bankData.account_name = bankDetailsData.account_name
-        }
-        if (bankDetailsData.bank_name) {
-          bankData.bank_name = bankDetailsData.bank_name
-        }
-        if (bankDetailsData.bank_branch) {
-          bankData.bank_branch = bankDetailsData.bank_branch
-        }
-        if (bankDetailsData.swift_bic_iban) {
-          bankData.swift_bic_iban = bankDetailsData.swift_bic_iban
-        }
-        if (bankDetailsData.routing_number) {
-          bankData.routing_number = bankDetailsData.routing_number
-        }
-        if (bankDetailsData.bank_account_type) {
-          bankData.bank_account_type = bankDetailsData.bank_account_type as BankAccountType
-        }
-        if (bankDetailsData.currency) {
-          bankData.currency = bankDetailsData.currency
-        }
-        if (bankDetailsData.stripe_account_email) {
-          bankData.stripe_account_email = bankDetailsData.stripe_account_email
-        }
-          if (userId) {
-            bankData.associated_user_id = userId
+          const credentialsPayload: any = {
+            // Only expedia_id is required, username and password are optional
+            expedia_id: credentialsData.expedia.id,
+            expedia_username: credentialsData.expedia.username || null,
+            expedia_password: credentialsData.expedia.password
+              ? EncryptionUtil.encrypt(
+                  credentialsData.expedia.password,
+                  encryptionSecret
+                )
+              : null,
+            // All agoda fields are optional
+            agoda_id: credentialsData.agoda?.id || null,
+            agoda_username: credentialsData.agoda?.username || null,
+            agoda_password: credentialsData.agoda?.password
+              ? EncryptionUtil.encrypt(
+                  credentialsData.agoda.password,
+                  encryptionSecret
+                )
+              : null,
+            // All booking fields are optional
+            booking_id: credentialsData.booking?.id || null,
+            booking_username: credentialsData.booking?.username || null,
+            booking_password: credentialsData.booking?.password
+              ? EncryptionUtil.encrypt(
+                  credentialsData.booking.password,
+                  encryptionSecret
+                )
+              : null
           }
 
-          if (existingBankDetails) {
-            await tx.propertyBankDetails.update({
+          if (existingCredentials) {
+            await tx.propertyCredentials.update({
               where: { property_id: propertyId },
-              data: bankData
+              data: credentialsPayload
             })
           } else {
-            await tx.propertyBankDetails.create({
+            await tx.propertyCredentials.create({
               data: {
                 property_id: propertyId,
-                ...bankData
+                ...credentialsPayload
               }
             })
           }
         }
-      }
 
-      // Fetch and return the complete property with all relations
-      const completeProperty = await tx.property.findUnique({
-        where: { id: propertyId },
-        include: {
-          currency: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              symbol: true
+        // Update or create bank details if provided
+        if (bankDetailsData) {
+          const existingBankDetails = await tx.propertyBankDetails.findUnique({
+            where: { property_id: propertyId }
+          })
+
+          // If bank_type is "none", delete existing bank details
+          if (bankDetailsData.bank_type === 'none') {
+            if (existingBankDetails) {
+              await tx.propertyBankDetails.delete({
+                where: { property_id: propertyId }
+              })
             }
-          },
-          portfolio: {
-            select: {
-              id: true,
-              name: true,
-              is_active: true,
-              service_type_id: true,
-              serviceType: {
-                select: {
-                  id: true,
-                  type: true
+            // Skip the rest of bank details processing
+          } else {
+            const bankData: any = {
+              bank_type: bankDetailsData.bank_type as BankType
+            }
+
+            // Add optional fields if provided
+            if (bankDetailsData.bank_sub_type) {
+              bankData.bank_sub_type =
+                bankDetailsData.bank_sub_type as BankSubType
+            }
+            if (bankDetailsData.hotel_portfolio_name) {
+              bankData.hotel_portfolio_name =
+                bankDetailsData.hotel_portfolio_name
+            }
+            if (bankDetailsData.beneficiary_name) {
+              bankData.beneficiary_name = bankDetailsData.beneficiary_name
+            }
+            if (bankDetailsData.beneficiary_address) {
+              bankData.beneficiary_address = bankDetailsData.beneficiary_address
+            }
+            if (bankDetailsData.account_number) {
+              bankData.account_number = bankDetailsData.account_number
+            }
+            if (bankDetailsData.account_name) {
+              bankData.account_name = bankDetailsData.account_name
+            }
+            if (bankDetailsData.bank_name) {
+              bankData.bank_name = bankDetailsData.bank_name
+            }
+            if (bankDetailsData.bank_branch) {
+              bankData.bank_branch = bankDetailsData.bank_branch
+            }
+            if (bankDetailsData.swift_bic_iban) {
+              bankData.swift_bic_iban = bankDetailsData.swift_bic_iban
+            }
+            if (bankDetailsData.routing_number) {
+              bankData.routing_number = bankDetailsData.routing_number
+            }
+            if (bankDetailsData.bank_account_type) {
+              bankData.bank_account_type =
+                bankDetailsData.bank_account_type as BankAccountType
+            }
+            if (bankDetailsData.currency) {
+              bankData.currency = bankDetailsData.currency
+            }
+            if (bankDetailsData.stripe_account_email) {
+              bankData.stripe_account_email =
+                bankDetailsData.stripe_account_email
+            }
+            if (userId) {
+              bankData.associated_user_id = userId
+            }
+
+            if (existingBankDetails) {
+              await tx.propertyBankDetails.update({
+                where: { property_id: propertyId },
+                data: bankData
+              })
+            } else {
+              await tx.propertyBankDetails.create({
+                data: {
+                  property_id: propertyId,
+                  ...bankData
                 }
-              }
-            }
-          },
-          credentials: true,
-          bankDetails: true,
-          audits: {
-            select: {
-              id: true,
-              type_of_ota: true,
-              audit_status_id: true,
-              amount_collectable: true,
-              amount_confirmed: true,
-              start_date: true,
-              end_date: true
+              })
             }
           }
         }
-      })
 
-      if (!completeProperty) {
-        throw new Error('Failed to retrieve updated property')
-      }
+        // Fetch and return the complete property with all relations
+        const completeProperty = await tx.property.findUnique({
+          where: { id: propertyId },
+          include: {
+            currency: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                symbol: true
+              }
+            },
+            portfolio: {
+              select: {
+                id: true,
+                name: true,
+                is_active: true,
+                service_type_id: true,
+                serviceType: {
+                  select: {
+                    id: true,
+                    type: true
+                  }
+                }
+              }
+            },
+            credentials: true,
+            bankDetails: true,
+            audits: {
+              select: {
+                id: true,
+                type_of_ota: true,
+                audit_status_id: true,
+                amount_collectable: true,
+                amount_confirmed: true,
+                start_date: true,
+                end_date: true
+              }
+            }
+          }
+        })
 
-      return completeProperty
-    },
+        if (!completeProperty) {
+          throw new Error('Failed to retrieve updated property')
+        }
+
+        return completeProperty
+      },
       {
-        timeout: 30000, // 30 seconds timeout for complex update operations
+        timeout: 30000 // 30 seconds timeout for complex update operations
       }
     )
   }
 
-  async findAll(queryOptions: any, _propertyIds?: string[]) {
+  async findAll(
+    queryOptions: any,
+    _propertyIds?: string[],
+    hasAuditAccess?: boolean
+  ) {
     const { where, skip, take, orderBy } = queryOptions
 
     const properties = await this.prisma.property.findMany({
@@ -463,44 +490,45 @@ export class PropertyRepository implements IPropertyRepository {
       .filter((id): id is string => id !== null && id !== undefined)
 
     // Fetch previous portfolios in bulk
-    const previousPortfolios = previousPortfolioIds.length > 0
-      ? await this.prisma.portfolio.findMany({
-          where: { id: { in: previousPortfolioIds } },
-          select: {
-            id: true,
-            name: true,
-            is_active: true
-          }
-        })
-      : []
+    const previousPortfolios =
+      previousPortfolioIds.length > 0
+        ? await this.prisma.portfolio.findMany({
+            where: { id: { in: previousPortfolioIds } },
+            select: {
+              id: true,
+              name: true,
+              is_active: true
+            }
+          })
+        : []
 
     // Create a map for quick lookup
-    const previousPortfolioMap = new Map(
-      previousPortfolios.map(p => [p.id, p])
-    )
+    const previousPortfolioMap = new Map(previousPortfolios.map(p => [p.id, p]))
 
-    // Get audit counts for each property
-    const auditCounts = await Promise.all(
-      propertyIds.map(async (propertyId) => ({
-        propertyId,
-        count: await this.prisma.audit.count({
-          where: {
-            property_id: propertyId,
-            is_archived: false
-          }
-        })
-      }))
-    )
+    // Get audit counts for each property only if user has audit access
+    let auditCountMap = new Map<string, number>()
+    if (hasAuditAccess !== false) {
+      const auditCounts = await Promise.all(
+        propertyIds.map(async propertyId => ({
+          propertyId,
+          count: await this.prisma.audit.count({
+            where: {
+              property_id: propertyId,
+              is_archived: false
+            }
+          })
+        }))
+      )
 
-    // Create a map for quick lookup
-    const auditCountMap = new Map(
-      auditCounts.map(ac => [ac.propertyId, ac.count])
-    )
+      auditCountMap = new Map(auditCounts.map(ac => [ac.propertyId, ac.count]))
+    }
 
     // Enrich each property with total_audits count and previous_portfolio data
+    // If user doesn't have audit access, total_audits will be 0
     return properties.map(property => ({
       ...property,
-      total_audits: auditCountMap.get(property.id) || 0,
+      total_audits:
+        hasAuditAccess !== false ? auditCountMap.get(property.id) || 0 : 0,
       previous_portfolio: property.previous_portfolio_id
         ? previousPortfolioMap.get(property.previous_portfolio_id) || null
         : null

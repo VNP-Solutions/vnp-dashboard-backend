@@ -116,11 +116,19 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
+    // Get user's accessible property IDs for filtering property counts
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
     // Re-fetch the portfolio to include the newly created contract URL
     const portfolioWithContractUrls = await this.portfolioRepository.findById(
       portfolio.id,
       user.id,
-      isSuperAdmin
+      isSuperAdmin,
+      accessiblePropertyIds
     )
 
     return portfolioWithContractUrls || portfolio
@@ -140,6 +148,13 @@ export class PortfolioService implements IPortfolioService {
         query.limit || 10
       )
     }
+
+    // Get user's accessible property IDs for filtering property counts
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
 
     const userIsSuperAdmin = isUserSuperAdmin(user)
     const userIsInternal = isInternalUser(user)
@@ -223,7 +238,8 @@ export class PortfolioService implements IPortfolioService {
         { where, skip, take, orderBy },
         undefined,
         user.id,
-        isSuperAdmin
+        isSuperAdmin,
+        accessiblePropertyIds
       ),
       this.portfolioRepository.count(where, undefined)
     ])
@@ -277,6 +293,13 @@ export class PortfolioService implements IPortfolioService {
     if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
       return []
     }
+
+    // Get user's accessible property IDs for filtering property counts
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
 
     const userIsInternal = isInternalUser(user)
 
@@ -356,7 +379,8 @@ export class PortfolioService implements IPortfolioService {
       { where, orderBy },
       undefined,
       user.id,
-      userIsSuperAdmin
+      userIsSuperAdmin,
+      accessiblePropertyIds
     )
 
     // Add pending action info to each portfolio
@@ -391,10 +415,19 @@ export class PortfolioService implements IPortfolioService {
   async findOne(id: string, user: IUserWithPermissions) {
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
+
+    // Get user's accessible property IDs for filtering property counts
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
     const portfolio = await this.portfolioRepository.findById(
       id,
       user.id,
-      isSuperAdmin
+      isSuperAdmin,
+      accessiblePropertyIds
     )
 
     if (!portfolio) {

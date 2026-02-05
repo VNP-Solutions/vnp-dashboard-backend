@@ -258,6 +258,12 @@ export class PropertyService implements IPropertyService {
       )
     }
 
+    // Check if user has audit access
+    const auditPermission = user.role.audit_permission
+    const hasAuditAccess = auditPermission
+      ? auditPermission.access_level !== AccessLevel.none
+      : false
+
     // Build additional filters from query params
     const additionalFilters: any = {}
     if (query.is_active) {
@@ -475,7 +481,8 @@ export class PropertyService implements IPropertyService {
     const [data, total] = await Promise.all([
       this.propertyRepository.findAll(
         { where, skip, take, orderBy },
-        undefined
+        undefined,
+        hasAuditAccess
       ),
       this.propertyRepository.count(where, undefined)
     ])
@@ -580,6 +587,12 @@ export class PropertyService implements IPropertyService {
     if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
       return []
     }
+
+    // Check if user has audit access
+    const auditPermission = user.role.audit_permission
+    const hasAuditAccess = auditPermission
+      ? auditPermission.access_level !== AccessLevel.none
+      : false
 
     // Build additional filters from query params
     const additionalFilters: any = {}
@@ -798,7 +811,8 @@ export class PropertyService implements IPropertyService {
     // Fetch all data without pagination
     const data = await this.propertyRepository.findAll(
       { where, orderBy },
-      undefined
+      undefined,
+      hasAuditAccess
     )
 
     // Get encryption secret for decrypting passwords
@@ -900,6 +914,12 @@ export class PropertyService implements IPropertyService {
       return []
     }
 
+    // Check if user has audit access
+    const auditPermission = user.role.audit_permission
+    const hasAuditAccess = auditPermission
+      ? auditPermission.access_level !== AccessLevel.none
+      : false
+
     // Build base where clause with permission filter
     const baseWhere: any =
       accessibleIds === 'all'
@@ -919,7 +939,8 @@ export class PropertyService implements IPropertyService {
 
       const properties = await this.propertyRepository.findAll(
         queryOptions,
-        undefined
+        undefined,
+        hasAuditAccess
       )
 
       // Add access_type field to each property and filter bank details based on permission
@@ -956,7 +977,8 @@ export class PropertyService implements IPropertyService {
 
     const properties = await this.propertyRepository.findAll(
       queryOptions,
-      undefined
+      undefined,
+      hasAuditAccess
     )
 
     // Add access_type field to each property and filter bank details based on permission
