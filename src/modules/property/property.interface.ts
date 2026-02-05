@@ -144,7 +144,8 @@ export interface IPropertyRepository {
   ): Promise<PropertyWithFullDetails>
   findAll(
     queryOptions: any,
-    propertyIds?: string[]
+    propertyIds?: string[],
+    hasAuditAccess?: boolean
   ): Promise<PropertyWithPendingActions[]>
   count(whereClause: any, propertyIds?: string[]): Promise<number>
   findById(id: string): Promise<PropertyWithFullDetails | null>
