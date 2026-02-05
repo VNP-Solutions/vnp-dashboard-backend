@@ -39,7 +39,8 @@ export class PortfolioRepository implements IPortfolioRepository {
     queryOptions: any,
     _portfolioIds?: string[],
     userId?: string,
-    isSuperAdmin?: boolean
+    isSuperAdmin?: boolean,
+    accessiblePropertyIds?: string[] | 'all'
   ) {
     const { where, skip, take, orderBy } = queryOptions
 
@@ -90,12 +91,26 @@ export class PortfolioRepository implements IPortfolioRepository {
     const [portfolioCounts, contractUrlCounts, notesCounts] = await Promise.all(
       [
         Promise.all(
-          portfolioIds.map(async portfolioId => ({
-            portfolioId,
-            count: await this.prisma.property.count({
-              where: { portfolio_id: portfolioId }
-            })
-          }))
+          portfolioIds.map(async portfolioId => {
+            // Build property where clause based on user's property access
+            const propertyWhere: any = { portfolio_id: portfolioId }
+
+            // Apply property access filter if user has partial access
+            if (
+              accessiblePropertyIds &&
+              accessiblePropertyIds !== 'all' &&
+              Array.isArray(accessiblePropertyIds)
+            ) {
+              propertyWhere.id = { in: accessiblePropertyIds }
+            }
+
+            return {
+              portfolioId,
+              count: await this.prisma.property.count({
+                where: propertyWhere
+              })
+            }
+          })
         ),
         Promise.all(
           portfolioIds.map(async portfolioId => ({
@@ -145,7 +160,12 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
-  async findById(id: string, userId?: string, isSuperAdmin?: boolean) {
+  async findById(
+    id: string,
+    userId?: string,
+    isSuperAdmin?: boolean,
+    accessiblePropertyIds?: string[] | 'all'
+  ) {
     const portfolio = await this.prisma.portfolio.findUnique({
       where: { id },
       include: {
@@ -163,10 +183,22 @@ export class PortfolioRepository implements IPortfolioRepository {
       return null
     }
 
+    // Build property where clause based on user's property access
+    const propertyWhere: any = { portfolio_id: id }
+
+    // Apply property access filter if user has partial access
+    if (
+      accessiblePropertyIds &&
+      accessiblePropertyIds !== 'all' &&
+      Array.isArray(accessiblePropertyIds)
+    ) {
+      propertyWhere.id = { in: accessiblePropertyIds }
+    }
+
     // Get property count, contract URL count, and notes count for this portfolio
     const [propertyCount, contractUrlCount, notesCount] = await Promise.all([
       this.prisma.property.count({
-        where: { portfolio_id: id }
+        where: propertyWhere
       }),
       this.prisma.contractUrl.count({
         where: {

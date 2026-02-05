@@ -65,13 +65,15 @@ export interface IPortfolioRepository {
     queryOptions: any,
     portfolioIds?: string[],
     userId?: string,
-    isSuperAdmin?: boolean
+    isSuperAdmin?: boolean,
+    accessiblePropertyIds?: string[] | 'all'
   ): Promise<PortfolioWithRelations[]>
   count(whereClause: any, portfolioIds?: string[]): Promise<number>
   findById(
     id: string,
     userId?: string,
-    isSuperAdmin?: boolean
+    isSuperAdmin?: boolean,
+    accessiblePropertyIds?: string[] | 'all'
   ): Promise<PortfolioWithFullDetails | null>
   findByName(name: string): Promise<Portfolio | null>
   update(
