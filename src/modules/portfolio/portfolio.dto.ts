@@ -12,6 +12,7 @@ import {
   ValidateNested
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
+import { IsCommaSeparatedEmails } from '../../common/validators/comma-separated-emails.validator'
 import { AttachmentUrlDto } from '../email/email.dto'
 
 export class CreatePortfolioDto {
@@ -55,11 +56,12 @@ export class CreatePortfolioDto {
   is_active: boolean
 
   @ApiPropertyOptional({
-    example: 'contact@example.com',
-    description: 'Contact email for portfolio'
+    example: 'contact@example.com, contact2@example.com',
+    description:
+      'Contact email(s) for portfolio - can be a single email or comma-separated emails for multiple recipients'
   })
   @IsString()
-  @IsEmail()
+  @IsCommaSeparatedEmails()
   @IsOptional()
   contact_email?: string
 

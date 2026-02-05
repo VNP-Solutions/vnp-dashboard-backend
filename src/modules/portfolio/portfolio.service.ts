@@ -22,6 +22,7 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import { splitEmails } from '../../common/validators/comma-separated-emails.validator'
 import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
 import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import { PrismaService } from '../prisma/prisma.service'
@@ -913,14 +914,24 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
+    // Split comma-separated emails
+    const emailAddresses = splitEmails(portfolio.contact_email)
+
+    if (emailAddresses.length === 0) {
+      throw new BadRequestException(
+        'Portfolio does not have valid contact email addresses configured'
+      )
+    }
+
     // Log email details for debugging
-    console.log('📧 Sending email to portfolio contact:', {
+    console.log('📧 Sending email to portfolio contact(s):', {
       requestedPortfolioId: id,
       portfolioId: portfolio.id,
       portfolioName: portfolio.name,
       contact_email: portfolio.contact_email,
+      email_addresses: emailAddresses,
+      recipient_count: emailAddresses.length,
       access_email: portfolio.access_email,
-      sending_to: portfolio.contact_email,
       subject,
       hasAttachments:
         (uploadedAttachments?.length || 0) + (attachmentUrls?.length || 0) > 0
@@ -941,14 +952,20 @@ export class PortfolioService implements IPortfolioService {
       allAttachments = [...allAttachments, ...urlAttachments]
     }
 
-    await this.emailUtil.sendEmail(
-      portfolio.contact_email,
-      subject,
-      body,
-      allAttachments.length > 0 ? allAttachments : undefined
-    )
+    // Send email to each recipient
+    for (const emailAddress of emailAddresses) {
+      await this.emailUtil.sendEmail(
+        emailAddress,
+        subject,
+        body,
+        allAttachments.length > 0 ? allAttachments : undefined
+      )
+    }
 
-    return { message: 'Email sent successfully' }
+    return {
+      message: `Email sent successfully to ${emailAddresses.length} recipient(s)`,
+      recipients: emailAddresses
+    }
   }
 
   async bulkImport(

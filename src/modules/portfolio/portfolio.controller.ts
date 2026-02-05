@@ -284,9 +284,11 @@ export class PortfolioController {
   @UseInterceptors(FilesInterceptor('attachments', 5)) // Allow up to 5 file attachments
   @ApiConsumes('multipart/form-data', 'application/json')
   @ApiOperation({
-    summary: 'Send email to portfolio contact with optional attachments',
+    summary:
+      'Send email to portfolio contact email(s) with optional attachments',
     description:
-      'Send an email to the portfolio contact email with optional attachments. ' +
+      'Send an email to the portfolio contact email address(es) with optional attachments. ' +
+      'If the portfolio has multiple comma-separated contact emails, the email will be sent to all recipients. ' +
       'Attachments can be provided as direct file uploads or URLs to files.'
   })
   @ApiBody({
@@ -340,12 +342,21 @@ export class PortfolioController {
       required: ['subject', 'body']
     }
   })
-  @ApiResponse({ status: 200, description: 'Email sent successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Email sent successfully to all contact email addresses',
+    schema: {
+      example: {
+        message: 'Email sent successfully to 2 recipient(s)',
+        recipients: ['contact1@example.com', 'contact2@example.com']
+      }
+    }
+  })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   @ApiResponse({
     status: 400,
     description:
-      'Portfolio does not have a contact email configured or failed to fetch attachment from URL'
+      'Portfolio does not have valid contact email addresses configured or failed to fetch attachment from URL'
   })
   @ApiResponse({
     status: 403,
@@ -379,7 +390,24 @@ export class PortfolioController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk import portfolios from Excel file (Internal users only)'
+    summary: 'Bulk import portfolios from Excel file (Internal users only)',
+    description: `
+    Upload an Excel file (.xlsx or .xls) to bulk import portfolios.
+    
+    Required columns:
+    - Portfolio Name: Name of the portfolio
+    - Service Type: Service type name (will be created if doesn't exist)
+    - Active status: Active status (Active/Inactive)
+    
+    Optional columns:
+    - Currency: Currency code (defaults to USD)
+    - Contact Email: Contact email(s) - can be comma-separated for multiple recipients (e.g., "email1@example.com, email2@example.com")
+    - Access Email: Access email
+    - Access Phone: Access phone
+    - Documents/Contract URL: Contract URL(s) - comma-separated (Super Admin only)
+    - Commissionable: Commissionable status (Yes/No)
+    - Sales Agent: Sales agent name (required if commissionable is Yes)
+    `
   })
   @ApiBody({
     schema: {
@@ -429,7 +457,7 @@ export class PortfolioController {
     - Portfolio Name/Portfolio name/Name: Name of the portfolio
     - Service Type/Service type: Service type name (will be created if doesn't exist)
     - Active status/Active Status/Status/Is Active: Active status (Active/Inactive)
-    - Contact Email/Contact email/Contact: Contact email
+    - Contact Email/Contact email/Contact: Contact email(s) - can be comma-separated for multiple recipients (e.g., "email1@example.com, email2@example.com")
     - Access Email/Access email: Access email
     - Access Phone/Access phone/Access Phone NO/Access Phone No/Access Contact: Access phone
     - Documents/Contract URL/Contract Url/Contract url: Contract URL(s) - comma-separated (Super Admin only)
