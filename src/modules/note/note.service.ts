@@ -7,6 +7,11 @@ import {
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
+  ModuleType,
+  PermissionAction
+} from '../../common/interfaces/permission.interface'
+import { PermissionService } from '../../common/services/permission.service'
+import {
   CreateNoteDto,
   DeleteAllNotesDto,
   NoteEntityType,
@@ -19,13 +24,45 @@ import type { INoteRepository, INoteService } from './note.interface'
 export class NoteService implements INoteService {
   constructor(
     @Inject('INoteRepository')
-    private noteRepository: INoteRepository
+    private noteRepository: INoteRepository,
+    @Inject(PermissionService)
+    private permissionService: PermissionService
   ) {}
 
   async create(data: CreateNoteDto, user: IUserWithPermissions) {
     if (!data.portfolio_id && !data.property_id && !data.audit_id) {
       throw new BadRequestException(
         'Note must be associated with either a portfolio, property, or audit'
+      )
+    }
+
+    // Check permissions based on the entity type
+    if (data.portfolio_id) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PORTFOLIO,
+        PermissionAction.READ,
+        data.portfolio_id
+      )
+    } else if (data.property_id) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PROPERTY,
+        PermissionAction.READ,
+        data.property_id
+      )
+    } else if (data.audit_id) {
+      // For audit notes, check property permission
+      // We need to get the property_id from the audit
+      const audit = await this.noteRepository.findAuditById(data.audit_id)
+      if (!audit) {
+        throw new NotFoundException('Audit not found')
+      }
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PROPERTY,
+        PermissionAction.READ,
+        audit.property_id
       )
     }
 
@@ -36,10 +73,59 @@ export class NoteService implements INoteService {
   }
 
   async findAll(query: NoteQueryDto, user: IUserWithPermissions) {
-    // Build where clause - always filter by user_id
-    const where: any = {
-      user_id: user.id
+    // Build where clause based on accessible resources
+    const where: any = {}
+
+    // Get accessible portfolios and properties
+    const portfolioIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PORTFOLIO
+    )
+    const propertyIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    // Build permission-based filters
+    const permissionFilters: any[] = []
+
+    // Portfolio notes - if user has view access to portfolios
+    if (portfolioIds === 'all' || (portfolioIds && portfolioIds.length > 0)) {
+      permissionFilters.push({
+        portfolio_id:
+          portfolioIds === 'all' ? { not: null } : { in: portfolioIds }
+      })
     }
+
+    // Property notes - if user has view access to properties
+    if (propertyIds === 'all' || (propertyIds && propertyIds.length > 0)) {
+      permissionFilters.push({
+        property_id: propertyIds === 'all' ? { not: null } : { in: propertyIds }
+      })
+    }
+
+    // Audit notes - based on property permission (audit belongs to property)
+    if (propertyIds === 'all' || (propertyIds && propertyIds.length > 0)) {
+      permissionFilters.push({
+        AND: [
+          { audit_id: { not: null } },
+          {
+            audit: {
+              property_id:
+                propertyIds === 'all' ? { not: null } : { in: propertyIds }
+            }
+          }
+        ]
+      })
+    }
+
+    // If no access to any resource type, return empty
+    if (permissionFilters.length === 0) {
+      return []
+    }
+
+    // Combine permission filters with OR
+    where.OR = permissionFilters
 
     // Add portfolio filter if provided
     if (query.portfolio_id) {
@@ -79,28 +165,33 @@ export class NoteService implements INoteService {
 
     // Search by text, portfolio name, property name, and audit details
     if (query.search) {
-      where.OR = [
+      where.AND = [
+        ...(where.AND || []),
         {
-          text: {
-            contains: query.search,
-            mode: 'insensitive'
-          }
-        },
-        {
-          portfolio: {
-            name: {
-              contains: query.search,
-              mode: 'insensitive'
+          OR: [
+            {
+              text: {
+                contains: query.search,
+                mode: 'insensitive'
+              }
+            },
+            {
+              portfolio: {
+                name: {
+                  contains: query.search,
+                  mode: 'insensitive'
+                }
+              }
+            },
+            {
+              property: {
+                name: {
+                  contains: query.search,
+                  mode: 'insensitive'
+                }
+              }
             }
-          }
-        },
-        {
-          property: {
-            name: {
-              contains: query.search,
-              mode: 'insensitive'
-            }
-          }
+          ]
         }
       ]
     }
@@ -122,9 +213,33 @@ export class NoteService implements INoteService {
       throw new NotFoundException('Note not found')
     }
 
-    // Ensure the note belongs to the authenticated user
-    if (note.user_id !== user.id) {
-      throw new ForbiddenException('You do not have access to this note')
+    // Check permissions based on the entity type
+    if (note.portfolio_id) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PORTFOLIO,
+        PermissionAction.READ,
+        note.portfolio_id
+      )
+    } else if (note.property_id) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PROPERTY,
+        PermissionAction.READ,
+        note.property_id
+      )
+    } else if (note.audit_id && note.audit) {
+      // For audit notes, check property permission
+      const audit = await this.noteRepository.findAuditById(note.audit_id)
+      if (!audit) {
+        throw new NotFoundException('Audit not found')
+      }
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PROPERTY,
+        PermissionAction.READ,
+        audit.property_id
+      )
     }
 
     return note
@@ -137,9 +252,33 @@ export class NoteService implements INoteService {
       throw new NotFoundException('Note not found')
     }
 
-    // Ensure the note belongs to the authenticated user
-    if (note.user_id !== user.id) {
-      throw new ForbiddenException('You do not have access to this note')
+    // Check permissions based on the entity type
+    if (note.portfolio_id) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PORTFOLIO,
+        PermissionAction.READ,
+        note.portfolio_id
+      )
+    } else if (note.property_id) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PROPERTY,
+        PermissionAction.READ,
+        note.property_id
+      )
+    } else if (note.audit_id) {
+      // For audit notes, check property permission
+      const audit = await this.noteRepository.findAuditById(note.audit_id)
+      if (!audit) {
+        throw new NotFoundException('Audit not found')
+      }
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PROPERTY,
+        PermissionAction.READ,
+        audit.property_id
+      )
     }
 
     return this.noteRepository.update(id, data)
@@ -152,9 +291,33 @@ export class NoteService implements INoteService {
       throw new NotFoundException('Note not found')
     }
 
-    // Ensure the note belongs to the authenticated user
-    if (note.user_id !== user.id) {
-      throw new ForbiddenException('You do not have access to this note')
+    // Check permissions based on the entity type
+    if (note.portfolio_id) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PORTFOLIO,
+        PermissionAction.READ,
+        note.portfolio_id
+      )
+    } else if (note.property_id) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PROPERTY,
+        PermissionAction.READ,
+        note.property_id
+      )
+    } else if (note.audit_id) {
+      // For audit notes, check property permission
+      const audit = await this.noteRepository.findAuditById(note.audit_id)
+      if (!audit) {
+        throw new NotFoundException('Audit not found')
+      }
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PROPERTY,
+        PermissionAction.READ,
+        audit.property_id
+      )
     }
 
     await this.noteRepository.delete(id)
@@ -163,10 +326,8 @@ export class NoteService implements INoteService {
   }
 
   async removeAll(query: DeleteAllNotesDto, user: IUserWithPermissions) {
-    // Build where clause - always filter by user_id
-    const where: any = {
-      user_id: user.id
-    }
+    // Build where clause based on accessible resources
+    const where: any = {}
 
     // Ensure at least one filter is provided
     if (
@@ -179,6 +340,60 @@ export class NoteService implements INoteService {
         'At least one filter (portfolio_id, property_id, audit_id, or is_done) must be provided'
       )
     }
+
+    // Get accessible portfolios and properties
+    const portfolioIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PORTFOLIO
+    )
+    const propertyIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    // Build permission-based filters
+    const permissionFilters: any[] = []
+
+    // Portfolio notes - if user has view access to portfolios
+    if (portfolioIds === 'all' || (portfolioIds && portfolioIds.length > 0)) {
+      permissionFilters.push({
+        portfolio_id:
+          portfolioIds === 'all' ? { not: null } : { in: portfolioIds }
+      })
+    }
+
+    // Property notes - if user has view access to properties
+    if (propertyIds === 'all' || (propertyIds && propertyIds.length > 0)) {
+      permissionFilters.push({
+        property_id: propertyIds === 'all' ? { not: null } : { in: propertyIds }
+      })
+    }
+
+    // Audit notes - based on property permission
+    if (propertyIds === 'all' || (propertyIds && propertyIds.length > 0)) {
+      permissionFilters.push({
+        AND: [
+          { audit_id: { not: null } },
+          {
+            audit: {
+              property_id:
+                propertyIds === 'all' ? { not: null } : { in: propertyIds }
+            }
+          }
+        ]
+      })
+    }
+
+    // If no access to any resource type, return 0
+    if (permissionFilters.length === 0) {
+      return {
+        message: '0 note(s) deleted successfully',
+        deletedCount: 0
+      }
+    }
+
+    // Combine permission filters with OR
+    where.OR = permissionFilters
 
     // Build filter based on query
     if (query.portfolio_id) {
