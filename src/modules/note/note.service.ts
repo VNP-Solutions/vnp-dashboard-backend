@@ -30,6 +30,13 @@ export class NoteService implements INoteService {
   ) {}
 
   async create(data: CreateNoteDto, user: IUserWithPermissions) {
+    // Notes are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Notes are only accessible by internal users'
+      )
+    }
+
     if (!data.portfolio_id && !data.property_id && !data.audit_id) {
       throw new BadRequestException(
         'Note must be associated with either a portfolio, property, or audit'
@@ -73,6 +80,13 @@ export class NoteService implements INoteService {
   }
 
   async findAll(query: NoteQueryDto, user: IUserWithPermissions) {
+    // Notes are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Notes are only accessible by internal users'
+      )
+    }
+
     // Build where clause based on accessible resources
     const where: any = {}
 
@@ -207,6 +221,13 @@ export class NoteService implements INoteService {
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
+    // Notes are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Notes are only accessible by internal users'
+      )
+    }
+
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
@@ -246,6 +267,13 @@ export class NoteService implements INoteService {
   }
 
   async update(id: string, data: UpdateNoteDto, user: IUserWithPermissions) {
+    // Notes are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Notes are only accessible by internal users'
+      )
+    }
+
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
@@ -285,6 +313,13 @@ export class NoteService implements INoteService {
   }
 
   async remove(id: string, user: IUserWithPermissions) {
+    // Notes are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Notes are only accessible by internal users'
+      )
+    }
+
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
@@ -326,6 +361,13 @@ export class NoteService implements INoteService {
   }
 
   async removeAll(query: DeleteAllNotesDto, user: IUserWithPermissions) {
+    // Notes are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Notes are only accessible by internal users'
+      )
+    }
+
     // Build where clause based on accessible resources
     const where: any = {}
 

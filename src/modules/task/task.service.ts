@@ -30,6 +30,13 @@ export class TaskService implements ITaskService {
   ) {}
 
   async create(data: CreateTaskDto, user: IUserWithPermissions) {
+    // Tasks are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Tasks are only accessible by internal users'
+      )
+    }
+
     if (!data.portfolio_id && !data.property_id && !data.audit_id) {
       throw new BadRequestException(
         'Task must be associated with either a portfolio, property, or audit'
@@ -73,6 +80,13 @@ export class TaskService implements ITaskService {
   }
 
   async findAll(query: TaskQueryDto, user: IUserWithPermissions) {
+    // Tasks are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Tasks are only accessible by internal users'
+      )
+    }
+
     // Build where clause based on accessible resources
     const where: any = {}
 
@@ -219,6 +233,13 @@ export class TaskService implements ITaskService {
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
+    // Tasks are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Tasks are only accessible by internal users'
+      )
+    }
+
     const task = await this.taskRepository.findById(id)
 
     if (!task) {
@@ -258,6 +279,13 @@ export class TaskService implements ITaskService {
   }
 
   async update(id: string, data: UpdateTaskDto, user: IUserWithPermissions) {
+    // Tasks are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Tasks are only accessible by internal users'
+      )
+    }
+
     const task = await this.taskRepository.findById(id)
 
     if (!task) {
@@ -297,6 +325,13 @@ export class TaskService implements ITaskService {
   }
 
   async remove(id: string, user: IUserWithPermissions) {
+    // Tasks are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Tasks are only accessible by internal users'
+      )
+    }
+
     const task = await this.taskRepository.findById(id)
 
     if (!task) {
@@ -338,6 +373,13 @@ export class TaskService implements ITaskService {
   }
 
   async removeAll(query: DeleteAllTasksDto, user: IUserWithPermissions) {
+    // Tasks are only accessible by internal users
+    if (user.role.is_external) {
+      throw new ForbiddenException(
+        'Tasks are only accessible by internal users'
+      )
+    }
+
     // Build where clause based on accessible resources
     const where: any = {}
 
