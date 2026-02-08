@@ -242,9 +242,17 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     // Set associated_user_id to current user
     (normalizedData as CreatePropertyBankDetailsDto).associated_user_id = user.id
 
-    return this.propertyBankDetailsRepository.create(
+    const result = await this.propertyBankDetailsRepository.create(
       normalizedData as CreatePropertyBankDetailsDto
     )
+
+    // Send email notification to super admins
+    await this.sendBankDetailsNotificationToSuperAdmins(
+      data.property_id,
+      'created'
+    )
+
+    return result
   }
 
   async findByPropertyId(propertyId: string, _user: IUserWithPermissions) {
@@ -305,10 +313,15 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     // Update associated_user_id to current user
     (normalizedData as UpdatePropertyBankDetailsDto).associated_user_id = user.id
 
-    return this.propertyBankDetailsRepository.update(
+    const result = await this.propertyBankDetailsRepository.update(
       propertyId,
       normalizedData as UpdatePropertyBankDetailsDto
     )
+
+    // Send email notification to super admins
+    await this.sendBankDetailsNotificationToSuperAdmins(propertyId, 'updated')
+
+    return result
   }
 
   async bulkUpdate(
@@ -1197,6 +1210,112 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     } catch (error) {
       console.error('❌ Error sending bulk update alerts:', error)
       // Don't throw - alerts are non-critical
+    }
+  }
+
+  /**
+   * Send email notification to all super admins when bank details are created or updated
+   */
+  private async sendBankDetailsNotificationToSuperAdmins(
+    propertyId: string,
+    action: 'created' | 'updated'
+  ): Promise<void> {
+    try {
+      console.log(
+        `📧 Sending bank details ${action} notification to super admins...`
+      )
+
+      // Get property details
+      const property = await this.prisma.property.findUnique({
+        where: { id: propertyId },
+        select: {
+          id: true,
+          name: true
+        }
+      })
+
+      if (!property) {
+        console.warn(
+          `Property not found for bank details notification: ${propertyId}`
+        )
+        return
+      }
+
+      // Get all super admin users
+      const allUsers = await this.prisma.user.findMany({
+        where: {
+          is_verified: true
+        },
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          role: {
+            select: {
+              portfolio_permission: true,
+              property_permission: true,
+              audit_permission: true,
+              user_permission: true,
+              system_settings_permission: true
+            }
+          }
+        }
+      })
+
+      // Filter super admins using the isUserSuperAdmin utility
+      const superAdminEmails: string[] = []
+
+      for (const user of allUsers) {
+        // Check if user is super admin by checking all permissions
+        const allPermissions = [
+          user.role.portfolio_permission,
+          user.role.property_permission,
+          user.role.audit_permission,
+          user.role.user_permission,
+          user.role.system_settings_permission
+        ]
+
+        // User is super admin if all permissions have permission_level 'all' and access_level 'all'
+        const isSuperAdmin = allPermissions.every(
+          permission =>
+            permission &&
+            permission.permission_level === 'all' &&
+            permission.access_level === 'all'
+        )
+
+        if (isSuperAdmin) {
+          superAdminEmails.push(user.email)
+        }
+      }
+
+      if (superAdminEmails.length === 0) {
+        console.warn('No super admin users found to notify')
+        return
+      }
+
+      // Send email to all super admins
+      const subject = `Bank Details ${action === 'created' ? 'Added' : 'Updated'} - ${property.name}`
+      const body = `Bank details have been ${action} for property "${property.name}".\n\nPlease review the changes in the VNP Solutions Dashboard.\n\nThis is an automated notification.`
+
+      try {
+        await this.emailUtil.sendEmail(superAdminEmails, subject, body)
+
+        console.log(
+          `✅ Sent bank details ${action} notification to ${superAdminEmails.length} super admin(s)`
+        )
+      } catch (emailError) {
+        console.error(
+          `❌ Failed to send bank details ${action} notification:`,
+          emailError
+        )
+      }
+    } catch (error) {
+      console.error(
+        `❌ Error sending bank details ${action} notification:`,
+        error
+      )
+      // Don't throw - email notifications are non-critical
     }
   }
 }
