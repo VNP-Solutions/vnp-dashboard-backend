@@ -59,7 +59,7 @@ export class CreatePropertyBankDetailsDto {
   @ApiPropertyOptional({
     example: '123 Main Street, New York, NY 10001',
     description:
-      'Beneficiary address. Required for Domestic US Wire and International Wire.'
+      'Beneficiary address. Optional for all bank sub-types (previously required for Domestic Wire and International Wire).'
   })
   @IsString()
   @IsOptional()
@@ -127,7 +127,7 @@ export class CreatePropertyBankDetailsDto {
   @ApiPropertyOptional({
     example: 'USD',
     description:
-      'Currency code (e.g., USD, EUR, GBP). Required for International Wire.'
+      'Currency code (e.g., USD, EUR, GBP). Optional for all bank sub-types (previously required for International Wire).'
   })
   @IsString()
   @IsOptional()
@@ -206,7 +206,7 @@ export class BulkUpdateBankDetailsResultDto {
 
   @ApiProperty({
     example: 8,
-    description: 'Number of bank details successfully updated'
+    description: 'Number of bank details successfully updated/created'
   })
   successCount: number
 
@@ -215,9 +215,10 @@ export class BulkUpdateBankDetailsResultDto {
 
   @ApiProperty({
     example: [
-      { row: 3, property: 'Test Property', error: 'Property not found' }
+      { row: 3, property: 'EXP123456', error: 'Property not found for this Expedia ID' },
+      { row: 5, property: 'EXP789012', error: 'Missing required fields for ach: Bank Account Type' }
     ],
-    description: 'List of errors encountered during bulk update'
+    description: 'List of errors encountered during bulk update. Property field contains Expedia ID.'
   })
   errors: Array<{
     row: number
@@ -226,8 +227,8 @@ export class BulkUpdateBankDetailsResultDto {
   }>
 
   @ApiProperty({
-    example: ['Property A', 'Property B'],
-    description: 'List of successfully updated property names'
+    example: ['EXP123456', 'EXP234567', 'EXP345678'],
+    description: 'List of successfully updated Expedia IDs'
   })
   successfulUpdates: string[]
 }
