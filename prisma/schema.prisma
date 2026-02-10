@@ -183,7 +183,8 @@ model PropertyBankDetails {
   account_name               String?
   bank_name                  String?
   bank_branch                String?
-  swift_bic_iban             String?
+  iban_number                String?
+  swift_bic_number           String?
   routing_number             String?
   bank_wiring_routing_number String?
   bank_account_type          BankAccountType?

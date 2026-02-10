@@ -44,8 +44,11 @@ export class PropertyBankDetailsRepository
     if (data.bank_branch) {
       createData.bank_branch = data.bank_branch
     }
-    if (data.swift_bic_iban) {
-      createData.swift_bic_iban = data.swift_bic_iban
+    if (data.iban_number) {
+      createData.iban_number = data.iban_number
+    }
+    if (data.swift_bic_number) {
+      createData.swift_bic_number = data.swift_bic_number
     }
     if (data.routing_number) {
       createData.routing_number = data.routing_number
@@ -129,8 +132,11 @@ export class PropertyBankDetailsRepository
     if (data.bank_branch !== undefined) {
       updateData.bank_branch = data.bank_branch
     }
-    if (data.swift_bic_iban !== undefined) {
-      updateData.swift_bic_iban = data.swift_bic_iban
+    if (data.iban_number !== undefined) {
+      updateData.iban_number = data.iban_number
+    }
+    if (data.swift_bic_number !== undefined) {
+      updateData.swift_bic_number = data.swift_bic_number
     }
     if (data.routing_number !== undefined) {
       updateData.routing_number = data.routing_number

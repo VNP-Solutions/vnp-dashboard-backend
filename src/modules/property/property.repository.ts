@@ -131,8 +131,11 @@ export class PropertyRepository implements IPropertyRepository {
         if (bankDetailsData.bank_branch) {
           bankData.bank_branch = bankDetailsData.bank_branch
         }
-        if (bankDetailsData.swift_bic_iban) {
-          bankData.swift_bic_iban = bankDetailsData.swift_bic_iban
+        if (bankDetailsData.iban_number) {
+          bankData.iban_number = bankDetailsData.iban_number
+        }
+        if (bankDetailsData.swift_bic_number) {
+          bankData.swift_bic_number = bankDetailsData.swift_bic_number
         }
         if (bankDetailsData.routing_number) {
           bankData.routing_number = bankDetailsData.routing_number
@@ -342,8 +345,11 @@ export class PropertyRepository implements IPropertyRepository {
             if (bankDetailsData.bank_branch) {
               bankData.bank_branch = bankDetailsData.bank_branch
             }
-            if (bankDetailsData.swift_bic_iban) {
-              bankData.swift_bic_iban = bankDetailsData.swift_bic_iban
+            if (bankDetailsData.iban_number) {
+              bankData.iban_number = bankDetailsData.iban_number
+            }
+            if (bankDetailsData.swift_bic_number) {
+              bankData.swift_bic_number = bankDetailsData.swift_bic_number
             }
             if (bankDetailsData.routing_number) {
               bankData.routing_number = bankDetailsData.routing_number

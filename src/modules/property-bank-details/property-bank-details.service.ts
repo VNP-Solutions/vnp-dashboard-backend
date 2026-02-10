@@ -136,8 +136,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           }
           // beneficiary_address is now OPTIONAL for International Wire
           // currency is now OPTIONAL for International Wire
-          if (!data.swift_bic_iban || !data.swift_bic_iban.trim()) {
-            missingFields.push('swift_bic_iban')
+          if (!data.iban_number || !data.iban_number.trim()) {
+            missingFields.push('iban_number')
+          }
+          if (!data.swift_bic_number || !data.swift_bic_number.trim()) {
+            missingFields.push('swift_bic_number')
           }
           break
 
@@ -623,16 +626,20 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Branch',
             'Branch Name'
           ])
-          const swiftBicIban = findHeaderValue(row, [
+          const ibanNumber = findHeaderValue(row, [
+            'IBAN or Account Number',
+            'IBAN or account number',
+            'Iban or Account Number',
+            'IBAN/Account Number',
+            'IBAN',
+            'Iban',
+            'iban_number'
+          ])
+          const swiftBicNumber = findHeaderValue(row, [
             'SWIFT/BIC Code',
             'Swift/BIC Code',
             'Swift/Bic Code',
             'SWIFT/BIC',
-            'Swift or BIC or IBAN',
-            'Swift or Bic or Iban',
-            'Swift/BIC/IBAN',
-            'Swift/Bic/Iban',
-            'swift_bic_iban',
             'Swift Code',
             'Swift code',
             'SWIFT',
@@ -640,8 +647,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'SWIFT Code',
             'BIC',
             'BIC Code',
-            'IBAN',
-            'Iban'
+            'swift_bic_number'
           ])
           const routingNumber = findHeaderValue(row, [
             'Bank Routing Number',
@@ -735,8 +741,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           if (bankBranch !== undefined) {
             updateData.bank_branch = bankBranch
           }
-          if (swiftBicIban !== undefined) {
-            updateData.swift_bic_iban = swiftBicIban
+          if (ibanNumber !== undefined) {
+            updateData.iban_number = ibanNumber
+          }
+          if (swiftBicNumber !== undefined) {
+            updateData.swift_bic_number = swiftBicNumber
           }
           if (routingNumber !== undefined) {
             // Validate routing number has at least 9 digits
@@ -838,10 +847,14 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               updateData.bank_wiring_routing_number !== undefined
                 ? updateData.bank_wiring_routing_number
                 : existingBankDetails?.bank_wiring_routing_number,
-            swift_bic_iban:
-              updateData.swift_bic_iban !== undefined
-                ? updateData.swift_bic_iban
-                : existingBankDetails?.swift_bic_iban,
+            iban_number:
+              updateData.iban_number !== undefined
+                ? updateData.iban_number
+                : existingBankDetails?.iban_number,
+            swift_bic_number:
+              updateData.swift_bic_number !== undefined
+                ? updateData.swift_bic_number
+                : existingBankDetails?.swift_bic_number,
             bank_account_type:
               updateData.bank_account_type !== undefined
                 ? updateData.bank_account_type
@@ -923,10 +936,16 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                   // beneficiary_address is now OPTIONAL for International Wire
                   // currency is now OPTIONAL for International Wire
                   if (
-                    !mergedData.swift_bic_iban ||
-                    !mergedData.swift_bic_iban.trim()
+                    !mergedData.iban_number ||
+                    !mergedData.iban_number.trim()
                   ) {
-                    missingFields.push('Swift or BIC or IBAN')
+                    missingFields.push('IBAN or Account Number')
+                  }
+                  if (
+                    !mergedData.swift_bic_number ||
+                    !mergedData.swift_bic_number.trim()
+                  ) {
+                    missingFields.push('SWIFT/BIC Code')
                   }
                   break
               }

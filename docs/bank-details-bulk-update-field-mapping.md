@@ -91,8 +91,8 @@ The system auto-detects bank sub-type based on column presence:
 | Beneficiary Address* | `beneficiary_address` | ✅ Optional |
 | Bank Name* | `bank_name` | ✅ **REQUIRED** |
 | Bank Address* | `bank_address` | ✅ Optional |
-| IBAN or Account Number* | `account_number` | ✅ **REQUIRED** |
-| SWIFT/BIC Code* | `swift_bic_iban` | ✅ **REQUIRED** |
+| IBAN or Account Number* | `iban_number` | ✅ **REQUIRED** |
+| SWIFT/BIC Code* | `swift_bic_number` | ✅ **REQUIRED** |
 | Contact Name* | `contact_name` | ✅ Optional |
 | Email Address* | `email_address` | ✅ Optional |
 | Comments | `comments` | ✅ Optional |
@@ -103,8 +103,8 @@ The system auto-detects bank sub-type based on column presence:
 - hotel_portfolio_name
 - beneficiary_name
 - bank_name
-- account_number
-- swift_bic_iban
+- iban_number
+- swift_bic_number
 
 **Optional Fields:**
 - beneficiary_address (now optional)
