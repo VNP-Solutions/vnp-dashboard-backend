@@ -674,7 +674,7 @@ export class PropertyController {
     Only internal users can use this endpoint.
     
     Required column:
-    - Property ID/Property Id/Property id/property_id/ID/Id/id: ID of the property to update (must exist)
+    - Expedia ID/Expedia Id/Expedia id/ExpediaID/expedia_id: Expedia ID to identify the property (must exist)
     
     Optional columns (only update if provided):
     - Property Name/Property name/Name: Name of the property
@@ -683,7 +683,6 @@ export class PropertyController {
     - Card Descriptor/Card descriptor/Descriptor: Card descriptor
     - Next Due Date/Next due date/Due Date: Next due date (mm/dd/yyyy)
     - Portfolio/Portfolio Name/Portfolio name: Portfolio name (will be created if doesn't exist)
-    - Expedia ID/Expedia Id/Expedia id/ExpediaID: Expedia ID
     - Expedia Username/Expedia username/Expedia User: Expedia username
     - Expedia Password/Expedia password/Expedia Pass: Expedia password
     - Agoda ID/Agoda Id/Agoda id/AgodaID: Agoda ID
@@ -733,13 +732,13 @@ export class PropertyController {
         errors: [
           {
             row: 3,
-            propertyId: '507f1f77bcf86cd799439011',
-            error: 'Property not found'
+            expediaId: 'EXP-12345',
+            error: 'Property not found with Expedia ID: EXP-12345'
           }
         ],
         successfulUpdates: [
-          '507f1f77bcf86cd799439012',
-          '507f1f77bcf86cd799439013'
+          'EXP-67890',
+          'EXP-11223'
         ]
       }
     }

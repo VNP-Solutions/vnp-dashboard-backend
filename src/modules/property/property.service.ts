@@ -2615,54 +2615,43 @@ export class PropertyService implements IPropertyService {
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
-          // Extract Property ID (required)
-          const propertyIdValue = findHeaderValue(row, [
-            'Property ID',
-            'Property Id',
-            'Property id',
-            'property_id',
-            'ID',
-            'Id',
-            'id'
+          // Extract Expedia ID (required) - now the unique identifier
+          const expediaIdValue = findHeaderValue(row, [
+            'Expedia ID',
+            'Expedia Id',
+            'Expedia id',
+            'ExpediaID',
+            'expedia_id'
           ])
 
-          if (!propertyIdValue) {
+          if (!expediaIdValue) {
             // Log row keys for debugging
             console.log(`Row ${rowNumber} keys:`, Object.keys(row))
             console.log(`Row ${rowNumber} values:`, row)
             result.errors.push({
               row: rowNumber,
-              propertyId: 'Unknown',
-              error: 'Property ID is required'
+              expediaId: 'Unknown',
+              error: 'Expedia ID is required'
             })
             result.failureCount++
             continue
           }
 
-          // Validate MongoDB ObjectId format
-          if (!QueryBuilder.isValidObjectId(propertyIdValue)) {
-            result.errors.push({
-              row: rowNumber,
-              propertyId: propertyIdValue,
-              error:
-                'Invalid property ID format (must be a valid MongoDB ObjectId)'
-            })
-            result.failureCount++
-            continue
-          }
-
-          // Find existing property
+          // Find existing property by Expedia ID
           const existingProperty =
-            await this.propertyRepository.findById(propertyIdValue)
+            await this.propertyRepository.findByExpediaId(expediaIdValue)
           if (!existingProperty) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
-              error: 'Property not found'
+              expediaId: expediaIdValue,
+              error: `Property not found with Expedia ID: ${expediaIdValue}`
             })
             result.failureCount++
             continue
           }
+
+          // Get the actual property ID for permission checks and updates
+          const propertyIdValue = existingProperty.id
 
           // Check if user has permission to update this property
           try {
@@ -2675,7 +2664,7 @@ export class PropertyService implements IPropertyService {
           } catch (error) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
+              expediaId: expediaIdValue,
               error:
                 error.message ||
                 'You do not have permission to update this property'
@@ -2694,14 +2683,15 @@ export class PropertyService implements IPropertyService {
             'Name'
           ])
           if (propertyName) {
-            // Check if name is being changed and if new name already exists
+            // Check if name is being changed and if new name already exists in a different property
             if (propertyName !== existingProperty.name) {
               const propertyWithSameName =
                 await this.propertyRepository.findByName(propertyName)
-              if (propertyWithSameName) {
+              // Only error if another property (different ID) already has this name
+              if (propertyWithSameName && propertyWithSameName.id !== existingProperty.id) {
                 result.errors.push({
                   row: rowNumber,
-                  propertyId: propertyIdValue,
+                  expediaId: expediaIdValue,
                   error: 'Property with this name already exists'
                 })
                 result.failureCount++
@@ -2759,7 +2749,7 @@ export class PropertyService implements IPropertyService {
             if (!nextDueDate) {
               result.errors.push({
                 row: rowNumber,
-                propertyId: propertyIdValue,
+                expediaId: expediaIdValue,
                 error:
                   'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
               })
@@ -2869,7 +2859,7 @@ export class PropertyService implements IPropertyService {
           if (hasExpediaUsername !== hasExpediaPassword) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
+              expediaId: expediaIdValue,
               error: 'Expedia username and password must be provided together'
             })
             result.failureCount++
@@ -2883,7 +2873,7 @@ export class PropertyService implements IPropertyService {
           if (hasAgodaPassword && !hasAgodaUsername) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
+              expediaId: expediaIdValue,
               error:
                 'Agoda username is required when Agoda password is provided'
             })
@@ -2896,7 +2886,7 @@ export class PropertyService implements IPropertyService {
           if (hasBookingUsername !== hasBookingPassword) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
+              expediaId: expediaIdValue,
               error: 'Booking username and password must be provided together'
             })
             result.failureCount++
@@ -2910,7 +2900,7 @@ export class PropertyService implements IPropertyService {
           if (!hasPropertyUpdate && !hasCredentialsUpdate) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
+              expediaId: expediaIdValue,
               error: 'No fields to update (all fields are empty)'
             })
             result.failureCount++
@@ -2988,22 +2978,20 @@ export class PropertyService implements IPropertyService {
           // Use POST /property-bank-details/bulk-update for bank details
 
           result.successCount++
-          result.successfulUpdates.push(propertyIdValue)
+          result.successfulUpdates.push(expediaIdValue)
         } catch (error) {
-          const propertyIdValue =
+          const expediaIdValue =
             findHeaderValue(row, [
-              'Property ID',
-              'Property Id',
-              'Property id',
-              'property_id',
-              'ID',
-              'Id',
-              'id'
+              'Expedia ID',
+              'Expedia Id',
+              'Expedia id',
+              'ExpediaID',
+              'expedia_id'
             ]) || 'Unknown'
 
           result.errors.push({
             row: rowNumber,
-            propertyId: propertyIdValue,
+            expediaId: expediaIdValue,
             error: error.message || 'Unknown error occurred'
           })
           result.failureCount++

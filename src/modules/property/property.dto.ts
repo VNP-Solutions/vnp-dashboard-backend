@@ -266,7 +266,7 @@ export class BulkUpdateResultDto {
     example: [
       {
         row: 3,
-        propertyId: '507f1f77bcf86cd799439011',
+        expediaId: 'EXP-12345',
         error: 'Property not found'
       }
     ],
@@ -274,13 +274,13 @@ export class BulkUpdateResultDto {
   })
   errors: Array<{
     row: number
-    propertyId: string
+    expediaId: string
     error: string
   }>
 
   @ApiProperty({
-    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
-    description: 'List of successfully updated property IDs'
+    example: ['EXP-12345', 'EXP-67890'],
+    description: 'List of successfully updated Expedia IDs'
   })
   successfulUpdates: string[]
 }
