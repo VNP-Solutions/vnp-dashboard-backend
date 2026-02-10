@@ -15,9 +15,12 @@ This document maps the client-provided Excel fields for bulk updating property b
 
 The system auto-detects bank sub-type based on column presence:
 
-1. **If sheet has SWIFT/BIC/IBAN columns** → International Wire
-2. **Else if sheet has Bank Account Type column** → ACH  
-3. **Otherwise** → Domestic Wire
+1. **If sheet has SWIFT/BIC Code or IBAN columns** → International Wire
+2. **Else if sheet has Bank Wiring Routing Number column** → Domestic Wire
+3. **Else if sheet has Bank Account Type column** → ACH
+4. **Otherwise** → Domestic Wire (default)
+
+**Important:** Both ACH and Domestic Wire sheets may have `Bank Account Type` column. The presence of `Bank Wiring Routing Number` is what distinguishes Domestic Wire from ACH.
 
 ---
 
@@ -57,9 +60,9 @@ The system auto-detects bank sub-type based on column presence:
 | Pay To The Order Of* | `beneficiary_name` | ✅ **REQUIRED** |
 | Bank Name* | `bank_name` | ✅ **REQUIRED** |
 | Bank Routing Number* | `routing_number` | ✅ **REQUIRED** (min 9 digits) |
-| Bank Wiring Routing Number | Not stored | ⚠️ Ignored |
+| Bank Wiring Routing Number | `bank_wiring_routing_number` | ✅ Optional (any length accepted) |
 | Bank Account Number* | `account_number` | ✅ **REQUIRED** |
-| Bank Account Type* | Not needed | ⚠️ Ignored (only for ACH) |
+| Bank Account Type* | Not needed for Domestic Wire | ⚠️ Ignored (only for ACH) |
 | Contact Name* | `contact_name` | ✅ Optional |
 | Email Address* | `email_address` | ✅ Optional |
 | Comments | `comments` | ✅ Optional |

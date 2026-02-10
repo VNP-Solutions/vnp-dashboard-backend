@@ -50,6 +50,9 @@ export class PropertyBankDetailsRepository
     if (data.routing_number) {
       createData.routing_number = data.routing_number
     }
+    if (data.bank_wiring_routing_number) {
+      createData.bank_wiring_routing_number = data.bank_wiring_routing_number
+    }
     if (data.bank_account_type) {
       createData.bank_account_type = data.bank_account_type
     }
@@ -131,6 +134,9 @@ export class PropertyBankDetailsRepository
     }
     if (data.routing_number !== undefined) {
       updateData.routing_number = data.routing_number
+    }
+    if (data.bank_wiring_routing_number !== undefined) {
+      updateData.bank_wiring_routing_number = data.bank_wiring_routing_number
     }
     if (data.bank_account_type !== undefined) {
       updateData.bank_account_type = data.bank_account_type

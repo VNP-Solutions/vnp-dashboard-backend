@@ -210,7 +210,17 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       return BankSubType.international_wire
     }
 
-    // Check for Bank Account Type → ACH
+    // Check for "Bank Wiring Routing Number" → Domestic Wire
+    const hasBankWiringRoutingNumber = normalizedHeaders.some(h =>
+      h.includes('bank wiring routing number') ||
+      h.includes('wiring routing number') ||
+      h === 'bank wiring routing number'
+    )
+    if (hasBankWiringRoutingNumber) {
+      return BankSubType.domestic_wire
+    }
+
+    // Check for Bank Account Type (without Bank Wiring Routing Number) → ACH
     const hasBankAccountType = normalizedHeaders.some(h =>
       h.includes('bank account type') ||
       h === 'bank account type' ||
@@ -552,6 +562,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
           // Extract bank details fields with comprehensive name matching
           const hotelPortfolioName = findHeaderValue(row, [
+            'Hotel Or Portfolio Name',
+            'Hotel or Portfolio Name',
             'Hotel Portfolio Name',
             'Hotel portfolio name',
             'hotel_portfolio_name',
@@ -561,6 +573,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Portfolio name'
           ])
           const beneficiaryName = findHeaderValue(row, [
+            'Pay To The Order Of',
+            'Pay to the Order Of',
+            'Pay to the order of',
             'Beneficiary Name',
             'Beneficiary name',
             'beneficiary_name',
@@ -575,11 +590,15 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Beneficiary addr'
           ])
           const accountNumber = findHeaderValue(row, [
+            'IBAN or Account Number',
+            'IBAN or account number',
+            'Iban or Account Number',
+            'Bank Account Number',
+            'Bank account number',
             'Account Number',
             'Account number',
             'account_number',
             'Bank Account',
-            'Bank Account Number',
             'Account No',
             'Account #'
           ])
@@ -605,6 +624,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Branch Name'
           ])
           const swiftBicIban = findHeaderValue(row, [
+            'SWIFT/BIC Code',
+            'Swift/BIC Code',
+            'Swift/Bic Code',
+            'SWIFT/BIC',
             'Swift or BIC or IBAN',
             'Swift or Bic or Iban',
             'Swift/BIC/IBAN',
@@ -616,11 +639,13 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Swift',
             'SWIFT Code',
             'BIC',
-            'SWIFT/BIC',
+            'BIC Code',
             'IBAN',
             'Iban'
           ])
           const routingNumber = findHeaderValue(row, [
+            'Bank Routing Number',
+            'Bank routing number',
             'Routing Number',
             'Routing number',
             'routing_number',
@@ -628,6 +653,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Routing No',
             'ABA Number',
             'ABA'
+          ])
+          const bankWiringRoutingNumber = findHeaderValue(row, [
+            'Bank Wiring Routing Number',
+            'Bank wiring routing number',
+            'Wiring Routing Number',
+            'Wiring routing number'
           ])
           const bankAccountType = findHeaderValue(row, [
             'Bank Account Type',
@@ -725,6 +756,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               updateData.routing_number = routingNumber
             }
           }
+          if (bankWiringRoutingNumber !== undefined) {
+            updateData.bank_wiring_routing_number = bankWiringRoutingNumber
+          }
           if (bankAccountType !== undefined) {
             const normalizedAccountType = bankAccountType.toLowerCase().trim()
             // Handle both "Checking/Saving" and "checking/savings"
@@ -800,6 +834,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               updateData.routing_number !== undefined
                 ? updateData.routing_number
                 : existingBankDetails?.routing_number,
+            bank_wiring_routing_number:
+              updateData.bank_wiring_routing_number !== undefined
+                ? updateData.bank_wiring_routing_number
+                : existingBankDetails?.bank_wiring_routing_number,
             swift_bic_iban:
               updateData.swift_bic_iban !== undefined
                 ? updateData.swift_bic_iban

@@ -377,9 +377,12 @@ This document provides comprehensive request and response examples for all bank 
 
 ### Detection Logic
 The system automatically detects the bank sub-type based on column headers:
-- If sheet contains `SWIFT`, `BIC`, or `IBAN` columns → **International Wire**
-- If sheet contains `Bank Account Type` column → **ACH**
-- Otherwise → **Domestic Wire**
+- If sheet contains `SWIFT/BIC Code` or `IBAN` columns → **International Wire**
+- If sheet contains `Bank Wiring Routing Number` column → **Domestic Wire**
+- If sheet contains `Bank Account Type` column (without `Bank Wiring Routing Number`) → **ACH**
+- Otherwise → **Domestic Wire** (default)
+
+**Important:** Both ACH and Domestic Wire sheets may have `Bank Account Type`. The key differentiator is the presence of `Bank Wiring Routing Number` for Domestic Wire.
 
 ### Example Request
 
@@ -441,11 +444,12 @@ The system automatically detects the bank sub-type based on column headers:
 
 #### Domestic Wire Sheet
 **Required Columns:** Expedia ID, Hotel Or Portfolio Name, Pay To The Order Of, Bank Name, Bank Routing Number, Bank Account Number  
-**Optional Columns:** Bank Wiring Routing Number, Contact Name, Email Address, Comments
+**Optional Columns:** Bank Wiring Routing Number, Bank Account Type, Contact Name, Email Address, Comments  
+**Note:** Bank Account Type is present but ignored for Domestic Wire (only used for ACH)
 
-| Expedia ID* | Hotel Or Portfolio Name* | Pay To The Order Of* | Bank Name* | Bank Routing Number* | Bank Wiring Routing Number | Bank Account Number* | Contact Name | Email Address | Comments |
-|-------------|-------------------------|---------------------|------------|---------------------|---------------------------|---------------------|--------------|---------------|----------|
-| EXP234567 | Plaza Hotel | Plaza LLC | Wells Fargo | 121000248 | 121000248 | 9876543210 | Jane Doe | jane@plaza.com | Wire account |
+| Expedia ID* | Hotel Or Portfolio Name* | Pay To The Order Of* | Bank Name* | Bank Routing Number* | Bank Wiring Routing Number | Bank Account Number* | Bank Account Type | Contact Name | Email Address | Comments |
+|-------------|-------------------------|---------------------|------------|---------------------|---------------------------|---------------------|------------------|--------------|---------------|----------|
+| EXP234567 | Plaza Hotel | Plaza LLC | Wells Fargo | 121000248 | 121000248 | 9876543210 | Checking | Jane Doe | jane@plaza.com | Wire account |
 
 #### International Wire Sheet
 **Required Columns:** Expedia ID, Hotel Or Portfolio Name, Beneficiary Name, Bank Name, IBAN or Account Number, SWIFT/BIC Code  

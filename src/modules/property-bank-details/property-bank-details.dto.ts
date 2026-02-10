@@ -116,6 +116,15 @@ export class CreatePropertyBankDetailsDto {
   routing_number?: string
 
   @ApiPropertyOptional({
+    example: '121000248',
+    description:
+      'Bank wiring routing number for wire transfers. Optional field, only applicable for Domestic Wire transfers.'
+  })
+  @IsString()
+  @IsOptional()
+  bank_wiring_routing_number?: string
+
+  @ApiPropertyOptional({
     enum: BankAccountType,
     example: BankAccountType.checking,
     description: 'Bank account type (checking or savings). Required for ACH.'
