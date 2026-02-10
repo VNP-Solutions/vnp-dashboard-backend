@@ -1,7 +1,7 @@
 import {
   registerDecorator,
-  ValidationOptions,
-  ValidationArguments
+  ValidationArguments,
+  ValidationOptions
 } from 'class-validator'
 
 /**
@@ -9,14 +9,14 @@ import {
  * @param validationOptions - Additional validation options
  */
 export function IsCommaSeparatedEmails(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isCommaSeparatedEmails',
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
+        validate(value: any) {
           if (!value || typeof value !== 'string') {
             return false
           }

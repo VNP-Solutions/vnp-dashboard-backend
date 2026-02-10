@@ -86,12 +86,130 @@ export class PropertyController {
       'Create a property with credentials and bank details in a single transaction (Internal users only)',
     description:
       'Creates a property along with optional credentials and bank details. All operations are performed in a transaction and will be rolled back if any operation fails. ' +
-      'Property data is required, while credentials and bank details are optional.'
+      'Property data is required, while credentials and bank details are optional. ' +
+      'Bank details support new fields: contact_name, email_address, bank_address, comments. ' +
+      'Optional fields: beneficiary_address and currency (no longer required for any sub-type).'
+  })
+  @ApiBody({
+    type: CompleteCreatePropertyDto,
+    examples: {
+      withACH: {
+        summary: 'Property with ACH Bank Details',
+        description: 'Complete property creation with ACH bank details',
+        value: {
+          property: {
+            name: 'Grand Plaza Hotel',
+            address: '123 Main Street, New York, NY 10001',
+            currency_id: '507f1f77bcf86cd799439020',
+            card_descriptor: 'GRAND PLAZA NY',
+            is_active: true,
+            portfolio_id: '507f1f77bcf86cd799439012'
+          },
+          credentials: {
+            expedia: {
+              expedia_id: 'EXP123456',
+              username: 'grandplaza@expedia.com',
+              password: 'ExpediaPass123!'
+            }
+          },
+          bank_details: {
+            bank_type: 'bank',
+            bank_sub_type: 'ach',
+            hotel_portfolio_name: 'Grand Plaza Hotel',
+            beneficiary_name: 'Grand Plaza LLC',
+            account_number: '1234567890',
+            bank_name: 'Chase Bank',
+            routing_number: '021000021',
+            bank_account_type: 'checking',
+            contact_name: 'John Smith',
+            email_address: 'accounting@grandplaza.com',
+            comments: 'Primary operating account'
+          }
+        }
+      },
+      withInternationalWire: {
+        summary: 'Property with International Wire',
+        description: 'Complete property creation with international wire details',
+        value: {
+          property: {
+            name: 'Royal Suites London',
+            address: '456 Park Lane, London, UK',
+            currency_id: '507f1f77bcf86cd799439021',
+            is_active: true,
+            portfolio_id: '507f1f77bcf86cd799439013'
+          },
+          credentials: {
+            expedia: {
+              expedia_id: 'EXP789012',
+              username: 'royalsuites@expedia.com',
+              password: 'ExpediaPass456!'
+            },
+            booking: {
+              hotel_id: 'BKG456789',
+              username: 'royal@booking.com',
+              password: 'BookingPass123!'
+            }
+          },
+          bank_details: {
+            bank_type: 'bank',
+            bank_sub_type: 'international_wire',
+            hotel_portfolio_name: 'Royal Suites International',
+            beneficiary_name: 'Royal Suites Ltd',
+            beneficiary_address: '456 Park Lane, London W1K 1PS, UK',
+            account_number: 'GB29NWBK60161331926819',
+            bank_name: 'HSBC Bank',
+            swift_bic_iban: 'HSBCGB2LXXX',
+            currency: 'GBP',
+            bank_address: '8 Canada Square, London E14 5HQ, UK',
+            contact_name: 'Sarah Williams',
+            email_address: 'finance@royalsuites.co.uk',
+            comments: 'For European bookings and payments'
+          }
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 201,
     description:
-      'Property with credentials and bank details created successfully'
+      'Property with credentials and bank details created successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Property created successfully with credentials and bank details',
+        data: {
+          id: '507f1f77bcf86cd799439030',
+          name: 'Grand Plaza Hotel',
+          address: '123 Main Street, New York, NY 10001',
+          currency_id: '507f1f77bcf86cd799439020',
+          card_descriptor: 'GRAND PLAZA NY',
+          is_active: true,
+          portfolio_id: '507f1f77bcf86cd799439012',
+          created_at: '2026-02-08T10:00:00.000Z',
+          updated_at: '2026-02-08T10:00:00.000Z',
+          credentials: {
+            id: '507f1f77bcf86cd799439031',
+            expedia_id: 'EXP123456',
+            property_id: '507f1f77bcf86cd799439030'
+          },
+          bank_details: {
+            id: '507f1f77bcf86cd799439032',
+            bank_type: 'bank',
+            bank_sub_type: 'ach',
+            hotel_portfolio_name: 'Grand Plaza Hotel',
+            beneficiary_name: 'Grand Plaza LLC',
+            account_number: '1234567890',
+            bank_name: 'Chase Bank',
+            routing_number: '021000021',
+            bank_account_type: 'checking',
+            contact_name: 'John Smith',
+            email_address: 'accounting@grandplaza.com',
+            comments: 'Primary operating account',
+            property_id: '507f1f77bcf86cd799439030'
+          }
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 400,
@@ -119,12 +237,119 @@ export class PropertyController {
       'Update a property with credentials and bank details in a single transaction',
     description:
       'Updates a property along with optional credentials and bank details. All operations are performed in a transaction and will be rolled back if any operation fails. ' +
-      'All fields are optional - only provided fields will be updated.'
+      'All fields are optional - only provided fields will be updated. ' +
+      'Bank details support new fields: contact_name, email_address, bank_address, comments. ' +
+      'Optional fields: beneficiary_address and currency (no longer required for any sub-type).'
+  })
+  @ApiBody({
+    type: CompleteUpdatePropertyDto,
+    examples: {
+      updateBankDetails: {
+        summary: 'Update Bank Details Only',
+        description: 'Update property bank details without changing property or credentials',
+        value: {
+          bank_details: {
+            contact_name: 'Jane Doe',
+            email_address: 'jane.doe@hotel.com',
+            comments: 'Updated contact person - Jane is now handling all bank inquiries'
+          }
+        }
+      },
+      updateAllSections: {
+        summary: 'Update Property, Credentials, and Bank Details',
+        description: 'Comprehensive update of all sections',
+        value: {
+          property: {
+            name: 'Grand Plaza Hotel & Suites',
+            address: '123 Main Street, Suite 100, New York, NY 10001',
+            card_descriptor: 'GRAND PLAZA SUITES'
+          },
+          credentials: {
+            expedia: {
+              expedia_id: 'EXP123456',
+              username: 'grandplaza.new@expedia.com',
+              password: 'NewExpediaPass123!'
+            },
+            agoda: {
+              hotel_id: 'AGD789012',
+              username: 'grandplaza@agoda.com',
+              password: 'AgodaPass456!'
+            }
+          },
+          bank_details: {
+            bank_sub_type: 'domestic_wire',
+            bank_name: 'Wells Fargo',
+            routing_number: '121000248',
+            account_number: '9876543210',
+            beneficiary_name: 'Grand Plaza Operations LLC',
+            beneficiary_address: '123 Main Street, New York, NY 10001',
+            contact_name: 'Michael Johnson',
+            email_address: 'michael.j@grandplaza.com',
+            bank_address: '420 Montgomery Street, San Francisco, CA 94104',
+            comments: 'Switched to Wells Fargo effective March 2026'
+          }
+        }
+      },
+      changeBankSubType: {
+        summary: 'Change Bank Sub-Type from ACH to International Wire',
+        description: 'Update bank sub-type and add required international wire fields',
+        value: {
+          bank_details: {
+            bank_sub_type: 'international_wire',
+            swift_bic_iban: 'CHASUS33XXX',
+            currency: 'USD',
+            bank_address: '270 Park Avenue, New York, NY 10017',
+            routing_number: null,
+            bank_account_type: null,
+            comments: 'Switching to international wire for better global coverage'
+          }
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 200,
     description:
-      'Property with credentials and bank details updated successfully'
+      'Property with credentials and bank details updated successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Property updated successfully',
+        data: {
+          id: '507f1f77bcf86cd799439030',
+          name: 'Grand Plaza Hotel & Suites',
+          address: '123 Main Street, Suite 100, New York, NY 10001',
+          currency_id: '507f1f77bcf86cd799439020',
+          card_descriptor: 'GRAND PLAZA SUITES',
+          is_active: true,
+          portfolio_id: '507f1f77bcf86cd799439012',
+          created_at: '2026-02-08T10:00:00.000Z',
+          updated_at: '2026-02-08T15:30:00.000Z',
+          credentials: {
+            id: '507f1f77bcf86cd799439031',
+            expedia_id: 'EXP123456',
+            agoda_id: 'AGD789012',
+            property_id: '507f1f77bcf86cd799439030'
+          },
+          bank_details: {
+            id: '507f1f77bcf86cd799439032',
+            bank_type: 'bank',
+            bank_sub_type: 'domestic_wire',
+            hotel_portfolio_name: 'Grand Plaza Hotel',
+            beneficiary_name: 'Grand Plaza Operations LLC',
+            beneficiary_address: '123 Main Street, New York, NY 10001',
+            account_number: '9876543210',
+            bank_name: 'Wells Fargo',
+            routing_number: '121000248',
+            contact_name: 'Michael Johnson',
+            email_address: 'michael.j@grandplaza.com',
+            bank_address: '420 Montgomery Street, San Francisco, CA 94104',
+            comments: 'Switched to Wells Fargo effective March 2026',
+            property_id: '507f1f77bcf86cd799439030'
+          }
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 400,
@@ -674,7 +899,7 @@ export class PropertyController {
     Only internal users can use this endpoint.
     
     Required column:
-    - Property ID/Property Id/Property id/property_id/ID/Id/id: ID of the property to update (must exist)
+    - Expedia ID/Expedia Id/Expedia id/ExpediaID/expedia_id: Expedia ID to identify the property (must exist)
     
     Optional columns (only update if provided):
     - Property Name/Property name/Name: Name of the property
@@ -683,7 +908,6 @@ export class PropertyController {
     - Card Descriptor/Card descriptor/Descriptor: Card descriptor
     - Next Due Date/Next due date/Due Date: Next due date (mm/dd/yyyy)
     - Portfolio/Portfolio Name/Portfolio name: Portfolio name (will be created if doesn't exist)
-    - Expedia ID/Expedia Id/Expedia id/ExpediaID: Expedia ID
     - Expedia Username/Expedia username/Expedia User: Expedia username
     - Expedia Password/Expedia password/Expedia Pass: Expedia password
     - Agoda ID/Agoda Id/Agoda id/AgodaID: Agoda ID
@@ -733,13 +957,13 @@ export class PropertyController {
         errors: [
           {
             row: 3,
-            propertyId: '507f1f77bcf86cd799439011',
-            error: 'Property not found'
+            expediaId: 'EXP-12345',
+            error: 'Property not found with Expedia ID: EXP-12345'
           }
         ],
         successfulUpdates: [
-          '507f1f77bcf86cd799439012',
-          '507f1f77bcf86cd799439013'
+          'EXP-67890',
+          'EXP-11223'
         ]
       }
     }

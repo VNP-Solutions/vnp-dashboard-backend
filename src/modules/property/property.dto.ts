@@ -266,7 +266,7 @@ export class BulkUpdateResultDto {
     example: [
       {
         row: 3,
-        propertyId: '507f1f77bcf86cd799439011',
+        expediaId: 'EXP-12345',
         error: 'Property not found'
       }
     ],
@@ -274,13 +274,13 @@ export class BulkUpdateResultDto {
   })
   errors: Array<{
     row: number
-    propertyId: string
+    expediaId: string
     error: string
   }>
 
   @ApiProperty({
-    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
-    description: 'List of successfully updated property IDs'
+    example: ['EXP-12345', 'EXP-67890'],
+    description: 'List of successfully updated Expedia IDs'
   })
   successfulUpdates: string[]
 }
@@ -511,12 +511,20 @@ export class CompleteBankDetailsDto {
   bank_branch?: string
 
   @ApiPropertyOptional({
-    example: 'CHASUS33XXX',
-    description: 'SWIFT or BIC or IBAN code'
+    example: 'GB29NWBK60161331926819',
+    description: 'IBAN or Account Number (for International Wire)'
   })
   @IsString()
   @IsOptional()
-  swift_bic_iban?: string
+  iban_number?: string
+
+  @ApiPropertyOptional({
+    example: 'CHASUS33XXX',
+    description: 'SWIFT/BIC Code (for International Wire)'
+  })
+  @IsString()
+  @IsOptional()
+  swift_bic_number?: string
 
   @ApiPropertyOptional({
     example: '021000021',
@@ -525,6 +533,14 @@ export class CompleteBankDetailsDto {
   @IsString()
   @IsOptional()
   routing_number?: string
+
+  @ApiPropertyOptional({
+    example: '121000248',
+    description: 'Bank wiring routing number for wire transfers (optional, only for Domestic Wire)'
+  })
+  @IsString()
+  @IsOptional()
+  bank_wiring_routing_number?: string
 
   @ApiPropertyOptional({
     enum: ['checking', 'savings'],
@@ -550,6 +566,38 @@ export class CompleteBankDetailsDto {
   @IsString()
   @IsOptional()
   stripe_account_email?: string
+
+  @ApiPropertyOptional({
+    example: 'John Smith',
+    description: 'Contact person name for bank account inquiries'
+  })
+  @IsString()
+  @IsOptional()
+  contact_name?: string
+
+  @ApiPropertyOptional({
+    example: 'john.smith@example.com',
+    description: 'Contact email address for bank account inquiries'
+  })
+  @IsString()
+  @IsOptional()
+  email_address?: string
+
+  @ApiPropertyOptional({
+    example: '123 Bank Street, New York, NY 10001',
+    description: 'Bank physical address (for International Wire)'
+  })
+  @IsString()
+  @IsOptional()
+  bank_address?: string
+
+  @ApiPropertyOptional({
+    example: 'Additional notes about the bank account',
+    description: 'Comments or notes about the bank account details'
+  })
+  @IsString()
+  @IsOptional()
+  comments?: string
 }
 
 export class CompleteCreatePropertyDto {

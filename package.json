@@ -19,6 +19,7 @@
     "seed:properties": "ts-node prisma/seed-properties.ts",
     "seed:audits": "ts-node prisma/seed-audits.ts",
     "fix:passwords": "ts-node scripts/fix-encrypted-passwords.ts",
+    "fix:expedia-ids": "ts-node scripts/fix-duplicate-expedia-ids.ts",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "push": "prisma db push",

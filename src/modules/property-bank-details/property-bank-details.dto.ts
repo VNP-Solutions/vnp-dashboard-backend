@@ -1,7 +1,13 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { BankType, BankSubType, BankAccountType } from '@prisma/client'
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator'
+import { BankAccountType, BankSubType } from '@prisma/client'
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength
+} from 'class-validator'
 
 export class CreatePropertyBankDetailsDto {
   @ApiProperty({
@@ -35,8 +41,7 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'Grand Hotel',
-    description:
-      'Hotel or Portfolio name. Required for all bank sub-types.'
+    description: 'Hotel or Portfolio name. Required for all bank sub-types.'
   })
   @IsString()
   @IsOptional()
@@ -54,7 +59,7 @@ export class CreatePropertyBankDetailsDto {
   @ApiPropertyOptional({
     example: '123 Main Street, New York, NY 10001',
     description:
-      'Beneficiary address. Required for Domestic US Wire and International Wire.'
+      'Beneficiary address. Optional for all bank sub-types (previously required for Domestic Wire and International Wire).'
   })
   @IsString()
   @IsOptional()
@@ -62,8 +67,7 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: '1234567890',
-    description:
-      'Bank account number. Required for all bank sub-types.'
+    description: 'Bank account number. Required for all bank sub-types.'
   })
   @IsString()
   @IsOptional()
@@ -71,8 +75,7 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'John Doe',
-    description:
-      'Account holder name. Optional field.'
+    description: 'Account holder name. Optional field.'
   })
   @IsString()
   @IsOptional()
@@ -80,8 +83,7 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'Chase Bank',
-    description:
-      'Name of the bank. Required for all bank sub-types.'
+    description: 'Name of the bank. Required for all bank sub-types.'
   })
   @IsString()
   @IsOptional()
@@ -89,21 +91,27 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'New York Branch',
-    description:
-      'Bank branch name or location. Optional field.'
+    description: 'Bank branch name or location. Optional field.'
   })
   @IsString()
   @IsOptional()
   bank_branch?: string
 
   @ApiPropertyOptional({
-    example: 'CHASUS33XXX',
-    description:
-      'SWIFT or BIC or IBAN code. Required for International Wire.'
+    example: 'GB29NWBK60161331926819',
+    description: 'IBAN or Account Number. Required for International Wire.'
   })
   @IsString()
   @IsOptional()
-  swift_bic_iban?: string
+  iban_number?: string
+
+  @ApiPropertyOptional({
+    example: 'CHASUS33XXX',
+    description: 'SWIFT/BIC Code. Required for International Wire.'
+  })
+  @IsString()
+  @IsOptional()
+  swift_bic_number?: string
 
   @ApiPropertyOptional({
     example: '021000021',
@@ -116,10 +124,18 @@ export class CreatePropertyBankDetailsDto {
   routing_number?: string
 
   @ApiPropertyOptional({
+    example: '121000248',
+    description:
+      'Bank wiring routing number for wire transfers. Optional field, only applicable for Domestic Wire transfers.'
+  })
+  @IsString()
+  @IsOptional()
+  bank_wiring_routing_number?: string
+
+  @ApiPropertyOptional({
     enum: BankAccountType,
     example: BankAccountType.checking,
-    description:
-      'Bank account type (checking or savings). Required for ACH.'
+    description: 'Bank account type (checking or savings). Required for ACH.'
   })
   @IsEnum(BankAccountType)
   @IsOptional()
@@ -128,7 +144,7 @@ export class CreatePropertyBankDetailsDto {
   @ApiPropertyOptional({
     example: 'USD',
     description:
-      'Currency code (e.g., USD, EUR, GBP). Required for International Wire.'
+      'Currency code (e.g., USD, EUR, GBP). Optional for all bank sub-types (previously required for International Wire).'
   })
   @IsString()
   @IsOptional()
@@ -142,6 +158,42 @@ export class CreatePropertyBankDetailsDto {
   @IsString()
   @IsOptional()
   stripe_account_email?: string
+
+  @ApiPropertyOptional({
+    example: 'John Smith',
+    description:
+      'Contact person name for bank account inquiries. Optional field.'
+  })
+  @IsString()
+  @IsOptional()
+  contact_name?: string
+
+  @ApiPropertyOptional({
+    example: 'john.smith@example.com',
+    description:
+      'Contact email address for bank account inquiries. Optional field.'
+  })
+  @IsString()
+  @IsOptional()
+  email_address?: string
+
+  @ApiPropertyOptional({
+    example: '123 Bank Street, New York, NY 10001',
+    description:
+      'Bank physical address. Optional field, typically used for International Wire transfers.'
+  })
+  @IsString()
+  @IsOptional()
+  bank_address?: string
+
+  @ApiPropertyOptional({
+    example: 'Additional notes or comments about the bank account',
+    description:
+      'Comments or notes about the bank account details. Optional field.'
+  })
+  @IsString()
+  @IsOptional()
+  comments?: string
 
   @ApiPropertyOptional({
     example: '507f1f77bcf86cd799439011',
@@ -171,7 +223,7 @@ export class BulkUpdateBankDetailsResultDto {
 
   @ApiProperty({
     example: 8,
-    description: 'Number of bank details successfully updated'
+    description: 'Number of bank details successfully updated/created'
   })
   successCount: number
 
@@ -180,9 +232,10 @@ export class BulkUpdateBankDetailsResultDto {
 
   @ApiProperty({
     example: [
-      { row: 3, property: 'Test Property', error: 'Property not found' }
+      { row: 3, property: 'EXP123456', error: 'Property not found for this Expedia ID' },
+      { row: 5, property: 'EXP789012', error: 'Missing required fields for ach: Bank Account Type' }
     ],
-    description: 'List of errors encountered during bulk update'
+    description: 'List of errors encountered during bulk update. Property field contains Expedia ID.'
   })
   errors: Array<{
     row: number
@@ -191,8 +244,8 @@ export class BulkUpdateBankDetailsResultDto {
   }>
 
   @ApiProperty({
-    example: ['Property A', 'Property B'],
-    description: 'List of successfully updated property names'
+    example: ['EXP123456', 'EXP234567', 'EXP345678'],
+    description: 'List of successfully updated Expedia IDs'
   })
   successfulUpdates: string[]
 }

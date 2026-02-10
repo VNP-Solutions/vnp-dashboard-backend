@@ -173,24 +173,30 @@ model PropertyCredentials {
 }
 
 model PropertyBankDetails {
-  id                   String           @id @default(auto()) @map("_id") @db.ObjectId
-  bank_type            BankType         @default(bank)
-  bank_sub_type        BankSubType?
-  hotel_portfolio_name String?
-  beneficiary_name     String?
-  beneficiary_address  String?
-  account_number       String?
-  account_name         String?
-  bank_name            String?
-  bank_branch          String?
-  swift_bic_iban       String?
-  routing_number       String?
-  bank_account_type    BankAccountType?
-  currency             String?
-  stripe_account_email String?
-  associated_user_id   String?          @db.ObjectId
-  property_id          String           @unique @db.ObjectId
-  property             Property         @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  id                         String           @id @default(auto()) @map("_id") @db.ObjectId
+  bank_type                  BankType         @default(bank)
+  bank_sub_type              BankSubType?
+  hotel_portfolio_name       String?
+  beneficiary_name           String?
+  beneficiary_address        String?
+  account_number             String?
+  account_name               String?
+  bank_name                  String?
+  bank_branch                String?
+  iban_number                String?
+  swift_bic_number           String?
+  routing_number             String?
+  bank_wiring_routing_number String?
+  bank_account_type          BankAccountType?
+  currency                   String?
+  stripe_account_email       String?
+  contact_name               String?
+  email_address              String?
+  bank_address               String?
+  comments                   String?
+  associated_user_id         String?          @db.ObjectId
+  property_id                String           @unique @db.ObjectId
+  property                   Property         @relation(fields: [property_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt

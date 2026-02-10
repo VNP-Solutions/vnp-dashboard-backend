@@ -131,11 +131,17 @@ export class PropertyRepository implements IPropertyRepository {
         if (bankDetailsData.bank_branch) {
           bankData.bank_branch = bankDetailsData.bank_branch
         }
-        if (bankDetailsData.swift_bic_iban) {
-          bankData.swift_bic_iban = bankDetailsData.swift_bic_iban
+        if (bankDetailsData.iban_number) {
+          bankData.iban_number = bankDetailsData.iban_number
+        }
+        if (bankDetailsData.swift_bic_number) {
+          bankData.swift_bic_number = bankDetailsData.swift_bic_number
         }
         if (bankDetailsData.routing_number) {
           bankData.routing_number = bankDetailsData.routing_number
+        }
+        if (bankDetailsData.bank_wiring_routing_number) {
+          bankData.bank_wiring_routing_number = bankDetailsData.bank_wiring_routing_number
         }
         if (bankDetailsData.bank_account_type) {
           bankData.bank_account_type =
@@ -146,6 +152,18 @@ export class PropertyRepository implements IPropertyRepository {
         }
         if (bankDetailsData.stripe_account_email) {
           bankData.stripe_account_email = bankDetailsData.stripe_account_email
+        }
+        if (bankDetailsData.contact_name) {
+          bankData.contact_name = bankDetailsData.contact_name
+        }
+        if (bankDetailsData.email_address) {
+          bankData.email_address = bankDetailsData.email_address
+        }
+        if (bankDetailsData.bank_address) {
+          bankData.bank_address = bankDetailsData.bank_address
+        }
+        if (bankDetailsData.comments) {
+          bankData.comments = bankDetailsData.comments
         }
         if (userId) {
           bankData.associated_user_id = userId
@@ -327,11 +345,17 @@ export class PropertyRepository implements IPropertyRepository {
             if (bankDetailsData.bank_branch) {
               bankData.bank_branch = bankDetailsData.bank_branch
             }
-            if (bankDetailsData.swift_bic_iban) {
-              bankData.swift_bic_iban = bankDetailsData.swift_bic_iban
+            if (bankDetailsData.iban_number) {
+              bankData.iban_number = bankDetailsData.iban_number
+            }
+            if (bankDetailsData.swift_bic_number) {
+              bankData.swift_bic_number = bankDetailsData.swift_bic_number
             }
             if (bankDetailsData.routing_number) {
               bankData.routing_number = bankDetailsData.routing_number
+            }
+            if (bankDetailsData.bank_wiring_routing_number) {
+              bankData.bank_wiring_routing_number = bankDetailsData.bank_wiring_routing_number
             }
             if (bankDetailsData.bank_account_type) {
               bankData.bank_account_type =
@@ -343,6 +367,18 @@ export class PropertyRepository implements IPropertyRepository {
             if (bankDetailsData.stripe_account_email) {
               bankData.stripe_account_email =
                 bankDetailsData.stripe_account_email
+            }
+            if (bankDetailsData.contact_name) {
+              bankData.contact_name = bankDetailsData.contact_name
+            }
+            if (bankDetailsData.email_address) {
+              bankData.email_address = bankDetailsData.email_address
+            }
+            if (bankDetailsData.bank_address) {
+              bankData.bank_address = bankDetailsData.bank_address
+            }
+            if (bankDetailsData.comments) {
+              bankData.comments = bankDetailsData.comments
             }
             if (userId) {
               bankData.associated_user_id = userId

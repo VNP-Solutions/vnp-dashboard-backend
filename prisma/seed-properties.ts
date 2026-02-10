@@ -572,7 +572,9 @@ async function main() {
                 !isStripe && Math.random() > 0.5
                   ? `Branch ${getRandomNumber(1, 500)}`
                   : null,
-              swift_bic_iban:
+              iban_number:
+                !isStripe && Math.random() > 0.4 ? generateSwiftBic() : null,
+              swift_bic_number:
                 !isStripe && Math.random() > 0.4 ? generateSwiftBic() : null,
               routing_number:
                 !isStripe && Math.random() > 0.6
