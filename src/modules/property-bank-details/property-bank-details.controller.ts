@@ -53,8 +53,9 @@ export class PropertyBankDetailsController {
       'For Stripe: Only stripe_account_email is required. ' +
       'For Bank: bank_sub_type is required (ach, domestic_wire, or international_wire). ' +
       'ACH requires: hotel_portfolio_name, beneficiary_name, bank_name, routing_number, account_number, bank_account_type. ' +
-      'Domestic Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, routing_number, account_number. ' +
-      'International Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, swift_bic_iban, account_number, currency.'
+      'Domestic Wire requires: hotel_portfolio_name, beneficiary_name, bank_name, routing_number, account_number. ' +
+      'International Wire requires: hotel_portfolio_name, beneficiary_name, bank_name, swift_bic_iban, account_number. ' +
+      'Optional fields: beneficiary_address, currency, contact_name, email_address, bank_address, comments.'
   })
   @ApiResponse({
     status: 201,
@@ -115,8 +116,9 @@ export class PropertyBankDetailsController {
       'For Stripe: Only stripe_account_email is required. ' +
       'For Bank: bank_sub_type is required (ach, domestic_wire, or international_wire). ' +
       'ACH requires: hotel_portfolio_name, beneficiary_name, bank_name, routing_number, account_number, bank_account_type. ' +
-      'Domestic Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, routing_number, account_number. ' +
-      'International Wire requires: hotel_portfolio_name, beneficiary_name, beneficiary_address, bank_name, swift_bic_iban, account_number, currency.'
+      'Domestic Wire requires: hotel_portfolio_name, beneficiary_name, bank_name, routing_number, account_number. ' +
+      'International Wire requires: hotel_portfolio_name, beneficiary_name, bank_name, swift_bic_iban, account_number. ' +
+      'Optional fields: beneficiary_address, currency, contact_name, email_address, bank_address, comments.'
   })
   @ApiResponse({
     status: 200,
@@ -156,13 +158,14 @@ export class PropertyBankDetailsController {
     summary: 'Bulk update property bank details from Excel file (Requires password verification)',
     description:
       'Updates bank details for multiple properties from an Excel file. Requires bank_details UPDATE permission and password verification. ' +
-      'The first column must be "Property Name" to identify the property. ' +
-      'For Stripe: Include "Stripe Account Email" column. ' +
-      'For Bank: Include "Bank Sub Type" column (ach, domestic_wire, or international_wire). ' +
+      'The first column must be "Expedia ID" to identify the property. ' +
+      'Bank sub-type is AUTO-DETECTED from sheet columns (no Bank Sub Type column needed). ' +
+      'Detection: SWIFT/BIC/IBAN columns → International Wire; Bank Account Type column → ACH; Otherwise → Domestic Wire. ' +
       'Common columns: Hotel Portfolio Name, Account Number, Bank Name. ' +
-      'ACH: Beneficiary Name, Routing Number, Bank Account Type (checking/savings). ' +
-      'Domestic Wire: Beneficiary Name, Beneficiary Address, Routing Number. ' +
-      'International Wire: Beneficiary Name, Beneficiary Address, Swift or BIC or IBAN, Currency. ' +
+      'ACH: Beneficiary Name, Routing Number, Bank Account Type (Checking/Saving accepted). ' +
+      'Domestic Wire: Beneficiary Name, Routing Number (Beneficiary Address optional). ' +
+      'International Wire: Beneficiary Name, Swift/BIC/IBAN (Beneficiary Address and Currency optional). ' +
+      'Optional fields: Contact Name, Email Address, Bank Address, Comments. ' +
       'After successful update, all users with access to the affected properties will be notified via email.'
   })
   @ApiBody({
@@ -174,9 +177,8 @@ export class PropertyBankDetailsController {
           format: 'binary',
           description:
             'Excel file (.xlsx or .xls) containing property bank details. ' +
-            'Required columns: Property Name. ' +
-            'Stripe: Stripe Account Email. ' +
-            'Bank: Bank Sub Type, Hotel Portfolio Name, Account Number, Bank Name + sub-type specific fields.'
+            'Required columns: Expedia ID, Hotel Portfolio Name, Account Number, Bank Name + sub-type specific fields. ' +
+            'Bank sub-type is auto-detected from columns present in the sheet.'
         },
         password: {
           type: 'string',

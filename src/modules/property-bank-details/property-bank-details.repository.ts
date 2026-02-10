@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { BankType, BankSubType, BankAccountType } from '@prisma/client'
+import { BankType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   CreatePropertyBankDetailsDto,
@@ -58,6 +58,18 @@ export class PropertyBankDetailsRepository
     }
     if (data.stripe_account_email) {
       createData.stripe_account_email = data.stripe_account_email
+    }
+    if (data.contact_name) {
+      createData.contact_name = data.contact_name
+    }
+    if (data.email_address) {
+      createData.email_address = data.email_address
+    }
+    if (data.bank_address) {
+      createData.bank_address = data.bank_address
+    }
+    if (data.comments) {
+      createData.comments = data.comments
     }
     if (data.associated_user_id) {
       createData.associated_user_id = data.associated_user_id
@@ -128,6 +140,18 @@ export class PropertyBankDetailsRepository
     }
     if (data.stripe_account_email !== undefined) {
       updateData.stripe_account_email = data.stripe_account_email
+    }
+    if (data.contact_name !== undefined) {
+      updateData.contact_name = data.contact_name
+    }
+    if (data.email_address !== undefined) {
+      updateData.email_address = data.email_address
+    }
+    if (data.bank_address !== undefined) {
+      updateData.bank_address = data.bank_address
+    }
+    if (data.comments !== undefined) {
+      updateData.comments = data.comments
     }
     if (data.associated_user_id !== undefined) {
       updateData.associated_user_id = data.associated_user_id

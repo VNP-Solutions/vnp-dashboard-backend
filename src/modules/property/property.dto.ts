@@ -550,6 +550,38 @@ export class CompleteBankDetailsDto {
   @IsString()
   @IsOptional()
   stripe_account_email?: string
+
+  @ApiPropertyOptional({
+    example: 'John Smith',
+    description: 'Contact person name for bank account inquiries'
+  })
+  @IsString()
+  @IsOptional()
+  contact_name?: string
+
+  @ApiPropertyOptional({
+    example: 'john.smith@example.com',
+    description: 'Contact email address for bank account inquiries'
+  })
+  @IsString()
+  @IsOptional()
+  email_address?: string
+
+  @ApiPropertyOptional({
+    example: '123 Bank Street, New York, NY 10001',
+    description: 'Bank physical address (for International Wire)'
+  })
+  @IsString()
+  @IsOptional()
+  bank_address?: string
+
+  @ApiPropertyOptional({
+    example: 'Additional notes about the bank account',
+    description: 'Comments or notes about the bank account details'
+  })
+  @IsString()
+  @IsOptional()
+  comments?: string
 }
 
 export class CompleteCreatePropertyDto {

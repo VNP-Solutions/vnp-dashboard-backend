@@ -188,6 +188,10 @@ model PropertyBankDetails {
   bank_account_type    BankAccountType?
   currency             String?
   stripe_account_email String?
+  contact_name         String?
+  email_address        String?
+  bank_address         String?
+  comments             String?
   associated_user_id   String?          @db.ObjectId
   property_id          String           @unique @db.ObjectId
   property             Property         @relation(fields: [property_id], references: [id], onDelete: Cascade)

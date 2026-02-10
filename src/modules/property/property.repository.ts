@@ -147,6 +147,18 @@ export class PropertyRepository implements IPropertyRepository {
         if (bankDetailsData.stripe_account_email) {
           bankData.stripe_account_email = bankDetailsData.stripe_account_email
         }
+        if (bankDetailsData.contact_name) {
+          bankData.contact_name = bankDetailsData.contact_name
+        }
+        if (bankDetailsData.email_address) {
+          bankData.email_address = bankDetailsData.email_address
+        }
+        if (bankDetailsData.bank_address) {
+          bankData.bank_address = bankDetailsData.bank_address
+        }
+        if (bankDetailsData.comments) {
+          bankData.comments = bankDetailsData.comments
+        }
         if (userId) {
           bankData.associated_user_id = userId
         }
@@ -343,6 +355,18 @@ export class PropertyRepository implements IPropertyRepository {
             if (bankDetailsData.stripe_account_email) {
               bankData.stripe_account_email =
                 bankDetailsData.stripe_account_email
+            }
+            if (bankDetailsData.contact_name) {
+              bankData.contact_name = bankDetailsData.contact_name
+            }
+            if (bankDetailsData.email_address) {
+              bankData.email_address = bankDetailsData.email_address
+            }
+            if (bankDetailsData.bank_address) {
+              bankData.bank_address = bankDetailsData.bank_address
+            }
+            if (bankDetailsData.comments) {
+              bankData.comments = bankDetailsData.comments
             }
             if (userId) {
               bankData.associated_user_id = userId

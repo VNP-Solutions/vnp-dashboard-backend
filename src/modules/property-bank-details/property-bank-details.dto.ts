@@ -1,7 +1,13 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { BankType, BankSubType, BankAccountType } from '@prisma/client'
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator'
+import { BankAccountType, BankSubType } from '@prisma/client'
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength
+} from 'class-validator'
 
 export class CreatePropertyBankDetailsDto {
   @ApiProperty({
@@ -35,8 +41,7 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'Grand Hotel',
-    description:
-      'Hotel or Portfolio name. Required for all bank sub-types.'
+    description: 'Hotel or Portfolio name. Required for all bank sub-types.'
   })
   @IsString()
   @IsOptional()
@@ -62,8 +67,7 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: '1234567890',
-    description:
-      'Bank account number. Required for all bank sub-types.'
+    description: 'Bank account number. Required for all bank sub-types.'
   })
   @IsString()
   @IsOptional()
@@ -71,8 +75,7 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'John Doe',
-    description:
-      'Account holder name. Optional field.'
+    description: 'Account holder name. Optional field.'
   })
   @IsString()
   @IsOptional()
@@ -80,8 +83,7 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'Chase Bank',
-    description:
-      'Name of the bank. Required for all bank sub-types.'
+    description: 'Name of the bank. Required for all bank sub-types.'
   })
   @IsString()
   @IsOptional()
@@ -89,8 +91,7 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'New York Branch',
-    description:
-      'Bank branch name or location. Optional field.'
+    description: 'Bank branch name or location. Optional field.'
   })
   @IsString()
   @IsOptional()
@@ -98,8 +99,7 @@ export class CreatePropertyBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'CHASUS33XXX',
-    description:
-      'SWIFT or BIC or IBAN code. Required for International Wire.'
+    description: 'SWIFT or BIC or IBAN code. Required for International Wire.'
   })
   @IsString()
   @IsOptional()
@@ -118,8 +118,7 @@ export class CreatePropertyBankDetailsDto {
   @ApiPropertyOptional({
     enum: BankAccountType,
     example: BankAccountType.checking,
-    description:
-      'Bank account type (checking or savings). Required for ACH.'
+    description: 'Bank account type (checking or savings). Required for ACH.'
   })
   @IsEnum(BankAccountType)
   @IsOptional()
@@ -142,6 +141,42 @@ export class CreatePropertyBankDetailsDto {
   @IsString()
   @IsOptional()
   stripe_account_email?: string
+
+  @ApiPropertyOptional({
+    example: 'John Smith',
+    description:
+      'Contact person name for bank account inquiries. Optional field.'
+  })
+  @IsString()
+  @IsOptional()
+  contact_name?: string
+
+  @ApiPropertyOptional({
+    example: 'john.smith@example.com',
+    description:
+      'Contact email address for bank account inquiries. Optional field.'
+  })
+  @IsString()
+  @IsOptional()
+  email_address?: string
+
+  @ApiPropertyOptional({
+    example: '123 Bank Street, New York, NY 10001',
+    description:
+      'Bank physical address. Optional field, typically used for International Wire transfers.'
+  })
+  @IsString()
+  @IsOptional()
+  bank_address?: string
+
+  @ApiPropertyOptional({
+    example: 'Additional notes or comments about the bank account',
+    description:
+      'Comments or notes about the bank account details. Optional field.'
+  })
+  @IsString()
+  @IsOptional()
+  comments?: string
 
   @ApiPropertyOptional({
     example: '507f1f77bcf86cd799439011',
