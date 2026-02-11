@@ -541,7 +541,7 @@ export class PropertyRepository implements IPropertyRepository {
     // Create a map for quick lookup
     const previousPortfolioMap = new Map(previousPortfolios.map(p => [p.id, p]))
 
-    // Get audit counts for each property only if user has audit access
+    // Get audit counts and note counts for each property
     let auditCountMap = new Map<string, number>()
     if (hasAuditAccess !== false) {
       const auditCounts = await Promise.all(
@@ -559,12 +559,25 @@ export class PropertyRepository implements IPropertyRepository {
       auditCountMap = new Map(auditCounts.map(ac => [ac.propertyId, ac.count]))
     }
 
-    // Enrich each property with total_audits count and previous_portfolio data
+    // Get note counts for each property
+    const noteCounts = await Promise.all(
+      propertyIds.map(async propertyId => ({
+        propertyId,
+        count: await this.prisma.note.count({
+          where: { property_id: propertyId }
+        })
+      }))
+    )
+
+    const noteCountMap = new Map(noteCounts.map(nc => [nc.propertyId, nc.count]))
+
+    // Enrich each property with total_audits count, total_notes count, and previous_portfolio data
     // If user doesn't have audit access, total_audits will be 0
     return properties.map(property => ({
       ...property,
       total_audits:
         hasAuditAccess !== false ? auditCountMap.get(property.id) || 0 : 0,
+      total_notes: noteCountMap.get(property.id) || 0,
       previous_portfolio: property.previous_portfolio_id
         ? previousPortfolioMap.get(property.previous_portfolio_id) || null
         : null
@@ -636,9 +649,15 @@ export class PropertyRepository implements IPropertyRepository {
       })
     }
 
+    // Get note count for this property
+    const noteCount = await this.prisma.note.count({
+      where: { property_id: id }
+    })
+
     return {
       ...property,
-      previous_portfolio
+      previous_portfolio,
+      total_notes: noteCount
     } as any
   }
 

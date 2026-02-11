@@ -99,7 +99,7 @@ export class AuditRepository implements IAuditRepository {
       }
     }
 
-    return this.prisma.audit.findMany({
+    const audits = await this.prisma.audit.findMany({
       where: finalWhere,
       skip,
       take,
@@ -170,6 +170,27 @@ export class AuditRepository implements IAuditRepository {
         }
       }
     })
+
+    // Get unique audit IDs for note count
+    const auditIds = audits.map(a => a.id)
+
+    // Get note counts for each audit
+    const noteCounts = await Promise.all(
+      auditIds.map(async auditId => ({
+        auditId,
+        count: await this.prisma.note.count({
+          where: { audit_id: auditId }
+        })
+      }))
+    )
+
+    const noteCountMap = new Map(noteCounts.map(nc => [nc.auditId, nc.count]))
+
+    // Enrich each audit with total_notes count
+    return audits.map(audit => ({
+      ...audit,
+      total_notes: noteCountMap.get(audit.id) || 0
+    }))
   }
 
   async count(whereClause: any, propertyIds?: string[]): Promise<number> {
@@ -215,7 +236,7 @@ export class AuditRepository implements IAuditRepository {
   }
 
   async findById(id: string) {
-    return this.prisma.audit.findUnique({
+    const audit = await this.prisma.audit.findUnique({
       where: { id },
       include: {
         auditStatus: {
@@ -292,6 +313,20 @@ export class AuditRepository implements IAuditRepository {
         }
       }
     })
+
+    if (!audit) {
+      return null
+    }
+
+    // Get note count for this audit
+    const noteCount = await this.prisma.note.count({
+      where: { audit_id: id }
+    })
+
+    return {
+      ...audit,
+      total_notes: noteCount
+    }
   }
 
   async update(id: string, data: UpdateAuditDto) {
