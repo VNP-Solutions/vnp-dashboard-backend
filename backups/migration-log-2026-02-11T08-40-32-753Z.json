@@ -1,0 +1,1247 @@
+{
+  "totalRecords": 177,
+  "migrated": 177,
+  "skipped": 0,
+  "errors": 0,
+  "details": [
+    {
+      "id": "69441c4ac5a3ce8c3cf558ce",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6967ca976dfc0b0cc70e6119",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6967cb096dfc0b0cc70e611a",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6967cb646dfc0b0cc70e611b",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6967cbce6dfc0b0cc70e611c",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696e86736dfc0b0cc70e618e",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696e86d36dfc0b0cc70e618f",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696e871d6dfc0b0cc70e6190",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696e87746dfc0b0cc70e6191",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696e87c66dfc0b0cc70e6192",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eac0b6dfc0b0cc70e6193",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eae2e6dfc0b0cc70e6194",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eafdb6dfc0b0cc70e6195",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb0256dfc0b0cc70e6196",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb06f6dfc0b0cc70e6197",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb0bb6dfc0b0cc70e6198",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb1016dfc0b0cc70e6199",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb13f6dfc0b0cc70e619a",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb1846dfc0b0cc70e619b",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb1c56dfc0b0cc70e619c",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb2036dfc0b0cc70e619d",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb23c6dfc0b0cc70e619e",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb2796dfc0b0cc70e619f",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696eb2ab6dfc0b0cc70e61a0",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fbb1bb822d210649122c8",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fbb63b822d210649122c9",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fbba1b822d210649122ca",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fbfb0b822d210649122cb",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fbfeeb822d210649122cc",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc07cb822d210649122cd",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc0afb822d210649122ce",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc0eab822d210649122cf",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc1ceb822d210649122d0",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc20fb822d210649122d1",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc253b822d210649122d2",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc28bb822d210649122d3",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc2beb822d210649122d4",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc2f6b822d210649122d5",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc328b822d210649122d6",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc36fb822d210649122d7",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc3bbb822d210649122d8",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc41db822d210649122d9",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc452b822d210649122da",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc486b822d210649122db",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc4ccb822d210649122dc",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc509b822d210649122dd",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc542b822d210649122de",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc590b822d210649122df",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc5d3b822d210649122e0",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc616b822d210649122e1",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc666b822d210649122e2",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc6c5b822d210649122e3",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc709b822d210649122e4",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fc740b822d210649122e5",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fd391b822d210649122e9",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fd437b822d210649122ea",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fd580b822d210649122eb",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fd5b7b822d210649122ec",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fd602b822d210649122ed",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fdaa3b822d210649122ee",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fdadab822d210649122ef",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fdb27b822d210649122f0",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fdb66b822d210649122f1",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fdbafb822d210649122f2",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fddfbb822d210649122f3",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fde30b822d210649122f4",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fdea1b822d210649122f5",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fdfd9b822d210649122f6",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fe17fb822d210649122f7",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fe1bbb822d210649122f8",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fe23fb822d210649122f9",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fe29db822d210649122fa",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fe49db822d210649122fb",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fe5cab822d210649122fc",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fe66eb822d210649122fd",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fe6a1b822d210649122fe",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fe6d7b822d210649122ff",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "696fe71fb822d21064912300",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970070fb822d21064912301",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970075eb822d21064912302",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697007d5b822d21064912303",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69700825b822d21064912304",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69700885b822d21064912305",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697008c4b822d21064912306",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697008f7b822d21064912307",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69701efab822d21064912308",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69701f35b822d21064912309",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69701f73b822d2106491230a",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69702880b822d2106491230c",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f3d5b822d2106491230e",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f453b822d2106491230f",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f54fb822d21064912310",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f5cdb822d21064912311",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f608b822d21064912312",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f760b822d21064912313",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f79eb822d21064912314",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f7d6b822d21064912315",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f8ffb822d21064912316",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f94cb822d21064912318",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f995b822d21064912319",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970f9c9b822d2106491231a",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970faa6b822d2106491231b",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970fadbb822d2106491231c",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970fb1bb822d2106491231d",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970fb85b822d2106491231e",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970fc7eb822d21064912321",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970fcbfb822d21064912322",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970fcf1b822d21064912323",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970fd67b822d21064912324",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970fdfeb822d21064912325",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6970fe46b822d21064912326",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697106fbb822d21064912328",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6971076bb822d21064912329",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697107a0b822d2106491232a",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697107e4b822d2106491232b",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710888b822d2106491232c",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697108b9b822d2106491232d",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710921b822d2106491232e",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6971095ab822d2106491232f",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710a18b822d21064912330",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710a4bb822d21064912331",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710ac2b822d21064912332",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710b4cb822d21064912333",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710be2b822d21064912334",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710c71b822d21064912337",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710d6ab822d21064912338",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710deeb822d21064912339",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710e1cb822d2106491233a",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69710fdab822d2106491233b",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6971101fb822d2106491233c",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6971107cb822d2106491233d",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697110b7b822d2106491233e",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697110fcb822d2106491233f",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6971113db822d21064912340",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697112bbb822d21064912341",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711302b822d21064912342",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711337b822d21064912343",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711361b822d21064912344",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697114c6b822d21064912345",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711561b822d21064912346",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697115a7b822d21064912347",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697115fdb822d21064912348",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6971163bb822d21064912349",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697116d2b822d2106491234a",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711712b822d2106491234b",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6971174fb822d2106491234c",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711787b822d2106491234d",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6971189db822d21064912350",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697118ceb822d21064912351",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711907b822d21064912352",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6971193db822d21064912353",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711971b822d21064912354",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697119a2b822d21064912355",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697119d7b822d21064912356",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711a07b822d21064912357",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711a3bb822d21064912358",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711a6cb822d21064912359",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711a9ab822d2106491235a",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711ad1b822d2106491235b",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711b05b822d2106491235c",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711b38b822d2106491235d",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711b6cb822d2106491235e",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711b96b822d2106491235f",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711bd6b822d21064912360",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711c14b822d21064912361",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711c45b822d21064912362",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711c7db822d21064912363",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711cafb822d21064912364",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711cebb822d21064912365",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69711d21b822d21064912366",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697146ccb822d21064912367",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "6971471db822d21064912368",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697147bcb822d21064912369",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "697147f5b822d2106491236a",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69714911b822d2106491236b",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "69826201fc51069ed3ee0585",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    },
+    {
+      "id": "698c38b6bf8e9205aba301c5",
+      "oldValue": null,
+      "newIban": null,
+      "newSwift": null,
+      "action": "migrated"
+    }
+  ]
+}

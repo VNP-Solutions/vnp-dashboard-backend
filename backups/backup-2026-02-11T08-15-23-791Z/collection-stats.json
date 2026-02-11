@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-02-11T08:15:32.751Z",
+  "counts": [
+    {
+      "name": "User",
+      "count": 54
+    },
+    {
+      "name": "UserRole",
+      "count": 11
+    },
+    {
+      "name": "Portfolio",
+      "count": 57
+    },
+    {
+      "name": "Property",
+      "count": 1799
+    },
+    {
+      "name": "PropertyCredentials",
+      "count": 2381
+    },
+    {
+      "name": "PropertyBankDetails",
+      "count": 177
+    },
+    {
+      "name": "Audit",
+      "count": 11
+    },
+    {
+      "name": "AuditStatus",
+      "count": 20
+    },
+    {
+      "name": "Note",
+      "count": 9
+    },
+    {
+      "name": "Task",
+      "count": 1
+    },
+    {
+      "name": "Otp",
+      "count": 209
+    },
+    {
+      "name": "ServiceType",
+      "count": 5
+    },
+    {
+      "name": "Currency",
+      "count": 5
+    },
+    {
+      "name": "AuditBatch",
+      "count": 1
+    },
+    {
+      "name": "PendingAction",
+      "count": 8
+    },
+    {
+      "name": "UserAccessedProperty",
+      "count": 40
+    },
+    {
+      "name": "ContractUrl",
+      "count": 44
+    },
+    {
+      "name": "ConsolidatedReport",
+      "count": 24
+    }
+  ],
+  "totalRecords": 4856
+}

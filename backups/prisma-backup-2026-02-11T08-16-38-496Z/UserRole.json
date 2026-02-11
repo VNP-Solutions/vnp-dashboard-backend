@@ -1,0 +1,387 @@
+[
+  {
+    "portfolio_permission": {
+      "permission_level": "all",
+      "access_level": "all"
+    },
+    "property_permission": {
+      "permission_level": "all",
+      "access_level": "all"
+    },
+    "audit_permission": {
+      "permission_level": "all",
+      "access_level": "all"
+    },
+    "user_permission": {
+      "permission_level": "all",
+      "access_level": "all"
+    },
+    "system_settings_permission": {
+      "permission_level": "all",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "all",
+      "access_level": "all"
+    },
+    "id": "68dbaf9e825d1650d0fe8a78",
+    "name": "Super Admin",
+    "description": "Super administrator with full system access",
+    "is_external": false,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 1,
+    "created_at": "2025-09-30T10:23:23.768Z",
+    "updated_at": "2025-12-17T09:55:25.106Z"
+  },
+  {
+    "portfolio_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "property_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "audit_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "user_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "system_settings_permission": {
+      "permission_level": "update",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "id": "69316381da49a64e2fc93003",
+    "name": "VNP Portfolio Manager",
+    "description": "- Access to selected portfolios -> properties -> audits\n- Internal \n- View, Create, Update, Delete",
+    "is_external": false,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 2,
+    "created_at": "2025-12-04T10:33:37.829Z",
+    "updated_at": "2026-01-23T15:26:19.966Z"
+  },
+  {
+    "portfolio_permission": {
+      "permission_level": "view",
+      "access_level": "none"
+    },
+    "property_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "audit_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "user_permission": {
+      "permission_level": "view",
+      "access_level": "none"
+    },
+    "system_settings_permission": {
+      "permission_level": "update",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "id": "69317357da49a64e2fc9300b",
+    "name": "VNP Property Manager",
+    "description": "- Access to selected properties -> audits \n- Internal\n- View, Create, Update, Delete",
+    "is_external": true,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 3,
+    "created_at": "2025-12-04T11:41:11.906Z",
+    "updated_at": "2026-01-22T09:17:57.771Z"
+  },
+  {
+    "portfolio_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "property_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "audit_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "user_permission": {
+      "permission_level": "view",
+      "access_level": "none"
+    },
+    "system_settings_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "id": "6931737bda49a64e2fc9300c",
+    "name": "VNP Sales/Finance Associate",
+    "description": "- All Access\n- Internal\n- View ",
+    "is_external": false,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 4,
+    "created_at": "2025-12-04T11:41:47.821Z",
+    "updated_at": "2025-12-17T09:55:28.751Z"
+  },
+  {
+    "portfolio_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "property_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "audit_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "user_permission": {
+      "permission_level": "all",
+      "access_level": "partial"
+    },
+    "system_settings_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "all",
+      "access_level": "partial"
+    },
+    "id": "693173b2da49a64e2fc9300d",
+    "name": "Client Portfolio Manager",
+    "description": "- Access to selected portfolios -> properties -> audits\n- External\n- View, Update",
+    "is_external": true,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 5,
+    "created_at": "2025-12-04T11:42:42.698Z",
+    "updated_at": "2026-01-23T15:57:33.371Z"
+  },
+  {
+    "portfolio_permission": {
+      "permission_level": "view",
+      "access_level": "none"
+    },
+    "property_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "audit_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "user_permission": {
+      "permission_level": "view",
+      "access_level": "none"
+    },
+    "system_settings_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "update",
+      "access_level": "partial"
+    },
+    "id": "693173e4da49a64e2fc9300e",
+    "name": "Client Property Manager",
+    "description": "- Access to selected properties -> audits\n- External\n- View, Update",
+    "is_external": true,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 6,
+    "created_at": "2025-12-04T11:43:32.157Z",
+    "updated_at": "2025-12-17T09:55:31.302Z"
+  },
+  {
+    "portfolio_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "property_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "audit_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "user_permission": {
+      "permission_level": "view",
+      "access_level": "none"
+    },
+    "system_settings_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "id": "69317419da49a64e2fc9300f",
+    "name": "Client Executive (Portfolio level)",
+    "description": "- Access to selected portfolios -> properties -> audits\n- External\n- View",
+    "is_external": true,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 7,
+    "created_at": "2025-12-04T11:44:25.703Z",
+    "updated_at": "2025-12-17T09:55:32.337Z"
+  },
+  {
+    "portfolio_permission": {
+      "permission_level": "view",
+      "access_level": "none"
+    },
+    "property_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "audit_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "user_permission": {
+      "permission_level": "view",
+      "access_level": "none"
+    },
+    "system_settings_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "id": "6931749dda49a64e2fc93010",
+    "name": "Client Executive (Property level)",
+    "description": "- Access to selected properties -> audits\n- External\n- View",
+    "is_external": true,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 8,
+    "created_at": "2025-12-04T11:46:37.816Z",
+    "updated_at": "2025-12-17T09:55:33.845Z"
+  },
+  {
+    "portfolio_permission": {
+      "permission_level": "all",
+      "access_level": "partial"
+    },
+    "property_permission": {
+      "permission_level": "all",
+      "access_level": "partial"
+    },
+    "audit_permission": {
+      "permission_level": "all",
+      "access_level": "partial"
+    },
+    "user_permission": {
+      "permission_level": "all",
+      "access_level": "partial"
+    },
+    "system_settings_permission": {
+      "permission_level": "update",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "all",
+      "access_level": "partial"
+    },
+    "id": "6975ba21fc51069ed3ee0534",
+    "name": "VNP Admin",
+    "description": "Main VNP admin role under the super admin",
+    "is_external": false,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 9,
+    "created_at": "2026-01-25T06:37:21.777Z",
+    "updated_at": "2026-01-25T07:23:49.451Z"
+  },
+  {
+    "portfolio_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "property_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "audit_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "user_permission": {
+      "permission_level": "view",
+      "access_level": "none"
+    },
+    "system_settings_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "view",
+      "access_level": "partial"
+    },
+    "id": "6975ba5cfc51069ed3ee0535",
+    "name": "VNP Sales",
+    "description": "For sales associates of VNP Solutions",
+    "is_external": false,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 10,
+    "created_at": "2026-01-25T06:38:20.920Z",
+    "updated_at": "2026-01-25T06:38:20.920Z"
+  },
+  {
+    "portfolio_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "property_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "audit_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "user_permission": {
+      "permission_level": "view",
+      "access_level": "none"
+    },
+    "system_settings_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "bank_details_permission": {
+      "permission_level": "view",
+      "access_level": "all"
+    },
+    "id": "6975c2cefc51069ed3ee0538",
+    "name": "VNP Finance",
+    "description": "For finance associates of VNP Solutions",
+    "is_external": false,
+    "can_access_mis": false,
+    "is_active": true,
+    "order": 11,
+    "created_at": "2026-01-25T07:14:22.517Z",
+    "updated_at": "2026-01-25T07:14:22.517Z"
+  }
+]
