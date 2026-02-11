@@ -36,6 +36,7 @@ type PortfolioWithRelations = Prisma.PortfolioGetPayload<{
 }> & {
   total_properties: number
   total_contract_urls: number
+  total_notes: number
 }
 
 type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
@@ -51,6 +52,7 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
 }> & {
   total_properties: number
   total_contract_urls: number
+  total_notes: number
 }
 
 export interface IPortfolioRepository {
@@ -63,13 +65,15 @@ export interface IPortfolioRepository {
     queryOptions: any,
     portfolioIds?: string[],
     userId?: string,
-    isSuperAdmin?: boolean
+    isSuperAdmin?: boolean,
+    accessiblePropertyIds?: string[] | 'all'
   ): Promise<PortfolioWithRelations[]>
   count(whereClause: any, portfolioIds?: string[]): Promise<number>
   findById(
     id: string,
     userId?: string,
-    isSuperAdmin?: boolean
+    isSuperAdmin?: boolean,
+    accessiblePropertyIds?: string[] | 'all'
   ): Promise<PortfolioWithFullDetails | null>
   findByName(name: string): Promise<Portfolio | null>
   update(
@@ -104,9 +108,36 @@ export interface IPortfolioService {
     data: UpdatePortfolioDto,
     user: IUserWithPermissions
   ): Promise<PortfolioWithServiceType>
-  remove(id: string, password: string, user: IUserWithPermissions): Promise<{ message: string }>
-  deactivate(id: string, password: string, user: IUserWithPermissions, reason?: string): Promise<{ message: string }>
-  activate(id: string, password: string, user: IUserWithPermissions, reason?: string): Promise<{ message: string }>
+  remove(
+    id: string,
+    password: string,
+    user: IUserWithPermissions
+  ): Promise<{ message: string }>
+  bulkDelete(
+    portfolio_ids: string[],
+    password: string,
+    user: IUserWithPermissions
+  ): Promise<{
+    success: number
+    failed: number
+    results: Array<{
+      portfolio_id: string
+      success: boolean
+      message?: string
+    }>
+  }>
+  deactivate(
+    id: string,
+    password: string,
+    user: IUserWithPermissions,
+    reason?: string
+  ): Promise<{ message: string }>
+  activate(
+    id: string,
+    password: string,
+    user: IUserWithPermissions,
+    reason?: string
+  ): Promise<{ message: string }>
   sendEmail(
     id: string,
     subject: string,

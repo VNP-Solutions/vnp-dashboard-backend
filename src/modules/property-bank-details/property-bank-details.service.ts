@@ -13,7 +13,10 @@ import {
   PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { EmailUtil } from '../../common/utils/email.util'
 import { PrismaService } from '../prisma/prisma.service'
+import type { IPropertyRepository } from '../property/property.interface'
 import {
   BulkUpdateBankDetailsResultDto,
   CreatePropertyBankDetailsDto,
@@ -29,8 +32,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   constructor(
     @Inject('IPropertyBankDetailsRepository')
     private propertyBankDetailsRepository: IPropertyBankDetailsRepository,
+    @Inject('IPropertyRepository')
+    private propertyRepository: IPropertyRepository,
     @Inject(PrismaService) private prisma: PrismaService,
-    @Inject(PermissionService) private permissionService: PermissionService
+    @Inject(PermissionService) private permissionService: PermissionService,
+    @Inject(EmailUtil) private emailUtil: EmailUtil
   ) {}
 
   /**
@@ -113,9 +119,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           if (!data.beneficiary_name || !data.beneficiary_name.trim()) {
             missingFields.push('beneficiary_name')
           }
-          if (!data.beneficiary_address || !data.beneficiary_address.trim()) {
-            missingFields.push('beneficiary_address')
-          }
+          // beneficiary_address is now OPTIONAL for Domestic Wire
           if (!data.routing_number || !data.routing_number.trim()) {
             missingFields.push('routing_number')
           } else if (data.routing_number.trim().length < 9) {
@@ -130,14 +134,13 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           if (!data.beneficiary_name || !data.beneficiary_name.trim()) {
             missingFields.push('beneficiary_name')
           }
-          if (!data.beneficiary_address || !data.beneficiary_address.trim()) {
-            missingFields.push('beneficiary_address')
+          // beneficiary_address is now OPTIONAL for International Wire
+          // currency is now OPTIONAL for International Wire
+          if (!data.iban_number || !data.iban_number.trim()) {
+            missingFields.push('iban_number')
           }
-          if (!data.swift_bic_iban || !data.swift_bic_iban.trim()) {
-            missingFields.push('swift_bic_iban')
-          }
-          if (!data.currency || !data.currency.trim()) {
-            missingFields.push('currency')
+          if (!data.swift_bic_number || !data.swift_bic_number.trim()) {
+            missingFields.push('swift_bic_number')
           }
           break
 
@@ -193,6 +196,47 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     )
   }
 
+  /**
+   * Detect bank sub-type from Excel sheet headers
+   * Uses unique column presence to determine the type
+   */
+  private detectBankSubType(headers: string[]): BankSubType {
+    const normalizedHeaders = headers.map(h => h.toLowerCase().trim())
+
+    // Check for SWIFT/BIC/IBAN columns → International Wire
+    const hasSwiftBicIban = normalizedHeaders.some(h =>
+      h.includes('swift') ||
+      h.includes('bic') ||
+      h.includes('iban')
+    )
+    if (hasSwiftBicIban) {
+      return BankSubType.international_wire
+    }
+
+    // Check for "Bank Wiring Routing Number" → Domestic Wire
+    const hasBankWiringRoutingNumber = normalizedHeaders.some(h =>
+      h.includes('bank wiring routing number') ||
+      h.includes('wiring routing number') ||
+      h === 'bank wiring routing number'
+    )
+    if (hasBankWiringRoutingNumber) {
+      return BankSubType.domestic_wire
+    }
+
+    // Check for Bank Account Type (without Bank Wiring Routing Number) → ACH
+    const hasBankAccountType = normalizedHeaders.some(h =>
+      h.includes('bank account type') ||
+      h === 'bank account type' ||
+      h === 'account type'
+    )
+    if (hasBankAccountType) {
+      return BankSubType.ach
+    }
+
+    // Default to Domestic Wire
+    return BankSubType.domestic_wire
+  }
+
   async create(data: CreatePropertyBankDetailsDto, user: IUserWithPermissions) {
     // Check permission - require CREATE permission on BANK_DETAILS module
     await this.checkBankDetailsPermission(
@@ -239,9 +283,17 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     // Set associated_user_id to current user
     (normalizedData as CreatePropertyBankDetailsDto).associated_user_id = user.id
 
-    return this.propertyBankDetailsRepository.create(
+    const result = await this.propertyBankDetailsRepository.create(
       normalizedData as CreatePropertyBankDetailsDto
     )
+
+    // Send email notification to super admins
+    await this.sendBankDetailsNotificationToSuperAdmins(
+      data.property_id,
+      'created'
+    )
+
+    return result
   }
 
   async findByPropertyId(propertyId: string, _user: IUserWithPermissions) {
@@ -302,16 +354,45 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     // Update associated_user_id to current user
     (normalizedData as UpdatePropertyBankDetailsDto).associated_user_id = user.id
 
-    return this.propertyBankDetailsRepository.update(
+    const result = await this.propertyBankDetailsRepository.update(
       propertyId,
       normalizedData as UpdatePropertyBankDetailsDto
     )
+
+    // Send email notification to super admins
+    await this.sendBankDetailsNotificationToSuperAdmins(propertyId, 'updated')
+
+    return result
   }
 
   async bulkUpdate(
     file: Express.Multer.File,
+    password: string,
     user: IUserWithPermissions
   ): Promise<BulkUpdateBankDetailsResultDto> {
+    // Verify password first
+    if (!password) {
+      throw new BadRequestException('Password is required for bulk bank update')
+    }
+
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
     if (!file) {
       throw new BadRequestException('No file provided')
     }
@@ -332,6 +413,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       errors: [],
       successfulUpdates: []
     }
+
+    // Track properties that were successfully updated for alert notifications
+    const updatedPropertyIds: string[] = []
 
     try {
       // Parse Excel file
@@ -392,75 +476,66 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         )
       }
 
+      // Detect bank sub-type from sheet headers
+      const headers = data.length > 0 ? Object.keys(data[0] as Record<string, any>) : []
+      const detectedBankSubType = this.detectBankSubType(headers)
+      console.log(
+        '\x1b[36m%s\x1b[0m',
+        `🔍 Detected bank sub-type: ${detectedBankSubType}`
+      )
+
       // Process each row
       for (let i = 0; i < data.length; i++) {
         const row = data[i] as any
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
-          // Extract property name (required)
-          const propertyName = findHeaderValue(row, [
-            'Property Name',
-            'Property name',
-            'property_name',
-            'Name',
-            'Property'
+          // Extract Expedia ID (required)
+          const expediaId = findHeaderValue(row, [
+            'Expedia ID',
+            'Expedia id',
+            'expedia_id',
+            'ExpediaID',
+            'Expedia Id'
           ])
 
           // Log row data for debugging
           console.table([
             {
               'Row #': rowNumber,
-              'Property Name': propertyName || 'N/A',
-              'Bank Type':
-                findHeaderValue(row, ['Bank Type', 'Bank type', 'bank_type']) ||
-                'N/A',
-              'Bank Sub Type':
-                findHeaderValue(row, [
-                  'Bank Sub Type',
-                  'Bank sub type',
-                  'bank_sub_type',
-                  'Sub Type',
-                  'SubType'
-                ]) || 'N/A',
-              'Stripe Email':
-                findHeaderValue(row, [
-                  'Stripe Account Email',
-                  'Stripe Email',
-                  'Stripe account email',
-                  'stripe_account_email'
-                ]) || 'N/A'
+              'Expedia ID': expediaId || 'N/A',
+              'Detected Sub-Type': detectedBankSubType
             }
           ])
 
-          if (!propertyName) {
+          if (!expediaId) {
             console.log(
               '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Property name is required. Available columns: ${Object.keys(row).join(', ')}`
+              `❌ Row ${rowNumber} FAILED: Expedia ID is required. Available columns: ${Object.keys(row).join(', ')}`
             )
             result.errors.push({
               row: rowNumber,
               property: 'Unknown',
-              error: 'Property name is required'
+              error: 'Expedia ID is required'
             })
             result.failureCount++
             continue
           }
 
-          // Find property by name
-          const property = await this.prisma.property.findFirst({
-            where: { name: propertyName }
-          })
+          // Find property by Expedia ID
+          const property = await this.propertyRepository.findByExpediaId(
+            expediaId
+          )
 
           if (!property) {
             console.log(
               '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Property '${propertyName}' not found in database`
+              `❌ Row ${rowNumber} FAILED: Property with Expedia ID '${expediaId}' not found in database`
             )
             result.errors.push({
               row: rowNumber,
-              property: propertyName,
-              error: 'Property not found'
+              property: expediaId,
+              error: 'Property not found for this Expedia ID'
             })
             result.failureCount++
             continue
@@ -476,11 +551,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           } catch {
             console.log(
               '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: No permission to edit '${propertyName}'`
+              `❌ Row ${rowNumber} FAILED: No permission to edit Expedia ID '${expediaId}'`
             )
             result.errors.push({
               row: rowNumber,
-              property: propertyName,
+              property: expediaId,
               error:
                 'You do not have permission to edit bank details for this property'
             })
@@ -488,80 +563,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             continue
           }
 
-          // Extract Bank Type (REQUIRED) - can be "None", "Stripe", or "Bank"
-          const bankTypeRaw = findHeaderValue(row, [
-            'Bank Type (None / Stripe / Bank)',
-            'Bank Type',
-            'Bank type',
-            'bank_type'
-          ])
-
-          if (!bankTypeRaw) {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Bank Type is required for '${propertyName}'`
-            )
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: 'Bank Type is required (None / Stripe / Bank)'
-            })
-            result.failureCount++
-            continue
-          }
-
-          const bankTypeNormalized = bankTypeRaw.toLowerCase().trim()
-
-          // If bank type is "None", delete existing bank details if any
-          if (bankTypeNormalized === 'none') {
-            const existingBankDetails =
-              await this.propertyBankDetailsRepository.findByPropertyId(
-                property.id
-              )
-
-            if (existingBankDetails) {
-              await this.prisma.propertyBankDetails.delete({
-                where: { property_id: property.id }
-              })
-              console.log(
-                '\x1b[32m%s\x1b[0m',
-                `✅ Row ${rowNumber} SUCCESS: Deleted bank details for '${propertyName}' (Bank Type = None)`
-              )
-              result.successCount++
-              result.successfulUpdates.push(propertyName)
-            } else {
-              console.log(
-                '\x1b[32m%s\x1b[0m',
-                `✅ Row ${rowNumber} SUCCESS: No bank details to delete for '${propertyName}' (Bank Type = None)`
-              )
-              result.successCount++
-              result.successfulUpdates.push(propertyName)
-            }
-            continue
-          }
-
           // Extract bank details fields with comprehensive name matching
-          const stripeAccountEmail = findHeaderValue(row, [
-            'Stripe Account Email',
-            'Stripe account email',
-            'stripe_account_email',
-            'Stripe Email',
-            'Stripe email',
-            'stripe_email'
-          ])
-
-          const bankSubTypeRaw = findHeaderValue(row, [
-            'Bank Sub Type (ACH / Domestic US Wire / International Wire)',
-            'Bank Sub Type',
-            'Bank sub type',
-            'Bank Sub type',
-            'bank_sub_type',
-            'Sub Type',
-            'SubType',
-            'Subtype',
-            'Bank Subtype'
-          ])
           const hotelPortfolioName = findHeaderValue(row, [
+            'Hotel Or Portfolio Name',
+            'Hotel or Portfolio Name',
             'Hotel Portfolio Name',
             'Hotel portfolio name',
             'hotel_portfolio_name',
@@ -571,6 +576,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Portfolio name'
           ])
           const beneficiaryName = findHeaderValue(row, [
+            'Pay To The Order Of',
+            'Pay to the Order Of',
+            'Pay to the order of',
             'Beneficiary Name',
             'Beneficiary name',
             'beneficiary_name',
@@ -585,11 +593,15 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Beneficiary addr'
           ])
           const accountNumber = findHeaderValue(row, [
+            'IBAN or Account Number',
+            'IBAN or account number',
+            'Iban or Account Number',
+            'Bank Account Number',
+            'Bank account number',
             'Account Number',
             'Account number',
             'account_number',
             'Bank Account',
-            'Bank Account Number',
             'Account No',
             'Account #'
           ])
@@ -614,23 +626,32 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Branch',
             'Branch Name'
           ])
-          const swiftBicIban = findHeaderValue(row, [
-            'Swift or BIC or IBAN',
-            'Swift or Bic or Iban',
-            'Swift/BIC/IBAN',
-            'Swift/Bic/Iban',
-            'swift_bic_iban',
+          const ibanNumber = findHeaderValue(row, [
+            'IBAN or Account Number',
+            'IBAN or account number',
+            'Iban or Account Number',
+            'IBAN/Account Number',
+            'IBAN',
+            'Iban',
+            'iban_number'
+          ])
+          const swiftBicNumber = findHeaderValue(row, [
+            'SWIFT/BIC Code',
+            'Swift/BIC Code',
+            'Swift/Bic Code',
+            'SWIFT/BIC',
             'Swift Code',
             'Swift code',
             'SWIFT',
             'Swift',
             'SWIFT Code',
             'BIC',
-            'SWIFT/BIC',
-            'IBAN',
-            'Iban'
+            'BIC Code',
+            'swift_bic_number'
           ])
           const routingNumber = findHeaderValue(row, [
+            'Bank Routing Number',
+            'Bank routing number',
             'Routing Number',
             'Routing number',
             'routing_number',
@@ -638,6 +659,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Routing No',
             'ABA Number',
             'ABA'
+          ])
+          const bankWiringRoutingNumber = findHeaderValue(row, [
+            'Bank Wiring Routing Number',
+            'Bank wiring routing number',
+            'Wiring Routing Number',
+            'Wiring routing number'
           ])
           const bankAccountType = findHeaderValue(row, [
             'Bank Account Type',
@@ -653,6 +680,30 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             'Currency Code',
             'Currency code'
           ])
+          const contactName = findHeaderValue(row, [
+            'Contact Name',
+            'Contact name',
+            'contact_name'
+          ])
+          const emailAddress = findHeaderValue(row, [
+            'Email Address',
+            'Email address',
+            'email_address',
+            'Email'
+          ])
+          const bankAddress = findHeaderValue(row, [
+            'Bank Address',
+            'Bank address',
+            'bank_address'
+          ])
+          const comments = findHeaderValue(row, [
+            'Comments',
+            'comments',
+            'Comment',
+            'comment',
+            'Notes',
+            'notes'
+          ])
 
           // Check if bank details already exist
           const existingBankDetails =
@@ -663,236 +714,176 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           // Prepare update data
           const updateData: any = {}
 
-          // Process based on Bank Type
-          if (bankTypeNormalized === 'stripe') {
-            // Validate Stripe Account Email is provided
-            if (!stripeAccountEmail || !stripeAccountEmail.trim()) {
-              console.log(
-                '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: Stripe Account Email is required when Bank Type is Stripe for '${propertyName}'`
-              )
-              result.errors.push({
-                row: rowNumber,
-                property: propertyName,
-                error: 'Stripe Account Email is required when Bank Type is Stripe'
-              })
-              result.failureCount++
-              continue
-            }
+          // All sheets are for Bank type (not Stripe), set bank_type and detected sub_type
+          updateData.bank_type = BankType.bank
+          updateData.bank_sub_type = detectedBankSubType
+          updateData.stripe_account_email = null
 
-            // Stripe account
-            updateData.bank_type = BankType.stripe
-            updateData.stripe_account_email = stripeAccountEmail.trim()
-            // Clear bank fields for stripe
-            updateData.bank_sub_type = null
-            updateData.hotel_portfolio_name = null
-            updateData.beneficiary_name = null
-            updateData.beneficiary_address = null
-            updateData.account_number = null
-            updateData.account_name = null
-            updateData.bank_name = null
-            updateData.bank_branch = null
-            updateData.swift_bic_iban = null
-            updateData.routing_number = null
-            updateData.bank_account_type = null
-            updateData.currency = null
-          } else if (bankTypeNormalized === 'bank') {
-            // Bank account - validate bank_sub_type is provided
-            if (!bankSubTypeRaw) {
+          // Only add fields that are provided
+          if (hotelPortfolioName !== undefined) {
+            updateData.hotel_portfolio_name = hotelPortfolioName
+          }
+          if (beneficiaryName !== undefined) {
+            updateData.beneficiary_name = beneficiaryName
+          }
+          if (beneficiaryAddress !== undefined) {
+            updateData.beneficiary_address = beneficiaryAddress
+          }
+          if (accountNumber !== undefined) {
+            updateData.account_number = accountNumber
+          }
+          if (accountName !== undefined) {
+            updateData.account_name = accountName
+          }
+          if (bankName !== undefined) {
+            updateData.bank_name = bankName
+          }
+          if (bankBranch !== undefined) {
+            updateData.bank_branch = bankBranch
+          }
+          if (ibanNumber !== undefined) {
+            updateData.iban_number = ibanNumber
+          }
+          if (swiftBicNumber !== undefined) {
+            updateData.swift_bic_number = swiftBicNumber
+          }
+          if (routingNumber !== undefined) {
+            // Validate routing number has at least 9 digits
+            if (routingNumber.trim().length < 9) {
               console.log(
-                '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: Bank Sub Type is required when Bank Type is Bank for '${propertyName}'`
+                '\x1b[33m%s\x1b[0m',
+                `⚠️  Row ${rowNumber} WARNING: Routing number '${routingNumber}' has less than 9 digits for Expedia ID '${expediaId}'. Skipping routing number update.`
               )
               result.errors.push({
                 row: rowNumber,
-                property: propertyName,
+                property: expediaId,
                 error:
-                  'Bank Sub Type is required when Bank Type is Bank (ACH / Domestic US Wire / International Wire)'
+                  'Routing number must be at least 9 digits. Routing number was not updated.'
               })
-              result.failureCount++
-              continue
+              // Don't update routing number, but continue processing other fields
+            } else {
+              updateData.routing_number = routingNumber
             }
-
-            updateData.bank_type = BankType.bank
-            updateData.stripe_account_email = null
-
-            // Map bank sub type from Excel values to enum values
-            const bankSubTypeNormalized = bankSubTypeRaw.toLowerCase().trim()
-            let mappedBankSubType: string
-
-            if (bankSubTypeNormalized === 'ach') {
-              mappedBankSubType = 'ach'
-            } else if (
-              bankSubTypeNormalized === 'domestic us wire' ||
-              bankSubTypeNormalized === 'domestic_us_wire' ||
-              bankSubTypeNormalized === 'domestic wire'
+          }
+          if (bankWiringRoutingNumber !== undefined) {
+            updateData.bank_wiring_routing_number = bankWiringRoutingNumber
+          }
+          if (bankAccountType !== undefined) {
+            const normalizedAccountType = bankAccountType.toLowerCase().trim()
+            // Handle both "Checking/Saving" and "checking/savings"
+            if (
+              normalizedAccountType === 'checking' ||
+              normalizedAccountType === 'check'
             ) {
-              mappedBankSubType = 'domestic_wire'
+              updateData.bank_account_type = 'checking'
             } else if (
-              bankSubTypeNormalized === 'international wire' ||
-              bankSubTypeNormalized === 'international_wire'
+              normalizedAccountType === 'savings' ||
+              normalizedAccountType === 'saving'
             ) {
-              mappedBankSubType = 'international_wire'
+              updateData.bank_account_type = 'savings'
             } else {
               console.log(
                 '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: Invalid Bank Sub Type '${bankSubTypeRaw}' for '${propertyName}'`
+                `❌ Row ${rowNumber} FAILED: Invalid bank account type '${bankAccountType}' for Expedia ID '${expediaId}'`
               )
               result.errors.push({
                 row: rowNumber,
-                property: propertyName,
-                error: `Invalid Bank Sub Type '${bankSubTypeRaw}'. Must be one of: ACH, Domestic US Wire, International Wire`
+                property: expediaId,
+                error: `Invalid bank account type: ${bankAccountType}. Must be one of: checking, savings, Checking, Saving`
               })
               result.failureCount++
               continue
             }
-
-            updateData.bank_sub_type = mappedBankSubType
-
-            // Only add fields that are provided
-            if (hotelPortfolioName !== undefined) {
-              updateData.hotel_portfolio_name = hotelPortfolioName
-            }
-            if (beneficiaryName !== undefined) {
-              updateData.beneficiary_name = beneficiaryName
-            }
-            if (beneficiaryAddress !== undefined) {
-              updateData.beneficiary_address = beneficiaryAddress
-            }
-            if (accountNumber !== undefined) {
-              updateData.account_number = accountNumber
-            }
-            if (accountName !== undefined) {
-              updateData.account_name = accountName
-            }
-            if (bankName !== undefined) {
-              updateData.bank_name = bankName
-            }
-            if (bankBranch !== undefined) {
-              updateData.bank_branch = bankBranch
-            }
-            if (swiftBicIban !== undefined) {
-              updateData.swift_bic_iban = swiftBicIban
-            }
-            if (routingNumber !== undefined) {
-              // Validate routing number has at least 9 digits
-              if (routingNumber.trim().length < 9) {
-                console.log(
-                  '\x1b[33m%s\x1b[0m',
-                  `⚠️  Row ${rowNumber} WARNING: Routing number '${routingNumber}' has less than 9 digits for '${propertyName}'. Skipping routing number update.`
-                )
-                result.errors.push({
-                  row: rowNumber,
-                  property: propertyName,
-                  error:
-                    'Routing number must be at least 9 digits. Routing number was not updated.'
-                })
-                // Don't update routing number, but continue processing other fields
-              } else {
-                updateData.routing_number = routingNumber
-              }
-            }
-            if (bankAccountType !== undefined) {
-              const normalizedAccountType = bankAccountType.toLowerCase()
-              if (['checking', 'savings'].includes(normalizedAccountType)) {
-                updateData.bank_account_type = normalizedAccountType
-              } else {
-                console.log(
-                  '\x1b[31m%s\x1b[0m',
-                  `❌ Row ${rowNumber} FAILED: Invalid bank account type '${bankAccountType}' for '${propertyName}'`
-                )
-                result.errors.push({
-                  row: rowNumber,
-                  property: propertyName,
-                  error: `Invalid bank account type: ${bankAccountType}. Must be one of: checking, savings`
-                })
-                result.failureCount++
-                continue
-              }
-            }
-            if (currency !== undefined) {
-              updateData.currency = currency
-            }
-          } else {
-            // Invalid bank type
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Invalid Bank Type '${bankTypeRaw}' for '${propertyName}'`
-            )
-            result.errors.push({
-              row: rowNumber,
-              property: propertyName,
-              error: `Invalid Bank Type '${bankTypeRaw}'. Must be one of: None, Stripe, Bank`
-            })
-            result.failureCount++
-            continue
+          }
+          if (currency !== undefined) {
+            updateData.currency = currency
+          }
+          // Add new fields
+          if (contactName !== undefined) {
+            updateData.contact_name = contactName
+          }
+          if (emailAddress !== undefined) {
+            updateData.email_address = emailAddress
+          }
+          if (bankAddress !== undefined) {
+            updateData.bank_address = bankAddress
+          }
+          if (comments !== undefined) {
+            updateData.comments = comments
           }
 
-          // For Bank type, validate required fields based on sub-type
-          if (bankTypeNormalized === 'bank') {
-            const finalSubType = updateData.bank_sub_type
+          // Validate required fields based on detected sub-type
+          const finalSubType = updateData.bank_sub_type
 
-            const missingFields: string[] = []
+          const missingFields: string[] = []
 
-            // Merge with existing data for validation
-            const mergedData = {
-              hotel_portfolio_name:
-                updateData.hotel_portfolio_name !== undefined
-                  ? updateData.hotel_portfolio_name
-                  : existingBankDetails?.hotel_portfolio_name,
-              beneficiary_name:
-                updateData.beneficiary_name !== undefined
-                  ? updateData.beneficiary_name
-                  : existingBankDetails?.beneficiary_name,
-              beneficiary_address:
-                updateData.beneficiary_address !== undefined
-                  ? updateData.beneficiary_address
-                  : existingBankDetails?.beneficiary_address,
-              account_number:
-                updateData.account_number !== undefined
-                  ? updateData.account_number
-                  : existingBankDetails?.account_number,
-              bank_name:
-                updateData.bank_name !== undefined
-                  ? updateData.bank_name
-                  : existingBankDetails?.bank_name,
-              routing_number:
-                updateData.routing_number !== undefined
-                  ? updateData.routing_number
-                  : existingBankDetails?.routing_number,
-              swift_bic_iban:
-                updateData.swift_bic_iban !== undefined
-                  ? updateData.swift_bic_iban
-                  : existingBankDetails?.swift_bic_iban,
-              bank_account_type:
-                updateData.bank_account_type !== undefined
-                  ? updateData.bank_account_type
-                  : existingBankDetails?.bank_account_type,
-              currency:
-                updateData.currency !== undefined
-                  ? updateData.currency
-                  : existingBankDetails?.currency
-            }
+          // Merge with existing data for validation
+          const mergedData = {
+            hotel_portfolio_name:
+              updateData.hotel_portfolio_name !== undefined
+                ? updateData.hotel_portfolio_name
+                : existingBankDetails?.hotel_portfolio_name,
+            beneficiary_name:
+              updateData.beneficiary_name !== undefined
+                ? updateData.beneficiary_name
+                : existingBankDetails?.beneficiary_name,
+            beneficiary_address:
+              updateData.beneficiary_address !== undefined
+                ? updateData.beneficiary_address
+                : existingBankDetails?.beneficiary_address,
+            account_number:
+              updateData.account_number !== undefined
+                ? updateData.account_number
+                : existingBankDetails?.account_number,
+            bank_name:
+              updateData.bank_name !== undefined
+                ? updateData.bank_name
+                : existingBankDetails?.bank_name,
+            routing_number:
+              updateData.routing_number !== undefined
+                ? updateData.routing_number
+                : existingBankDetails?.routing_number,
+            bank_wiring_routing_number:
+              updateData.bank_wiring_routing_number !== undefined
+                ? updateData.bank_wiring_routing_number
+                : existingBankDetails?.bank_wiring_routing_number,
+            iban_number:
+              updateData.iban_number !== undefined
+                ? updateData.iban_number
+                : existingBankDetails?.iban_number,
+            swift_bic_number:
+              updateData.swift_bic_number !== undefined
+                ? updateData.swift_bic_number
+                : existingBankDetails?.swift_bic_number,
+            bank_account_type:
+              updateData.bank_account_type !== undefined
+                ? updateData.bank_account_type
+                : existingBankDetails?.bank_account_type,
+            currency:
+              updateData.currency !== undefined
+                ? updateData.currency
+                : existingBankDetails?.currency
+          }
 
-            // Common required fields
-            if (
-              !mergedData.hotel_portfolio_name ||
-              !mergedData.hotel_portfolio_name.trim()
-            ) {
-              missingFields.push('Hotel Portfolio Name')
-            }
-            if (
-              !mergedData.account_number ||
-              !mergedData.account_number.trim()
-            ) {
-              missingFields.push('Account Number')
-            }
-            if (!mergedData.bank_name || !mergedData.bank_name.trim()) {
-              missingFields.push('Bank Name')
-            }
+          // Common required fields
+          if (
+            !mergedData.hotel_portfolio_name ||
+            !mergedData.hotel_portfolio_name.trim()
+          ) {
+            missingFields.push('Hotel Portfolio Name')
+          }
+          if (
+            !mergedData.account_number ||
+            !mergedData.account_number.trim()
+          ) {
+            missingFields.push('Account Number')
+          }
+          if (!mergedData.bank_name || !mergedData.bank_name.trim()) {
+            missingFields.push('Bank Name')
+          }
 
-            // Sub-type specific validation
-            switch (finalSubType) {
+          // Sub-type specific validation
+          switch (finalSubType) {
               case BankSubType.ach:
                   if (
                     !mergedData.beneficiary_name ||
@@ -922,12 +913,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                   ) {
                     missingFields.push('Beneficiary Name')
                   }
-                  if (
-                    !mergedData.beneficiary_address ||
-                    !mergedData.beneficiary_address.trim()
-                  ) {
-                    missingFields.push('Beneficiary Address')
-                  }
+                  // beneficiary_address is now OPTIONAL for Domestic Wire
                   if (
                     !mergedData.routing_number ||
                     !mergedData.routing_number.trim()
@@ -947,20 +933,19 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                   ) {
                     missingFields.push('Beneficiary Name')
                   }
+                  // beneficiary_address is now OPTIONAL for International Wire
+                  // currency is now OPTIONAL for International Wire
                   if (
-                    !mergedData.beneficiary_address ||
-                    !mergedData.beneficiary_address.trim()
+                    !mergedData.iban_number ||
+                    !mergedData.iban_number.trim()
                   ) {
-                    missingFields.push('Beneficiary Address')
+                    missingFields.push('IBAN or Account Number')
                   }
                   if (
-                    !mergedData.swift_bic_iban ||
-                    !mergedData.swift_bic_iban.trim()
+                    !mergedData.swift_bic_number ||
+                    !mergedData.swift_bic_number.trim()
                   ) {
-                    missingFields.push('Swift or BIC or IBAN')
-                  }
-                  if (!mergedData.currency || !mergedData.currency.trim()) {
-                    missingFields.push('Currency')
+                    missingFields.push('SWIFT/BIC Code')
                   }
                   break
               }
@@ -968,17 +953,16 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             if (missingFields.length > 0) {
               console.log(
                 '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: Missing required fields for ${finalSubType}: ${missingFields.join(', ')} for '${propertyName}'`
+                `❌ Row ${rowNumber} FAILED: Missing required fields for ${finalSubType}: ${missingFields.join(', ')} for Expedia ID '${expediaId}'`
               )
               result.errors.push({
                 row: rowNumber,
-                property: propertyName,
+                property: expediaId,
                 error: `Missing required fields for ${finalSubType}: ${missingFields.join(', ')}`
               })
               result.failureCount++
               continue
             }
-          }
 
           // Set associated user
           updateData.associated_user_id = user.id
@@ -991,37 +975,38 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             )
             console.log(
               '\x1b[32m%s\x1b[0m',
-              `✅ Row ${rowNumber} SUCCESS: Updated bank details for '${propertyName}'`
+              `✅ Row ${rowNumber} SUCCESS: Updated bank details for Expedia ID '${expediaId}'`
             )
+            updatedPropertyIds.push(property.id)
           } else {
             // Create new bank details
             updateData.property_id = property.id
             await this.propertyBankDetailsRepository.create(updateData)
             console.log(
               '\x1b[32m%s\x1b[0m',
-              `✅ Row ${rowNumber} SUCCESS: Created bank details for '${propertyName}'`
+              `✅ Row ${rowNumber} SUCCESS: Created bank details for Expedia ID '${expediaId}'`
             )
+            updatedPropertyIds.push(property.id)
           }
 
           result.successCount++
-          result.successfulUpdates.push(propertyName)
+          result.successfulUpdates.push(expediaId)
         } catch (error) {
-          const propertyName =
+          const expediaIdFromRow =
             findHeaderValue(row, [
-              'Property Name',
-              'Property name',
-              'property_name',
-              'Name',
-              'Property'
+              'Expedia ID',
+              'Expedia id',
+              'expedia_id',
+              'ExpediaID'
             ]) || 'Unknown'
 
           console.log(
             '\x1b[31m%s\x1b[0m',
-            `❌ Row ${rowNumber} FAILED: ${error.message || 'Unknown error occurred'} for '${propertyName}'`
+            `❌ Row ${rowNumber} FAILED: ${error.message || 'Unknown error occurred'} for Expedia ID '${expediaIdFromRow}'`
           )
           result.errors.push({
             row: rowNumber,
-            property: propertyName,
+            property: expediaIdFromRow,
             error: error.message || 'Unknown error occurred'
           })
           result.failureCount++
@@ -1065,11 +1050,212 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         '========================================\n'
       )
 
+      // Send alert notifications to all users with access to updated properties
+      if (updatedPropertyIds.length > 0) {
+        await this.sendBulkUpdateAlerts(updatedPropertyIds)
+      }
+
       return result
     } catch (error) {
       throw new BadRequestException(
         `Failed to process Excel file: ${error.message}`
       )
+    }
+  }
+
+  /**
+   * Send email alerts to all users with access to properties that had bank details updated
+   */
+  private async sendBulkUpdateAlerts(propertyIds: string[]): Promise<void> {
+    try {
+      console.log(
+        `📧 Sending bank update alerts for ${propertyIds.length} properties...`
+      )
+
+      // Get all properties with their names
+      const properties = await this.prisma.property.findMany({
+        where: {
+          id: {
+            in: propertyIds
+          }
+        },
+        select: {
+          id: true,
+          name: true
+        }
+      })
+
+      // Get all users who have access to these properties
+      const userAccesses = await this.prisma.userAccessedProperty.findMany({
+        where: {
+          property_id: {
+            hasSome: propertyIds
+          }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              first_name: true,
+              last_name: true
+            }
+          }
+        }
+      })
+
+      // Create a map of propertyId -> users with access
+      const propertyUserMap = new Map<string, Set<string>>()
+
+      for (const access of userAccesses) {
+        for (const propertyId of access.property_id) {
+          if (propertyIds.includes(propertyId)) {
+            if (!propertyUserMap.has(propertyId)) {
+              propertyUserMap.set(propertyId, new Set())
+            }
+            propertyUserMap.get(propertyId)!.add(access.user.email)
+          }
+        }
+      }
+
+      // Send email for each property to all users with access
+      for (const property of properties) {
+        const userEmails = propertyUserMap.get(property.id)
+
+        if (userEmails && userEmails.size > 0) {
+          const recipients = Array.from(userEmails)
+
+          try {
+            await this.emailUtil.sendEmail(
+              recipients,
+              `Bank Details Updated - ${property.name}`,
+              `Bank details have been updated for property "${property.name}".\n\nPlease review the changes in the system.\n\nThis is an automated notification.`
+            )
+
+            console.log(
+              `✅ Sent bank update alert for "${property.name}" to ${recipients.length} user(s)`
+            )
+          } catch (emailError) {
+            console.error(
+              `❌ Failed to send alert for "${property.name}":`,
+              emailError
+            )
+          }
+        }
+      }
+
+      console.log(
+        `✅ Completed sending bank update alerts for ${properties.length} properties`
+      )
+    } catch (error) {
+      console.error('❌ Error sending bulk update alerts:', error)
+      // Don't throw - alerts are non-critical
+    }
+  }
+
+  /**
+   * Send email notification to all super admins when bank details are created or updated
+   */
+  private async sendBankDetailsNotificationToSuperAdmins(
+    propertyId: string,
+    action: 'created' | 'updated'
+  ): Promise<void> {
+    try {
+      console.log(
+        `📧 Sending bank details ${action} notification to super admins...`
+      )
+
+      // Get property details
+      const property = await this.prisma.property.findUnique({
+        where: { id: propertyId },
+        select: {
+          id: true,
+          name: true
+        }
+      })
+
+      if (!property) {
+        console.warn(
+          `Property not found for bank details notification: ${propertyId}`
+        )
+        return
+      }
+
+      // Get all super admin users
+      const allUsers = await this.prisma.user.findMany({
+        where: {
+          is_verified: true
+        },
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          role: {
+            select: {
+              portfolio_permission: true,
+              property_permission: true,
+              audit_permission: true,
+              user_permission: true,
+              system_settings_permission: true
+            }
+          }
+        }
+      })
+
+      // Filter super admins using the isUserSuperAdmin utility
+      const superAdminEmails: string[] = []
+
+      for (const user of allUsers) {
+        // Check if user is super admin by checking all permissions
+        const allPermissions = [
+          user.role.portfolio_permission,
+          user.role.property_permission,
+          user.role.audit_permission,
+          user.role.user_permission,
+          user.role.system_settings_permission
+        ]
+
+        // User is super admin if all permissions have permission_level 'all' and access_level 'all'
+        const isSuperAdmin = allPermissions.every(
+          permission =>
+            permission &&
+            permission.permission_level === 'all' &&
+            permission.access_level === 'all'
+        )
+
+        if (isSuperAdmin) {
+          superAdminEmails.push(user.email)
+        }
+      }
+
+      if (superAdminEmails.length === 0) {
+        console.warn('No super admin users found to notify')
+        return
+      }
+
+      // Send email to all super admins
+      const subject = `Bank Details ${action === 'created' ? 'Added' : 'Updated'} - ${property.name}`
+      const body = `Bank details have been ${action} for property "${property.name}".\n\nPlease review the changes in the VNP Solutions Dashboard.\n\nThis is an automated notification.`
+
+      try {
+        await this.emailUtil.sendEmail(superAdminEmails, subject, body)
+
+        console.log(
+          `✅ Sent bank details ${action} notification to ${superAdminEmails.length} super admin(s)`
+        )
+      } catch (emailError) {
+        console.error(
+          `❌ Failed to send bank details ${action} notification:`,
+          emailError
+        )
+      }
+    } catch (error) {
+      console.error(
+        `❌ Error sending bank details ${action} notification:`,
+        error
+      )
+      // Don't throw - email notifications are non-critical
     }
   }
 }

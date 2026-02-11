@@ -35,6 +35,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   ActivatePropertyDto,
+  BulkDeletePropertyDto,
   BulkTransferPropertyDto,
   CompleteCreatePropertyDto,
   CompleteUpdatePropertyDto,
@@ -64,12 +65,12 @@ export class PropertyController {
   ) {}
 
   @Post()
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
-  @ApiOperation({ summary: 'Create a new property' })
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
+  @ApiOperation({ summary: 'Create a new property (Internal users only)' })
   @ApiResponse({ status: 201, description: 'Property created successfully' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   create(
     @Body() createPropertyDto: CreatePropertyDto,
@@ -79,16 +80,136 @@ export class PropertyController {
   }
 
   @Post('complete-create')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Create a property with credentials and bank details in a single transaction',
+    summary:
+      'Create a property with credentials and bank details in a single transaction (Internal users only)',
     description:
       'Creates a property along with optional credentials and bank details. All operations are performed in a transaction and will be rolled back if any operation fails. ' +
-      'Property data is required, while credentials and bank details are optional.'
+      'Property data is required, while credentials and bank details are optional. ' +
+      'Bank details support new fields: contact_name, email_address, bank_address, comments. ' +
+      'Optional fields: beneficiary_address and currency (no longer required for any sub-type).'
+  })
+  @ApiBody({
+    type: CompleteCreatePropertyDto,
+    examples: {
+      withACH: {
+        summary: 'Property with ACH Bank Details',
+        description: 'Complete property creation with ACH bank details',
+        value: {
+          property: {
+            name: 'Grand Plaza Hotel',
+            address: '123 Main Street, New York, NY 10001',
+            currency_id: '507f1f77bcf86cd799439020',
+            card_descriptor: 'GRAND PLAZA NY',
+            is_active: true,
+            portfolio_id: '507f1f77bcf86cd799439012'
+          },
+          credentials: {
+            expedia: {
+              expedia_id: 'EXP123456',
+              username: 'grandplaza@expedia.com',
+              password: 'ExpediaPass123!'
+            }
+          },
+          bank_details: {
+            bank_type: 'bank',
+            bank_sub_type: 'ach',
+            hotel_portfolio_name: 'Grand Plaza Hotel',
+            beneficiary_name: 'Grand Plaza LLC',
+            account_number: '1234567890',
+            bank_name: 'Chase Bank',
+            routing_number: '021000021',
+            bank_account_type: 'checking',
+            contact_name: 'John Smith',
+            email_address: 'accounting@grandplaza.com',
+            comments: 'Primary operating account'
+          }
+        }
+      },
+      withInternationalWire: {
+        summary: 'Property with International Wire',
+        description: 'Complete property creation with international wire details',
+        value: {
+          property: {
+            name: 'Royal Suites London',
+            address: '456 Park Lane, London, UK',
+            currency_id: '507f1f77bcf86cd799439021',
+            is_active: true,
+            portfolio_id: '507f1f77bcf86cd799439013'
+          },
+          credentials: {
+            expedia: {
+              expedia_id: 'EXP789012',
+              username: 'royalsuites@expedia.com',
+              password: 'ExpediaPass456!'
+            },
+            booking: {
+              hotel_id: 'BKG456789',
+              username: 'royal@booking.com',
+              password: 'BookingPass123!'
+            }
+          },
+          bank_details: {
+            bank_type: 'bank',
+            bank_sub_type: 'international_wire',
+            hotel_portfolio_name: 'Royal Suites International',
+            beneficiary_name: 'Royal Suites Ltd',
+            beneficiary_address: '456 Park Lane, London W1K 1PS, UK',
+            account_number: 'GB29NWBK60161331926819',
+            bank_name: 'HSBC Bank',
+            swift_bic_iban: 'HSBCGB2LXXX',
+            currency: 'GBP',
+            bank_address: '8 Canada Square, London E14 5HQ, UK',
+            contact_name: 'Sarah Williams',
+            email_address: 'finance@royalsuites.co.uk',
+            comments: 'For European bookings and payments'
+          }
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 201,
-    description: 'Property with credentials and bank details created successfully'
+    description:
+      'Property with credentials and bank details created successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Property created successfully with credentials and bank details',
+        data: {
+          id: '507f1f77bcf86cd799439030',
+          name: 'Grand Plaza Hotel',
+          address: '123 Main Street, New York, NY 10001',
+          currency_id: '507f1f77bcf86cd799439020',
+          card_descriptor: 'GRAND PLAZA NY',
+          is_active: true,
+          portfolio_id: '507f1f77bcf86cd799439012',
+          created_at: '2026-02-08T10:00:00.000Z',
+          updated_at: '2026-02-08T10:00:00.000Z',
+          credentials: {
+            id: '507f1f77bcf86cd799439031',
+            expedia_id: 'EXP123456',
+            property_id: '507f1f77bcf86cd799439030'
+          },
+          bank_details: {
+            id: '507f1f77bcf86cd799439032',
+            bank_type: 'bank',
+            bank_sub_type: 'ach',
+            hotel_portfolio_name: 'Grand Plaza Hotel',
+            beneficiary_name: 'Grand Plaza LLC',
+            account_number: '1234567890',
+            bank_name: 'Chase Bank',
+            routing_number: '021000021',
+            bank_account_type: 'checking',
+            contact_name: 'John Smith',
+            email_address: 'accounting@grandplaza.com',
+            comments: 'Primary operating account',
+            property_id: '507f1f77bcf86cd799439030'
+          }
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 400,
@@ -96,7 +217,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   @ApiResponse({
     status: 409,
@@ -112,14 +233,123 @@ export class PropertyController {
   @Patch(':id/complete-update')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Update a property with credentials and bank details in a single transaction',
+    summary:
+      'Update a property with credentials and bank details in a single transaction',
     description:
       'Updates a property along with optional credentials and bank details. All operations are performed in a transaction and will be rolled back if any operation fails. ' +
-      'All fields are optional - only provided fields will be updated.'
+      'All fields are optional - only provided fields will be updated. ' +
+      'Bank details support new fields: contact_name, email_address, bank_address, comments. ' +
+      'Optional fields: beneficiary_address and currency (no longer required for any sub-type).'
+  })
+  @ApiBody({
+    type: CompleteUpdatePropertyDto,
+    examples: {
+      updateBankDetails: {
+        summary: 'Update Bank Details Only',
+        description: 'Update property bank details without changing property or credentials',
+        value: {
+          bank_details: {
+            contact_name: 'Jane Doe',
+            email_address: 'jane.doe@hotel.com',
+            comments: 'Updated contact person - Jane is now handling all bank inquiries'
+          }
+        }
+      },
+      updateAllSections: {
+        summary: 'Update Property, Credentials, and Bank Details',
+        description: 'Comprehensive update of all sections',
+        value: {
+          property: {
+            name: 'Grand Plaza Hotel & Suites',
+            address: '123 Main Street, Suite 100, New York, NY 10001',
+            card_descriptor: 'GRAND PLAZA SUITES'
+          },
+          credentials: {
+            expedia: {
+              expedia_id: 'EXP123456',
+              username: 'grandplaza.new@expedia.com',
+              password: 'NewExpediaPass123!'
+            },
+            agoda: {
+              hotel_id: 'AGD789012',
+              username: 'grandplaza@agoda.com',
+              password: 'AgodaPass456!'
+            }
+          },
+          bank_details: {
+            bank_sub_type: 'domestic_wire',
+            bank_name: 'Wells Fargo',
+            routing_number: '121000248',
+            account_number: '9876543210',
+            beneficiary_name: 'Grand Plaza Operations LLC',
+            beneficiary_address: '123 Main Street, New York, NY 10001',
+            contact_name: 'Michael Johnson',
+            email_address: 'michael.j@grandplaza.com',
+            bank_address: '420 Montgomery Street, San Francisco, CA 94104',
+            comments: 'Switched to Wells Fargo effective March 2026'
+          }
+        }
+      },
+      changeBankSubType: {
+        summary: 'Change Bank Sub-Type from ACH to International Wire',
+        description: 'Update bank sub-type and add required international wire fields',
+        value: {
+          bank_details: {
+            bank_sub_type: 'international_wire',
+            swift_bic_iban: 'CHASUS33XXX',
+            currency: 'USD',
+            bank_address: '270 Park Avenue, New York, NY 10017',
+            routing_number: null,
+            bank_account_type: null,
+            comments: 'Switching to international wire for better global coverage'
+          }
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 200,
-    description: 'Property with credentials and bank details updated successfully'
+    description:
+      'Property with credentials and bank details updated successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Property updated successfully',
+        data: {
+          id: '507f1f77bcf86cd799439030',
+          name: 'Grand Plaza Hotel & Suites',
+          address: '123 Main Street, Suite 100, New York, NY 10001',
+          currency_id: '507f1f77bcf86cd799439020',
+          card_descriptor: 'GRAND PLAZA SUITES',
+          is_active: true,
+          portfolio_id: '507f1f77bcf86cd799439012',
+          created_at: '2026-02-08T10:00:00.000Z',
+          updated_at: '2026-02-08T15:30:00.000Z',
+          credentials: {
+            id: '507f1f77bcf86cd799439031',
+            expedia_id: 'EXP123456',
+            agoda_id: 'AGD789012',
+            property_id: '507f1f77bcf86cd799439030'
+          },
+          bank_details: {
+            id: '507f1f77bcf86cd799439032',
+            bank_type: 'bank',
+            bank_sub_type: 'domestic_wire',
+            hotel_portfolio_name: 'Grand Plaza Hotel',
+            beneficiary_name: 'Grand Plaza Operations LLC',
+            beneficiary_address: '123 Main Street, New York, NY 10001',
+            account_number: '9876543210',
+            bank_name: 'Wells Fargo',
+            routing_number: '121000248',
+            contact_name: 'Michael Johnson',
+            email_address: 'michael.j@grandplaza.com',
+            bank_address: '420 Montgomery Street, San Francisco, CA 94104',
+            comments: 'Switched to Wells Fargo effective March 2026',
+            property_id: '507f1f77bcf86cd799439030'
+          }
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 400,
@@ -223,12 +453,12 @@ export class PropertyController {
 
   @Patch(':id')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
-  @ApiOperation({ summary: 'Update a property' })
+  @ApiOperation({ summary: 'Update a property (Internal users only)' })
   @ApiResponse({ status: 200, description: 'Property updated successfully' })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   update(
     @Param('id') id: string,
@@ -241,22 +471,25 @@ export class PropertyController {
   @Patch(':id/transfer')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Transfer a property to another portfolio (requires ownership and password verification)',
-    description: 'Super admins can directly transfer properties. Internal and external users with portfolio ownership can create transfer requests that require super admin approval. Password verification is required for all users.'
+    summary:
+      'Transfer a property to another portfolio or submit transfer request',
+    description:
+      'Super Admin can directly transfer with password (no reason required). All other users with UPDATE permission can submit transfer request with password and reason.'
   })
   @ApiResponse({
     status: 200,
-    description: 'Property transferred successfully or transfer request submitted for approval'
+    description:
+      'Property transferred successfully or transfer request submitted for approval'
   })
   @ApiResponse({ status: 404, description: 'Property or Portfolio not found' })
   @ApiResponse({
     status: 400,
     description:
-      'Property is already in the target portfolio or invalid password'
+      'Property is already in the target portfolio or invalid password or reason required for non-super admin users'
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - User does not have ownership of the property portfolio or insufficient permissions'
+    description: 'Forbidden - Insufficient permissions'
   })
   async transfer(
     @Param('id') id: string,
@@ -285,7 +518,8 @@ export class PropertyController {
   @Patch(':id/share')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Share a property with other portfolios (view-only access)'
+    summary:
+      'Share a property with other portfolios (Internal users only, view-only access)'
   })
   @ApiResponse({
     status: 200,
@@ -301,7 +535,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only property owner can share'
+    description: 'Forbidden - Only internal users can share properties'
   })
   share(
     @Param('id') id: string,
@@ -314,7 +548,8 @@ export class PropertyController {
   @Patch(':id/unshare')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Remove property sharing from specified portfolios'
+    summary:
+      'Remove property sharing from specified portfolios (Internal users only)'
   })
   @ApiResponse({
     status: 200,
@@ -326,7 +561,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only property owner can unshare'
+    description: 'Forbidden - Only internal users can unshare properties'
   })
   unshare(
     @Param('id') id: string,
@@ -339,8 +574,10 @@ export class PropertyController {
   @Post('bulk-transfer')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Bulk transfer multiple properties to another portfolio (Super admin or internal property/portfolio manager only, requires password verification)',
-    description: 'Allows bulk transfer of multiple properties to a target portfolio. Only super admins or internal property/portfolio managers can perform this operation. Password verification is required.'
+    summary:
+      'Bulk transfer multiple properties to another portfolio (Internal users only, requires password verification)',
+    description:
+      'Allows bulk transfer of multiple properties to a target portfolio. Only internal users can perform this operation. Password verification is required.'
   })
   @ApiResponse({
     status: 200,
@@ -353,7 +590,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only super admins or internal property/portfolio managers can perform bulk transfers'
+    description: 'Forbidden - Only internal users can perform bulk transfers'
   })
   async bulkTransfer(
     @Body() bulkTransferPropertyDto: BulkTransferPropertyDto,
@@ -377,11 +614,77 @@ export class PropertyController {
     return this.propertyService.bulkTransfer(bulkTransferPropertyDto, user)
   }
 
+  @Post('bulk-delete')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE)
+  @ApiOperation({
+    summary:
+      'Bulk delete multiple properties (Super Admin only with password verification)',
+    description:
+      'Allows bulk deletion of multiple properties. Only super admin can perform this operation. ' +
+      'Will skip properties that have unarchived audits and add them to the error list. ' +
+      'Password verification is required.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk delete completed with results',
+    schema: {
+      example: {
+        success: 3,
+        failed: 2,
+        results: [
+          { property_id: '507f1f77bcf86cd799439011', success: true },
+          {
+            property_id: '507f1f77bcf86cd799439012',
+            success: false,
+            message:
+              'Cannot delete property. It has 3 unarchived audits. Please archive all audits before deleting the property.'
+          }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid password or validation errors'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only Super Admin can bulk delete properties'
+  })
+  async bulkDelete(
+    @Body() bulkDeleteDto: BulkDeletePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // Password validation
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      bulkDeleteDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    return this.propertyService.bulkDelete(
+      bulkDeleteDto.property_ids,
+      bulkDeleteDto.password,
+      user
+    )
+  }
+
   @Delete(':id')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE, true)
   @ApiOperation({
-    summary: 'Delete a property (Super admin only, requires password verification)',
-    description: 'Only super admins can delete properties. The property must not have any unarchived audits. Password verification is required.'
+    summary:
+      'Delete a property (Super admin only, requires password verification)',
+    description:
+      'Only super admins can delete properties. The property must not have any unarchived audits. Password verification is required.'
   })
   @ApiResponse({ status: 200, description: 'Property deleted successfully' })
   @ApiResponse({ status: 404, description: 'Property not found' })
@@ -420,8 +723,10 @@ export class PropertyController {
   @Post(':id/delete')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.DELETE, true)
   @ApiOperation({
-    summary: 'Delete a property via POST (Super admin only, requires password verification)',
-    description: 'Alternative endpoint for deletion using POST method. Only super admins can delete properties. The property must not have any unarchived audits. Password verification is required.'
+    summary:
+      'Delete a property via POST (Super admin only, requires password verification)',
+    description:
+      'Alternative endpoint for deletion using POST method. Only super admins can delete properties. The property must not have any unarchived audits. Password verification is required.'
   })
   @ApiResponse({ status: 200, description: 'Property deleted successfully' })
   @ApiResponse({ status: 404, description: 'Property not found' })
@@ -460,14 +765,20 @@ export class PropertyController {
   @Post(':id/deactivate')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Deactivate a property (requires password verification)',
-    description: 'Super admins can directly deactivate. All other users (internal and external) create a pending action for approval. Password verification is required for all.'
+    summary: 'Deactivate a property or submit deactivation request',
+    description:
+      'Super Admin can directly deactivate with password (no reason required). All other users with UPDATE permission submit a deactivation request with password and reason.'
   })
-  @ApiResponse({ status: 200, description: 'Property deactivated successfully or deactivation request submitted for approval' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Property deactivated successfully or deactivation request submitted for approval'
+  })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
-    description: 'Invalid password or property already deactivated'
+    description:
+      'Invalid password or property already deactivated or reason required for non-super admin users'
   })
   async deactivate(
     @Param('id') id: string,
@@ -490,20 +801,30 @@ export class PropertyController {
       throw new BadRequestException('Invalid password')
     }
 
-    return this.propertyService.deactivate(id, user, deactivatePropertyDto.reason)
+    return this.propertyService.deactivate(
+      id,
+      user,
+      deactivatePropertyDto.reason
+    )
   }
 
   @Post(':id/activate')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Activate a property (requires password verification)',
-    description: 'Super admins can directly activate. All other users (internal and external) create a pending action for approval. Password verification is required for all.'
+    summary: 'Activate a property or submit activation request',
+    description:
+      'Super Admin can directly activate with password (no reason required). All other users with UPDATE permission submit an activation request with password and reason.'
   })
-  @ApiResponse({ status: 200, description: 'Property activated successfully or activation request submitted for approval' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Property activated successfully or activation request submitted for approval'
+  })
   @ApiResponse({ status: 404, description: 'Property not found' })
   @ApiResponse({
     status: 400,
-    description: 'Invalid password or property already active'
+    description:
+      'Invalid password or property already active or reason required for non-super admin users'
   })
   async activate(
     @Param('id') id: string,
@@ -530,10 +851,12 @@ export class PropertyController {
   }
 
   @Post('bulk-import')
-  @RequirePermission(ModuleType.PROPERTY, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Bulk import properties from Excel file' })
+  @ApiOperation({
+    summary: 'Bulk import properties from Excel file (Internal users only)'
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -556,7 +879,7 @@ export class PropertyController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   bulkImport(
     @UploadedFile() file: Express.Multer.File,
@@ -570,13 +893,13 @@ export class PropertyController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk update properties from Excel file',
+    summary: 'Bulk update properties from Excel file (Internal users only)',
     description: `
     Upload an Excel file (.xlsx or .xls) to bulk update existing properties.
-    Only Super Admin and internal users can use this endpoint.
+    Only internal users can use this endpoint.
     
     Required column:
-    - Property ID/Property Id/Property id/property_id/ID/Id/id: ID of the property to update (must exist)
+    - Expedia ID/Expedia Id/Expedia id/ExpediaID/expedia_id: Expedia ID to identify the property (must exist)
     
     Optional columns (only update if provided):
     - Property Name/Property name/Name: Name of the property
@@ -585,7 +908,6 @@ export class PropertyController {
     - Card Descriptor/Card descriptor/Descriptor: Card descriptor
     - Next Due Date/Next due date/Due Date: Next due date (mm/dd/yyyy)
     - Portfolio/Portfolio Name/Portfolio name: Portfolio name (will be created if doesn't exist)
-    - Expedia ID/Expedia Id/Expedia id/ExpediaID: Expedia ID
     - Expedia Username/Expedia username/Expedia User: Expedia username
     - Expedia Password/Expedia password/Expedia Pass: Expedia password
     - Agoda ID/Agoda Id/Agoda id/AgodaID: Agoda ID
@@ -635,24 +957,25 @@ export class PropertyController {
         errors: [
           {
             row: 3,
-            propertyId: '507f1f77bcf86cd799439011',
-            error: 'Property not found'
+            expediaId: 'EXP-12345',
+            error: 'Property not found with Expedia ID: EXP-12345'
           }
         ],
         successfulUpdates: [
-          '507f1f77bcf86cd799439012',
-          '507f1f77bcf86cd799439013'
+          'EXP-67890',
+          'EXP-11223'
         ]
       }
     }
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid file or file format or only Super Admin and internal users can bulk update'
+    description:
+      'Bad Request - Invalid file or file format or only internal users can bulk update'
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   bulkUpdate(
     @UploadedFile() file: Express.Multer.File,

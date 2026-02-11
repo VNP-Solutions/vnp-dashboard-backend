@@ -9,9 +9,11 @@ import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
-  ModuleType
+  ModuleType,
+  PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { roundAmount } from '../../common/utils/amount.util'
 import { COMPLETED_AUDIT_STATUSES } from '../../common/utils/audit.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
@@ -20,7 +22,7 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
-import { roundAmount } from '../../common/utils/amount.util'
+import { splitEmails } from '../../common/validators/comma-separated-emails.validator'
 import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
 import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import { PrismaService } from '../prisma/prisma.service'
@@ -57,6 +59,11 @@ export class PortfolioService implements IPortfolioService {
   ) {}
 
   async create(data: CreatePortfolioDto, user: IUserWithPermissions) {
+    // Only internal users can create portfolios
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can create portfolios')
+    }
+
     const existingPortfolio = await this.portfolioRepository.findByName(
       data.name
     )
@@ -109,11 +116,19 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
+    // Get user's accessible property IDs for filtering property counts
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
     // Re-fetch the portfolio to include the newly created contract URL
     const portfolioWithContractUrls = await this.portfolioRepository.findById(
       portfolio.id,
       user.id,
-      isSuperAdmin
+      isSuperAdmin,
+      accessiblePropertyIds
     )
 
     return portfolioWithContractUrls || portfolio
@@ -133,6 +148,13 @@ export class PortfolioService implements IPortfolioService {
         query.limit || 10
       )
     }
+
+    // Get user's accessible property IDs for filtering property counts
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
 
     const userIsSuperAdmin = isUserSuperAdmin(user)
     const userIsInternal = isInternalUser(user)
@@ -216,7 +238,8 @@ export class PortfolioService implements IPortfolioService {
         { where, skip, take, orderBy },
         undefined,
         user.id,
-        isSuperAdmin
+        isSuperAdmin,
+        accessiblePropertyIds
       ),
       this.portfolioRepository.count(where, undefined)
     ])
@@ -231,11 +254,20 @@ export class PortfolioService implements IPortfolioService {
         ...portfolioWithoutPendingActions
       } = portfolio
 
-      return {
+      // Conditionally hide sales_agent for external users
+      const isInternal = userIsInternal || userIsSuperAdmin
+      const portfolioData = {
         ...portfolioWithoutPendingActions,
         has_pending_action: pendingActions.length > 0,
         pending_actions: pendingActions
       }
+
+      // Remove sales_agent field if user is not internal
+      if (!isInternal) {
+        delete portfolioData.sales_agent
+      }
+
+      return portfolioData
     })
 
     return QueryBuilder.buildPaginatedResult(
@@ -247,6 +279,12 @@ export class PortfolioService implements IPortfolioService {
   }
 
   async findAllForExport(query: PortfolioQueryDto, user: IUserWithPermissions) {
+    // Only super admin can export portfolios
+    const userIsSuperAdmin = isUserSuperAdmin(user)
+    if (!userIsSuperAdmin) {
+      throw new BadRequestException('Only Super Admin can export portfolios')
+    }
+
     const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PORTFOLIO
@@ -256,7 +294,13 @@ export class PortfolioService implements IPortfolioService {
       return []
     }
 
-    const userIsSuperAdmin = isUserSuperAdmin(user)
+    // Get user's accessible property IDs for filtering property counts
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
     const userIsInternal = isInternalUser(user)
 
     // Build additional filters from query params
@@ -335,7 +379,8 @@ export class PortfolioService implements IPortfolioService {
       { where, orderBy },
       undefined,
       user.id,
-      userIsSuperAdmin
+      userIsSuperAdmin,
+      accessiblePropertyIds
     )
 
     // Add pending action info to each portfolio
@@ -348,11 +393,20 @@ export class PortfolioService implements IPortfolioService {
         ...portfolioWithoutPendingActions
       } = portfolio
 
-      return {
+      // Conditionally hide sales_agent for external users (though only super admin can export)
+      const isInternal = userIsInternal || userIsSuperAdmin
+      const portfolioData = {
         ...portfolioWithoutPendingActions,
         has_pending_action: pendingActions.length > 0,
         pending_actions: pendingActions
       }
+
+      // Remove sales_agent field if user is not internal
+      if (!isInternal) {
+        delete portfolioData.sales_agent
+      }
+
+      return portfolioData
     })
 
     return enrichedData
@@ -361,10 +415,19 @@ export class PortfolioService implements IPortfolioService {
   async findOne(id: string, user: IUserWithPermissions) {
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
+
+    // Get user's accessible property IDs for filtering property counts
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
     const portfolio = await this.portfolioRepository.findById(
       id,
       user.id,
-      isSuperAdmin
+      isSuperAdmin,
+      accessiblePropertyIds
     )
 
     if (!portfolio) {
@@ -376,6 +439,13 @@ export class PortfolioService implements IPortfolioService {
       throw new NotFoundException('Portfolio not found')
     }
 
+    // Conditionally hide sales_agent for external users
+    if (!isInternal && !isSuperAdmin) {
+      const { sales_agent: _sales_agent, ...portfolioWithoutSalesAgent } =
+        portfolio as any
+      return portfolioWithoutSalesAgent
+    }
+
     return portfolio
   }
 
@@ -384,6 +454,11 @@ export class PortfolioService implements IPortfolioService {
     data: UpdatePortfolioDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can update portfolios
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can update portfolios')
+    }
+
     const isSuperAdmin = isUserSuperAdmin(user)
     const portfolio = await this.portfolioRepository.findById(
       id,
@@ -485,6 +560,112 @@ export class PortfolioService implements IPortfolioService {
     return { message: 'Portfolio deleted successfully' }
   }
 
+  async bulkDelete(
+    portfolio_ids: string[],
+    password: string,
+    user: IUserWithPermissions
+  ) {
+    const isSuperAdmin = isUserSuperAdmin(user)
+
+    // Only super admin can bulk delete portfolios
+    if (!isSuperAdmin) {
+      throw new BadRequestException(
+        'Only Super Admin can bulk delete portfolios'
+      )
+    }
+
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    // Validate at least one portfolio ID is provided
+    if (!portfolio_ids || portfolio_ids.length === 0) {
+      throw new BadRequestException('At least one portfolio ID is required')
+    }
+
+    const results: Array<{
+      portfolio_id: string
+      success: boolean
+      message?: string
+    }> = []
+    let successCount = 0
+    let failedCount = 0
+
+    // Process each portfolio
+    for (const portfolioId of portfolio_ids) {
+      try {
+        // Find the portfolio
+        const portfolio = await this.portfolioRepository.findById(
+          portfolioId,
+          user.id,
+          isSuperAdmin
+        )
+
+        if (!portfolio) {
+          results.push({
+            portfolio_id: portfolioId,
+            success: false,
+            message: 'Portfolio not found'
+          })
+          failedCount++
+          continue
+        }
+
+        // Check if portfolio has properties
+        const propertyCount =
+          await this.portfolioRepository.countProperties(portfolioId)
+
+        if (propertyCount > 0) {
+          results.push({
+            portfolio_id: portfolioId,
+            success: false,
+            message: `Cannot delete portfolio with ${propertyCount} associated properties. Please delete or reassign the properties first.`
+          })
+          failedCount++
+          continue
+        }
+
+        // Delete the portfolio
+        await this.portfolioRepository.delete(portfolioId)
+
+        results.push({
+          portfolio_id: portfolioId,
+          success: true
+        })
+        successCount++
+      } catch (error) {
+        results.push({
+          portfolio_id: portfolioId,
+          success: false,
+          message: error.message || 'Unknown error occurred'
+        })
+        failedCount++
+      }
+    }
+
+    return {
+      success: successCount,
+      failed: failedCount,
+      results
+    }
+  }
+
   async deactivate(
     id: string,
     password: string,
@@ -494,17 +675,44 @@ export class PortfolioService implements IPortfolioService {
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
 
-    // Only super admin and internal users can deactivate portfolios
-    if (!isSuperAdmin && !isInternal) {
+    // Check if user has at least update permission for portfolio module
+    const portfolioPermission = user.role.portfolio_permission
+
+    if (!portfolioPermission) {
       throw new BadRequestException(
-        'Only Super Admin and internal users can deactivate portfolios'
+        'No portfolio permission found for this user'
       )
     }
 
-    // Internal users (non-super admin) must provide a reason
-    if (!isSuperAdmin && isInternal && !reason) {
+    const hasUpdatePermission =
+      portfolioPermission.permission_level === 'all' ||
+      portfolioPermission.permission_level === 'update'
+
+    const hasAccess =
+      portfolioPermission.access_level === 'all' ||
+      portfolioPermission.access_level === 'partial'
+
+    // Only internal users with update (or all) permission and partial (or all) access can request deactivation
+    if (!isInternal || !hasUpdatePermission || !hasAccess) {
       throw new BadRequestException(
-        'Reason is required for internal users to deactivate portfolios'
+        'Only internal users with at least update permission and partial access for portfolio module can deactivate portfolios'
+      )
+    }
+
+    // For partial access, verify user has access to this portfolio
+    if (portfolioPermission.access_level === 'partial' && !isSuperAdmin) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PORTFOLIO,
+        PermissionAction.UPDATE,
+        id
+      )
+    }
+
+    // Non-super admin users must provide a reason for pending request
+    if (!isSuperAdmin && !reason) {
+      throw new BadRequestException(
+        'Reason is required for non-super admin users to submit deactivation request'
       )
     }
 
@@ -543,7 +751,7 @@ export class PortfolioService implements IPortfolioService {
       throw new BadRequestException('Portfolio is already deactivated')
     }
 
-    // Super admin can deactivate directly
+    // Super admin can deactivate directly (no reason required)
     if (isSuperAdmin) {
       await this.prisma.portfolio.update({
         where: { id },
@@ -552,7 +760,7 @@ export class PortfolioService implements IPortfolioService {
       return { message: 'Portfolio deactivated successfully' }
     }
 
-    // Internal users (non-super admin) need to create a pending action
+    // Non-super admin users need to create a pending action
     // Check if there's already a pending deactivation request
     const existingPendingAction = await this.prisma.pendingAction.findFirst({
       where: {
@@ -595,17 +803,44 @@ export class PortfolioService implements IPortfolioService {
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
 
-    // Only super admin and internal users can activate portfolios
-    if (!isSuperAdmin && !isInternal) {
+    // Check if user has at least update permission for portfolio module
+    const portfolioPermission = user.role.portfolio_permission
+
+    if (!portfolioPermission) {
       throw new BadRequestException(
-        'Only Super Admin and internal users can activate portfolios'
+        'No portfolio permission found for this user'
       )
     }
 
-    // Internal users (non-super admin) must provide a reason
-    if (!isSuperAdmin && isInternal && !reason) {
+    const hasUpdatePermission =
+      portfolioPermission.permission_level === 'all' ||
+      portfolioPermission.permission_level === 'update'
+
+    const hasAccess =
+      portfolioPermission.access_level === 'all' ||
+      portfolioPermission.access_level === 'partial'
+
+    // Only internal users with update (or all) permission and partial (or all) access can request activation
+    if (!isInternal || !hasUpdatePermission || !hasAccess) {
       throw new BadRequestException(
-        'Reason is required for internal users to activate portfolios'
+        'Only internal users with at least update permission and partial access for portfolio module can activate portfolios'
+      )
+    }
+
+    // For partial access, verify user has access to this portfolio
+    if (portfolioPermission.access_level === 'partial' && !isSuperAdmin) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PORTFOLIO,
+        PermissionAction.UPDATE,
+        id
+      )
+    }
+
+    // Non-super admin users must provide a reason for pending request
+    if (!isSuperAdmin && !reason) {
+      throw new BadRequestException(
+        'Reason is required for non-super admin users to submit activation request'
       )
     }
 
@@ -644,7 +879,7 @@ export class PortfolioService implements IPortfolioService {
       throw new BadRequestException('Portfolio is already active')
     }
 
-    // Super admin can activate directly
+    // Super admin can activate directly (no reason required)
     if (isSuperAdmin) {
       await this.prisma.portfolio.update({
         where: { id },
@@ -653,7 +888,7 @@ export class PortfolioService implements IPortfolioService {
       return { message: 'Portfolio activated successfully' }
     }
 
-    // Internal users (non-super admin) need to create a pending action
+    // Non-super admin users need to create a pending action
     // Check if there's already a pending activation request
     const existingPendingAction = await this.prisma.pendingAction.findFirst({
       where: {
@@ -712,14 +947,24 @@ export class PortfolioService implements IPortfolioService {
       )
     }
 
+    // Split comma-separated emails
+    const emailAddresses = splitEmails(portfolio.contact_email)
+
+    if (emailAddresses.length === 0) {
+      throw new BadRequestException(
+        'Portfolio does not have valid contact email addresses configured'
+      )
+    }
+
     // Log email details for debugging
-    console.log('📧 Sending email to portfolio contact:', {
+    console.log('📧 Sending email to portfolio contact(s):', {
       requestedPortfolioId: id,
       portfolioId: portfolio.id,
       portfolioName: portfolio.name,
       contact_email: portfolio.contact_email,
+      email_addresses: emailAddresses,
+      recipient_count: emailAddresses.length,
       access_email: portfolio.access_email,
-      sending_to: portfolio.contact_email,
       subject,
       hasAttachments:
         (uploadedAttachments?.length || 0) + (attachmentUrls?.length || 0) > 0
@@ -740,20 +985,33 @@ export class PortfolioService implements IPortfolioService {
       allAttachments = [...allAttachments, ...urlAttachments]
     }
 
-    await this.emailUtil.sendEmail(
-      portfolio.contact_email,
-      subject,
-      body,
-      allAttachments.length > 0 ? allAttachments : undefined
-    )
+    // Send email to each recipient
+    for (const emailAddress of emailAddresses) {
+      await this.emailUtil.sendEmail(
+        emailAddress,
+        subject,
+        body,
+        allAttachments.length > 0 ? allAttachments : undefined
+      )
+    }
 
-    return { message: 'Email sent successfully' }
+    return {
+      message: `Email sent successfully to ${emailAddresses.length} recipient(s)`,
+      recipients: emailAddresses
+    }
   }
 
   async bulkImport(
     file: Express.Multer.File,
     _user: IUserWithPermissions
   ): Promise<BulkImportResultDto> {
+    // Only internal users can bulk import portfolios
+    if (!isInternalUser(_user)) {
+      throw new BadRequestException(
+        'Only internal users can bulk import portfolios'
+      )
+    }
+
     if (!file) {
       throw new BadRequestException('No file provided')
     }
@@ -1026,6 +1284,16 @@ export class PortfolioService implements IPortfolioService {
             _user.id
           )
 
+          // If user has partial access, grant them access to the created portfolio
+          const permission = _user.role.portfolio_permission
+          if (permission?.access_level === AccessLevel.partial) {
+            await this.permissionService.grantResourceAccess(
+              _user.id,
+              ModuleType.PORTFOLIO,
+              newPortfolio.id
+            )
+          }
+
           // If contract URL is provided, create contract URL entries for the user
           // Handle comma-separated values
           // Only super admin can create contract URLs
@@ -1076,13 +1344,13 @@ export class PortfolioService implements IPortfolioService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<BulkUpdateResultDto> {
-    // Only super admins and internal users can bulk update portfolios
+    // Only internal users can bulk update portfolios
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
 
-    if (!isSuperAdmin && !isInternal) {
+    if (!isInternal) {
       throw new BadRequestException(
-        'Only Super Admin and internal users can bulk update portfolios'
+        'Only internal users can bulk update portfolios'
       )
     }
 
@@ -1222,6 +1490,26 @@ export class PortfolioService implements IPortfolioService {
               row: rowNumber,
               portfolioId: portfolioIdValue,
               error: 'Portfolio not found'
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Check if user has permission to update this portfolio
+          try {
+            await this.permissionService.requirePermission(
+              user,
+              ModuleType.PORTFOLIO,
+              PermissionAction.UPDATE,
+              portfolioIdValue
+            )
+          } catch (error) {
+            result.errors.push({
+              row: rowNumber,
+              portfolioId: portfolioIdValue,
+              error:
+                error.message ||
+                'You do not have permission to update this portfolio'
             })
             result.failureCount++
             continue
@@ -1697,12 +1985,16 @@ export class PortfolioService implements IPortfolioService {
       completed_audit_count: completedAuditCount,
       recent_audits: formattedRecentAudits.map(audit => ({
         ...audit,
-        amount_collectable: audit.amount_collectable !== null && audit.amount_collectable !== undefined
-          ? roundAmount(audit.amount_collectable)
-          : null,
-        amount_confirmed: audit.amount_confirmed !== null && audit.amount_confirmed !== undefined
-          ? roundAmount(audit.amount_confirmed)
-          : null
+        amount_collectable:
+          audit.amount_collectable !== null &&
+          audit.amount_collectable !== undefined
+            ? roundAmount(audit.amount_collectable)
+            : null,
+        amount_confirmed:
+          audit.amount_confirmed !== null &&
+          audit.amount_confirmed !== undefined
+            ? roundAmount(audit.amount_confirmed)
+            : null
       }))
     }
   }

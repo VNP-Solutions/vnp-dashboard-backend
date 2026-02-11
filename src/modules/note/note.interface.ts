@@ -44,6 +44,7 @@ export interface INoteRepository {
   create(data: CreateNoteDto & { user_id: string }): Promise<NoteWithRelations>
   findAll(queryOptions: any): Promise<NoteWithRelations[]>
   findById(id: string): Promise<NoteWithRelations | null>
+  findAuditById(auditId: string): Promise<{ property_id: string } | null>
   update(id: string, data: UpdateNoteDto): Promise<NoteWithRelations>
   delete(id: string): Promise<Note>
   deleteMany(whereClause: any): Promise<number>

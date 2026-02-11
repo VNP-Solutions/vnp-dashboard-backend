@@ -1,0 +1,113 @@
+{
+  "success": true,
+  "timestamp": "2026-02-11T08:44:11.982Z",
+  "checks": [
+    {
+      "name": "PropertyBankDetails Count",
+      "passed": true,
+      "details": "Found 177 records",
+      "data": {
+        "count": 177
+      }
+    },
+    {
+      "name": "New Schema Fields",
+      "passed": true,
+      "details": "All new fields are accessible in Prisma schema",
+      "data": {
+        "sample": {
+          "id": "69441c4ac5a3ce8c3cf558ce",
+          "iban_number": null,
+          "swift_bic_number": null,
+          "bank_wiring_routing_number": null,
+          "contact_name": null,
+          "email_address": null,
+          "bank_address": null,
+          "comments": null
+        }
+      }
+    },
+    {
+      "name": "Old Field Removed",
+      "passed": true,
+      "details": "Old field swift_bic_iban was removed during migration"
+    },
+    {
+      "name": "No Null IDs",
+      "passed": true,
+      "details": "MongoDB ensures all records have valid IDs"
+    },
+    {
+      "name": "Foreign Key Relationships",
+      "passed": true,
+      "details": "All PropertyBankDetails have valid property relationships",
+      "data": {
+        "total": 177,
+        "valid": 177
+      }
+    },
+    {
+      "name": "IBAN/SWIFT Distribution",
+      "passed": true,
+      "details": "IBAN: 0, SWIFT: 0, Both: 0, Neither: 177",
+      "data": {
+        "withIban": 0,
+        "withSwift": 0,
+        "withBoth": 0,
+        "withNeither": 177
+      }
+    },
+    {
+      "name": "Sample Data Review",
+      "passed": true,
+      "details": "Retrieved 3 sample records",
+      "data": [
+        {
+          "id": "69441c4ac5a3ce8c3cf558ce",
+          "iban_number": null,
+          "swift_bic_number": null,
+          "bank_wiring_routing_number": null,
+          "contact_name": null,
+          "email_address": null,
+          "property_id": "6929c13a9c77631ff6cecf32"
+        },
+        {
+          "id": "6967ca976dfc0b0cc70e6119",
+          "iban_number": null,
+          "swift_bic_number": null,
+          "bank_wiring_routing_number": null,
+          "contact_name": null,
+          "email_address": null,
+          "property_id": "696041e6cc4ed1a4eb4cac3e"
+        },
+        {
+          "id": "6967cb096dfc0b0cc70e611a",
+          "iban_number": null,
+          "swift_bic_number": null,
+          "bank_wiring_routing_number": null,
+          "contact_name": null,
+          "email_address": null,
+          "property_id": "696041e6cc4ed1a4eb4cac3c"
+        }
+      ]
+    },
+    {
+      "name": "Collection Counts",
+      "passed": true,
+      "details": "All collections are accessible",
+      "data": {
+        "users": 54,
+        "portfolios": 57,
+        "properties": 1799,
+        "audits": 11,
+        "credentials": 2381,
+        "bankDetails": 177
+      }
+    }
+  ],
+  "summary": {
+    "totalChecks": 8,
+    "passed": 8,
+    "failed": 0
+  }
+}

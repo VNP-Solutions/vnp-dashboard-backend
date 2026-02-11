@@ -44,6 +44,7 @@ export interface ITaskRepository {
   create(data: CreateTaskDto & { user_id: string }): Promise<TaskWithRelations>
   findAll(queryOptions: any): Promise<TaskWithRelations[]>
   findById(id: string): Promise<TaskWithRelations | null>
+  findAuditById(auditId: string): Promise<{ property_id: string } | null>
   update(id: string, data: UpdateTaskDto): Promise<TaskWithRelations>
   delete(id: string): Promise<Task>
   deleteMany(whereClause: any): Promise<number>

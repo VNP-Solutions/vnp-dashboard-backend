@@ -44,9 +44,12 @@ export class EmailUtil {
     // Verify transporter configuration on startup (only log once)
     if (!EmailUtil.smtpVerified) {
       EmailUtil.smtpVerified = true
-      this.transporter.verify((error) => {
+      this.transporter.verify(error => {
         if (error) {
-          console.error('\x1b[31mSMTP connection failed: %s\x1b[0m', error instanceof Error ? error.message : String(error))
+          console.error(
+            '\x1b[31mSMTP connection failed: %s\x1b[0m',
+            error instanceof Error ? error.message : String(error)
+          )
         } else {
           console.log('SMTP is ready to send emails')
         }
@@ -127,14 +130,14 @@ export class EmailUtil {
             </div>
             <p style="color: #666;">⏳ This temporary password is valid for <strong>5 days</strong>.</p>
             <p>Click the link below to set up your account and get started:</p>
-            ${redirectUrl ? `<p><a href="${redirectUrl}?email=${email}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold;">Accept Invitation →</a></p>` : ''}
+            ${redirectUrl ? `<p><a href="${redirectUrl}?email=${encodeURIComponent(email)}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold;">Accept Invitation →</a></p>` : ''}
             <p style="color: #666;">If you weren't expecting this invitation, please contact your manager or reply to this email.</p>
             <div style="margin-top: 30px;">
               <p>Best regards,<br><strong>VNP Solutions Admin</strong></p>
             </div>
           </div>
         `,
-        text: `${greeting}\n\nWelcome aboard! You've been invited to join the VNP Solutions platform as part of our internal team.\n\nYour temporary password is: ${tempPassword}\n\nThis temporary password is valid for 5 days.\n\nClick the link below to set up your account and get started:\n${redirectUrl ? `${redirectUrl}?email=${email}` : ''}\n\nIf you weren't expecting this invitation, please contact your manager or reply to this email.\n\nBest regards,\nVNP Solutions Admin`
+        text: `${greeting}\n\nWelcome aboard! You've been invited to join the VNP Solutions platform as part of our internal team.\n\nYour temporary password is: ${tempPassword}\n\nThis temporary password is valid for 5 days.\n\nClick the link below to set up your account and get started:\n${redirectUrl ? `${redirectUrl}?email=${encodeURIComponent(email)}` : ''}\n\nIf you weren't expecting this invitation, please contact your manager or reply to this email.\n\nBest regards,\nVNP Solutions Admin`
       }
 
       try {
@@ -168,14 +171,14 @@ export class EmailUtil {
           </div>
           <p style="color: #666;">⏳ This temporary password is valid for <strong>5 days</strong>.</p>
           <p>Click below to activate your account:</p>
-          ${redirectUrl ? `<p><a href="${redirectUrl}?email=${email}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold;">Activate Account →</a></p>` : ''}
+          ${redirectUrl ? `<p><a href="${redirectUrl}?email=${encodeURIComponent(email)}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold;">Activate Account →</a></p>` : ''}
           <p style="color: #666;">If you need any help during setup, please contact us at support@vnpsolutions.com.</p>
           <div style="margin-top: 30px;">
             <p>Warm regards,<br><strong>Client Success Team</strong><br><strong>VNP Solutions</strong></p>
           </div>
         </div>
       `,
-      text: `${greeting}\n\nWe're excited to have you onboard with VNP Solutions, your trusted partner for OTA Revenue Recovery and Audit Services.\n\nYou've been invited to access your property's dashboard to review audit results, payment summaries, and compliance reports.\n\nYour temporary password is: ${tempPassword}\n\nThis temporary password is valid for 5 days.\n\nClick below to activate your account:\n${redirectUrl ? `${redirectUrl}?email=${email}` : ''}\n\nIf you need any help during setup, please contact us at support@vnpsolutions.com.\n\nWarm regards,\nClient Success Team\nVNP Solutions`
+      text: `${greeting}\n\nWe're excited to have you onboard with VNP Solutions, your trusted partner for OTA Revenue Recovery and Audit Services.\n\nYou've been invited to access your property's dashboard to review audit results, payment summaries, and compliance reports.\n\nYour temporary password is: ${tempPassword}\n\nThis temporary password is valid for 5 days.\n\nClick below to activate your account:\n${redirectUrl ? `${redirectUrl}?email=${encodeURIComponent(email)}` : ''}\n\nIf you need any help during setup, please contact us at support@vnpsolutions.com.\n\nWarm regards,\nClient Success Team\nVNP Solutions`
     }
 
     try {
@@ -226,7 +229,10 @@ export class EmailUtil {
 
     try {
       const info = await this.transporter.sendMail(mailOptions)
-      console.log('✓ Password reset OTP email sent:', { to: email, messageId: info.messageId })
+      console.log('✓ Password reset OTP email sent:', {
+        to: email,
+        messageId: info.messageId
+      })
     } catch (error) {
       console.error('✗ Failed to send password reset OTP email:', error)
       throw new BadRequestException(
@@ -368,7 +374,9 @@ export class EmailUtil {
 
             response.on('end', () => {
               clearTimeout(timeout)
-              console.log(`✓ Fetched file from URL: ${url} (${(totalSize / 1024 / 1024).toFixed(2)}MB)`)
+              console.log(
+                `✓ Fetched file from URL: ${url} (${(totalSize / 1024 / 1024).toFixed(2)}MB)`
+              )
               resolve(Buffer.concat(chunks))
             })
 
@@ -482,10 +490,14 @@ export class EmailUtil {
     effectiveDate: Date
   ): Promise<void> {
     // Remove duplicates and filter out empty emails
-    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
 
     if (uniqueEmails.length === 0) {
-      console.warn('No valid recipient emails provided for property transfer notification')
+      console.warn(
+        'No valid recipient emails provided for property transfer notification'
+      )
       return
     }
 
@@ -532,7 +544,10 @@ export class EmailUtil {
           messageId: info.messageId
         })
       } catch (error) {
-        console.error(`✗ Failed to send property transfer email to ${userEmail}:`, error)
+        console.error(
+          `✗ Failed to send property transfer email to ${userEmail}:`,
+          error
+        )
         // Continue sending to other recipients even if one fails
       }
     }
@@ -546,10 +561,14 @@ export class EmailUtil {
     effectiveDate: Date
   ): Promise<void> {
     // Remove duplicates and filter out empty emails
-    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
 
     if (uniqueEmails.length === 0) {
-      console.warn('No valid recipient emails provided for audit status change notification')
+      console.warn(
+        'No valid recipient emails provided for audit status change notification'
+      )
       return
     }
 
@@ -561,7 +580,10 @@ export class EmailUtil {
     })
 
     // Get dashboard URL from config
-    const dashboardUrl = String(this.configService.get('dashboardUrl', { infer: true }) || 'https://new.dashboardvnps.com/')
+    const dashboardUrl = String(
+      this.configService.get('dashboardUrl', { infer: true }) ||
+        'https://new.dashboardvnps.com/'
+    )
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -605,7 +627,10 @@ export class EmailUtil {
           messageId: info.messageId
         })
       } catch (error) {
-        console.error(`✗ Failed to send audit status change email to ${userEmail}:`, error)
+        console.error(
+          `✗ Failed to send audit status change email to ${userEmail}:`,
+          error
+        )
         // Continue sending to other recipients even if one fails
       }
     }
@@ -620,10 +645,14 @@ export class EmailUtil {
     requestedDate: Date
   ): Promise<void> {
     // Remove duplicates and filter out empty emails
-    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
 
     if (uniqueEmails.length === 0) {
-      console.warn('No valid recipient emails provided for property transfer rejection notification')
+      console.warn(
+        'No valid recipient emails provided for property transfer rejection notification'
+      )
       return
     }
 
@@ -675,7 +704,10 @@ export class EmailUtil {
           messageId: info.messageId
         })
       } catch (error) {
-        console.error(`✗ Failed to send property transfer rejection email to ${userEmail}:`, error)
+        console.error(
+          `✗ Failed to send property transfer rejection email to ${userEmail}:`,
+          error
+        )
         // Continue sending to other recipients even if one fails
       }
     }
@@ -689,10 +721,14 @@ export class EmailUtil {
     requestedDate: Date
   ): Promise<void> {
     // Remove duplicates and filter out empty emails
-    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
 
     if (uniqueEmails.length === 0) {
-      console.warn('No valid recipient emails provided for property deactivation rejection notification')
+      console.warn(
+        'No valid recipient emails provided for property deactivation rejection notification'
+      )
       return
     }
 
@@ -744,7 +780,10 @@ export class EmailUtil {
           messageId: info.messageId
         })
       } catch (error) {
-        console.error(`✗ Failed to send property deactivation rejection email to ${userEmail}:`, error)
+        console.error(
+          `✗ Failed to send property deactivation rejection email to ${userEmail}:`,
+          error
+        )
         // Continue sending to other recipients even if one fails
       }
     }
@@ -757,10 +796,14 @@ export class EmailUtil {
     requestedDate: Date
   ): Promise<void> {
     // Remove duplicates and filter out empty emails
-    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
 
     if (uniqueEmails.length === 0) {
-      console.warn('No valid recipient emails provided for portfolio deactivation rejection notification')
+      console.warn(
+        'No valid recipient emails provided for portfolio deactivation rejection notification'
+      )
       return
     }
 
@@ -812,7 +855,10 @@ export class EmailUtil {
           messageId: info.messageId
         })
       } catch (error) {
-        console.error(`✗ Failed to send portfolio deactivation rejection email to ${userEmail}:`, error)
+        console.error(
+          `✗ Failed to send portfolio deactivation rejection email to ${userEmail}:`,
+          error
+        )
         // Continue sending to other recipients even if one fails
       }
     }
@@ -826,10 +872,14 @@ export class EmailUtil {
     requestedDate: Date
   ): Promise<void> {
     // Remove duplicates and filter out empty emails
-    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
 
     if (uniqueEmails.length === 0) {
-      console.warn('No valid recipient emails provided for property activation rejection notification')
+      console.warn(
+        'No valid recipient emails provided for property activation rejection notification'
+      )
       return
     }
 
@@ -881,7 +931,10 @@ export class EmailUtil {
           messageId: info.messageId
         })
       } catch (error) {
-        console.error(`✗ Failed to send property activation rejection email to ${userEmail}:`, error)
+        console.error(
+          `✗ Failed to send property activation rejection email to ${userEmail}:`,
+          error
+        )
         // Continue sending to other recipients even if one fails
       }
     }
@@ -896,10 +949,14 @@ export class EmailUtil {
     updatedDate: Date
   ): Promise<void> {
     // Remove duplicates and filter out empty emails
-    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
 
     if (uniqueEmails.length === 0) {
-      console.warn('No valid recipient emails provided for audit report URL update notification')
+      console.warn(
+        'No valid recipient emails provided for audit report URL update notification'
+      )
       return
     }
 
@@ -911,7 +968,10 @@ export class EmailUtil {
     })
 
     // Get dashboard URL from config
-    const dashboardUrl = String(this.configService.get('dashboardUrl', { infer: true }) || 'https://new.dashboardvnps.com/')
+    const dashboardUrl = String(
+      this.configService.get('dashboardUrl', { infer: true }) ||
+        'https://new.dashboardvnps.com/'
+    )
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -928,19 +988,18 @@ export class EmailUtil {
         const mailOptions = {
           from: this.configService.get('smtp.email', { infer: true }),
           to: userEmail,
-          subject: 'Audit Report URL Updated – VNP Solutions',
+          subject: 'Audit Report Uploaded – VNP Solutions',
           html: `
             <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
               <p><strong>${greeting}</strong></p>
-              <p>We wanted to inform you that the report URL has been updated for your <strong>${auditName}</strong> audit.</p>
+              <p>We wanted to inform you that the audit report has been uploaded for your <strong>${auditName}</strong> audit.</p>
               <p><strong>📊 Audit Details:</strong></p>
               <ul style="list-style: none; padding-left: 0;">
                 <li>📁 <strong>Property:</strong> ${propertyName}</li>
                 <li>🏢 <strong>Portfolio:</strong> ${portfolioName}</li>
-                <li>📅 <strong>Update Date:</strong> ${formattedDate}</li>
-                <li>🔗 <strong>Report URL:</strong> <a href="${reportUrl}" style="color: #007bff;">${reportUrl}</a></li>
+                <li>📅 <strong>Upload Date:</strong> ${formattedDate}</li>
               </ul>
-              <p>You can log in to your dashboard at any time to view the updated report and audit details.</p>
+              <p>Please log in to your dashboard to view the report and audit details.</p>
               <div style="margin: 30px 0;">
                 <a href="${dashboardUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Access Dashboard →</a>
               </div>
@@ -950,16 +1009,19 @@ export class EmailUtil {
               </div>
             </div>
           `,
-          text: `${greeting}\\n\\nWe wanted to inform you that the report URL has been updated for your ${auditName} audit.\\n\\n📊 Audit Details:\\n📁 Property: ${propertyName}\\n🏢 Portfolio: ${portfolioName}\\n📅 Update Date: ${formattedDate}\\n🔗 Report URL: ${reportUrl}\\n\\nYou can log in to your dashboard at any time to view the updated report and audit details.\\n\\nAccess Dashboard: ${dashboardUrl}\\n\\nThank you for your continued partnership with VNP Solutions.\\n\\nWarm regards,\\nVNP Solutions Team`
+          text: `${greeting}\\n\\nWe wanted to inform you that the audit report has been uploaded for your ${auditName} audit.\\n\\n📊 Audit Details:\\n📁 Property: ${propertyName}\\n🏢 Portfolio: ${portfolioName}\\n📅 Upload Date: ${formattedDate}\\n\\nPlease log in to your dashboard to view the report and audit details.\\n\\nAccess Dashboard: ${dashboardUrl}\\n\\nThank you for your continued partnership with VNP Solutions.\\n\\nWarm regards,\\nVNP Solutions Team`
         }
 
         const info = await this.transporter.sendMail(mailOptions)
-        console.log('✓ Audit report URL update email sent:', {
+        console.log('✓ Audit report upload email sent:', {
           to: userEmail,
           messageId: info.messageId
         })
       } catch (error) {
-        console.error(`✗ Failed to send audit report URL update email to ${userEmail}:`, error)
+        console.error(
+          `✗ Failed to send audit report upload email to ${userEmail}:`,
+          error
+        )
         // Continue sending to other recipients even if one fails
       }
     }
@@ -972,10 +1034,14 @@ export class EmailUtil {
     uploadedDate: Date
   ): Promise<void> {
     // Remove duplicates and filter out empty emails
-    const uniqueEmails = [...new Set(recipientEmails.filter(email => email && email.trim()))]
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
 
     if (uniqueEmails.length === 0) {
-      console.warn('No valid recipient emails provided for consolidated report upload notification')
+      console.warn(
+        'No valid recipient emails provided for consolidated report upload notification'
+      )
       return
     }
 
@@ -987,7 +1053,10 @@ export class EmailUtil {
     })
 
     // Get dashboard URL from config
-    const dashboardUrl = String(this.configService.get('dashboardUrl', { infer: true }) || 'https://new.dashboardvnps.com/')
+    const dashboardUrl = String(
+      this.configService.get('dashboardUrl', { infer: true }) ||
+        'https://new.dashboardvnps.com/'
+    )
 
     // Limit report URLs to first 5 to avoid email being too long
     const displayUrls = reportUrls.slice(0, 5)
@@ -1058,7 +1127,223 @@ export class EmailUtil {
           messageId: info.messageId
         })
       } catch (error) {
-        console.error(`✗ Failed to send consolidated report upload email to ${userEmail}:`, error)
+        console.error(
+          `✗ Failed to send consolidated report upload email to ${userEmail}:`,
+          error
+        )
+        // Continue sending to other recipients even if one fails
+      }
+    }
+  }
+
+  async sendPortfolioDeactivateEmail(
+    recipientEmails: string[],
+    portfolioName: string,
+    effectiveDate: Date
+  ): Promise<void> {
+    // Remove duplicates and filter out empty emails
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
+
+    if (uniqueEmails.length === 0) {
+      console.warn(
+        'No valid recipient emails provided for portfolio deactivation notification'
+      )
+      return
+    }
+
+    // Format the effective date
+    const formattedDate = effectiveDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    // Send individual emails to each recipient for personalization
+    for (const userEmail of uniqueEmails) {
+      try {
+        // Fetch user's first name from database
+        const user = await this.prisma.user.findUnique({
+          where: { email: userEmail },
+          select: { first_name: true }
+        })
+
+        const firstName = user?.first_name?.split(' ')[0] || ''
+        const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+
+        const mailOptions = {
+          from: this.configService.get('smtp.email', { infer: true }),
+          to: userEmail,
+          subject: `Portfolio Deactivation Notification – ${portfolioName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <p><strong>${greeting}</strong></p>
+              <p>We wanted to inform you that the portfolio <strong>${portfolioName}</strong> has been <strong style="color: #dc3545;">deactivated</strong> effective <strong>${formattedDate}</strong>.</p>
+              <p>This portfolio is no longer active in the <strong>VNP Solutions Dashboard</strong>. All properties under this portfolio will be affected by this change.</p>
+              <p>If you believe this deactivation was made in error or need additional details, please contact <strong>support@vnpsolutions.com</strong>.</p>
+              <div style="margin-top: 30px; color: #666;">
+                <p>Warm regards,<br><strong>VNP Solutions Support Team</strong></p>
+              </div>
+            </div>
+          `,
+          text: `${greeting}\n\nWe wanted to inform you that the portfolio ${portfolioName} has been deactivated effective ${formattedDate}.\n\nThis portfolio is no longer active in the VNP Solutions Dashboard. All properties under this portfolio will be affected by this change.\n\nIf you believe this deactivation was made in error or need additional details, please contact support@vnpsolutions.com.\n\nWarm regards,\nVNP Solutions Support Team`
+        }
+
+        const info = await this.transporter.sendMail(mailOptions)
+        console.log('✓ Portfolio deactivation email sent:', {
+          to: userEmail,
+          messageId: info.messageId
+        })
+      } catch (error) {
+        console.error(
+          `✗ Failed to send portfolio deactivation email to ${userEmail}:`,
+          error
+        )
+        // Continue sending to other recipients even if one fails
+      }
+    }
+  }
+
+  async sendPortfolioActivateEmail(
+    recipientEmails: string[],
+    portfolioName: string,
+    effectiveDate: Date
+  ): Promise<void> {
+    // Remove duplicates and filter out empty emails
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
+
+    if (uniqueEmails.length === 0) {
+      console.warn(
+        'No valid recipient emails provided for portfolio activation notification'
+      )
+      return
+    }
+
+    // Format the effective date
+    const formattedDate = effectiveDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    // Send individual emails to each recipient for personalization
+    for (const userEmail of uniqueEmails) {
+      try {
+        // Fetch user's first name from database
+        const user = await this.prisma.user.findUnique({
+          where: { email: userEmail },
+          select: { first_name: true }
+        })
+
+        const firstName = user?.first_name?.split(' ')[0] || ''
+        const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+
+        const mailOptions = {
+          from: this.configService.get('smtp.email', { infer: true }),
+          to: userEmail,
+          subject: `Portfolio Activation Notification – ${portfolioName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <p><strong>${greeting}</strong></p>
+              <p>We wanted to inform you that the portfolio <strong>${portfolioName}</strong> has been <strong style="color: #28a745;">activated</strong> effective <strong>${formattedDate}</strong>.</p>
+              <p>This portfolio is now active in the <strong>VNP Solutions Dashboard</strong>. All properties under this portfolio are now accessible for operations.</p>
+              <p>If you have any questions or need additional details, please contact <strong>support@vnpsolutions.com</strong>.</p>
+              <div style="margin-top: 30px; color: #666;">
+                <p>Warm regards,<br><strong>VNP Solutions Support Team</strong></p>
+              </div>
+            </div>
+          `,
+          text: `${greeting}\n\nWe wanted to inform you that the portfolio ${portfolioName} has been activated effective ${formattedDate}.\n\nThis portfolio is now active in the VNP Solutions Dashboard. All properties under this portfolio are now accessible for operations.\n\nIf you have any questions or need additional details, please contact support@vnpsolutions.com.\n\nWarm regards,\nVNP Solutions Support Team`
+        }
+
+        const info = await this.transporter.sendMail(mailOptions)
+        console.log('✓ Portfolio activation email sent:', {
+          to: userEmail,
+          messageId: info.messageId
+        })
+      } catch (error) {
+        console.error(
+          `✗ Failed to send portfolio activation email to ${userEmail}:`,
+          error
+        )
+        // Continue sending to other recipients even if one fails
+      }
+    }
+  }
+
+  async sendPortfolioActivateRejectionEmail(
+    recipientEmails: string[],
+    portfolioName: string,
+    rejectionReason: string,
+    requestedDate: Date
+  ): Promise<void> {
+    // Remove duplicates and filter out empty emails
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
+
+    if (uniqueEmails.length === 0) {
+      console.warn(
+        'No valid recipient emails provided for portfolio activation rejection notification'
+      )
+      return
+    }
+
+    // Format the requested date
+    const formattedDate = requestedDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    // Send individual emails to each recipient for personalization
+    for (const userEmail of uniqueEmails) {
+      try {
+        // Fetch user's first name from database
+        const user = await this.prisma.user.findUnique({
+          where: { email: userEmail },
+          select: { first_name: true }
+        })
+
+        const firstName = user?.first_name?.split(' ')[0] || ''
+        const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+
+        const mailOptions = {
+          from: this.configService.get('smtp.email', { infer: true }),
+          to: userEmail,
+          subject: `Portfolio Activation Request Rejected – ${portfolioName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <p><strong>${greeting}</strong></p>
+              <p>We wanted to inform you that the request to activate the portfolio <strong>${portfolioName}</strong> has been <strong style="color: #dc3545;">rejected</strong>.</p>
+              <p><strong>📅 Requested Date:</strong> ${formattedDate}</p>
+              <p><strong>❌ Rejection Reason:</strong></p>
+              <div style="background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0; color: #721c24;">${rejectionReason}</p>
+              </div>
+              <p>The portfolio remains inactive in the <strong>VNP Solutions Dashboard</strong>.</p>
+              <p>If you have any questions or need further clarification, please contact <strong>support@vnpsolutions.com</strong>.</p>
+              <div style="margin-top: 30px; color: #666;">
+                <p>Warm regards,<br><strong>VNP Solutions Support Team</strong></p>
+              </div>
+            </div>
+          `,
+          text: `${greeting}\n\nWe wanted to inform you that the request to activate the portfolio ${portfolioName} has been rejected.\n\n📅 Requested Date: ${formattedDate}\n\n❌ Rejection Reason:\n${rejectionReason}\n\nThe portfolio remains inactive in the VNP Solutions Dashboard.\n\nIf you have any questions or need further clarification, please contact support@vnpsolutions.com.\n\nWarm regards,\nVNP Solutions Support Team`
+        }
+
+        const info = await this.transporter.sendMail(mailOptions)
+        console.log('✓ Portfolio activation rejection email sent:', {
+          to: userEmail,
+          messageId: info.messageId
+        })
+      } catch (error) {
+        console.error(
+          `✗ Failed to send portfolio activation rejection email to ${userEmail}:`,
+          error
+        )
         // Continue sending to other recipients even if one fails
       }
     }

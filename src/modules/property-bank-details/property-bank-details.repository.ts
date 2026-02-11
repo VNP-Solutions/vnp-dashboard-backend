@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { BankType, BankSubType, BankAccountType } from '@prisma/client'
+import { BankType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   CreatePropertyBankDetailsDto,
@@ -21,7 +21,7 @@ export class PropertyBankDetailsRepository
 
     // Add optional fields if provided
     if (data.bank_sub_type) {
-      createData.bank_sub_type = data.bank_sub_type as BankSubType
+      createData.bank_sub_type = data.bank_sub_type
     }
     if (data.hotel_portfolio_name) {
       createData.hotel_portfolio_name = data.hotel_portfolio_name
@@ -44,20 +44,38 @@ export class PropertyBankDetailsRepository
     if (data.bank_branch) {
       createData.bank_branch = data.bank_branch
     }
-    if (data.swift_bic_iban) {
-      createData.swift_bic_iban = data.swift_bic_iban
+    if (data.iban_number) {
+      createData.iban_number = data.iban_number
+    }
+    if (data.swift_bic_number) {
+      createData.swift_bic_number = data.swift_bic_number
     }
     if (data.routing_number) {
       createData.routing_number = data.routing_number
     }
+    if (data.bank_wiring_routing_number) {
+      createData.bank_wiring_routing_number = data.bank_wiring_routing_number
+    }
     if (data.bank_account_type) {
-      createData.bank_account_type = data.bank_account_type as BankAccountType
+      createData.bank_account_type = data.bank_account_type
     }
     if (data.currency) {
       createData.currency = data.currency
     }
     if (data.stripe_account_email) {
       createData.stripe_account_email = data.stripe_account_email
+    }
+    if (data.contact_name) {
+      createData.contact_name = data.contact_name
+    }
+    if (data.email_address) {
+      createData.email_address = data.email_address
+    }
+    if (data.bank_address) {
+      createData.bank_address = data.bank_address
+    }
+    if (data.comments) {
+      createData.comments = data.comments
     }
     if (data.associated_user_id) {
       createData.associated_user_id = data.associated_user_id
@@ -91,7 +109,7 @@ export class PropertyBankDetailsRepository
       updateData.bank_type = data.bank_type as BankType
     }
     if (data.bank_sub_type !== undefined) {
-      updateData.bank_sub_type = data.bank_sub_type as BankSubType
+      updateData.bank_sub_type = data.bank_sub_type
     }
     if (data.hotel_portfolio_name !== undefined) {
       updateData.hotel_portfolio_name = data.hotel_portfolio_name
@@ -114,20 +132,38 @@ export class PropertyBankDetailsRepository
     if (data.bank_branch !== undefined) {
       updateData.bank_branch = data.bank_branch
     }
-    if (data.swift_bic_iban !== undefined) {
-      updateData.swift_bic_iban = data.swift_bic_iban
+    if (data.iban_number !== undefined) {
+      updateData.iban_number = data.iban_number
+    }
+    if (data.swift_bic_number !== undefined) {
+      updateData.swift_bic_number = data.swift_bic_number
     }
     if (data.routing_number !== undefined) {
       updateData.routing_number = data.routing_number
     }
+    if (data.bank_wiring_routing_number !== undefined) {
+      updateData.bank_wiring_routing_number = data.bank_wiring_routing_number
+    }
     if (data.bank_account_type !== undefined) {
-      updateData.bank_account_type = data.bank_account_type as BankAccountType
+      updateData.bank_account_type = data.bank_account_type
     }
     if (data.currency !== undefined) {
       updateData.currency = data.currency
     }
     if (data.stripe_account_email !== undefined) {
       updateData.stripe_account_email = data.stripe_account_email
+    }
+    if (data.contact_name !== undefined) {
+      updateData.contact_name = data.contact_name
+    }
+    if (data.email_address !== undefined) {
+      updateData.email_address = data.email_address
+    }
+    if (data.bank_address !== undefined) {
+      updateData.bank_address = data.bank_address
+    }
+    if (data.comments !== undefined) {
+      updateData.comments = data.comments
     }
     if (data.associated_user_id !== undefined) {
       updateData.associated_user_id = data.associated_user_id

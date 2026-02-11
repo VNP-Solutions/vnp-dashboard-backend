@@ -7,7 +7,8 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards
+  UseGuards,
+  Header
 } from '@nestjs/common'
 import {
   ApiBearerAuth,
@@ -30,7 +31,8 @@ import {
   ManageUserAccessDto,
   UpdateOwnProfileDto,
   UpdateUserDto,
-  UserQueryDto
+  UserQueryDto,
+  UserProfileResponseDto
 } from './user.dto'
 import type { IUserService } from './user.interface'
 
@@ -45,8 +47,13 @@ export class UserController {
   ) {}
 
   @Get('profile')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
   @ApiOperation({ summary: 'Get own profile' })
-  @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile retrieved successfully',
+    type: UserProfileResponseDto
+  })
   getProfile(@CurrentUser() user: IUserWithPermissions) {
     return this.userService.getProfile(user.id)
   }

@@ -118,6 +118,15 @@ export class NoteRepository implements INoteRepository {
     })
   }
 
+  async findAuditById(auditId: string) {
+    return this.prisma.audit.findUnique({
+      where: { id: auditId },
+      select: {
+        property_id: true
+      }
+    })
+  }
+
   async update(id: string, data: UpdateNoteDto) {
     return this.prisma.note.update({
       where: { id },

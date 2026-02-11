@@ -144,7 +144,8 @@ export interface IPropertyRepository {
   ): Promise<PropertyWithFullDetails>
   findAll(
     queryOptions: any,
-    propertyIds?: string[]
+    propertyIds?: string[],
+    hasAuditAccess?: boolean
   ): Promise<PropertyWithPendingActions[]>
   count(whereClause: any, propertyIds?: string[]): Promise<number>
   findById(id: string): Promise<PropertyWithFullDetails | null>
@@ -225,6 +226,19 @@ export interface IPropertyService {
     id: string,
     user: IUserWithPermissions
   ): Promise<{ message: string; pending_action?: any }>
+  bulkDelete(
+    property_ids: string[],
+    password: string,
+    user: IUserWithPermissions
+  ): Promise<{
+    success: number
+    failed: number
+    results: Array<{
+      property_id: string
+      success: boolean
+      message?: string
+    }>
+  }>
   deactivate(
     id: string,
     user: IUserWithPermissions,

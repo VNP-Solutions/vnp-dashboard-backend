@@ -33,6 +33,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { EmailAttachment } from '../email/email.dto'
 import {
   ActivatePortfolioDto,
+  BulkDeletePortfolioDto,
   CreatePortfolioDto,
   DeactivatePortfolioDto,
   DeletePortfolioDto,
@@ -54,12 +55,12 @@ export class PortfolioController {
   ) {}
 
   @Post()
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
-  @ApiOperation({ summary: 'Create a new portfolio' })
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE)
+  @ApiOperation({ summary: 'Create a new portfolio (Internal users only)' })
   @ApiResponse({ status: 201, description: 'Portfolio created successfully' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   create(
     @Body() createPortfolioDto: CreatePortfolioDto,
@@ -89,11 +90,15 @@ export class PortfolioController {
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get all portfolios without pagination for export purposes (supports search, filter, and sort)'
+      'Get all portfolios without pagination for export purposes (Super Admin only)'
   })
   @ApiResponse({
     status: 200,
     description: 'All portfolios retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super Admin only'
   })
   findAllForExport(
     @Query() query: PortfolioQueryDto,
@@ -117,12 +122,12 @@ export class PortfolioController {
 
   @Patch(':id')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
-  @ApiOperation({ summary: 'Update a portfolio' })
+  @ApiOperation({ summary: 'Update a portfolio (Internal users only)' })
   @ApiResponse({ status: 200, description: 'Portfolio updated successfully' })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   update(
     @Param('id') id: string,
@@ -156,13 +161,60 @@ export class PortfolioController {
     return this.portfolioService.remove(id, deletePortfolioDto.password, user)
   }
 
+  @Post('bulk-delete')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE)
+  @ApiOperation({
+    summary:
+      'Bulk delete multiple portfolios (Super Admin only with password verification)',
+    description:
+      'Allows bulk deletion of multiple portfolios. Only super admin can perform this operation. ' +
+      'Will skip portfolios that have associated properties and add them to the error list. ' +
+      'Password verification is required.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk delete completed with results',
+    schema: {
+      example: {
+        success: 3,
+        failed: 2,
+        results: [
+          { portfolio_id: '507f1f77bcf86cd799439011', success: true },
+          {
+            portfolio_id: '507f1f77bcf86cd799439012',
+            success: false,
+            message:
+              'Cannot delete portfolio with 5 associated properties. Please delete or reassign the properties first.'
+          }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid password or validation errors'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only Super Admin can bulk delete portfolios'
+  })
+  async bulkDelete(
+    @Body() bulkDeleteDto: BulkDeletePortfolioDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.bulkDelete(
+      bulkDeleteDto.portfolio_ids,
+      bulkDeleteDto.password,
+      user
+    )
+  }
+
   @Post(':id/deactivate')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary:
-      'Deactivate a portfolio (Super Admin and internal users with password verification)',
+    summary: 'Deactivate a portfolio or submit deactivation request',
     description:
-      'Super Admin can deactivate directly. Internal users create a pending action for approval.'
+      'Super Admin can deactivate directly with password (no reason required). Internal users submit a pending action for approval with password and reason.'
   })
   @ApiResponse({
     status: 200,
@@ -173,7 +225,7 @@ export class PortfolioController {
   @ApiResponse({
     status: 400,
     description:
-      'Portfolio already deactivated or pending request exists or only Super Admin and internal users can deactivate or invalid password'
+      'Portfolio already deactivated or pending request exists or only Super Admin and internal users can deactivate or invalid password or reason required for internal users'
   })
   @ApiResponse({
     status: 403,
@@ -195,10 +247,9 @@ export class PortfolioController {
   @Post(':id/activate')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary:
-      'Activate a portfolio (Super Admin and internal users with password verification)',
+    summary: 'Activate a portfolio or submit activation request',
     description:
-      'Super Admin can activate directly. Internal users create a pending action for approval.'
+      'Super Admin can activate directly with password (no reason required). Internal users submit a pending action for approval with password and reason.'
   })
   @ApiResponse({
     status: 200,
@@ -209,7 +260,7 @@ export class PortfolioController {
   @ApiResponse({
     status: 400,
     description:
-      'Portfolio already active or pending request exists or only Super Admin and internal users can activate or invalid password'
+      'Portfolio already active or pending request exists or only Super Admin and internal users can activate or invalid password or reason required for internal users'
   })
   @ApiResponse({
     status: 403,
@@ -233,9 +284,11 @@ export class PortfolioController {
   @UseInterceptors(FilesInterceptor('attachments', 5)) // Allow up to 5 file attachments
   @ApiConsumes('multipart/form-data', 'application/json')
   @ApiOperation({
-    summary: 'Send email to portfolio contact with optional attachments',
+    summary:
+      'Send email to portfolio contact email(s) with optional attachments',
     description:
-      'Send an email to the portfolio contact email with optional attachments. ' +
+      'Send an email to the portfolio contact email address(es) with optional attachments. ' +
+      'If the portfolio has multiple comma-separated contact emails, the email will be sent to all recipients. ' +
       'Attachments can be provided as direct file uploads or URLs to files.'
   })
   @ApiBody({
@@ -289,12 +342,21 @@ export class PortfolioController {
       required: ['subject', 'body']
     }
   })
-  @ApiResponse({ status: 200, description: 'Email sent successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Email sent successfully to all contact email addresses',
+    schema: {
+      example: {
+        message: 'Email sent successfully to 2 recipient(s)',
+        recipients: ['contact1@example.com', 'contact2@example.com']
+      }
+    }
+  })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   @ApiResponse({
     status: 400,
     description:
-      'Portfolio does not have a contact email configured or failed to fetch attachment from URL'
+      'Portfolio does not have valid contact email addresses configured or failed to fetch attachment from URL'
   })
   @ApiResponse({
     status: 403,
@@ -324,10 +386,29 @@ export class PortfolioController {
   }
 
   @Post('bulk-import')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Bulk import portfolios from Excel file' })
+  @ApiOperation({
+    summary: 'Bulk import portfolios from Excel file (Internal users only)',
+    description: `
+    Upload an Excel file (.xlsx or .xls) to bulk import portfolios.
+    
+    Required columns:
+    - Portfolio Name: Name of the portfolio
+    - Service Type: Service type name (will be created if doesn't exist)
+    - Active status: Active status (Active/Inactive)
+    
+    Optional columns:
+    - Currency: Currency code (defaults to USD)
+    - Contact Email: Contact email(s) - can be comma-separated for multiple recipients (e.g., "email1@example.com, email2@example.com")
+    - Access Email: Access email
+    - Access Phone: Access phone
+    - Documents/Contract URL: Contract URL(s) - comma-separated (Super Admin only)
+    - Commissionable: Commissionable status (Yes/No)
+    - Sales Agent: Sales agent name (required if commissionable is Yes)
+    `
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -350,7 +431,7 @@ export class PortfolioController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Insufficient permissions'
+    description: 'Forbidden - Insufficient permissions or not an internal user'
   })
   bulkImport(
     @UploadedFile() file: Express.Multer.File,
@@ -376,7 +457,7 @@ export class PortfolioController {
     - Portfolio Name/Portfolio name/Name: Name of the portfolio
     - Service Type/Service type: Service type name (will be created if doesn't exist)
     - Active status/Active Status/Status/Is Active: Active status (Active/Inactive)
-    - Contact Email/Contact email/Contact: Contact email
+    - Contact Email/Contact email/Contact: Contact email(s) - can be comma-separated for multiple recipients (e.g., "email1@example.com, email2@example.com")
     - Access Email/Access email: Access email
     - Access Phone/Access phone/Access Phone NO/Access Phone No/Access Contact: Access phone
     - Documents/Contract URL/Contract Url/Contract url: Contract URL(s) - comma-separated (Super Admin only)
@@ -422,7 +503,8 @@ export class PortfolioController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid file or file format or only Super Admin and internal users can bulk update'
+    description:
+      'Bad Request - Invalid file or file format or only Super Admin and internal users can bulk update'
   })
   @ApiResponse({
     status: 403,

@@ -29,17 +29,44 @@ export class EncryptionUtil {
   }
 
   static decrypt(encryptedText: string, secret: string): string {
-    const parts = encryptedText.split(':')
-    const iv = Buffer.from(parts[0], 'hex')
-    const encrypted = parts[1]
+    try {
+      const parts = encryptedText.split(':')
 
-    const key = crypto.scryptSync(secret, 'salt', 32)
-    const decipher = crypto.createDecipheriv(this.ALGORITHM, key, iv)
+      // Validate format: must have exactly 2 parts (iv:encrypted)
+      if (parts.length !== 2) {
+        throw new Error(
+          'Invalid encrypted text format: expected "iv:encrypted"'
+        )
+      }
 
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8')
-    decrypted += decipher.final('utf8')
+      const ivHex = parts[0]
+      const encrypted = parts[1]
 
-    return decrypted
+      // Validate IV length (should be 32 hex characters = 16 bytes)
+      if (ivHex.length !== this.IV_LENGTH * 2) {
+        throw new Error(
+          `Invalid IV length: expected ${this.IV_LENGTH * 2} hex characters, got ${ivHex.length}`
+        )
+      }
+
+      // Validate that encrypted part exists
+      if (!encrypted || encrypted.length === 0) {
+        throw new Error('Invalid encrypted text: encrypted data is empty')
+      }
+
+      const iv = Buffer.from(ivHex, 'hex')
+      const key = crypto.scryptSync(secret, 'salt', 32)
+      const decipher = crypto.createDecipheriv(this.ALGORITHM, key, iv)
+
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8')
+      decrypted += decipher.final('utf8')
+
+      return decrypted
+    } catch (error) {
+      throw new Error(
+        `Decryption failed: ${error.message}. This may indicate corrupted data, plain text stored as encrypted, or wrong encryption secret.`
+      )
+    }
   }
 
   /**
@@ -55,16 +82,43 @@ export class EncryptionUtil {
    * Decrypt using a pre-derived key (much faster for bulk operations)
    */
   static decryptWithKey(encryptedText: string, key: Buffer): string {
-    const parts = encryptedText.split(':')
-    const iv = Buffer.from(parts[0], 'hex')
-    const encrypted = parts[1]
+    try {
+      const parts = encryptedText.split(':')
 
-    const decipher = crypto.createDecipheriv(this.ALGORITHM, key, iv)
+      // Validate format: must have exactly 2 parts (iv:encrypted)
+      if (parts.length !== 2) {
+        throw new Error(
+          'Invalid encrypted text format: expected "iv:encrypted"'
+        )
+      }
 
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8')
-    decrypted += decipher.final('utf8')
+      const ivHex = parts[0]
+      const encrypted = parts[1]
 
-    return decrypted
+      // Validate IV length (should be 32 hex characters = 16 bytes)
+      if (ivHex.length !== this.IV_LENGTH * 2) {
+        throw new Error(
+          `Invalid IV length: expected ${this.IV_LENGTH * 2} hex characters, got ${ivHex.length}`
+        )
+      }
+
+      // Validate that encrypted part exists
+      if (!encrypted || encrypted.length === 0) {
+        throw new Error('Invalid encrypted text: encrypted data is empty')
+      }
+
+      const iv = Buffer.from(ivHex, 'hex')
+      const decipher = crypto.createDecipheriv(this.ALGORITHM, key, iv)
+
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8')
+      decrypted += decipher.final('utf8')
+
+      return decrypted
+    } catch (error) {
+      throw new Error(
+        `Decryption failed: ${error.message}. This may indicate corrupted data, plain text stored as encrypted, or wrong encryption secret.`
+      )
+    }
   }
 
   static generateOtp(): number {

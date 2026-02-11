@@ -13,23 +13,22 @@ import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
-  ModuleType
+  ModuleType,
+  PermissionAction,
+  PermissionLevel
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { roundAmount } from '../../common/utils/amount.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
   canCreateBankDetails,
   canReadBankDetails,
-  canRequestBulkPropertyTransfer,
-  canRequestPropertyDelete,
-  canRequestPropertyTransfer,
   canUpdateBankDetails,
   isInternalUser,
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
-import { roundAmount } from '../../common/utils/amount.util'
 import { Configuration } from '../../config/configuration'
 import type { ICurrencyRepository } from '../currency/currency.interface'
 import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
@@ -80,6 +79,11 @@ export class PropertyService implements IPropertyService {
   ) {}
 
   async create(data: CreatePropertyDto, user: IUserWithPermissions) {
+    // Only internal users can create properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can create properties')
+    }
+
     const existingProperty = await this.propertyRepository.findByName(data.name)
 
     if (existingProperty) {
@@ -111,6 +115,11 @@ export class PropertyService implements IPropertyService {
     data: CompleteCreatePropertyDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can create properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can create properties')
+    }
+
     // Validate property name is unique
     const existingProperty = await this.propertyRepository.findByName(
       data.property.name
@@ -168,6 +177,11 @@ export class PropertyService implements IPropertyService {
     data: CompleteUpdatePropertyDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can update properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can update properties')
+    }
+
     // Validate property exists
     const property = await this.propertyRepository.findById(id)
     if (!property) {
@@ -243,6 +257,12 @@ export class PropertyService implements IPropertyService {
         query.limit || 10
       )
     }
+
+    // Check if user has audit access
+    const auditPermission = user.role.audit_permission
+    const hasAuditAccess = auditPermission
+      ? auditPermission.access_level !== AccessLevel.none
+      : false
 
     // Build additional filters from query params
     const additionalFilters: any = {}
@@ -461,7 +481,8 @@ export class PropertyService implements IPropertyService {
     const [data, total] = await Promise.all([
       this.propertyRepository.findAll(
         { where, skip, take, orderBy },
-        undefined
+        undefined,
+        hasAuditAccess
       ),
       this.propertyRepository.count(where, undefined)
     ])
@@ -566,6 +587,12 @@ export class PropertyService implements IPropertyService {
     if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
       return []
     }
+
+    // Check if user has audit access
+    const auditPermission = user.role.audit_permission
+    const hasAuditAccess = auditPermission
+      ? auditPermission.access_level !== AccessLevel.none
+      : false
 
     // Build additional filters from query params
     const additionalFilters: any = {}
@@ -784,7 +811,8 @@ export class PropertyService implements IPropertyService {
     // Fetch all data without pagination
     const data = await this.propertyRepository.findAll(
       { where, orderBy },
-      undefined
+      undefined,
+      hasAuditAccess
     )
 
     // Get encryption secret for decrypting passwords
@@ -886,6 +914,12 @@ export class PropertyService implements IPropertyService {
       return []
     }
 
+    // Check if user has audit access
+    const auditPermission = user.role.audit_permission
+    const hasAuditAccess = auditPermission
+      ? auditPermission.access_level !== AccessLevel.none
+      : false
+
     // Build base where clause with permission filter
     const baseWhere: any =
       accessibleIds === 'all'
@@ -905,7 +939,8 @@ export class PropertyService implements IPropertyService {
 
       const properties = await this.propertyRepository.findAll(
         queryOptions,
-        undefined
+        undefined,
+        hasAuditAccess
       )
 
       // Add access_type field to each property and filter bank details based on permission
@@ -942,7 +977,8 @@ export class PropertyService implements IPropertyService {
 
     const properties = await this.propertyRepository.findAll(
       queryOptions,
-      undefined
+      undefined,
+      hasAuditAccess
     )
 
     // Add access_type field to each property and filter bank details based on permission
@@ -1004,6 +1040,11 @@ export class PropertyService implements IPropertyService {
     data: UpdatePropertyDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can update properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can update properties')
+    }
+
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
@@ -1048,15 +1089,19 @@ export class PropertyService implements IPropertyService {
     }
 
     // Check if user has permission to request property transfer
-    // Requirements: internal user, property permission level 'update' or 'all', access level 'partial' or 'all'
-    if (!canRequestPropertyTransfer(user)) {
+    // All users with UPDATE permission can request transfer
+    const propertyPermission = user.role.property_permission
+    if (
+      !propertyPermission ||
+      (propertyPermission.permission_level !== PermissionLevel.update &&
+        propertyPermission.permission_level !== PermissionLevel.all)
+    ) {
       throw new ForbiddenException(
-        'You do not have permission to transfer properties. Property transfer requires: (1) internal user account, (2) property permission level "update" or "all", and (3) property access level "partial" or "all".'
+        'You do not have permission to transfer properties. Property transfer requires UPDATE or ALL permission level.'
       )
     }
 
-    // Check ownership: Only the owner portfolio can transfer the property
-    await this.validatePropertyOwnership(property, user)
+    // No ownership validation needed - any user with UPDATE permission and property access can request transfer
 
     // Validate the new portfolio exists
     const newPortfolio = await this.portfolioRepository.findById(
@@ -1128,7 +1173,7 @@ export class PropertyService implements IPropertyService {
       return updatedProperty
     }
 
-    // Property manager (with ownership rights) creates pending action for approval
+    // All other users with UPDATE permission create pending action for approval
     // Get current portfolio details for history
     const currentPortfolio = property.portfolio
       ? {
@@ -1164,6 +1209,13 @@ export class PropertyService implements IPropertyService {
     data: BulkTransferPropertyDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can bulk transfer properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException(
+        'Only internal users can bulk transfer properties'
+      )
+    }
+
     // Validate the target portfolio exists
     const targetPortfolio = await this.portfolioRepository.findById(
       data.new_portfolio_id
@@ -1177,14 +1229,7 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('At least one property ID is required')
     }
 
-    // Check if user has permission to request bulk property transfer
-    // Requirements: internal user, property permission level 'all', access level 'partial' or 'all'
-    if (!canRequestBulkPropertyTransfer(user)) {
-      throw new ForbiddenException(
-        'You do not have permission to perform bulk property transfers. Bulk transfer requires: (1) internal user account, (2) property permission level "all", and (3) property access level "partial" or "all".'
-      )
-    }
-
+    // Bulk transfer is restricted to internal users only (already checked at the beginning)
     // Perform bulk transfer
     const results: Array<{
       property_id: string
@@ -1262,18 +1307,8 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Property not found')
     }
 
-    // Check if user has permission to request property deletion
-    // Requirements: property permission level 'update' or 'all', access level 'partial' or 'all'
-    if (!canRequestPropertyDelete(user)) {
-      throw new ForbiddenException(
-        'You do not have permission to delete properties. Property deletion requires: (1) property permission level "update" or "all", and (2) property access level "partial" or "all".'
-      )
-    }
-
-    // Check ownership: Only the owner portfolio can delete the property
-    await this.validatePropertyOwnership(property, user)
-
     const isSuperAdmin = isUserSuperAdmin(user)
+    const isInternal = isInternalUser(user)
 
     // Check if there are any unarchived audits
     const unarchivedAuditCount = await this.prisma.audit.count({
@@ -1296,7 +1331,14 @@ export class PropertyService implements IPropertyService {
       return { message: 'Property deleted successfully' }
     }
 
-    // Property manager (with ownership rights) creates pending action for approval
+    // Only internal users can request property deletion
+    if (!isInternal) {
+      throw new ForbiddenException(
+        'Only internal users can request property deletion'
+      )
+    }
+
+    // Internal users create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'property',
       property_id: id,
@@ -1309,6 +1351,112 @@ export class PropertyService implements IPropertyService {
       message:
         'Deletion request submitted for approval. A super admin will review your request.',
       pending_action: pendingAction
+    }
+  }
+
+  async bulkDelete(
+    property_ids: string[],
+    password: string,
+    user: IUserWithPermissions
+  ) {
+    const isSuperAdmin = isUserSuperAdmin(user)
+
+    // Only super admin can bulk delete properties
+    if (!isSuperAdmin) {
+      throw new BadRequestException(
+        'Only Super Admin can bulk delete properties'
+      )
+    }
+
+    // Fetch user with password from database for verification
+    const userFromDb = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+
+    if (!userFromDb) {
+      throw new NotFoundException('User not found')
+    }
+
+    // Verify user password
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      password,
+      userFromDb.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    // Validate at least one property ID is provided
+    if (!property_ids || property_ids.length === 0) {
+      throw new BadRequestException('At least one property ID is required')
+    }
+
+    const results: Array<{
+      property_id: string
+      success: boolean
+      message?: string
+    }> = []
+    let successCount = 0
+    let failedCount = 0
+
+    // Process each property
+    for (const propertyId of property_ids) {
+      try {
+        // Find the property
+        const property = await this.propertyRepository.findById(propertyId)
+
+        if (!property) {
+          results.push({
+            property_id: propertyId,
+            success: false,
+            message: 'Property not found'
+          })
+          failedCount++
+          continue
+        }
+
+        // Check if there are any unarchived audits
+        const unarchivedAuditCount = await this.prisma.audit.count({
+          where: {
+            property_id: propertyId,
+            is_archived: false
+          }
+        })
+
+        if (unarchivedAuditCount > 0) {
+          results.push({
+            property_id: propertyId,
+            success: false,
+            message: `Cannot delete property. It has ${unarchivedAuditCount} unarchived audit${unarchivedAuditCount === 1 ? '' : 's'}. Please archive all audits before deleting the property.`
+          })
+          failedCount++
+          continue
+        }
+
+        // Delete the property
+        await this.propertyRepository.delete(propertyId)
+
+        results.push({
+          property_id: propertyId,
+          success: true
+        })
+        successCount++
+      } catch (error) {
+        results.push({
+          property_id: propertyId,
+          success: false,
+          message: error.message || 'Unknown error occurred'
+        })
+        failedCount++
+      }
+    }
+
+    return {
+      success: successCount,
+      failed: failedCount,
+      results
     }
   }
 
@@ -1408,6 +1556,13 @@ export class PropertyService implements IPropertyService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<BulkImportResultDto> {
+    // Only internal users can bulk import properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException(
+        'Only internal users can bulk import properties'
+      )
+    }
+
     if (!file) {
       throw new BadRequestException('No file provided')
     }
@@ -1442,10 +1597,16 @@ export class PropertyService implements IPropertyService {
 
       result.totalRows = data.length
 
-      console.log(`📊 Starting bulk import of ${result.totalRows} properties...`)
+      console.log(
+        `📊 Starting bulk import of ${result.totalRows} properties...`
+      )
 
       // Helper function to add error and log it
-      const addError = (row: number, property: string, errorMessage: string) => {
+      const addError = (
+        row: number,
+        property: string,
+        errorMessage: string
+      ) => {
         result.errors.push({
           row,
           property,
@@ -1456,8 +1617,14 @@ export class PropertyService implements IPropertyService {
       }
 
       // Helper function to log success
-      const logSuccess = (row: number, property: string, action: 'created' | 'updated') => {
-        console.log(`✅ Row ${row} - Property "${property}" ${action} successfully`)
+      const logSuccess = (
+        row: number,
+        property: string,
+        action: 'created' | 'updated'
+      ) => {
+        console.log(
+          `✅ Row ${row} - Property "${property}" ${action} successfully`
+        )
       }
 
       // Helper function to clean column name - removes asterisks and other markers, trims whitespace
@@ -1655,7 +1822,11 @@ export class PropertyService implements IPropertyService {
           if (nextDueDateValue) {
             nextDueDate = parseDate(nextDueDateValue)
             if (!nextDueDate) {
-              addError(rowNumber, propertyName, 'Invalid date format for Next Due Date (expected mm/dd/yyyy)')
+              addError(
+                rowNumber,
+                propertyName,
+                'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
+              )
               continue
             }
           }
@@ -1685,36 +1856,22 @@ export class PropertyService implements IPropertyService {
             continue
           }
 
-          // Find or create portfolio
-          let portfolio =
+          // Find portfolio - skip property if not found
+          const portfolio =
             await this.portfolioRepository.findByName(portfolioName)
 
           if (!portfolio) {
-            // Create new portfolio with default service type
-            // First, find or create a default service type
-            let defaultServiceType = await this.prisma.serviceType.findFirst({
-              where: { type: 'Default' }
-            })
-
-            if (!defaultServiceType) {
-              defaultServiceType = await this.prisma.serviceType.create({
-                data: {
-                  type: 'Default',
-                  is_active: true
-                }
-              })
-            }
-
-            portfolio = await this.portfolioRepository.create({
-              name: portfolioName,
-              service_type_id: defaultServiceType.id,
-              is_active: true,
-              is_commissionable: false
-            } as any)
+            addError(
+              rowNumber,
+              propertyName,
+              `Portfolio "${portfolioName}" not found`
+            )
+            continue
           }
 
           // Create or update property
           let propertyId: string
+          let isNewProperty = false
 
           if (existingProperty) {
             // Update existing property - use Prisma directly since bulk import
@@ -1748,6 +1905,7 @@ export class PropertyService implements IPropertyService {
             const createdProperty =
               await this.propertyRepository.create(propertyData)
             propertyId = createdProperty.id
+            isNewProperty = true
           }
 
           // Extract remaining credentials fields
@@ -1800,21 +1958,33 @@ export class PropertyService implements IPropertyService {
           const hasExpediaUsername = !!expediaUsername
           const hasExpediaPassword = !!expediaPassword
           if (hasExpediaUsername !== hasExpediaPassword) {
-            addError(rowNumber, propertyName, 'Expedia username and password must be provided together')
+            addError(
+              rowNumber,
+              propertyName,
+              'Expedia username and password must be provided together'
+            )
             continue
           }
 
           // Validate Agoda credentials: username can be provided alone,
           // but if password is provided, username must also be provided
           if (agodaPassword && !agodaUsername) {
-            addError(rowNumber, propertyName, 'Agoda username is required when Agoda password is provided')
+            addError(
+              rowNumber,
+              propertyName,
+              'Agoda username is required when Agoda password is provided'
+            )
             continue
           }
 
           const hasBookingUsername = !!bookingUsername
           const hasBookingPassword = !!bookingPassword
           if (hasBookingUsername !== hasBookingPassword) {
-            addError(rowNumber, propertyName, 'Booking username and password must be provided together')
+            addError(
+              rowNumber,
+              propertyName,
+              'Booking username and password must be provided together'
+            )
             continue
           }
 
@@ -1866,9 +2036,25 @@ export class PropertyService implements IPropertyService {
           // Check if user has permission to create bank details
           // If not, silently skip bank details creation and mark as success
           if (!canCreateBankDetails(user)) {
+            // If this was a new property and user has partial access, grant them access
+            if (isNewProperty) {
+              const permission = user.role.property_permission
+              if (permission?.access_level === AccessLevel.partial) {
+                await this.permissionService.grantResourceAccess(
+                  user.id,
+                  ModuleType.PROPERTY,
+                  propertyId
+                )
+              }
+            }
+
             result.successCount++
             result.successfulImports.push(propertyName)
-            logSuccess(rowNumber, propertyName, existingProperty ? 'updated' : 'created')
+            logSuccess(
+              rowNumber,
+              propertyName,
+              existingProperty ? 'updated' : 'created'
+            )
             continue
           }
 
@@ -1882,7 +2068,11 @@ export class PropertyService implements IPropertyService {
           ])
 
           if (!bankTypeRaw) {
-            addError(rowNumber, propertyName, 'Bank Type is required (None / Stripe / Bank)')
+            addError(
+              rowNumber,
+              propertyName,
+              'Bank Type is required (None / Stripe / Bank)'
+            )
             continue
           }
 
@@ -1890,10 +2080,26 @@ export class PropertyService implements IPropertyService {
 
           // If bank type is "None", skip bank details processing
           if (bankTypeNormalized === 'none') {
+            // If this was a new property and user has partial access, grant them access
+            if (isNewProperty) {
+              const permission = user.role.property_permission
+              if (permission?.access_level === AccessLevel.partial) {
+                await this.permissionService.grantResourceAccess(
+                  user.id,
+                  ModuleType.PROPERTY,
+                  propertyId
+                )
+              }
+            }
+
             // Successfully created property without bank details
             result.successCount++
             result.successfulImports.push(propertyName)
-            logSuccess(rowNumber, propertyName, existingProperty ? 'updated' : 'created')
+            logSuccess(
+              rowNumber,
+              propertyName,
+              existingProperty ? 'updated' : 'created'
+            )
             continue
           }
 
@@ -2017,7 +2223,11 @@ export class PropertyService implements IPropertyService {
           if (bankTypeNormalized === 'stripe') {
             // Validate Stripe Account Email is provided
             if (!stripeAccountEmail || !stripeAccountEmail.trim()) {
-              addError(rowNumber, propertyName, 'Stripe Account Email is required when Bank Type is Stripe')
+              addError(
+                rowNumber,
+                propertyName,
+                'Stripe Account Email is required when Bank Type is Stripe'
+              )
               continue
             }
 
@@ -2040,7 +2250,11 @@ export class PropertyService implements IPropertyService {
           } else if (bankTypeNormalized === 'bank') {
             // Bank account - validate bank_sub_type is provided
             if (!bankSubTypeRaw) {
-              addError(rowNumber, propertyName, 'Bank Sub Type is required when Bank Type is Bank (ACH / Domestic US Wire / International Wire)')
+              addError(
+                rowNumber,
+                propertyName,
+                'Bank Sub Type is required when Bank Type is Bank (ACH / Domestic US Wire / International Wire)'
+              )
               continue
             }
 
@@ -2068,7 +2282,11 @@ export class PropertyService implements IPropertyService {
             ) {
               mappedBankSubType = 'international_wire'
             } else {
-              addError(rowNumber, propertyName, `Invalid Bank Sub Type '${bankSubTypeRaw}'. Must be one of: ACH, Domestic US Wire, International Wire`)
+              addError(
+                rowNumber,
+                propertyName,
+                `Invalid Bank Sub Type '${bankSubTypeRaw}'. Must be one of: ACH, Domestic US Wire, International Wire`
+              )
               continue
             }
 
@@ -2102,7 +2320,9 @@ export class PropertyService implements IPropertyService {
             if (routingNumber !== undefined) {
               // Validate routing number has at least 9 digits
               if (routingNumber.trim().length < 9) {
-                console.warn(`⚠️  Row ${rowNumber} - Property "${propertyName}": routing number '${routingNumber}' has less than 9 digits. Routing number was not saved.`)
+                console.warn(
+                  `⚠️  Row ${rowNumber} - Property "${propertyName}": routing number '${routingNumber}' has less than 9 digits. Routing number was not saved.`
+                )
                 // Don't set routing number, but continue processing other fields
               } else {
                 bankDetailsData.routing_number = routingNumber
@@ -2111,10 +2331,16 @@ export class PropertyService implements IPropertyService {
             if (bankAccountType !== undefined) {
               const normalizedAccountType = bankAccountType.toLowerCase()
               if (!['checking', 'savings'].includes(normalizedAccountType)) {
-                console.warn(`⚠️  Row ${rowNumber} - Property "${propertyName}": Invalid bank account type '${bankAccountType}'. Property was ${existingProperty ? 'updated' : 'created'} but bank account type was not saved.`)
+                console.warn(
+                  `⚠️  Row ${rowNumber} - Property "${propertyName}": Invalid bank account type '${bankAccountType}'. Property was ${existingProperty ? 'updated' : 'created'} but bank account type was not saved.`
+                )
                 result.successCount++
                 result.successfulImports.push(propertyName)
-                logSuccess(rowNumber, propertyName, existingProperty ? 'updated' : 'created')
+                logSuccess(
+                  rowNumber,
+                  propertyName,
+                  existingProperty ? 'updated' : 'created'
+                )
                 continue
               }
               bankDetailsData.bank_account_type = normalizedAccountType
@@ -2124,7 +2350,11 @@ export class PropertyService implements IPropertyService {
             }
           } else {
             // Invalid bank type
-            addError(rowNumber, propertyName, `Invalid Bank Type '${bankTypeRaw}'. Must be one of: None, Stripe, Bank`)
+            addError(
+              rowNumber,
+              propertyName,
+              `Invalid Bank Type '${bankTypeRaw}'. Must be one of: None, Stripe, Bank`
+            )
             continue
           }
 
@@ -2138,20 +2368,42 @@ export class PropertyService implements IPropertyService {
             await this.bankDetailsRepository.create(bankDetailsData)
           }
 
+          // If this was a new property and user has partial access, grant them access
+          if (isNewProperty) {
+            const permission = user.role.property_permission
+            if (permission?.access_level === AccessLevel.partial) {
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PROPERTY,
+                propertyId
+              )
+            }
+          }
+
           result.successCount++
           result.successfulImports.push(propertyName)
 
-          logSuccess(rowNumber, propertyName, existingProperty ? 'updated' : 'created')
+          logSuccess(
+            rowNumber,
+            propertyName,
+            existingProperty ? 'updated' : 'created'
+          )
         } catch (error) {
           const propertyName =
             findHeaderValue(row, ['Property Name', 'Property name', 'Name']) ||
             'Unknown'
 
-          addError(rowNumber, propertyName, error.message || 'Unknown error occurred')
+          addError(
+            rowNumber,
+            propertyName,
+            error.message || 'Unknown error occurred'
+          )
         }
       }
 
-      console.log(`📊 Bulk import completed: ${result.successCount} succeeded, ${result.failureCount} failed out of ${result.totalRows} total`)
+      console.log(
+        `📊 Bulk import completed: ${result.successCount} succeeded, ${result.failureCount} failed out of ${result.totalRows} total`
+      )
 
       return result
     } catch (error) {
@@ -2165,13 +2417,10 @@ export class PropertyService implements IPropertyService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<BulkUpdateResultDto> {
-    // Only super admins and internal users can bulk update properties
-    const isSuperAdmin = isUserSuperAdmin(user)
-    const isInternal = isInternalUser(user)
-
-    if (!isSuperAdmin && !isInternal) {
+    // Only internal users can bulk update properties
+    if (!isInternalUser(user)) {
       throw new BadRequestException(
-        'Only Super Admin and internal users can bulk update properties'
+        'Only internal users can bulk update properties'
       )
     }
 
@@ -2218,7 +2467,11 @@ export class PropertyService implements IPropertyService {
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
-            return String(value).trim()
+            const trimmed = String(value).trim()
+            // Return only if trimmed value is not empty
+            if (trimmed !== '') {
+              return trimmed
+            }
           }
         }
 
@@ -2231,7 +2484,11 @@ export class PropertyService implements IPropertyService {
             if (cleanKey.toLowerCase() === name.toLowerCase()) {
               const value = row[key]
               if (value !== undefined && value !== null && value !== '') {
-                return String(value).trim()
+                const trimmed = String(value).trim()
+                // Return only if trimmed value is not empty
+                if (trimmed !== '') {
+                  return trimmed
+                }
               }
             }
           }
@@ -2358,50 +2615,59 @@ export class PropertyService implements IPropertyService {
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
-          // Extract Property ID (required)
-          const propertyIdValue = findHeaderValue(row, [
-            'Property ID',
-            'Property Id',
-            'Property id',
-            'property_id',
-            'ID',
-            'Id',
-            'id'
+          // Extract Expedia ID (required) - now the unique identifier
+          const expediaIdValue = findHeaderValue(row, [
+            'Expedia ID',
+            'Expedia Id',
+            'Expedia id',
+            'ExpediaID',
+            'expedia_id'
           ])
 
-          if (!propertyIdValue) {
+          if (!expediaIdValue) {
             // Log row keys for debugging
             console.log(`Row ${rowNumber} keys:`, Object.keys(row))
             console.log(`Row ${rowNumber} values:`, row)
             result.errors.push({
               row: rowNumber,
-              propertyId: 'Unknown',
-              error: 'Property ID is required'
+              expediaId: 'Unknown',
+              error: 'Expedia ID is required'
             })
             result.failureCount++
             continue
           }
 
-          // Validate MongoDB ObjectId format
-          if (!QueryBuilder.isValidObjectId(propertyIdValue)) {
-            result.errors.push({
-              row: rowNumber,
-              propertyId: propertyIdValue,
-              error:
-                'Invalid property ID format (must be a valid MongoDB ObjectId)'
-            })
-            result.failureCount++
-            continue
-          }
-
-          // Find existing property
+          // Find existing property by Expedia ID
           const existingProperty =
-            await this.propertyRepository.findById(propertyIdValue)
+            await this.propertyRepository.findByExpediaId(expediaIdValue)
           if (!existingProperty) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
-              error: 'Property not found'
+              expediaId: expediaIdValue,
+              error: `Property not found with Expedia ID: ${expediaIdValue}`
+            })
+            result.failureCount++
+            continue
+          }
+
+          // Get the actual property ID for permission checks and updates
+          const propertyIdValue = existingProperty.id
+
+          // Check if user has permission to update this property
+          try {
+            await this.permissionService.requirePermission(
+              user,
+              ModuleType.PROPERTY,
+              PermissionAction.UPDATE,
+              propertyIdValue
+            )
+          } catch (error) {
+            result.errors.push({
+              row: rowNumber,
+              expediaId: expediaIdValue,
+              error:
+                error.message ||
+                'You do not have permission to update this property'
             })
             result.failureCount++
             continue
@@ -2417,14 +2683,15 @@ export class PropertyService implements IPropertyService {
             'Name'
           ])
           if (propertyName) {
-            // Check if name is being changed and if new name already exists
+            // Check if name is being changed and if new name already exists in a different property
             if (propertyName !== existingProperty.name) {
               const propertyWithSameName =
                 await this.propertyRepository.findByName(propertyName)
-              if (propertyWithSameName) {
+              // Only error if another property (different ID) already has this name
+              if (propertyWithSameName && propertyWithSameName.id !== existingProperty.id) {
                 result.errors.push({
                   row: rowNumber,
-                  propertyId: propertyIdValue,
+                  expediaId: expediaIdValue,
                   error: 'Property with this name already exists'
                 })
                 result.failureCount++
@@ -2482,7 +2749,7 @@ export class PropertyService implements IPropertyService {
             if (!nextDueDate) {
               result.errors.push({
                 row: rowNumber,
-                propertyId: propertyIdValue,
+                expediaId: expediaIdValue,
                 error:
                   'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
               })
@@ -2586,12 +2853,13 @@ export class PropertyService implements IPropertyService {
             bookingPassword
 
           // Validate username/password pairs - if one is provided, both must be provided
-          const hasExpediaUsername = !!expediaUsername
-          const hasExpediaPassword = !!expediaPassword
+          // Check for non-empty trimmed values
+          const hasExpediaUsername = !!expediaUsername?.trim()
+          const hasExpediaPassword = !!expediaPassword?.trim()
           if (hasExpediaUsername !== hasExpediaPassword) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
+              expediaId: expediaIdValue,
               error: 'Expedia username and password must be provided together'
             })
             result.failureCount++
@@ -2600,22 +2868,25 @@ export class PropertyService implements IPropertyService {
 
           // Validate Agoda credentials: username can be provided alone,
           // but if password is provided, username must also be provided
-          if (agodaPassword && !agodaUsername) {
+          const hasAgodaUsername = !!agodaUsername?.trim()
+          const hasAgodaPassword = !!agodaPassword?.trim()
+          if (hasAgodaPassword && !hasAgodaUsername) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
-              error: 'Agoda username is required when Agoda password is provided'
+              expediaId: expediaIdValue,
+              error:
+                'Agoda username is required when Agoda password is provided'
             })
             result.failureCount++
             continue
           }
 
-          const hasBookingUsername = !!bookingUsername
-          const hasBookingPassword = !!bookingPassword
+          const hasBookingUsername = !!bookingUsername?.trim()
+          const hasBookingPassword = !!bookingPassword?.trim()
           if (hasBookingUsername !== hasBookingPassword) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
+              expediaId: expediaIdValue,
               error: 'Booking username and password must be provided together'
             })
             result.failureCount++
@@ -2629,7 +2900,7 @@ export class PropertyService implements IPropertyService {
           if (!hasPropertyUpdate && !hasCredentialsUpdate) {
             result.errors.push({
               row: rowNumber,
-              propertyId: propertyIdValue,
+              expediaId: expediaIdValue,
               error: 'No fields to update (all fields are empty)'
             })
             result.failureCount++
@@ -2707,22 +2978,20 @@ export class PropertyService implements IPropertyService {
           // Use POST /property-bank-details/bulk-update for bank details
 
           result.successCount++
-          result.successfulUpdates.push(propertyIdValue)
+          result.successfulUpdates.push(expediaIdValue)
         } catch (error) {
-          const propertyIdValue =
+          const expediaIdValue =
             findHeaderValue(row, [
-              'Property ID',
-              'Property Id',
-              'Property id',
-              'property_id',
-              'ID',
-              'Id',
-              'id'
+              'Expedia ID',
+              'Expedia Id',
+              'Expedia id',
+              'ExpediaID',
+              'expedia_id'
             ]) || 'Unknown'
 
           result.errors.push({
             row: rowNumber,
-            propertyId: propertyIdValue,
+            expediaId: expediaIdValue,
             error: error.message || 'Unknown error occurred'
           })
           result.failureCount++
@@ -2738,6 +3007,11 @@ export class PropertyService implements IPropertyService {
   }
 
   async share(id: string, data: SharePropertyDto, user: IUserWithPermissions) {
+    // Only internal users can share properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can share properties')
+    }
+
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
@@ -2783,6 +3057,13 @@ export class PropertyService implements IPropertyService {
     data: UnsharePropertyDto,
     user: IUserWithPermissions
   ) {
+    // Only internal users can unshare properties
+    if (!isInternalUser(user)) {
+      throw new BadRequestException(
+        'Only internal users can unshare properties'
+      )
+    }
+
     const property = await this.propertyRepository.findById(id)
 
     if (!property) {
@@ -2874,8 +3155,12 @@ export class PropertyService implements IPropertyService {
     })
 
     return {
-      total_amount_collectable: roundAmount(auditAggregates._sum.amount_collectable),
-      total_amount_confirmed: roundAmount(auditAggregates._sum.amount_confirmed),
+      total_amount_collectable: roundAmount(
+        auditAggregates._sum.amount_collectable
+      ),
+      total_amount_confirmed: roundAmount(
+        auditAggregates._sum.amount_confirmed
+      ),
       property: {
         id: property.id,
         name: property.name,
