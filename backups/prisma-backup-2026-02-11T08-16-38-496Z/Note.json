@@ -1,0 +1,101 @@
+[
+  {
+    "id": "694b79349e2273523b480b79",
+    "text": "Test note Yedia",
+    "is_done": false,
+    "user_id": "690082e122d97e0d6264e5f2",
+    "portfolio_id": "692da6c071a1feb06b11bc16",
+    "property_id": null,
+    "audit_id": null,
+    "created_at": "2025-12-24T05:25:08.318Z",
+    "updated_at": "2025-12-24T05:25:08.318Z"
+  },
+  {
+    "id": "69555ef79e2273523b480c62",
+    "text": "Always send Consolidated Invoice to Jon",
+    "is_done": false,
+    "user_id": "6925d3cc7ff8c7dfbddd1a17",
+    "portfolio_id": "694985ef9e2273523b48060c",
+    "property_id": null,
+    "audit_id": null,
+    "created_at": "2025-12-31T17:35:51.209Z",
+    "updated_at": "2025-12-31T17:35:51.209Z"
+  },
+  {
+    "id": "6972cb4efc51069ed3ee0528",
+    "text": "Can the next user see this note?",
+    "is_done": false,
+    "user_id": "6972ab65fc51069ed3ee0525",
+    "portfolio_id": null,
+    "property_id": "69614e12cc4ed1a4eb4cacec",
+    "audit_id": null,
+    "created_at": "2026-01-23T01:13:50.531Z",
+    "updated_at": "2026-01-23T01:13:50.531Z"
+  },
+  {
+    "id": "697b8497fc51069ed3ee0562",
+    "text": "10% commission to Kim",
+    "is_done": false,
+    "user_id": "6904650cabf33d8c8a8e132d",
+    "portfolio_id": "697b77cffc51069ed3ee055d",
+    "property_id": null,
+    "audit_id": null,
+    "created_at": "2026-01-29T16:02:31.927Z",
+    "updated_at": "2026-01-29T16:02:31.927Z"
+  },
+  {
+    "id": "697ba637fc51069ed3ee056b",
+    "text": "12% Commission agreed per Parvez",
+    "is_done": false,
+    "user_id": "6904650cabf33d8c8a8e132d",
+    "portfolio_id": "697ba4c5fc51069ed3ee0566",
+    "property_id": null,
+    "audit_id": null,
+    "created_at": "2026-01-29T18:25:59.233Z",
+    "updated_at": "2026-01-29T18:25:59.233Z"
+  },
+  {
+    "id": "698a42c6fc51069ed3ee058f",
+    "text": "EBS is invoiced at 1% of totals as a bulk invoice\nOTA POST audits are paidout lump sum to ACH Bank Data on fill for HHM",
+    "is_done": false,
+    "user_id": "6904650cabf33d8c8a8e132d",
+    "portfolio_id": "692889779c77631ff6cec9eb",
+    "property_id": null,
+    "audit_id": null,
+    "created_at": "2026-02-09T20:25:42.696Z",
+    "updated_at": "2026-02-09T20:25:42.696Z"
+  },
+  {
+    "id": "698a4307fc51069ed3ee0590",
+    "text": "OTA POST payout is paid to each hotel ACH bank data on file",
+    "is_done": false,
+    "user_id": "6904650cabf33d8c8a8e132d",
+    "portfolio_id": "6949cabb9e2273523b480879",
+    "property_id": null,
+    "audit_id": null,
+    "created_at": "2026-02-09T20:26:47.307Z",
+    "updated_at": "2026-02-09T20:26:47.307Z"
+  },
+  {
+    "id": "698a4347fc51069ed3ee0591",
+    "text": "OTA POST payout is paid to corp ACH bank data on file",
+    "is_done": false,
+    "user_id": "6904650cabf33d8c8a8e132d",
+    "portfolio_id": "692889779c77631ff6cec9e6",
+    "property_id": null,
+    "audit_id": null,
+    "created_at": "2026-02-09T20:27:51.731Z",
+    "updated_at": "2026-02-09T20:27:51.731Z"
+  },
+  {
+    "id": "698a4355fc51069ed3ee0592",
+    "text": "OTA POST payout is paid to each hotel ACH bank data on file\n",
+    "is_done": false,
+    "user_id": "6904650cabf33d8c8a8e132d",
+    "portfolio_id": "692889779c77631ff6cec9e7",
+    "property_id": null,
+    "audit_id": null,
+    "created_at": "2026-02-09T20:28:05.491Z",
+    "updated_at": "2026-02-09T20:28:05.491Z"
+  }
+]

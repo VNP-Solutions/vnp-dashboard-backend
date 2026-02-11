@@ -1,0 +1,529 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  first_name         String
+  last_name          String
+  email              String    @unique
+  language           String
+  user_role_id       String    @db.ObjectId
+  role               UserRole  @relation(fields: [user_role_id], references: [id])
+  password           String
+  display_image      String?
+  contact_number     String?
+  is_verified        Boolean
+  temp_password      String?
+  invitation_sent_at DateTime?
+  invited_by_id      String?   @db.ObjectId
+  invitedBy          User?     @relation("UserInvitedBy", fields: [invited_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  invitedUsers       User[]    @relation("UserInvitedBy")
+
+  otps                    Otp[]
+  userAccessedProperties  UserAccessedProperty[]
+  notes                   Note[]
+  tasks                   Task[]
+  contractUrls            ContractUrl[]
+  consolidatedReports     ConsolidatedReport[]
+  requestedPendingActions PendingAction[]        @relation("PendingActionRequestedBy")
+  approvedPendingActions  PendingAction[]        @relation("PendingActionApprovedBy")
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([user_role_id])
+  @@index([is_verified])
+  @@index([invited_by_id])
+}
+
+model Portfolio {
+  id                String      @id @default(auto()) @map("_id") @db.ObjectId
+  name              String      @unique
+  service_type_id   String      @db.ObjectId
+  serviceType       ServiceType @relation(fields: [service_type_id], references: [id])
+  currency          String      @default("USD")
+  is_active         Boolean
+  contact_email     String?
+  is_commissionable Boolean
+  sales_agent       String?
+  access_email      String?
+  access_phone      String?
+
+  properties          Property[]
+  notes               Note[]
+  tasks               Task[]
+  contractUrls        ContractUrl[]
+  consolidatedReports ConsolidatedReport[]
+  pendingActions      PendingAction[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([service_type_id])
+  @@index([is_active])
+  @@index([is_commissionable])
+}
+
+model Property {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  name                  String    @unique
+  address               String
+  currency_id           String    @db.ObjectId
+  currency              Currency  @relation(fields: [currency_id], references: [id])
+  card_descriptor       String?
+  is_active             Boolean   @default(true)
+  next_due_date         DateTime?
+  portfolio_id          String    @db.ObjectId
+  portfolio             Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  previous_portfolio_id String?   @db.ObjectId
+  show_in_portfolio     String[]  @db.ObjectId
+
+  audits         Audit[]
+  credentials    PropertyCredentials?
+  bankDetails    PropertyBankDetails?
+  notes          Note[]
+  tasks          Task[]
+  pendingActions PendingAction[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([portfolio_id])
+  @@index([currency_id])
+  @@index([is_active])
+  @@index([next_due_date])
+  @@index([portfolio_id, is_active])
+}
+
+model Otp {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id    String   @db.ObjectId
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  otp        Int
+  is_used    Boolean
+  expires_at DateTime
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([is_used])
+  @@index([expires_at])
+  @@index([user_id, is_used, expires_at])
+}
+
+model Audit {
+  id                 String       @id @default(auto()) @map("_id") @db.ObjectId
+  type_of_ota        OtaType?
+  billing_type       BillingType?
+  audit_status_id    String       @db.ObjectId
+  auditStatus        AuditStatus  @relation(fields: [audit_status_id], references: [id])
+  amount_collectable Float?
+  amount_confirmed   Float?
+  is_archived        Boolean      @default(false)
+  start_date         DateTime?
+  end_date           DateTime?
+  property_id        String       @db.ObjectId
+  property           Property     @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  batch_id           String?      @db.ObjectId
+  batch              AuditBatch?  @relation(fields: [batch_id], references: [id])
+  report_url         String?
+
+  notes          Note[]
+  tasks          Task[]
+  pendingActions PendingAction[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([property_id])
+  @@index([audit_status_id])
+  @@index([type_of_ota])
+  @@index([billing_type])
+  @@index([is_archived])
+  @@index([start_date])
+  @@index([end_date])
+  @@index([batch_id])
+  @@index([property_id, is_archived])
+  @@index([property_id, start_date, end_date])
+}
+
+model PropertyCredentials {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  expedia_id       String
+  expedia_username String?
+  expedia_password String?
+  agoda_id         String?
+  agoda_username   String?
+  agoda_password   String?
+  booking_id       String?
+  booking_username String?
+  booking_password String?
+  property_id      String   @unique @db.ObjectId
+  property         Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model PropertyBankDetails {
+  id                         String           @id @default(auto()) @map("_id") @db.ObjectId
+  bank_type                  BankType         @default(bank)
+  bank_sub_type              BankSubType?
+  hotel_portfolio_name       String?
+  beneficiary_name           String?
+  beneficiary_address        String?
+  account_number             String?
+  account_name               String?
+  bank_name                  String?
+  bank_branch                String?
+  iban_number                String?
+  swift_bic_number           String?
+  routing_number             String?
+  bank_wiring_routing_number String?
+  bank_account_type          BankAccountType?
+  currency                   String?
+  stripe_account_email       String?
+  contact_name               String?
+  email_address              String?
+  bank_address               String?
+  comments                   String?
+  associated_user_id         String?          @db.ObjectId
+  property_id                String           @unique @db.ObjectId
+  property                   Property         @relation(fields: [property_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model AuditBatch {
+  id       String  @id @default(auto()) @map("_id") @db.ObjectId
+  batch_no String  @unique
+  order    Int     @default(0)
+  audits   Audit[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([order])
+}
+
+model ServiceType {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  type       String      @unique
+  is_active  Boolean
+  order      Int         @default(0)
+  portfolios Portfolio[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([is_active])
+  @@index([order])
+}
+
+model AuditStatus {
+  id     String  @id @default(auto()) @map("_id") @db.ObjectId
+  status String
+  order  Int     @default(0)
+  audits Audit[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([order])
+}
+
+model UserRole {
+  id                         String                    @id @default(auto()) @map("_id") @db.ObjectId
+  name                       String                    @unique
+  description                String
+  is_external                Boolean
+  can_access_mis             Boolean                   @default(false)
+  is_active                  Boolean                   @default(true)
+  order                      Int                       @default(0)
+  portfolio_permission       PortfolioPermission?
+  property_permission        PropertyPermission?
+  audit_permission           AuditPermission?
+  user_permission            UserPermission?
+  system_settings_permission SystemSettingsPermission?
+  bank_details_permission    BankDetailsPermission?
+  users                      User[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([is_active])
+  @@index([is_external])
+  @@index([order])
+}
+
+type PortfolioPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type PropertyPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type AuditPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type UserPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type SystemSettingsPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type BankDetailsPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+model UserAccessedProperty {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id      String   @db.ObjectId
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  portfolio_id String[] @db.ObjectId
+  property_id  String[] @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([user_id])
+}
+
+model Currency {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  code       String     @unique
+  name       String
+  symbol     String?
+  is_active  Boolean    @default(true)
+  order      Int        @default(0)
+  properties Property[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([is_active])
+  @@index([order])
+}
+
+model Note {
+  id      String  @id @default(auto()) @map("_id") @db.ObjectId
+  text    String
+  is_done Boolean @default(false)
+
+  user_id String @db.ObjectId
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  portfolio_id String?    @db.ObjectId
+  portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  property_id  String?    @db.ObjectId
+  property     Property?  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  audit_id     String?    @db.ObjectId
+  audit        Audit?     @relation(fields: [audit_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([portfolio_id])
+  @@index([property_id])
+  @@index([audit_id])
+  @@index([is_done])
+  @@index([user_id, is_done])
+  @@index([portfolio_id, is_done])
+  @@index([property_id, is_done])
+  @@index([audit_id, is_done])
+}
+
+model Task {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  is_done     Boolean   @default(false)
+  due_date    DateTime?
+
+  user_id String @db.ObjectId
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  portfolio_id String?    @db.ObjectId
+  portfolio    Portfolio? @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  property_id  String?    @db.ObjectId
+  property     Property?  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  audit_id     String?    @db.ObjectId
+  audit        Audit?     @relation(fields: [audit_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([portfolio_id])
+  @@index([property_id])
+  @@index([audit_id])
+  @@index([is_done])
+  @@index([due_date])
+  @@index([user_id, is_done])
+  @@index([portfolio_id, is_done])
+  @@index([property_id, is_done])
+  @@index([audit_id, is_done])
+  @@index([due_date, is_done])
+}
+
+model ContractUrl {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  url          String
+  description  String?
+  is_active    Boolean   @default(true)
+  portfolio_id String    @db.ObjectId
+  portfolio    Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  user_id      String    @db.ObjectId
+  user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([portfolio_id])
+  @@index([user_id])
+  @@index([is_active])
+  @@index([portfolio_id, user_id])
+}
+
+model ConsolidatedReport {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  url          String
+  portfolio_id String    @db.ObjectId
+  portfolio    Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  user_id      String    @db.ObjectId
+  user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([portfolio_id])
+  @@index([user_id])
+}
+
+enum OtaType {
+  expedia
+  agoda
+  booking
+}
+
+enum BillingType {
+  VCC
+  DB
+  EBS
+}
+
+enum BankType {
+  bank
+  stripe
+}
+
+enum BankSubType {
+  ach
+  domestic_wire
+  international_wire
+}
+
+enum BankAccountType {
+  checking
+  savings
+}
+
+enum PermissionLevel {
+  all
+  update
+  view
+}
+
+enum AccessLevel {
+  all
+  partial
+  none
+}
+
+enum PendingActionType {
+  PROPERTY_DELETE
+  PROPERTY_TRANSFER
+  PROPERTY_DEACTIVATE
+  PROPERTY_ACTIVATE
+  PORTFOLIO_DEACTIVATE
+  PORTFOLIO_ACTIVATE
+  AUDIT_UPDATE_AMOUNT_CONFIRMED
+}
+
+enum PendingActionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+type TransferData {
+  new_portfolio_id String
+  portfolio_from   PortfolioInfo?
+  portfolio_to     PortfolioInfo?
+}
+
+type PortfolioInfo {
+  id   String
+  name String
+}
+
+type AuditUpdateData {
+  amount_confirmed Float
+}
+
+model PendingAction {
+  id                String              @id @default(auto()) @map("_id") @db.ObjectId
+  resource_type     String // 'property', 'portfolio', or 'audit'
+  property_id       String?             @db.ObjectId
+  property          Property?           @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  portfolio_id      String?             @db.ObjectId
+  portfolio         Portfolio?          @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  audit_id          String?             @db.ObjectId
+  audit             Audit?              @relation(fields: [audit_id], references: [id], onDelete: Cascade)
+  action_type       PendingActionType
+  status            PendingActionStatus @default(PENDING)
+  requested_user_id String              @db.ObjectId
+  requestedBy       User                @relation("PendingActionRequestedBy", fields: [requested_user_id], references: [id], onDelete: Cascade)
+  transfer_data     TransferData? // Stores new_portfolio_id for transfer actions
+  audit_update_data AuditUpdateData? // Stores amount_confirmed for audit update actions
+  reason            String? // Reason provided by requester for the action
+  approval_user_id  String?             @db.ObjectId
+  approvedBy        User?               @relation("PendingActionApprovedBy", fields: [approval_user_id], references: [id], onDelete: SetNull)
+  rejection_reason  String?
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
+  approved_at       DateTime?
+
+  @@index([property_id])
+  @@index([portfolio_id])
+  @@index([audit_id])
+  @@index([requested_user_id])
+  @@index([resource_type])
+  @@index([status])
+  @@index([action_type])
+  @@index([status, action_type])
+  @@index([property_id, status])
+  @@index([portfolio_id, status])
+  @@index([audit_id, status])
+  @@index([requested_user_id, status])
+  @@index([resource_type, status])
+}
