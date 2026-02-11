@@ -103,43 +103,38 @@ export class NoteService implements INoteService {
     // Build permission-based filters
     const permissionFilters: any[] = []
 
-    // Portfolio notes - if user has view access to portfolios
-    if (portfolioIds === 'all' || (portfolioIds && portfolioIds.length > 0)) {
+    // Portfolio notes - if user has partial access to specific portfolios
+    if (portfolioIds !== 'all' && portfolioIds && portfolioIds.length > 0) {
       permissionFilters.push({
-        portfolio_id:
-          portfolioIds === 'all' ? { not: null } : { in: portfolioIds }
+        portfolio_id: { in: portfolioIds }
       })
     }
 
-    // Property notes - if user has view access to properties
-    if (propertyIds === 'all' || (propertyIds && propertyIds.length > 0)) {
+    // Property notes - if user has partial access to specific properties
+    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
       permissionFilters.push({
-        property_id: propertyIds === 'all' ? { not: null } : { in: propertyIds }
+        property_id: { in: propertyIds }
       })
     }
 
-    // Audit notes - based on property permission (audit belongs to property)
-    if (propertyIds === 'all' || (propertyIds && propertyIds.length > 0)) {
+    // Audit notes - if user has partial access to specific properties
+    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
       permissionFilters.push({
-        AND: [
-          { audit_id: { not: null } },
-          {
-            audit: {
-              property_id:
-                propertyIds === 'all' ? { not: null } : { in: propertyIds }
-            }
-          }
-        ]
+        audit: {
+          property_id: { in: propertyIds }
+        }
       })
     }
 
-    // If no access to any resource type, return empty
-    if (permissionFilters.length === 0) {
+    // If user has "all" access (permissionFilters is empty), they can see all notes
+    // If user has partial access, apply permission filters
+    if (permissionFilters.length > 0) {
+      where.OR = permissionFilters
+    } else if (portfolioIds.length === 0 && propertyIds.length === 0) {
+      // User has no access to any resource
       return []
     }
-
-    // Combine permission filters with OR
-    where.OR = permissionFilters
+    // If permissionFilters is empty but user has "all" access, don't add OR filter
 
     // Add portfolio filter if provided
     if (query.portfolio_id) {
@@ -161,12 +156,15 @@ export class NoteService implements INoteService {
     if (query.entity_type && query.entity_type !== NoteEntityType.ALL) {
       switch (query.entity_type) {
         case NoteEntityType.PORTFOLIO:
+          // Only show notes that have a portfolio_id set (not null)
           where.portfolio_id = { not: null }
           break
         case NoteEntityType.PROPERTY:
+          // Only show notes that have a property_id set (not null)
           where.property_id = { not: null }
           break
         case NoteEntityType.AUDIT:
+          // Only show notes that have an audit_id set (not null)
           where.audit_id = { not: null }
           break
       }
@@ -396,46 +394,41 @@ export class NoteService implements INoteService {
     // Build permission-based filters
     const permissionFilters: any[] = []
 
-    // Portfolio notes - if user has view access to portfolios
-    if (portfolioIds === 'all' || (portfolioIds && portfolioIds.length > 0)) {
+    // Portfolio notes - if user has partial access to specific portfolios
+    if (portfolioIds !== 'all' && portfolioIds && portfolioIds.length > 0) {
       permissionFilters.push({
-        portfolio_id:
-          portfolioIds === 'all' ? { not: null } : { in: portfolioIds }
+        portfolio_id: { in: portfolioIds }
       })
     }
 
-    // Property notes - if user has view access to properties
-    if (propertyIds === 'all' || (propertyIds && propertyIds.length > 0)) {
+    // Property notes - if user has partial access to specific properties
+    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
       permissionFilters.push({
-        property_id: propertyIds === 'all' ? { not: null } : { in: propertyIds }
+        property_id: { in: propertyIds }
       })
     }
 
-    // Audit notes - based on property permission
-    if (propertyIds === 'all' || (propertyIds && propertyIds.length > 0)) {
+    // Audit notes - if user has partial access to specific properties
+    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
       permissionFilters.push({
-        AND: [
-          { audit_id: { not: null } },
-          {
-            audit: {
-              property_id:
-                propertyIds === 'all' ? { not: null } : { in: propertyIds }
-            }
-          }
-        ]
+        audit: {
+          property_id: { in: propertyIds }
+        }
       })
     }
 
-    // If no access to any resource type, return 0
-    if (permissionFilters.length === 0) {
+    // If user has "all" access (permissionFilters is empty), they can delete all matching notes
+    // If user has partial access, apply permission filters
+    if (permissionFilters.length > 0) {
+      where.OR = permissionFilters
+    } else if (portfolioIds.length === 0 && propertyIds.length === 0) {
+      // User has no access to any resource
       return {
         message: '0 note(s) deleted successfully',
         deletedCount: 0
       }
     }
-
-    // Combine permission filters with OR
-    where.OR = permissionFilters
+    // If permissionFilters is empty but user has "all" access, don't add OR filter
 
     // Build filter based on query
     if (query.portfolio_id) {
