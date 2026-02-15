@@ -336,6 +336,10 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         const deleted = await this.prisma.propertyBankDetails.delete({
           where: { property_id: propertyId }
         })
+
+        // Send email notification to super admins about deletion
+        await this.sendBankDetailsNotificationToSuperAdmins(propertyId, 'deleted')
+
         return deleted
       } else {
         // Bank details don't exist, return a success response
@@ -418,7 +422,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       successfulUpdates: []
     }
 
-    // Track properties that were successfully updated for alert notifications
+    // Track properties that were successfully created or updated for alert notifications
+    const createdPropertyIds: string[] = []
     const updatedPropertyIds: string[] = []
 
     try {
@@ -997,7 +1002,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               '\x1b[32m%s\x1b[0m',
               `✅ Row ${rowNumber} SUCCESS: Created bank details for Expedia ID '${expediaId}'`
             )
-            updatedPropertyIds.push(property.id)
+            createdPropertyIds.push(property.id)
           }
 
           result.successCount++
@@ -1062,8 +1067,19 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       )
 
       // Send alert notifications to all users with access to updated properties
+      const allUpdatedPropertyIds = [...createdPropertyIds, ...updatedPropertyIds]
+      if (allUpdatedPropertyIds.length > 0) {
+        await this.sendBulkUpdateAlerts(allUpdatedPropertyIds)
+      }
+
+      // Send notification to super admins for created properties
+      if (createdPropertyIds.length > 0) {
+        await this.sendBulkNotificationToSuperAdmins(createdPropertyIds, 'created')
+      }
+
+      // Send notification to super admins for updated properties
       if (updatedPropertyIds.length > 0) {
-        await this.sendBulkUpdateAlerts(updatedPropertyIds)
+        await this.sendBulkNotificationToSuperAdmins(updatedPropertyIds, 'updated')
       }
 
       return result
@@ -1165,11 +1181,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   }
 
   /**
-   * Send email notification to all super admins when bank details are created or updated
+   * Send email notification to all super admins when bank details are created, updated, or deleted
    */
   private async sendBankDetailsNotificationToSuperAdmins(
     propertyId: string,
-    action: 'created' | 'updated'
+    action: 'created' | 'updated' | 'deleted'
   ): Promise<void> {
     try {
       console.log(
@@ -1274,7 +1290,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       })
 
       // Send email to all super admins
-      const subject = `Bank Details ${action === 'created' ? 'Added' : 'Updated'} - ${property.name}`
+      const actionLabel = action === 'created' ? 'Added' : action === 'deleted' ? 'Deleted' : 'Updated'
+      const subject = `Bank Details ${actionLabel} - ${property.name}`
       const body = `Bank details have been ${action} for property "${property.name}".\n\nPlease review the changes in VNP Solutions Dashboard.\n\nThis is an automated notification.`
 
       console.log(
@@ -1304,6 +1321,165 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     } catch (error) {
       console.error(
         `\n❌ ERROR: Exception in sendBankDetailsNotificationToSuperAdmins`
+      )
+      console.error('Error details:', error)
+      console.log(
+        `========================================\n`
+      )
+      // Don't throw - email notifications are non-critical
+    }
+  }
+
+  /**
+   * Send email notification to all super admins when bank details are bulk created or updated
+   */
+  private async sendBulkNotificationToSuperAdmins(
+    propertyIds: string[],
+    action: 'created' | 'updated'
+  ): Promise<void> {
+    try {
+      console.log(
+        `\n========================================`
+      )
+      console.log(
+        `📧 BANK DETAILS BULK UPDATE NOTIFICATION`
+      )
+      console.log(
+        `========================================`
+      )
+      console.log(`Properties count: ${propertyIds.length}`)
+      console.log(`Action: ${action.toUpperCase()}`)
+
+      // Get all properties with their names
+      const properties = await this.prisma.property.findMany({
+        where: {
+          id: {
+            in: propertyIds
+          }
+        },
+        select: {
+          id: true,
+          name: true
+        }
+      })
+
+      if (properties.length === 0) {
+        console.warn(
+          `⚠️  No properties found for bulk update notification`
+        )
+        return
+      }
+
+      console.log(`✓ Found ${properties.length} properties`)
+
+      // Get all super admin users
+      const allUsers = await this.prisma.user.findMany({
+        where: {
+          is_verified: true
+        },
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          role: {
+            select: {
+              portfolio_permission: true,
+              property_permission: true,
+              audit_permission: true,
+              user_permission: true,
+              system_settings_permission: true
+            }
+          }
+        }
+      })
+
+      console.log(`✓ Found ${allUsers.length} verified user(s) in database`)
+
+      // Filter super admins using isUserSuperAdmin utility
+      const superAdminEmails: string[] = []
+      const superAdminDetails: Array<{email: string, name: string}> = []
+
+      for (const user of allUsers) {
+        // Check if user is super admin by checking all permissions
+        const allPermissions = [
+          user.role.portfolio_permission,
+          user.role.property_permission,
+          user.role.audit_permission,
+          user.role.user_permission,
+          user.role.system_settings_permission
+        ]
+
+        // User is super admin if all permissions have permission_level 'all' and access_level 'all'
+        const isSuperAdmin = allPermissions.every(
+          permission =>
+            permission &&
+            permission.permission_level === 'all' &&
+            permission.access_level === 'all'
+        )
+
+        if (isSuperAdmin) {
+          superAdminEmails.push(user.email)
+          superAdminDetails.push({
+            email: user.email,
+            name: `${user.first_name} ${user.last_name}`.trim()
+          })
+        }
+      }
+
+      if (superAdminEmails.length === 0) {
+        console.warn(
+          `⚠️  No super admin users found to notify`
+        )
+        console.log(
+          `A super admin must have ALL permissions with permission_level='all' AND access_level='all'`
+        )
+        return
+      }
+
+      console.log(
+        `✓ Found ${superAdminEmails.length} super admin(s):`
+      )
+      superAdminDetails.forEach((admin, idx) => {
+        console.log(`   ${idx + 1}. ${admin.name} (${admin.email})`)
+      })
+
+      // Create property names list
+      const propertyNames = properties.map(p => p.name).join(', ')
+
+      // Send email to all super admins
+      const actionLabel = action === 'created' ? 'Added' : 'Updated'
+      const subject = `Bank Details Bulk ${actionLabel} - ${properties.length} Property(s)`
+      const body = `Bank details have been bulk ${action} for the following properties:\n\n${propertyNames}\n\nPlease review the changes in VNP Solutions Dashboard.\n\nThis is an automated notification.`
+
+      console.log(
+        `\n📧 Attempting to send email...`
+      )
+      console.log(`Subject: ${subject}`)
+      console.log(`Recipients: ${superAdminEmails.join(', ')}`)
+      console.log(`Properties: ${propertyNames}`)
+
+      try {
+        await this.emailUtil.sendEmail(superAdminEmails, subject, body)
+
+        console.log(
+          `\n✅ SUCCESS: Sent bulk update notification to ${superAdminEmails.length} super admin(s)`
+        )
+        console.log(
+          `========================================\n`
+        )
+      } catch (emailError) {
+        console.error(
+          `\n❌ FAILED: Could not send bulk update notification`
+        )
+        console.error('Error details:', emailError)
+        console.log(
+          `========================================\n`
+        )
+      }
+    } catch (error) {
+      console.error(
+        `\n❌ ERROR: Exception in sendBulkUpdateNotificationToSuperAdmins`
       )
       console.error('Error details:', error)
       console.log(
