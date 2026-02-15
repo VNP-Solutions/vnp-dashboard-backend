@@ -88,9 +88,6 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       if (!data.hotel_portfolio_name || !data.hotel_portfolio_name.trim()) {
         missingFields.push('hotel_portfolio_name')
       }
-      if (!data.account_number || !data.account_number.trim()) {
-        missingFields.push('account_number')
-      }
       if (!data.bank_name || !data.bank_name.trim()) {
         missingFields.push('bank_name')
       }
@@ -101,6 +98,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           // ACH required fields
           if (!data.beneficiary_name || !data.beneficiary_name.trim()) {
             missingFields.push('beneficiary_name')
+          }
+          if (!data.account_number || !data.account_number.trim()) {
+            missingFields.push('account_number')
           }
           if (!data.routing_number || !data.routing_number.trim()) {
             missingFields.push('routing_number')
@@ -119,6 +119,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           if (!data.beneficiary_name || !data.beneficiary_name.trim()) {
             missingFields.push('beneficiary_name')
           }
+          if (!data.account_number || !data.account_number.trim()) {
+            missingFields.push('account_number')
+          }
           // beneficiary_address is now OPTIONAL for Domestic Wire
           if (!data.routing_number || !data.routing_number.trim()) {
             missingFields.push('routing_number')
@@ -136,6 +139,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           }
           // beneficiary_address is now OPTIONAL for International Wire
           // currency is now OPTIONAL for International Wire
+          // Note: International wire uses IBAN instead of account_number
           if (!data.iban_number || !data.iban_number.trim()) {
             missingFields.push('iban_number')
           }
@@ -865,18 +869,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                 : existingBankDetails?.currency
           }
 
-          // Common required fields
+          // Common required fields (note: account_number is not common - ACH/domestic wire use it, international wire uses IBAN)
           if (
             !mergedData.hotel_portfolio_name ||
             !mergedData.hotel_portfolio_name.trim()
           ) {
             missingFields.push('Hotel Portfolio Name')
-          }
-          if (
-            !mergedData.account_number ||
-            !mergedData.account_number.trim()
-          ) {
-            missingFields.push('Account Number')
           }
           if (!mergedData.bank_name || !mergedData.bank_name.trim()) {
             missingFields.push('Bank Name')
@@ -890,6 +888,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                     !mergedData.beneficiary_name.trim()
                   ) {
                     missingFields.push('Beneficiary Name')
+                  }
+                  if (
+                    !mergedData.account_number ||
+                    !mergedData.account_number.trim()
+                  ) {
+                    missingFields.push('Account Number')
                   }
                   if (
                     !mergedData.routing_number ||
@@ -913,6 +917,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                   ) {
                     missingFields.push('Beneficiary Name')
                   }
+                  if (
+                    !mergedData.account_number ||
+                    !mergedData.account_number.trim()
+                  ) {
+                    missingFields.push('Account Number')
+                  }
                   // beneficiary_address is now OPTIONAL for Domestic Wire
                   if (
                     !mergedData.routing_number ||
@@ -935,6 +945,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                   }
                   // beneficiary_address is now OPTIONAL for International Wire
                   // currency is now OPTIONAL for International Wire
+                  // Note: International wire uses IBAN, not account_number
                   if (
                     !mergedData.iban_number ||
                     !mergedData.iban_number.trim()
