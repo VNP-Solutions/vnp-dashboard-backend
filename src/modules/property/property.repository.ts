@@ -51,7 +51,8 @@ export class PropertyRepository implements IPropertyRepository {
   ) {
     const encryptionSecret = process.env.JWT_ACCESS_SECRET || ''
 
-    return this.prisma.$transaction(async tx => {
+    return this.prisma.$transaction(
+      async tx => {
       // Create property data
       const createData: any = { ...propertyData }
       if (propertyData.next_due_date) {
@@ -221,7 +222,11 @@ export class PropertyRepository implements IPropertyRepository {
       }
 
       return completeProperty
-    })
+    },
+    {
+      timeout: 30000 // 30 seconds timeout for complex create operations
+    }
+  )
   }
 
   async completeUpdate(

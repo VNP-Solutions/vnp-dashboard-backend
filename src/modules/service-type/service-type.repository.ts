@@ -61,13 +61,15 @@ export class ServiceTypeRepository implements IServiceTypeRepository {
   }
 
   async updateMany(data: Array<{ id: string; order: number }>): Promise<void> {
-    await this.prisma.$transaction(
-      data.map(item =>
-        this.prisma.serviceType.update({
-          where: { id: item.id },
-          data: { order: item.order }
-        })
-      )
+    const updates = data.map(item =>
+      this.prisma.serviceType.update({
+        where: { id: item.id },
+        data: { order: item.order }
+      })
     )
+
+    await this.prisma.$transaction([...updates] as any, {
+      timeout: 10000 // 10 seconds timeout for bulk order updates
+    })
   }
 }
