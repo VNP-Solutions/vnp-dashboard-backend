@@ -2502,8 +2502,7 @@ export class AuditService implements IAuditService {
     // Send email notification to external portfolio managers
     await this.sendReportUrlUpdateNotification(
       updatedAudit,
-      data.report_url,
-      user.id
+      data.report_url
     )
 
     return updatedAudit
@@ -2511,76 +2510,36 @@ export class AuditService implements IAuditService {
 
   /**
    * Send email notification when report URL is updated
-   * Finds all external portfolio managers for the audit's portfolio and sends them notification
-   * Excludes the user who performed the update (self-mailing prevention)
+   * Sends email to portfolio contact emails (comma-separated values)
    */
   private async sendReportUrlUpdateNotification(
     audit: any,
-    reportUrl: string,
-    updaterUserId: string
+    reportUrl: string
   ) {
     try {
-      const portfolioId = audit.property.portfolio.id
-
-      // Find all users with external role who have portfolio access
-      const users = await this.prisma.user.findMany({
-        where: {
-          role: {
-            is_external: true,
-            is_active: true
-          }
-        },
-        include: {
-          role: {
-            select: {
-              portfolio_permission: true,
-              property_permission: true,
-              audit_permission: true,
-              is_external: true
-            }
-          },
-          userAccessedProperties: true
-        }
+      // Get portfolio details with contact_email
+      const portfolio = await this.prisma.portfolio.findUnique({
+        where: { id: audit.property.portfolio_id },
+        select: { contact_email: true, name: true }
       })
 
-      // Filter users who have access to this portfolio
-      const eligibleUsers = users.filter(user => {
-        // Exclude the updater (self-mailing prevention)
-        if (user.id === updaterUserId) {
-          return false
-        }
-
-        const portfolioPermission = user.role.portfolio_permission
-
-        if (!portfolioPermission) return false
-
-        // Check if user has 'all' access level
-        if (portfolioPermission.access_level === 'all') {
-          return true
-        }
-
-        // Check if user has 'partial' access level and this portfolio is in their accessible list
-        if (portfolioPermission.access_level === AccessLevel.partial) {
-          // userAccessedProperties is an array, get the first element's portfolio_id array
-          const accessedPortfolios =
-            user.userAccessedProperties?.[0]?.portfolio_id || []
-          return accessedPortfolios.includes(portfolioId)
-        }
-
-        return false
-      })
-
-      if (eligibleUsers.length === 0) {
+      if (!portfolio?.contact_email) {
         console.log(
-          'No eligible external portfolio managers found for report URL update notification'
+          'No contact email found for portfolio in report URL update notification'
         )
         return
       }
 
-      // Extract email addresses
-      const recipientEmails = eligibleUsers.map(user => user.email)
+      // Parse comma-separated email addresses
+      const recipientEmails = portfolio.contact_email
+        .split(',')
+        .map(email => email.trim())
+        .filter(email => email.length > 0)
 
-      // Generate audit name (type_of_ota + " Audit")
+      if (recipientEmails.length === 0) {
+        console.log('No valid email addresses found in portfolio contact_email')
+        return
+      }
       const auditName = audit.type_of_ota
         ? `${audit.type_of_ota.charAt(0).toUpperCase() + audit.type_of_ota.slice(1)} Audit`
         : 'Audit'
@@ -2590,7 +2549,7 @@ export class AuditService implements IAuditService {
         recipientEmails,
         auditName,
         audit.property.name,
-        audit.property.portfolio.name,
+        portfolio.name,
         reportUrl,
         new Date()
       )
