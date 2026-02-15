@@ -1162,8 +1162,15 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   ): Promise<void> {
     try {
       console.log(
-        `📧 Sending bank details ${action} notification to super admins...`
+        `\n========================================`
       )
+      console.log(
+        `📧 BANK DETAILS ${action.toUpperCase()} NOTIFICATION`
+      )
+      console.log(
+        `========================================`
+      )
+      console.log(`Property ID: ${propertyId}`)
 
       // Get property details
       const property = await this.prisma.property.findUnique({
@@ -1176,10 +1183,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
       if (!property) {
         console.warn(
-          `Property not found for bank details notification: ${propertyId}`
+          `⚠️  Property not found for bank details notification: ${propertyId}`
         )
         return
       }
+
+      console.log(`✓ Property found: "${property.name}"`)
 
       // Get all super admin users
       const allUsers = await this.prisma.user.findMany({
@@ -1203,8 +1212,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         }
       })
 
+      console.log(`✓ Found ${allUsers.length} verified user(s) in database`)
+
       // Filter super admins using the isUserSuperAdmin utility
       const superAdminEmails: string[] = []
+      const superAdminDetails: Array<{email: string, name: string}> = []
 
       for (const user of allUsers) {
         // Check if user is super admin by checking all permissions
@@ -1226,34 +1238,65 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
         if (isSuperAdmin) {
           superAdminEmails.push(user.email)
+          superAdminDetails.push({
+            email: user.email,
+            name: `${user.first_name} ${user.last_name}`.trim()
+          })
         }
       }
 
       if (superAdminEmails.length === 0) {
-        console.warn('No super admin users found to notify')
+        console.warn(
+          `⚠️  No super admin users found to notify`
+        )
+        console.log(
+          `A super admin must have ALL permissions with permission_level='all' AND access_level='all'`
+        )
         return
       }
 
+      console.log(
+        `✓ Found ${superAdminEmails.length} super admin(s):`
+      )
+      superAdminDetails.forEach((admin, idx) => {
+        console.log(`   ${idx + 1}. ${admin.name} (${admin.email})`)
+      })
+
       // Send email to all super admins
       const subject = `Bank Details ${action === 'created' ? 'Added' : 'Updated'} - ${property.name}`
-      const body = `Bank details have been ${action} for property "${property.name}".\n\nPlease review the changes in the VNP Solutions Dashboard.\n\nThis is an automated notification.`
+      const body = `Bank details have been ${action} for property "${property.name}".\n\nPlease review the changes in VNP Solutions Dashboard.\n\nThis is an automated notification.`
+
+      console.log(
+        `\n📧 Attempting to send email...`
+      )
+      console.log(`Subject: ${subject}`)
+      console.log(`Recipients: ${superAdminEmails.join(', ')}`)
 
       try {
         await this.emailUtil.sendEmail(superAdminEmails, subject, body)
 
         console.log(
-          `✅ Sent bank details ${action} notification to ${superAdminEmails.length} super admin(s)`
+          `\n✅ SUCCESS: Sent bank details ${action} notification to ${superAdminEmails.length} super admin(s)`
+        )
+        console.log(
+          `========================================\n`
         )
       } catch (emailError) {
         console.error(
-          `❌ Failed to send bank details ${action} notification:`,
-          emailError
+          `\n❌ FAILED: Could not send bank details ${action} notification`
+        )
+        console.error('Error details:', emailError)
+        console.log(
+          `========================================\n`
         )
       }
     } catch (error) {
       console.error(
-        `❌ Error sending bank details ${action} notification:`,
-        error
+        `\n❌ ERROR: Exception in sendBankDetailsNotificationToSuperAdmins`
+      )
+      console.error('Error details:', error)
+      console.log(
+        `========================================\n`
       )
       // Don't throw - email notifications are non-critical
     }

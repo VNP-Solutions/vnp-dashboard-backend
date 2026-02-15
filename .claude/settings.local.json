@@ -21,7 +21,8 @@
       "Bash(netstat:*)",
       "Bash(taskkill //F //PID 39956)",
       "Bash(yarn seed:test:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(npx ts-node:*)"
     ],
     "deny": [],
     "ask": []
