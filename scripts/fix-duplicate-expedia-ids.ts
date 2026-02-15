@@ -6,8 +6,57 @@ async function fixDuplicateExpediaIds() {
   console.log('🔍 Starting to fix duplicate Expedia IDs...\n')
 
   try {
-    // Get all property credentials with their expedia_id and property info
-    const allCredentials = await prisma.propertyCredentials.findMany({
+    // Get all property credentials first
+    const allCredentialsRaw = await prisma.propertyCredentials.findMany({
+      select: {
+        id: true,
+        expedia_id: true,
+        property_id: true
+      },
+      orderBy: {
+        property_id: 'asc'
+      }
+    })
+
+    console.log(`📊 Total PropertyCredentials records: ${allCredentialsRaw.length}`)
+
+    // Find all valid property IDs
+    const validPropertyIds = new Set(
+      (await prisma.property.findMany({
+        select: { id: true }
+      })).map(p => p.id)
+    )
+
+    console.log(`📊 Valid properties in database: ${validPropertyIds.size}\n`)
+
+    // Filter out orphaned credentials
+    const orphanedCredentials = allCredentialsRaw.filter(
+      cred => !validPropertyIds.has(cred.property_id)
+    )
+
+    if (orphanedCredentials.length > 0) {
+      console.log(`⚠️  Found ${orphanedCredentials.length} orphaned PropertyCredentials (property_id doesn't exist)`)
+      console.log('These will be deleted to fix data integrity.\n')
+
+      // Delete orphaned records
+      for (const orphan of orphanedCredentials) {
+        await prisma.propertyCredentials.delete({
+          where: { id: orphan.id }
+        })
+        console.log(`  🗑️  Deleted orphaned credential: ${orphan.id} (property_id: ${orphan.property_id}, expedia_id: ${orphan.expedia_id})`)
+      }
+      console.log('')
+    }
+
+    // Get credentials with valid properties and their property details
+    const validCredentials = await prisma.propertyCredentials.findMany({
+      where: {
+        id: {
+          in: allCredentialsRaw
+            .filter(cred => validPropertyIds.has(cred.property_id))
+            .map(cred => cred.id)
+        }
+      },
       select: {
         id: true,
         expedia_id: true,
@@ -20,16 +69,16 @@ async function fixDuplicateExpediaIds() {
         }
       },
       orderBy: {
-        property_id: 'asc' // Order by property ID for consistent processing
+        property_id: 'asc'
       }
     })
 
-    console.log(`📊 Total properties with credentials: ${allCredentials.length}`)
+    console.log(`📊 Valid properties with credentials: ${validCredentials.length}\n`)
 
     // Group by expedia_id to find duplicates
-    const expediaIdGroups = new Map<string, typeof allCredentials>()
+    const expediaIdGroups = new Map<string, typeof validCredentials>()
 
-    for (const credential of allCredentials) {
+    for (const credential of validCredentials) {
       const expediaId = credential.expedia_id
       if (!expediaIdGroups.has(expediaId)) {
         expediaIdGroups.set(expediaId, [])
