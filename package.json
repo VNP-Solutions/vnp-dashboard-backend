@@ -25,6 +25,7 @@
     "migrate:bank-details": "ts-node scripts/migrate-bank-details-schema.ts",
     "migrate:production": "ts-node scripts/migrate-production-direct.ts",
     "validate:migration": "ts-node scripts/validate-migration.ts",
+    "delete:stripe-bank-details": "ts-node scripts/delete-stripe-bank-details.ts",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "push": "prisma db push",
