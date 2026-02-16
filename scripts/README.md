@@ -57,6 +57,50 @@ yarn fix:passwords
 
 ---
 
+### Migrate Audit OTA Type to Array
+
+**Script:** `migrate-audit-ota-to-array.ts`
+
+**Purpose:** Converts the `type_of_ota` field in the Audit model from a single value to an array format.
+
+**How it works:**
+- Fetches all audits from the database
+- Checks if `type_of_ota` is already an array (skips if so)
+- Converts single values to arrays (e.g., `"expedia"` → `["expedia"]`)
+- Sets null/undefined values to empty arrays (`[]`)
+- Uses MongoDB raw commands for type conversion
+
+**Usage:**
+```bash
+# Run the script
+yarn migrate:audit-ota
+
+# Or directly with ts-node
+ts-node scripts/migrate-audit-ota-to-array.ts
+```
+
+**Output:**
+The script will display:
+- Total number of audits found
+- Progress for each audit being processed
+- Summary with counts for:
+  - Successfully updated audits
+  - Already arrays (skipped)
+  - Errors encountered
+
+**Prerequisites:**
+- Ensure the Prisma schema has been updated with `type_of_ota OtaType[] @default([])`
+- Run `yarn generate` to regenerate Prisma client before running the migration
+
+**Safety:**
+- Handles both null and existing values
+- Skips audits that already have array values
+- Logs all changes for review
+- Includes error handling for individual audit failures
+- Automatically disconnects from database when complete
+
+---
+
 ## Best Practices
 
 1. **Always backup your database before running fix scripts**

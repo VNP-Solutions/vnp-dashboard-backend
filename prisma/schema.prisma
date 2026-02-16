@@ -120,7 +120,7 @@ model Otp {
 
 model Audit {
   id                 String       @id @default(auto()) @map("_id") @db.ObjectId
-  type_of_ota        OtaType?
+  type_of_ota        OtaType[]    @default([])
   billing_type       BillingType?
   audit_status_id    String       @db.ObjectId
   auditStatus        AuditStatus  @relation(fields: [audit_status_id], references: [id])
