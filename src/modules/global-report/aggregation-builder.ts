@@ -311,6 +311,11 @@ export class AggregationBuilder {
       return this.buildOtaPasswordMatchCondition(filter)
     }
 
+    // Special case: otaType is now an array field
+    if (col.key === 'otaType') {
+      return this.buildOtaTypeMatchCondition(filter)
+    }
+
     const fieldPath = col.fieldPath
     const condition: any = {}
 
@@ -512,6 +517,48 @@ export class AggregationBuilder {
         const regex = { $regex: this.escapeRegex(String(filter.value)), $options: 'i' }
         return {
           $or: otaPasswordFields.map(field => ({ [field]: regex }))
+        }
+      }
+
+      default:
+        return {}
+    }
+  }
+
+  /**
+   * Build a special $match condition for otaType filter
+   * Since type_of_ota is now an array, we need to use array operators
+   */
+  private buildOtaTypeMatchCondition(filter: ColumnFilter): any {
+    const fieldPath = 'type_of_ota'
+
+    switch (filter.operator) {
+      case FilterOperator.EQ: {
+        // Check if array contains this specific value
+        return { [fieldPath]: filter.value }
+      }
+
+      case FilterOperator.IN: {
+        // Check if array contains any of these values
+        const values = Array.isArray(filter.value) ? filter.value : [filter.value]
+        return { [fieldPath]: { $in: values } }
+      }
+
+      case FilterOperator.IS_NULL: {
+        // Check if array is empty or field doesn't exist
+        return {
+          $or: [
+            { [fieldPath]: { $exists: false } },
+            { [fieldPath]: null },
+            { [fieldPath]: [] }
+          ]
+        }
+      }
+
+      case FilterOperator.IS_NOT_NULL: {
+        // Check if array is not empty
+        return {
+          [fieldPath]: { $exists: true, $ne: null, $not: { $size: 0 } }
         }
       }
 

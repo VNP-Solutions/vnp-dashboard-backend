@@ -26,6 +26,7 @@
     "migrate:bank-details": "ts-node scripts/migrate-bank-details-schema.ts",
     "migrate:production": "ts-node scripts/migrate-production-direct.ts",
     "migrate:audit-ota": "ts-node scripts/migrate-audit-ota-to-array.ts",
+    "verify:audit-ota": "ts-node scripts/verify-audit-ota-migration.ts",
     "validate:migration": "ts-node scripts/validate-migration.ts",
     "delete:stripe-bank-details": "ts-node scripts/delete-stripe-bank-details.ts",
     "generate": "prisma generate",

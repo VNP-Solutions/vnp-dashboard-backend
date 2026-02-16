@@ -449,15 +449,29 @@ export class GlobalReportService implements IGlobalReportService {
     doc: any,
     passwordMap: Map<string, string>
   ): ReportRowDto {
-    const otaType = doc.type_of_ota || null
+    // type_of_ota is now an array, join for display
+    const otaType =
+      doc.type_of_ota && Array.isArray(doc.type_of_ota) && doc.type_of_ota.length > 0
+        ? doc.type_of_ota.join(', ')
+        : null
     const credentials = doc.credentials || {}
 
-    // Compute OTA ID and Username
-    const otaId = this.getOtaFieldValue(otaType, credentials, 'id')
-    const otaUsername = this.getOtaFieldValue(otaType, credentials, 'username')
+    // For OTA ID and Username, if multiple OTA types, show all
+    const otaIds: string[] = []
+    const otaUsernames: string[] = []
+    const otaPasswords: string[] = []
 
-    // Get password - use the same field access pattern as username
-    const otaPassword = this.getOtaPassword(otaType, credentials, passwordMap)
+    if (doc.type_of_ota && Array.isArray(doc.type_of_ota)) {
+      doc.type_of_ota.forEach((ota: string) => {
+        const id = this.getOtaFieldValue(ota, credentials, 'id')
+        const username = this.getOtaFieldValue(ota, credentials, 'username')
+        const password = this.getOtaPassword(ota, credentials, passwordMap)
+
+        if (id) otaIds.push(`${ota}: ${id}`)
+        if (username) otaUsernames.push(`${ota}: ${username}`)
+        if (password) otaPasswords.push(`${ota}: ${password}`)
+      })
+    }
 
     // Extract audit ID from MongoDB document
     const auditId = this.extractObjectId(doc._id)
@@ -470,7 +484,7 @@ export class GlobalReportService implements IGlobalReportService {
       serviceType: doc.serviceType?.type || null,
       billingType: doc.billing_type || null,
       otaType,
-      otaId,
+      otaId: otaIds.length > 0 ? otaIds.join('; ') : null,
       auditStatus: doc.auditStatus?.status || null,
       startDate: this.extractDate(doc.start_date),
       endDate: this.extractDate(doc.end_date),
@@ -479,8 +493,8 @@ export class GlobalReportService implements IGlobalReportService {
       amountCollectable: roundToDecimals(doc.amount_collectable) ?? null,
       amountConfirmed: roundToDecimals(doc.amount_confirmed) ?? null,
       portfolioContactEmail: doc.portfolio?.contact_email || null,
-      otaUsername,
-      otaPassword
+      otaUsername: otaUsernames.length > 0 ? otaUsernames.join('; ') : null,
+      otaPassword: otaPasswords.length > 0 ? otaPasswords.join('; ') : null
     }
 
     return result

@@ -165,7 +165,18 @@ async function main() {
 
     for (let i = 1; i <= auditsPerProperty; i++) {
       try {
-        const otaType = getRandomElement(otaTypes)
+        // Generate random number of OTA types (1-3)
+        const numOtaTypes = Math.floor(Math.random() * 3) + 1
+        const selectedOtaTypes: OtaType[] = []
+        
+        // Randomly select OTA types without duplicates
+        const availableOtas = [...otaTypes]
+        for (let j = 0; j < numOtaTypes && availableOtas.length > 0; j++) {
+          const randomIndex = Math.floor(Math.random() * availableOtas.length)
+          selectedOtaTypes.push(availableOtas[randomIndex])
+          availableOtas.splice(randomIndex, 1)
+        }
+
         const billingType = getRandomElement(billingTypes)
         const status = getRandomElement(auditStatuses)
         const { start_date, end_date } = generateDateRange()
@@ -178,7 +189,7 @@ async function main() {
         await prisma.audit.create({
           data: {
             property_id: property.id,
-            type_of_ota: otaType,
+            type_of_ota: selectedOtaTypes,
             billing_type: billingType,
             audit_status_id: status.id,
             amount_collectable,
