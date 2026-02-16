@@ -211,7 +211,11 @@ async function main() {
           status.status,
           (auditsByStatus.get(status.status) || 0) + 1
         )
-        auditsByOta.set(otaType, (auditsByOta.get(otaType) || 0) + 1)
+        
+        // Count each OTA type separately
+        selectedOtaTypes.forEach(ota => {
+          auditsByOta.set(ota, (auditsByOta.get(ota) || 0) + 1)
+        })
 
         process.stdout.write(
           `  ✓ ${createdCount}/${totalAudits} audits created\r`
