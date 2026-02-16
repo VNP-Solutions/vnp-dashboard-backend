@@ -291,16 +291,21 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     enumValues: ['VCC', 'DB', 'EBS']
   },
 
-  // OTA Type
+  // OTA Type - now an array field
   otaType: {
     key: 'otaType',
     label: 'OTA Type',
     dataType: ColumnDataType.ENUM,
     filterable: true,
-    sortable: true,
+    sortable: false, // Sorting by array fields is complex, disable for now
     source: 'audit',
     fieldPath: 'type_of_ota',
-    allowedOperators: ENUM_OPERATORS,
+    allowedOperators: [
+      FilterOperator.IN, // Check if any value in array matches any in the filter array
+      FilterOperator.EQ, // Check if array contains specific value
+      FilterOperator.IS_NULL,
+      FilterOperator.IS_NOT_NULL
+    ],
     enumValues: ['expedia', 'agoda', 'booking']
   },
 

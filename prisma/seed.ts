@@ -341,12 +341,12 @@ async function main() {
           ? amountCollectable
           : Math.floor(amountCollectable * Math.random())
 
-      await prisma.audit.create({
-        data: {
-          property_id: property.id,
-          type_of_ota: otaType,
-          billing_type: billingType,
-          audit_status_id: status.id,
+        await prisma.audit.create({
+          data: {
+            property_id: property.id,
+            type_of_ota: [otaType], // Convert to array
+            billing_type: billingType,
+            audit_status_id: status.id,
           amount_collectable: amountCollectable,
           amount_confirmed: amountConfirmed,
           is_archived: Math.random() < 0.1, // 10% archived

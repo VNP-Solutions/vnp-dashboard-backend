@@ -1953,15 +1953,22 @@ export class PortfolioService implements IPortfolioService {
       amountCollectable.total += collectableAmount
       amountConfirmed.total += confirmedAmount
 
-      if (aggregate.type_of_ota === 'expedia') {
-        amountCollectable.expedia += collectableAmount
-        amountConfirmed.expedia += confirmedAmount
-      } else if (aggregate.type_of_ota === 'booking') {
-        amountCollectable.booking += collectableAmount
-        amountConfirmed.booking += confirmedAmount
-      } else if (aggregate.type_of_ota === 'agoda') {
-        amountCollectable.agoda += collectableAmount
-        amountConfirmed.agoda += confirmedAmount
+      // Since type_of_ota is now an array, we need to handle it differently
+      // This aggregation won't work as expected with arrays
+      // We'll fetch individual audits instead (see alternative approach above in audit service)
+      if (Array.isArray(aggregate.type_of_ota)) {
+        aggregate.type_of_ota.forEach((ota: string) => {
+          if (ota === 'expedia') {
+            amountCollectable.expedia += collectableAmount
+            amountConfirmed.expedia += confirmedAmount
+          } else if (ota === 'booking') {
+            amountCollectable.booking += collectableAmount
+            amountConfirmed.booking += confirmedAmount
+          } else if (ota === 'agoda') {
+            amountCollectable.agoda += collectableAmount
+            amountConfirmed.agoda += confirmedAmount
+          }
+        })
       }
     })
 
