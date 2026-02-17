@@ -178,6 +178,51 @@ export interface IGlobalReportService {
   getOtaPasswords(user: IUserWithPermissions): Promise<OtaPasswordsResponseDto>
 
   /**
+   * Get Expedia IDs only
+   */
+  getExpediaIds(user: IUserWithPermissions): Promise<{ data: string[] }>
+
+  /**
+   * Get Agoda IDs only
+   */
+  getAgodaIds(user: IUserWithPermissions): Promise<{ data: string[] }>
+
+  /**
+   * Get Booking IDs only
+   */
+  getBookingIds(user: IUserWithPermissions): Promise<{ data: string[] }>
+
+  /**
+   * Get Expedia usernames only
+   */
+  getExpediaUsernames(user: IUserWithPermissions): Promise<{ data: string[] }>
+
+  /**
+   * Get Agoda usernames only
+   */
+  getAgodaUsernames(user: IUserWithPermissions): Promise<{ data: string[] }>
+
+  /**
+   * Get Booking usernames only
+   */
+  getBookingUsernames(user: IUserWithPermissions): Promise<{ data: string[] }>
+
+  /**
+   * Get Expedia passwords only
+   */
+  getExpediaPasswords(user: IUserWithPermissions): Promise<{ data: string[] }>
+
+  /**
+   * Get Agoda passwords only
+   */
+  getAgodaPasswords(user: IUserWithPermissions): Promise<{ data: string[] }>
+
+  /**
+   * Get Booking passwords only
+   */
+  getBookingPasswords(user: IUserWithPermissions): Promise<{ data: string[] }>
+
+  /**
    * Get all portfolios (id and name only) for filtering
    */
   getPortfolios(user: IUserWithPermissions): Promise<PortfoliosListResponseDto>
