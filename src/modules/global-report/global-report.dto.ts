@@ -165,8 +165,10 @@ export class GlobalReportExportDto extends GlobalReportQueryDto {
  * - property
  * - service type
  * - billing type
- * - ota type
- * - ota id
+ * - ota type (array)
+ * - expedia id, username, password
+ * - agoda id, username, password
+ * - booking id, username, password
  * - ota review status
  * - start date
  * - end date
@@ -175,8 +177,6 @@ export class GlobalReportExportDto extends GlobalReportQueryDto {
  * - amount collectable
  * - amount confirmed
  * - portfolio contact email
- * - ota username
- * - ota password
  */
 export class ReportRowDto {
   @ApiProperty({ description: 'Audit ID (unique identifier)' })
@@ -194,11 +194,40 @@ export class ReportRowDto {
   @ApiPropertyOptional({ description: 'Billing Type (VCC, DB, EBS)' })
   billingType: string | null
 
-  @ApiPropertyOptional({ description: 'OTA Type (expedia, agoda, booking)' })
-  otaType: string | null
+  @ApiProperty({ 
+    description: 'Array of OTA Types',
+    example: ['expedia', 'agoda'],
+    isArray: true,
+    type: [String]
+  })
+  otaType: string[]
 
-  @ApiPropertyOptional({ description: 'OTA ID (computed based on otaType)' })
-  otaId: string | null
+  @ApiPropertyOptional({ description: 'Expedia ID' })
+  expediaId: string | null
+
+  @ApiPropertyOptional({ description: 'Expedia Username' })
+  expediaUsername: string | null
+
+  @ApiPropertyOptional({ description: 'Expedia Password (decrypted)' })
+  expediaPassword: string | null
+
+  @ApiPropertyOptional({ description: 'Agoda ID' })
+  agodaId: string | null
+
+  @ApiPropertyOptional({ description: 'Agoda Username' })
+  agodaUsername: string | null
+
+  @ApiPropertyOptional({ description: 'Agoda Password (decrypted)' })
+  agodaPassword: string | null
+
+  @ApiPropertyOptional({ description: 'Booking ID' })
+  bookingId: string | null
+
+  @ApiPropertyOptional({ description: 'Booking Username' })
+  bookingUsername: string | null
+
+  @ApiPropertyOptional({ description: 'Booking Password (decrypted)' })
+  bookingPassword: string | null
 
   @ApiPropertyOptional({ description: 'OTA Review Status' })
   auditStatus: string | null
@@ -223,12 +252,6 @@ export class ReportRowDto {
 
   @ApiPropertyOptional({ description: 'Portfolio Contact Email' })
   portfolioContactEmail: string | null
-
-  @ApiPropertyOptional({ description: 'OTA Username (computed based on otaType)' })
-  otaUsername: string | null
-
-  @ApiPropertyOptional({ description: 'OTA Password (computed based on otaType)' })
-  otaPassword: string | null
 }
 
 /**
@@ -379,6 +402,114 @@ export class OtaPasswordItemDto {
 export class OtaPasswordsResponseDto {
   @ApiProperty({ type: [OtaPasswordItemDto] })
   data: OtaPasswordItemDto[]
+}
+
+/**
+ * Response for specific OTA credentials (Expedia IDs only)
+ */
+export class ExpediaIdsResponseDto {
+  @ApiProperty({ 
+    type: [String],
+    description: 'List of unique Expedia IDs',
+    example: ['EXP-12345', 'EXP-67890']
+  })
+  data: string[]
+}
+
+/**
+ * Response for specific OTA credentials (Agoda IDs only)
+ */
+export class AgodaIdsResponseDto {
+  @ApiProperty({ 
+    type: [String],
+    description: 'List of unique Agoda IDs',
+    example: ['AGO-12345', 'AGO-67890']
+  })
+  data: string[]
+}
+
+/**
+ * Response for specific OTA credentials (Booking IDs only)
+ */
+export class BookingIdsResponseDto {
+  @ApiProperty({ 
+    type: [String],
+    description: 'List of unique Booking IDs',
+    example: ['BOOK-12345', 'BOOK-67890']
+  })
+  data: string[]
+}
+
+/**
+ * Response for specific OTA usernames (Expedia)
+ */
+export class ExpediaUsernamesResponseDto {
+  @ApiProperty({ 
+    type: [String],
+    description: 'List of unique Expedia usernames',
+    example: ['user1@expedia.com', 'user2@expedia.com']
+  })
+  data: string[]
+}
+
+/**
+ * Response for specific OTA usernames (Agoda)
+ */
+export class AgodaUsernamesResponseDto {
+  @ApiProperty({ 
+    type: [String],
+    description: 'List of unique Agoda usernames',
+    example: ['user1@agoda.com', 'user2@agoda.com']
+  })
+  data: string[]
+}
+
+/**
+ * Response for specific OTA usernames (Booking)
+ */
+export class BookingUsernamesResponseDto {
+  @ApiProperty({ 
+    type: [String],
+    description: 'List of unique Booking usernames',
+    example: ['user1@booking.com', 'user2@booking.com']
+  })
+  data: string[]
+}
+
+/**
+ * Response for specific OTA passwords (Expedia)
+ */
+export class ExpediaPasswordsResponseDto {
+  @ApiProperty({ 
+    type: [String],
+    description: 'List of unique Expedia passwords (decrypted)',
+    example: ['Pass123!', 'SecurePass456!']
+  })
+  data: string[]
+}
+
+/**
+ * Response for specific OTA passwords (Agoda)
+ */
+export class AgodaPasswordsResponseDto {
+  @ApiProperty({ 
+    type: [String],
+    description: 'List of unique Agoda passwords (decrypted)',
+    example: ['Pass123!', 'SecurePass456!']
+  })
+  data: string[]
+}
+
+/**
+ * Response for specific OTA passwords (Booking)
+ */
+export class BookingPasswordsResponseDto {
+  @ApiProperty({ 
+    type: [String],
+    description: 'List of unique Booking passwords (decrypted)',
+    example: ['Pass123!', 'SecurePass456!']
+  })
+  data: string[]
 }
 
 /**
