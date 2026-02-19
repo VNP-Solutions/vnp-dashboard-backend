@@ -169,6 +169,14 @@ export class PropertyQueryDto extends QueryDto {
   bank_type?: string
 
   @ApiPropertyOptional({
+    description: 'Filter by bank sub type (ach/domestic_wire/international_wire/all)',
+    example: 'ach'
+  })
+  @IsOptional()
+  @IsString()
+  bank_sub_type?: string
+
+  @ApiPropertyOptional({
     description: 'Filter by portfolio ID (can be comma-separated for multiple)',
     example: '507f1f77bcf86cd799439012'
   })

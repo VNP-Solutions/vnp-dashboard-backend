@@ -1846,7 +1846,7 @@ export class AuditService implements IAuditService {
             'type_of_ota'
           ])
 
-          let typeOfOtaArray: OtaType[] = []
+          const typeOfOtaArray: OtaType[] = []
           if (otaTypeValue) {
             const otaTypesArray = otaTypeValue
               .split(',')
