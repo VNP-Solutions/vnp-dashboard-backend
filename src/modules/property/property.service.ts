@@ -300,6 +300,12 @@ export class PropertyService implements IPropertyService {
     if (query.bank_type) {
       additionalFilters.bank_type = query.bank_type
     }
+    if (query.bank_sub_type) {
+      const bankSubTypeValue = query.bank_sub_type.toLowerCase().trim()
+      if (bankSubTypeValue !== 'all') {
+        additionalFilters.bank_sub_type = bankSubTypeValue
+      }
+    }
     // Handle portfolio_id filter with shared properties support
     let portfolioFilter: any = {}
     if (query.portfolio_id) {
@@ -336,6 +342,7 @@ export class PropertyService implements IPropertyService {
       filterableFields: [
         'is_active',
         'bank_type',
+        'bank_sub_type',
         // 'portfolio_id' removed - handled separately with OR logic for shared properties
         'currency_id'
       ],
@@ -355,7 +362,8 @@ export class PropertyService implements IPropertyService {
       nestedFieldMap: {
         portfolio_name: 'portfolio.name',
         currency_code: 'currency.code',
-        bank_type: 'bankDetails.bank_type'
+        bank_type: 'bankDetails.bank_type',
+        bank_sub_type: 'bankDetails.bank_sub_type'
       }
     }
 
@@ -630,6 +638,12 @@ export class PropertyService implements IPropertyService {
     if (query.bank_type) {
       additionalFilters.bank_type = query.bank_type
     }
+    if (query.bank_sub_type) {
+      const bankSubTypeValue = query.bank_sub_type.toLowerCase().trim()
+      if (bankSubTypeValue !== 'all') {
+        additionalFilters.bank_sub_type = bankSubTypeValue
+      }
+    }
 
     // Handle portfolio_id filter with shared properties support
     let portfolioFilter: any = {}
@@ -667,6 +681,7 @@ export class PropertyService implements IPropertyService {
       filterableFields: [
         'is_active',
         'bank_type',
+        'bank_sub_type',
         // 'portfolio_id' removed - handled separately with OR logic for shared properties
         'currency_id'
       ],
@@ -686,7 +701,8 @@ export class PropertyService implements IPropertyService {
       nestedFieldMap: {
         portfolio_name: 'portfolio.name',
         currency_code: 'currency.code',
-        bank_type: 'bankDetails.bank_type'
+        bank_type: 'bankDetails.bank_type',
+        bank_sub_type: 'bankDetails.bank_sub_type'
       }
     }
 
