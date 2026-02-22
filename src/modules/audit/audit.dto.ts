@@ -16,12 +16,23 @@ import { QueryDto } from '../../common/dto/query.dto'
 export class CreateAuditDto {
   @ApiPropertyOptional({
     enum: OtaType,
-    example: OtaType.expedia,
-    description: 'Type of OTA (expedia, agoda, booking)'
+    example: [OtaType.expedia, OtaType.agoda],
+    description: 'Array of OTA types (expedia, agoda, booking). No duplicates allowed.',
+    isArray: true,
+    type: [String]
   })
-  @IsEnum(OtaType)
+  @IsArray()
+  @IsEnum(OtaType, { each: true })
   @IsOptional()
-  type_of_ota?: OtaType
+  @Transform(({ value }) => {
+    // Ensure it's an array
+    if (!Array.isArray(value)) {
+      return value
+    }
+    // Remove duplicates by converting to Set and back to array
+    return [...new Set(value)]
+  })
+  type_of_ota?: OtaType[]
 
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
@@ -101,7 +112,7 @@ export class AuditQueryDto extends QueryDto {
 
   @ApiPropertyOptional({
     enum: OtaType,
-    description: 'Filter by OTA type (expedia, agoda, booking)',
+    description: 'Filter by OTA type (expedia, agoda, booking). Can filter by single value or use operators like "in" for multiple values.',
     example: OtaType.expedia
   })
   @IsOptional()

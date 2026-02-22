@@ -186,7 +186,8 @@ export class AuditService implements IAuditService {
       additionalFilters.batch_id = query.batch_id
     }
     if (query.type_of_ota) {
-      additionalFilters.type_of_ota = query.type_of_ota
+      // Since type_of_ota is now an array, use "has" operator to check if array contains value
+      additionalFilters.type_of_ota = { has: query.type_of_ota }
     }
     if (query.audit_status_id) {
       additionalFilters.audit_status_id = query.audit_status_id
@@ -450,7 +451,8 @@ export class AuditService implements IAuditService {
       additionalFilters.batch_id = query.batch_id
     }
     if (query.type_of_ota) {
-      additionalFilters.type_of_ota = query.type_of_ota
+      // Since type_of_ota is now an array, use "has" operator to check if array contains value
+      additionalFilters.type_of_ota = { has: query.type_of_ota }
     }
     if (query.audit_status_id) {
       additionalFilters.audit_status_id = query.audit_status_id
@@ -1223,7 +1225,7 @@ export class AuditService implements IAuditService {
             updateData.property_id = property.id
           }
 
-          // Extract OTA type (if provided)
+          // Extract OTA type (if provided) - can be comma-separated values
           const otaTypeValue = findHeaderValue(row, [
             'OTA',
             'OTA Type',
@@ -1232,9 +1234,22 @@ export class AuditService implements IAuditService {
             'type_of_ota'
           ])
           if (otaTypeValue) {
-            const typeOfOta = parseOtaType(otaTypeValue)
-            if (typeOfOta) {
-              updateData.type_of_ota = typeOfOta
+            // Handle comma-separated multiple OTA types
+            const otaTypesArray = otaTypeValue
+              .split(',')
+              .map(s => s.trim())
+              .filter(s => s)
+            const parsedOtaTypes: OtaType[] = []
+
+            for (const otaStr of otaTypesArray) {
+              const typeOfOta = parseOtaType(otaStr)
+              if (typeOfOta && !parsedOtaTypes.includes(typeOfOta)) {
+                parsedOtaTypes.push(typeOfOta)
+              }
+            }
+
+            if (parsedOtaTypes.length > 0) {
+              updateData.type_of_ota = parsedOtaTypes
             }
           }
 
@@ -1822,7 +1837,7 @@ export class AuditService implements IAuditService {
             continue
           }
 
-          // Extract OTA type
+          // Extract OTA type - can be comma-separated values
           const otaTypeValue = findHeaderValue(row, [
             'OTA',
             'OTA Type',
@@ -1830,7 +1845,20 @@ export class AuditService implements IAuditService {
             'Ota type',
             'type_of_ota'
           ])
-          const typeOfOta = otaTypeValue ? parseOtaType(otaTypeValue) : null
+
+          const typeOfOtaArray: OtaType[] = []
+          if (otaTypeValue) {
+            const otaTypesArray = otaTypeValue
+              .split(',')
+              .map(s => s.trim())
+              .filter(s => s)
+            for (const otaStr of otaTypesArray) {
+              const parsedType = parseOtaType(otaStr)
+              if (parsedType && !typeOfOtaArray.includes(parsedType)) {
+                typeOfOtaArray.push(parsedType)
+              }
+            }
+          }
 
           // Extract audit status
           const auditStatusValue = findHeaderValue(row, [
@@ -1994,7 +2022,7 @@ export class AuditService implements IAuditService {
             audit_status_id: auditStatus.id,
             start_date: startDate ? startDate.toISOString() : undefined,
             end_date: endDate ? endDate.toISOString() : undefined,
-            type_of_ota: typeOfOta || undefined,
+            type_of_ota: typeOfOtaArray.length > 0 ? typeOfOtaArray : undefined,
             amount_collectable: amountCollectable,
             amount_confirmed: amountConfirmed,
             report_url: reportUrl,
@@ -2004,12 +2032,12 @@ export class AuditService implements IAuditService {
           // Create the audit
           await this.auditRepository.create(auditData)
 
-          const auditDescription = `${expediaId} - ${typeOfOta ? typeOfOta : 'Unknown OTA'} Audit`
+          const auditDescription = `${expediaId} - ${typeOfOtaArray.length > 0 ? typeOfOtaArray.join(', ') : 'Unknown OTA'} Audit`
           result.successCount++
           result.successfulImports.push(auditDescription)
           console.log(
             '\x1b[32m%s\x1b[0m',
-            `✅ Row ${rowNumber} SUCCESS: Created audit for Expedia ID '${expediaId}' (${typeOfOta || 'Unknown OTA'})`
+            `✅ Row ${rowNumber} SUCCESS: Created audit for Expedia ID '${expediaId}' (${typeOfOtaArray.join(', ') || 'Unknown OTA'})`
           )
         } catch (error) {
           const expediaIdValue =
@@ -2136,11 +2164,11 @@ export class AuditService implements IAuditService {
             is_archived: false
           }
 
-    // Get aggregate data for amount collectable and confirmed by OTA type
-    const auditAggregates = await this.prisma.audit.groupBy({
-      by: ['type_of_ota'],
+    // Since type_of_ota is now an array, we need to fetch all audits and process them
+    const audits = await this.prisma.audit.findMany({
       where: whereClause,
-      _sum: {
+      select: {
+        type_of_ota: true,
         amount_collectable: true,
         amount_confirmed: true
       }
@@ -2173,23 +2201,30 @@ export class AuditService implements IAuditService {
       agoda: 0
     }
 
-    // Process aggregated data
-    auditAggregates.forEach(aggregate => {
-      const collectableAmount = aggregate._sum.amount_collectable || 0
-      const confirmedAmount = aggregate._sum.amount_confirmed || 0
+    // Process each audit and count amounts by OTA type
+    // Note: An audit with multiple OTA types contributes to each OTA's total
+    audits.forEach(audit => {
+      const collectableAmount = audit.amount_collectable || 0
+      const confirmedAmount = audit.amount_confirmed || 0
 
+      // Add to total (each audit counted once for total)
       amountCollectable.total += collectableAmount
       amountConfirmed.total += confirmedAmount
 
-      if (aggregate.type_of_ota === 'expedia') {
-        amountCollectable.expedia += collectableAmount
-        amountConfirmed.expedia += confirmedAmount
-      } else if (aggregate.type_of_ota === 'booking') {
-        amountCollectable.booking += collectableAmount
-        amountConfirmed.booking += confirmedAmount
-      } else if (aggregate.type_of_ota === 'agoda') {
-        amountCollectable.agoda += collectableAmount
-        amountConfirmed.agoda += confirmedAmount
+      // Add to each OTA type's total if present in the array
+      if (audit.type_of_ota && Array.isArray(audit.type_of_ota)) {
+        audit.type_of_ota.forEach((ota: string) => {
+          if (ota === 'expedia') {
+            amountCollectable.expedia += collectableAmount
+            amountConfirmed.expedia += confirmedAmount
+          } else if (ota === 'booking') {
+            amountCollectable.booking += collectableAmount
+            amountConfirmed.booking += confirmedAmount
+          } else if (ota === 'agoda') {
+            amountCollectable.agoda += collectableAmount
+            amountConfirmed.agoda += confirmedAmount
+          }
+        })
       }
     })
 
@@ -2321,10 +2356,16 @@ export class AuditService implements IAuditService {
         recipientEmails.push(portfolio.contact_email)
       }
 
-      // Generate audit name (type_of_ota + " Audit")
-      const auditName = audit.type_of_ota
-        ? `${audit.type_of_ota.charAt(0).toUpperCase() + audit.type_of_ota.slice(1)} Audit`
-        : 'Audit'
+      // Generate audit name from type_of_ota array
+      const auditName =
+        audit.type_of_ota && audit.type_of_ota.length > 0
+          ? audit.type_of_ota
+              .map(
+                (ota: string) =>
+                  `${ota.charAt(0).toUpperCase() + ota.slice(1)}`
+              )
+              .join(' + ') + ' Audit'
+          : 'Audit'
 
       // Send the email
       await this.emailUtil.sendAuditStatusChangeEmail(
@@ -2502,8 +2543,7 @@ export class AuditService implements IAuditService {
     // Send email notification to external portfolio managers
     await this.sendReportUrlUpdateNotification(
       updatedAudit,
-      data.report_url,
-      user.id
+      data.report_url
     )
 
     return updatedAudit
@@ -2511,76 +2551,36 @@ export class AuditService implements IAuditService {
 
   /**
    * Send email notification when report URL is updated
-   * Finds all external portfolio managers for the audit's portfolio and sends them notification
-   * Excludes the user who performed the update (self-mailing prevention)
+   * Sends email to portfolio contact emails (comma-separated values)
    */
   private async sendReportUrlUpdateNotification(
     audit: any,
-    reportUrl: string,
-    updaterUserId: string
+    reportUrl: string
   ) {
     try {
-      const portfolioId = audit.property.portfolio.id
-
-      // Find all users with external role who have portfolio access
-      const users = await this.prisma.user.findMany({
-        where: {
-          role: {
-            is_external: true,
-            is_active: true
-          }
-        },
-        include: {
-          role: {
-            select: {
-              portfolio_permission: true,
-              property_permission: true,
-              audit_permission: true,
-              is_external: true
-            }
-          },
-          userAccessedProperties: true
-        }
+      // Get portfolio details with contact_email
+      const portfolio = await this.prisma.portfolio.findUnique({
+        where: { id: audit.property.portfolio_id },
+        select: { contact_email: true, name: true }
       })
 
-      // Filter users who have access to this portfolio
-      const eligibleUsers = users.filter(user => {
-        // Exclude the updater (self-mailing prevention)
-        if (user.id === updaterUserId) {
-          return false
-        }
-
-        const portfolioPermission = user.role.portfolio_permission
-
-        if (!portfolioPermission) return false
-
-        // Check if user has 'all' access level
-        if (portfolioPermission.access_level === 'all') {
-          return true
-        }
-
-        // Check if user has 'partial' access level and this portfolio is in their accessible list
-        if (portfolioPermission.access_level === AccessLevel.partial) {
-          // userAccessedProperties is an array, get the first element's portfolio_id array
-          const accessedPortfolios =
-            user.userAccessedProperties?.[0]?.portfolio_id || []
-          return accessedPortfolios.includes(portfolioId)
-        }
-
-        return false
-      })
-
-      if (eligibleUsers.length === 0) {
+      if (!portfolio?.contact_email) {
         console.log(
-          'No eligible external portfolio managers found for report URL update notification'
+          'No contact email found for portfolio in report URL update notification'
         )
         return
       }
 
-      // Extract email addresses
-      const recipientEmails = eligibleUsers.map(user => user.email)
+      // Parse comma-separated email addresses
+      const recipientEmails = portfolio.contact_email
+        .split(',')
+        .map(email => email.trim())
+        .filter(email => email.length > 0)
 
-      // Generate audit name (type_of_ota + " Audit")
+      if (recipientEmails.length === 0) {
+        console.log('No valid email addresses found in portfolio contact_email')
+        return
+      }
       const auditName = audit.type_of_ota
         ? `${audit.type_of_ota.charAt(0).toUpperCase() + audit.type_of_ota.slice(1)} Audit`
         : 'Audit'
@@ -2590,7 +2590,7 @@ export class AuditService implements IAuditService {
         recipientEmails,
         auditName,
         audit.property.name,
-        audit.property.portfolio.name,
+        portfolio.name,
         reportUrl,
         new Date()
       )

@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function fixDuplicateExpediaIds() {
-  console.log('🔍 Starting to fix duplicate Expedia IDs...\n')
+  console.log('🔍 Starting advanced fix for duplicate Expedia IDs...\n')
 
   try {
     // Get all property credentials first
@@ -64,16 +64,22 @@ async function fixDuplicateExpediaIds() {
         property: {
           select: {
             id: true,
-            name: true
+            name: true,
+            created_at: true
           }
         }
       },
       orderBy: {
-        property_id: 'asc'
+        property: {
+          created_at: 'asc'
+        }
       }
     })
 
     console.log(`📊 Valid properties with credentials: ${validCredentials.length}\n`)
+
+    // Create a set of all existing expedia_ids for conflict checking
+    const existingExpediaIds = new Set(validCredentials.map(c => c.expedia_id))
 
     // Group by expedia_id to find duplicates
     const expediaIdGroups = new Map<string, typeof validCredentials>()
@@ -106,19 +112,34 @@ async function fixDuplicateExpediaIds() {
         `\n📝 Processing Expedia ID: "${originalExpediaId}" (${group.length} properties)`
       )
 
-      // Keep the first one as-is, append letters to the rest
+      // Keep the first one (oldest by created_at) as-is, update the rest
       for (let i = 0; i < group.length; i++) {
         const credential = group[i]
 
         if (i === 0) {
-          // First occurrence - keep as is
+          // First occurrence (oldest) - keep as is
           console.log(
-            `  ✓ Property "${credential.property.name}" - keeping Expedia ID: ${originalExpediaId}`
+            `  ✓ Property "${credential.property.name}" - keeping Expedia ID: ${originalExpediaId} (oldest)`
           )
         } else {
-          // Generate suffix: a, b, c, ..., z, aa, ab, etc.
-          const suffix = generateSuffix(i - 1)
-          const newExpediaId = `${originalExpediaId}${suffix}`
+          // Find a non-conflicting suffix
+          let newExpediaId: string
+          let suffixIndex = i - 1
+          
+          do {
+            const suffix = generateSuffix(suffixIndex)
+            newExpediaId = `${originalExpediaId}${suffix}`
+            
+            // Check if this new ID already exists
+            if (existingExpediaIds.has(newExpediaId)) {
+              console.log(
+                `  ⚠️  Conflict detected: ${newExpediaId} already exists, trying next suffix...`
+              )
+              suffixIndex++
+            } else {
+              break
+            }
+          } while (true)
 
           console.log(
             `  → Property "${credential.property.name}" - updating to: ${newExpediaId}`
@@ -130,6 +151,8 @@ async function fixDuplicateExpediaIds() {
             data: { expedia_id: newExpediaId }
           })
 
+          // Add the new ID to our set of existing IDs
+          existingExpediaIds.add(newExpediaId)
           totalUpdated++
         }
       }
@@ -139,6 +162,7 @@ async function fixDuplicateExpediaIds() {
     console.log(
       `📊 Summary: ${duplicateGroups.length} groups processed, ${totalUpdated} IDs updated`
     )
+    console.log('\n💡 You can now run "yarn push" to update the schema.')
   } catch (error) {
     console.error('❌ Error fixing duplicate Expedia IDs:', error)
     throw error

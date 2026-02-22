@@ -258,6 +258,7 @@ export class AuditRepository implements IAuditRepository {
             name: true,
             address: true,
             is_active: true,
+            portfolio_id: true,
             card_descriptor: true,
             currency: {
               select: {
@@ -493,6 +494,7 @@ export class AuditRepository implements IAuditRepository {
             name: true,
             address: true,
             is_active: true,
+            portfolio_id: true,
             card_descriptor: true,
             currency: {
               select: {

@@ -291,30 +291,147 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     enumValues: ['VCC', 'DB', 'EBS']
   },
 
-  // OTA Type
+  // OTA Type - now an array field
   otaType: {
     key: 'otaType',
     label: 'OTA Type',
     dataType: ColumnDataType.ENUM,
     filterable: true,
-    sortable: true,
+    sortable: false, // Sorting by array fields is complex, disable for now
     source: 'audit',
     fieldPath: 'type_of_ota',
-    allowedOperators: ENUM_OPERATORS,
+    allowedOperators: [
+      FilterOperator.IN, // Check if any value in array matches any in the filter array
+      FilterOperator.EQ, // Check if array contains specific value
+      FilterOperator.IS_NULL,
+      FilterOperator.IS_NOT_NULL
+    ],
     enumValues: ['expedia', 'agoda', 'booking']
   },
 
-  // OTA ID (filterable across all OTA types - expedia_id, agoda_id, booking_id)
+  // Expedia Credentials
+  expediaId: {
+    key: 'expediaId',
+    label: 'Expedia ID',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: true,
+    source: 'credentials',
+    fieldPath: 'credentials.expedia_id',
+    allowedOperators: STRING_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+  },
+
+  expediaUsername: {
+    key: 'expediaUsername',
+    label: 'Expedia Username',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: true,
+    source: 'credentials',
+    fieldPath: 'credentials.expedia_username',
+    allowedOperators: STRING_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+  },
+
+  expediaPassword: {
+    key: 'expediaPassword',
+    label: 'Expedia Password',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: false,
+    source: 'credentials',
+    fieldPath: 'credentials.expedia_password',
+    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+  },
+
+  // Agoda Credentials
+  agodaId: {
+    key: 'agodaId',
+    label: 'Agoda ID',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: true,
+    source: 'credentials',
+    fieldPath: 'credentials.agoda_id',
+    allowedOperators: STRING_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+  },
+
+  agodaUsername: {
+    key: 'agodaUsername',
+    label: 'Agoda Username',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: true,
+    source: 'credentials',
+    fieldPath: 'credentials.agoda_username',
+    allowedOperators: STRING_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+  },
+
+  agodaPassword: {
+    key: 'agodaPassword',
+    label: 'Agoda Password',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: false,
+    source: 'credentials',
+    fieldPath: 'credentials.agoda_password',
+    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+  },
+
+  // Booking Credentials
+  bookingId: {
+    key: 'bookingId',
+    label: 'Booking ID',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: true,
+    source: 'credentials',
+    fieldPath: 'credentials.booking_id',
+    allowedOperators: STRING_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+  },
+
+  bookingUsername: {
+    key: 'bookingUsername',
+    label: 'Booking Username',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: true,
+    source: 'credentials',
+    fieldPath: 'credentials.booking_username',
+    allowedOperators: STRING_OPERATORS,
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+  },
+
+  bookingPassword: {
+    key: 'bookingPassword',
+    label: 'Booking Password',
+    dataType: ColumnDataType.STRING,
+    filterable: true,
+    sortable: false,
+    source: 'credentials',
+    fieldPath: 'credentials.booking_password',
+    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+  },
+
+  // OTA ID (filterable across all OTA types - DEPRECATED, kept for backward compatibility)
   otaId: {
     key: 'otaId',
-    label: 'OTA ID',
+    label: 'OTA ID (Any)',
     dataType: ColumnDataType.STRING,
     filterable: true,
     sortable: false,
     source: 'credentials',
     fieldPath: 'credentials', // Special case - handled in aggregation builder
     allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
-    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP],
+    filterOnly: true
   },
 
   // Audit Status ID (for filtering only)
@@ -444,30 +561,32 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP]
   },
 
-  // OTA Username (filterable across all OTA types - expedia_username, agoda_username, booking_username)
+  // OTA Username (filterable across all OTA types - DEPRECATED, kept for backward compatibility)
   otaUsername: {
     key: 'otaUsername',
-    label: 'OTA Username',
+    label: 'OTA Username (Any)',
     dataType: ColumnDataType.STRING,
     filterable: true,
     sortable: false,
     source: 'credentials',
     fieldPath: 'credentials', // Special case - handled in aggregation builder
     allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
-    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP],
+    filterOnly: true
   },
 
-  // OTA Password (filterable across all OTA types - expedia_password, agoda_password, booking_password)
+  // OTA Password (filterable across all OTA types - DEPRECATED, kept for backward compatibility)
   otaPassword: {
     key: 'otaPassword',
-    label: 'OTA Password',
+    label: 'OTA Password (Any)',
     dataType: ColumnDataType.STRING,
     filterable: true,
     sortable: false,
     source: 'credentials',
     fieldPath: 'credentials', // Special case - handled in aggregation builder
     allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
-    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
+    requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP],
+    filterOnly: true
   }
 }
 

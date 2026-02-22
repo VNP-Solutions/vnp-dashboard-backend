@@ -260,8 +260,13 @@ export class PortfolioStatsAuditDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Audit ID' })
   id: string
 
-  @ApiProperty({ example: 'expedia', description: 'OTA type' })
-  type_of_ota: string | null
+  @ApiProperty({ 
+    example: ['expedia', 'agoda'], 
+    description: 'OTA types array',
+    isArray: true,
+    type: [String]
+  })
+  type_of_ota: string[]
 
   @ApiProperty({ example: 25000, description: 'Amount collectable' })
   amount_collectable: number | null

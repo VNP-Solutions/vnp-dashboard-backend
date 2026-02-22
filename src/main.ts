@@ -43,6 +43,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config)
   SwaggerModule.setup('api/docs', app, document)
 
+  // Add custom route for docs.json endpoint
+  app.getHttpAdapter().get('/api/docs.json', (_req, res) => {
+    res.json(document)
+  })
+
   const configService = app.get(ConfigService)
   await app.listen(configService.app.port)
 
@@ -51,6 +56,9 @@ async function bootstrap() {
   )
   console.log(
     `Swagger documentation available at: http://localhost:${configService.app.port}/api/docs`
+  )
+  console.log(
+    `Swagger JSON available at: http://localhost:${configService.app.port}/api/docs.json`
   )
   console.log(
     `Deployment running on: ${'https://dashboard-backend.vnpmanage.online'}`

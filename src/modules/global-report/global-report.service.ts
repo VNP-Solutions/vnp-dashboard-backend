@@ -311,6 +311,150 @@ export class GlobalReportService implements IGlobalReportService {
   }
 
   /**
+   * Get Expedia IDs only
+   */
+  async getExpediaIds(user: IUserWithPermissions): Promise<{ data: string[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access Expedia IDs')
+    }
+
+    const allOtaIds = await this.globalReportRepository.findAllOtaIds()
+    const expediaIds = allOtaIds
+      .filter(item => item.otaType === 'expedia')
+      .map(item => item.otaId)
+    
+    return { data: expediaIds }
+  }
+
+  /**
+   * Get Agoda IDs only
+   */
+  async getAgodaIds(user: IUserWithPermissions): Promise<{ data: string[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access Agoda IDs')
+    }
+
+    const allOtaIds = await this.globalReportRepository.findAllOtaIds()
+    const agodaIds = allOtaIds
+      .filter(item => item.otaType === 'agoda')
+      .map(item => item.otaId)
+    
+    return { data: agodaIds }
+  }
+
+  /**
+   * Get Booking IDs only
+   */
+  async getBookingIds(user: IUserWithPermissions): Promise<{ data: string[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access Booking IDs')
+    }
+
+    const allOtaIds = await this.globalReportRepository.findAllOtaIds()
+    const bookingIds = allOtaIds
+      .filter(item => item.otaType === 'booking')
+      .map(item => item.otaId)
+    
+    return { data: bookingIds }
+  }
+
+  /**
+   * Get Expedia usernames only
+   */
+  async getExpediaUsernames(user: IUserWithPermissions): Promise<{ data: string[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access Expedia usernames')
+    }
+
+    const allUsernames = await this.globalReportRepository.findAllOtaUsernames()
+    const expediaUsernames = allUsernames
+      .filter(item => item.otaType === 'expedia')
+      .map(item => item.username)
+    
+    return { data: expediaUsernames }
+  }
+
+  /**
+   * Get Agoda usernames only
+   */
+  async getAgodaUsernames(user: IUserWithPermissions): Promise<{ data: string[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access Agoda usernames')
+    }
+
+    const allUsernames = await this.globalReportRepository.findAllOtaUsernames()
+    const agodaUsernames = allUsernames
+      .filter(item => item.otaType === 'agoda')
+      .map(item => item.username)
+    
+    return { data: agodaUsernames }
+  }
+
+  /**
+   * Get Booking usernames only
+   */
+  async getBookingUsernames(user: IUserWithPermissions): Promise<{ data: string[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access Booking usernames')
+    }
+
+    const allUsernames = await this.globalReportRepository.findAllOtaUsernames()
+    const bookingUsernames = allUsernames
+      .filter(item => item.otaType === 'booking')
+      .map(item => item.username)
+    
+    return { data: bookingUsernames }
+  }
+
+  /**
+   * Get Expedia passwords only (decrypted)
+   */
+  async getExpediaPasswords(user: IUserWithPermissions): Promise<{ data: string[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access Expedia passwords')
+    }
+
+    const allPasswords = await this.getOtaPasswords(user)
+    const expediaPasswords = allPasswords.data
+      .filter(item => item.otaType === 'expedia')
+      .map(item => item.password)
+    
+    return { data: expediaPasswords }
+  }
+
+  /**
+   * Get Agoda passwords only (decrypted)
+   */
+  async getAgodaPasswords(user: IUserWithPermissions): Promise<{ data: string[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access Agoda passwords')
+    }
+
+    const allPasswords = await this.getOtaPasswords(user)
+    const agodaPasswords = allPasswords.data
+      .filter(item => item.otaType === 'agoda')
+      .map(item => item.password)
+    
+    return { data: agodaPasswords }
+  }
+
+  /**
+   * Get Booking passwords only (decrypted)
+   */
+  async getBookingPasswords(user: IUserWithPermissions): Promise<{ data: string[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access Booking passwords')
+    }
+
+    const allPasswords = await this.getOtaPasswords(user)
+    const bookingPasswords = allPasswords.data
+      .filter(item => item.otaType === 'booking')
+      .map(item => item.password)
+    
+    return { data: bookingPasswords }
+  }
+
+  /**
    * Get all portfolios (id and name only) for filtering
    * Uses optimized repository method with caching
    */
@@ -409,17 +553,21 @@ export class GlobalReportService implements IGlobalReportService {
    * This method decrypts them using EncryptionUtil.
    */
   private transformReportDataWithDecryption(data: any[]): ReportRowDto[] {
-    // Step 1: Extract all unique encrypted passwords
+    // Step 1: Extract all unique encrypted passwords from all OTA types
     const passwordMap = new Map<string, string>() // encrypted -> decrypted
 
     for (const doc of data) {
-      const otaType = doc.type_of_ota?.toLowerCase()
       const credentials = doc.credentials || {}
 
-      if (otaType && credentials) {
-        const passwordField = `${otaType}_password`
-        const encryptedPassword = credentials[passwordField]
+      // Collect all encrypted passwords (for all OTA types)
+      const passwordFields = [
+        'expedia_password',
+        'agoda_password',
+        'booking_password'
+      ]
 
+      for (const field of passwordFields) {
+        const encryptedPassword = credentials[field]
         if (encryptedPassword && !passwordMap.has(encryptedPassword)) {
           // Decrypt the password using pre-derived key (fast)
           try {
@@ -449,15 +597,30 @@ export class GlobalReportService implements IGlobalReportService {
     doc: any,
     passwordMap: Map<string, string>
   ): ReportRowDto {
-    const otaType = doc.type_of_ota || null
+    // type_of_ota is now an array
+    const otaTypeArray =
+      doc.type_of_ota && Array.isArray(doc.type_of_ota) ? doc.type_of_ota : []
+    
     const credentials = doc.credentials || {}
 
-    // Compute OTA ID and Username
-    const otaId = this.getOtaFieldValue(otaType, credentials, 'id')
-    const otaUsername = this.getOtaFieldValue(otaType, credentials, 'username')
+    // Extract individual OTA credentials
+    const expediaId = credentials.expedia_id || null
+    const expediaUsername = credentials.expedia_username || null
+    const expediaPassword = credentials.expedia_password
+      ? (passwordMap.get(credentials.expedia_password) || null)
+      : null
 
-    // Get password - use the same field access pattern as username
-    const otaPassword = this.getOtaPassword(otaType, credentials, passwordMap)
+    const agodaId = credentials.agoda_id || null
+    const agodaUsername = credentials.agoda_username || null
+    const agodaPassword = credentials.agoda_password
+      ? (passwordMap.get(credentials.agoda_password) || null)
+      : null
+
+    const bookingId = credentials.booking_id || null
+    const bookingUsername = credentials.booking_username || null
+    const bookingPassword = credentials.booking_password
+      ? (passwordMap.get(credentials.booking_password) || null)
+      : null
 
     // Extract audit ID from MongoDB document
     const auditId = this.extractObjectId(doc._id)
@@ -469,8 +632,16 @@ export class GlobalReportService implements IGlobalReportService {
       propertyName: doc.property?.name || '',
       serviceType: doc.serviceType?.type || null,
       billingType: doc.billing_type || null,
-      otaType,
-      otaId,
+      otaType: otaTypeArray,
+      expediaId,
+      expediaUsername,
+      expediaPassword,
+      agodaId,
+      agodaUsername,
+      agodaPassword,
+      bookingId,
+      bookingUsername,
+      bookingPassword,
       auditStatus: doc.auditStatus?.status || null,
       startDate: this.extractDate(doc.start_date),
       endDate: this.extractDate(doc.end_date),
@@ -478,9 +649,7 @@ export class GlobalReportService implements IGlobalReportService {
       currency: doc.currency?.code || '',
       amountCollectable: roundToDecimals(doc.amount_collectable) ?? null,
       amountConfirmed: roundToDecimals(doc.amount_confirmed) ?? null,
-      portfolioContactEmail: doc.portfolio?.contact_email || null,
-      otaUsername,
-      otaPassword
+      portfolioContactEmail: doc.portfolio?.contact_email || null
     }
 
     return result

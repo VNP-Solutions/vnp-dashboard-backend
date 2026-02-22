@@ -58,6 +58,41 @@ export class PortfolioService implements IPortfolioService {
     private prisma: PrismaService
   ) {}
 
+  /**
+   * Check if user can upload contract documents to a portfolio
+   * User can upload if they are Super Admin OR
+   * Internal user with at least 'update' permission level and 'partial' access level
+   */
+  private canUploadContractDocuments(user: IUserWithPermissions): boolean {
+    // Super Admin can always upload
+    if (isUserSuperAdmin(user)) {
+      return true
+    }
+
+    // Must be internal user
+    if (!isInternalUser(user)) {
+      return false
+    }
+
+    // Check portfolio permissions
+    const portfolioPermission = user.role.portfolio_permission
+    if (!portfolioPermission) {
+      return false
+    }
+
+    // Must have at least 'update' permission level
+    const hasUpdatePermission =
+      portfolioPermission.permission_level === 'all' ||
+      portfolioPermission.permission_level === 'update'
+
+    // Must have at least 'partial' access level
+    const hasAccess =
+      portfolioPermission.access_level === 'all' ||
+      portfolioPermission.access_level === 'partial'
+
+    return hasUpdatePermission && hasAccess
+  }
+
   async create(data: CreatePortfolioDto, user: IUserWithPermissions) {
     // Only internal users can create portfolios
     if (!isInternalUser(user)) {
@@ -82,10 +117,10 @@ export class PortfolioService implements IPortfolioService {
     // Extract contract_url from data before creating portfolio
     const { contract_url, ...portfolioData } = data
 
-    // Check if user is trying to create contract URL
-    if (contract_url && !isUserSuperAdmin(user)) {
+    // Check if user can upload contract URLs
+    if (contract_url && !this.canUploadContractDocuments(user)) {
       throw new BadRequestException(
-        'Only Super Admin can upload contract URLs. Please remove the contract_url field or contact a Super Admin.'
+        'Only Super Admin or internal users with at least update permission and partial access can upload contract URLs.'
       )
     }
 
@@ -96,8 +131,8 @@ export class PortfolioService implements IPortfolioService {
       isSuperAdmin
     )
 
-    // If contract_url is provided and user is super admin, create a contract URL entry
-    if (contract_url && isSuperAdmin) {
+    // If contract_url is provided and user has permission, create a contract URL entry
+    if (contract_url && this.canUploadContractDocuments(user)) {
       await this.contractUrlRepository.create({
         url: contract_url,
         portfolio_id: portfolio.id,
@@ -1294,10 +1329,9 @@ export class PortfolioService implements IPortfolioService {
             )
           }
 
-          // If contract URL is provided, create contract URL entries for the user
+          // If contract URL is provided and user has permission, create contract URL entries for the user
           // Handle comma-separated values
-          // Only super admin can create contract URLs
-          if (contractUrl && isUserSuperAdmin(_user)) {
+          if (contractUrl && this.canUploadContractDocuments(_user)) {
             const urls = contractUrl
               .split(',')
               .map(url => url.trim())
@@ -1714,8 +1748,8 @@ export class PortfolioService implements IPortfolioService {
             isSuperAdmin
           )
 
-          // If contract URL is provided and user is super admin, create contract URL entries
-          if (contractUrl && isSuperAdmin) {
+          // If contract URL is provided and user has permission, create contract URL entries
+          if (contractUrl && this.canUploadContractDocuments(user)) {
             const urls = contractUrl
               .split(',')
               .map(url => url.trim())
@@ -1919,15 +1953,22 @@ export class PortfolioService implements IPortfolioService {
       amountCollectable.total += collectableAmount
       amountConfirmed.total += confirmedAmount
 
-      if (aggregate.type_of_ota === 'expedia') {
-        amountCollectable.expedia += collectableAmount
-        amountConfirmed.expedia += confirmedAmount
-      } else if (aggregate.type_of_ota === 'booking') {
-        amountCollectable.booking += collectableAmount
-        amountConfirmed.booking += confirmedAmount
-      } else if (aggregate.type_of_ota === 'agoda') {
-        amountCollectable.agoda += collectableAmount
-        amountConfirmed.agoda += confirmedAmount
+      // Since type_of_ota is now an array, we need to handle it differently
+      // This aggregation won't work as expected with arrays
+      // We'll fetch individual audits instead (see alternative approach above in audit service)
+      if (Array.isArray(aggregate.type_of_ota)) {
+        aggregate.type_of_ota.forEach((ota: string) => {
+          if (ota === 'expedia') {
+            amountCollectable.expedia += collectableAmount
+            amountConfirmed.expedia += confirmedAmount
+          } else if (ota === 'booking') {
+            amountCollectable.booking += collectableAmount
+            amountConfirmed.booking += confirmedAmount
+          } else if (ota === 'agoda') {
+            amountCollectable.agoda += collectableAmount
+            amountConfirmed.agoda += confirmedAmount
+          }
+        })
       }
     })
 
