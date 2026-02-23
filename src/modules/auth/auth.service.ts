@@ -232,6 +232,7 @@ export class AuthService implements IAuthService {
       language: data.language,
       user_role_id: data.role_id,
       password: hashedPassword,
+      job_title: data.job_title,
       temp_password: tempPassword,
       is_verified: false,
       invited_by_id: inviterId,

@@ -63,7 +63,8 @@ export class UserService implements IUserService {
       last_name: data.last_name,
       language: data.language,
       display_image: data.display_image,
-      contact_number: data.contact_number
+      contact_number: data.contact_number,
+      job_title: data.job_title
     }
 
     // Remove undefined fields
@@ -122,6 +123,7 @@ export class UserService implements IUserService {
       updateData.display_image = data.display_image
     if (data.contact_number !== undefined)
       updateData.contact_number = data.contact_number
+    if (data.job_title !== undefined) updateData.job_title = data.job_title
 
     // Update user access if provided
     if (data.portfolio_ids || data.property_ids) {

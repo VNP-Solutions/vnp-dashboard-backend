@@ -31,6 +31,7 @@ export interface IAuthRepository {
     language: string
     user_role_id: string
     password: string
+    job_title?: string
     temp_password?: string
     is_verified: boolean
     invited_by_id?: string
