@@ -100,6 +100,11 @@ export class UpdateUserDto {
   @IsOptional()
   contact_number?: string
 
+  @ApiPropertyOptional({ example: 'Software Engineer', description: 'Job title' })
+  @IsString()
+  @IsOptional()
+  job_title?: string
+
   @ApiPropertyOptional({
     example: ['507f1f77bcf86cd799439011'],
     description: 'Array of portfolio IDs user can access'
@@ -151,6 +156,11 @@ export class UpdateOwnProfileDto {
   @IsString()
   @IsOptional()
   contact_number?: string
+
+  @ApiPropertyOptional({ example: 'Software Engineer', description: 'Job title' })
+  @IsString()
+  @IsOptional()
+  job_title?: string
 }
 
 export class AssignUserRoleDto {

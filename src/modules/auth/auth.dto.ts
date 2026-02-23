@@ -83,6 +83,11 @@ export class InviteUserDto {
   @IsNotEmpty()
   language: string
 
+  @ApiPropertyOptional({ example: 'Software Engineer', description: 'Job title' })
+  @IsString()
+  @IsOptional()
+  job_title?: string
+
   @ApiPropertyOptional({
     example: ['507f1f77bcf86cd799439011'],
     description: 'Array of portfolio IDs user can access'

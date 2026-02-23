@@ -18,6 +18,7 @@ model User {
   password           String
   display_image      String?
   contact_number     String?
+  job_title          String?
   is_verified        Boolean
   temp_password      String?
   invitation_sent_at DateTime?
