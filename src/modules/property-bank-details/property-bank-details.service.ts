@@ -27,6 +27,13 @@ import type {
   IPropertyBankDetailsService
 } from './property-bank-details.interface'
 
+// Define the role names for bank details notifications (for logging only)
+// We match users by their permissions/attributes, not by role name
+const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
+  'Client portfolio manager',
+  'VNP Admin'
+]
+
 @Injectable()
 export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   constructor(
@@ -241,7 +248,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     return BankSubType.domestic_wire
   }
 
-  async create(data: CreatePropertyBankDetailsDto, user: IUserWithPermissions) {
+  async create(data: CreatePropertyBankDetailsDto, user: IUserWithPermissions, location?: string | null) {
     // Check permission - require CREATE permission on BANK_DETAILS module
     await this.checkBankDetailsPermission(
       user,
@@ -291,10 +298,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       normalizedData as CreatePropertyBankDetailsDto
     )
 
-    // Send email notification to super admins
-    await this.sendBankDetailsNotificationToSuperAdmins(
+    // Send email notification to super admins and role users
+    await this.sendBankDetailsNotification(
       data.property_id,
-      'created'
+      'created',
+      location
     )
 
     return result
@@ -314,7 +322,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   async update(
     propertyId: string,
     data: UpdatePropertyBankDetailsDto,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    location?: string | null
   ) {
     // Check permission - require UPDATE permission on BANK_DETAILS module
     await this.checkBankDetailsPermission(
@@ -337,8 +346,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           where: { property_id: propertyId }
         })
 
-        // Send email notification to super admins about deletion
-        await this.sendBankDetailsNotificationToSuperAdmins(propertyId, 'deleted')
+        // Send email notification about deletion
+        await this.sendBankDetailsNotification(propertyId, 'deleted', location)
 
         return deleted
       } else {
@@ -367,8 +376,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       normalizedData as UpdatePropertyBankDetailsDto
     )
 
-    // Send email notification to super admins
-    await this.sendBankDetailsNotificationToSuperAdmins(propertyId, 'updated')
+    // Send email notification to super admins and role users
+    await this.sendBankDetailsNotification(propertyId, 'updated', location)
 
     return result
   }
@@ -376,7 +385,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   async bulkUpdate(
     file: Express.Multer.File,
     password: string,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    location?: string | null
   ): Promise<BulkUpdateBankDetailsResultDto> {
     // Verify password first
     if (!password) {
@@ -1072,14 +1082,14 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         await this.sendBulkUpdateAlerts(allUpdatedPropertyIds)
       }
 
-      // Send notification to super admins for created properties
+      // Send notification to super admins and role users for created properties
       if (createdPropertyIds.length > 0) {
-        await this.sendBulkNotificationToSuperAdmins(createdPropertyIds, 'created')
+        await this.sendBulkNotification(createdPropertyIds, 'created', location)
       }
 
-      // Send notification to super admins for updated properties
+      // Send notification to super admins and role users for updated properties
       if (updatedPropertyIds.length > 0) {
-        await this.sendBulkNotificationToSuperAdmins(updatedPropertyIds, 'updated')
+        await this.sendBulkNotification(updatedPropertyIds, 'updated', location)
       }
 
       return result
@@ -1181,11 +1191,172 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   }
 
   /**
-   * Send email notification to all super admins when bank details are created, updated, or deleted
+   * Get users with specific role attributes who have access to a property
+   * Matches by permissions/attributes instead of role name
    */
-  private async sendBankDetailsNotificationToSuperAdmins(
+  private async getUsersWithRolesAndPropertyAccess(
     propertyId: string,
-    action: 'created' | 'updated' | 'deleted'
+    _roleNames: string[]
+  ): Promise<string[]> {
+    const userEmails: string[] = []
+
+    console.log(`\n🔍 Looking for users matching notification role conditions...`)
+    console.log(`🔍 Property ID to check access: ${propertyId}`)
+
+    // Get all verified users with their role details
+    const allUsers = await this.prisma.user.findMany({
+      where: {
+        is_verified: true
+      },
+      select: {
+        id: true,
+        email: true,
+        role: {
+          select: {
+            name: true,
+            is_external: true,
+            can_access_mis: true,
+            bank_details_permission: true,
+            portfolio_permission: true,
+            property_permission: true,
+            audit_permission: true,
+            user_permission: true,
+            system_settings_permission: true
+          }
+        }
+      }
+    })
+
+    console.log(`✓ Found ${allUsers.length} total verified user(s)`)
+
+    // Filter users that match the notification role criteria
+    const matchingUsers: typeof allUsers = []
+
+    for (const user of allUsers) {
+      const role = user.role
+
+      // Check for VNP Admin: internal (is_external: false) + partial access
+      const isVnpAdmin =
+        !role.is_external && // internal user
+        role.can_access_mis === false &&
+        role.portfolio_permission?.access_level === 'partial' &&
+        role.property_permission?.access_level === 'partial' &&
+        role.bank_details_permission?.access_level === 'partial'
+
+      // Check for Client Portfolio Manager: external + partial access
+      const isClientPortfolioManager =
+        role.is_external && // external user
+        role.can_access_mis === false &&
+        role.portfolio_permission?.permission_level === 'update' &&
+        role.portfolio_permission?.access_level === 'partial' &&
+        role.property_permission?.permission_level === 'update' &&
+        role.property_permission?.access_level === 'partial' &&
+        role.bank_details_permission?.permission_level === 'all' &&
+        role.bank_details_permission?.access_level === 'partial'
+
+      if (isVnpAdmin || isClientPortfolioManager) {
+        matchingUsers.push(user)
+        const roleType = isVnpAdmin ? 'VNP Admin' : 'Client Portfolio Manager'
+        console.log(`   ✓ Match: ${user.email} (${role.name} - matches ${roleType} criteria)`)
+      }
+    }
+
+    console.log(`✓ Found ${matchingUsers.length} user(s) matching notification role criteria`)
+
+    if (matchingUsers.length === 0) {
+      console.log(`ℹ️  No users matched the notification role criteria`)
+      return userEmails
+    }
+
+    // Get user accesses for matching users
+    const userIds = matchingUsers.map(u => u.id)
+    const userAccesses = await this.prisma.userAccessedProperty.findMany({
+      where: {
+        user_id: {
+          in: userIds
+        }
+      },
+      select: {
+        user_id: true,
+        property_id: true
+      }
+    })
+
+    console.log(`✓ Found ${userAccesses.length} user access records`)
+
+    // Filter users who have access to the property
+    for (const access of userAccesses) {
+      console.log(`   Checking user ${access.user_id} - property_ids: ${access.property_id.join(', ')}`)
+      if (access.property_id.includes(propertyId)) {
+        const user = matchingUsers.find(u => u.id === access.user_id)
+        if (user) {
+          userEmails.push(user.email)
+          console.log(`   ✓ User ${user.email} has access to property ${propertyId}`)
+        }
+      }
+    }
+
+    console.log(`📧 Final role-based recipients: ${userEmails.length} user(s)`)
+    return userEmails
+  }
+
+  /**
+   * Get all super admin emails
+   */
+  private async getSuperAdminEmails(): Promise<string[]> {
+    const allUsers = await this.prisma.user.findMany({
+      where: {
+        is_verified: true
+      },
+      select: {
+        id: true,
+        email: true,
+        role: {
+          select: {
+            portfolio_permission: true,
+            property_permission: true,
+            audit_permission: true,
+            user_permission: true,
+            system_settings_permission: true
+          }
+        }
+      }
+    })
+
+    const superAdminEmails: string[] = []
+
+    for (const user of allUsers) {
+      const allPermissions = [
+        user.role.portfolio_permission,
+        user.role.property_permission,
+        user.role.audit_permission,
+        user.role.user_permission,
+        user.role.system_settings_permission
+      ]
+
+      const isSuperAdmin = allPermissions.every(
+        permission =>
+          permission &&
+          permission.permission_level === 'all' &&
+          permission.access_level === 'all'
+      )
+
+      if (isSuperAdmin) {
+        superAdminEmails.push(user.email)
+      }
+    }
+
+    return superAdminEmails
+  }
+
+  /**
+   * Send email notification when bank details are created, updated, or deleted
+   * Sends to super admins and users with Client Portfolio Manager / VNP Admin roles
+   */
+  private async sendBankDetailsNotification(
+    propertyId: string,
+    action: 'created' | 'updated' | 'deleted',
+    location: string | null = null
   ): Promise<void> {
     try {
       console.log(
@@ -1217,110 +1388,53 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
       console.log(`✓ Property found: "${property.name}"`)
 
-      // Get all super admin users
-      const allUsers = await this.prisma.user.findMany({
-        where: {
-          is_verified: true
-        },
-        select: {
-          id: true,
-          email: true,
-          first_name: true,
-          last_name: true,
-          role: {
-            select: {
-              portfolio_permission: true,
-              property_permission: true,
-              audit_permission: true,
-              user_permission: true,
-              system_settings_permission: true
-            }
-          }
-        }
-      })
+      // Collect all recipients
+      const allRecipients: string[] = []
 
-      console.log(`✓ Found ${allUsers.length} verified user(s) in database`)
+      // Get super admin emails
+      const superAdminEmails = await this.getSuperAdminEmails()
+      allRecipients.push(...superAdminEmails)
+      console.log(`✓ Found ${superAdminEmails.length} super admin(s)`)
 
-      // Filter super admins using the isUserSuperAdmin utility
-      const superAdminEmails: string[] = []
-      const superAdminDetails: Array<{email: string, name: string}> = []
+      // Get users with specific roles who have property access
+      const roleUserEmails = await this.getUsersWithRolesAndPropertyAccess(
+        propertyId,
+        BANK_DETAILS_NOTIFICATION_ROLE_NAMES
+      )
+      allRecipients.push(...roleUserEmails)
+      console.log(
+        `✓ Found ${roleUserEmails.length} user(s) with roles ${BANK_DETAILS_NOTIFICATION_ROLE_NAMES.join(', ')}`
+      )
 
-      for (const user of allUsers) {
-        // Check if user is super admin by checking all permissions
-        const allPermissions = [
-          user.role.portfolio_permission,
-          user.role.property_permission,
-          user.role.audit_permission,
-          user.role.user_permission,
-          user.role.system_settings_permission
-        ]
+      // Remove duplicates
+      const uniqueRecipients = [...new Set(allRecipients)]
 
-        // User is super admin if all permissions have permission_level 'all' and access_level 'all'
-        const isSuperAdmin = allPermissions.every(
-          permission =>
-            permission &&
-            permission.permission_level === 'all' &&
-            permission.access_level === 'all'
-        )
-
-        if (isSuperAdmin) {
-          superAdminEmails.push(user.email)
-          superAdminDetails.push({
-            email: user.email,
-            name: `${user.first_name} ${user.last_name}`.trim()
-          })
-        }
-      }
-
-      if (superAdminEmails.length === 0) {
-        console.warn(
-          `⚠️  No super admin users found to notify`
-        )
-        console.log(
-          `A super admin must have ALL permissions with permission_level='all' AND access_level='all'`
-        )
+      if (uniqueRecipients.length === 0) {
+        console.warn(`⚠️  No recipients found to notify`)
         return
       }
 
       console.log(
-        `✓ Found ${superAdminEmails.length} super admin(s):`
+        `✓ Total unique recipients: ${uniqueRecipients.length}`
       )
-      superAdminDetails.forEach((admin, idx) => {
-        console.log(`   ${idx + 1}. ${admin.name} (${admin.email})`)
-      })
 
-      // Send email to all super admins
-      const actionLabel = action === 'created' ? 'Added' : action === 'deleted' ? 'Deleted' : 'Updated'
-      const subject = `Bank Details ${actionLabel} - ${property.name}`
-      const body = `Bank details have been ${action} for property "${property.name}".\n\nPlease review the changes in VNP Solutions Dashboard.\n\nThis is an automated notification.`
+      // Send email using the new method with location
+      await this.emailUtil.sendBankDetailsUpdateEmail(
+        uniqueRecipients,
+        [property.name],
+        location,
+        new Date()
+      )
 
       console.log(
-        `\n📧 Attempting to send email...`
+        `\n✅ SUCCESS: Sent bank details ${action} notification to ${uniqueRecipients.length} recipient(s)`
       )
-      console.log(`Subject: ${subject}`)
-      console.log(`Recipients: ${superAdminEmails.join(', ')}`)
-
-      try {
-        await this.emailUtil.sendEmail(superAdminEmails, subject, body)
-
-        console.log(
-          `\n✅ SUCCESS: Sent bank details ${action} notification to ${superAdminEmails.length} super admin(s)`
-        )
-        console.log(
-          `========================================\n`
-        )
-      } catch (emailError) {
-        console.error(
-          `\n❌ FAILED: Could not send bank details ${action} notification`
-        )
-        console.error('Error details:', emailError)
-        console.log(
-          `========================================\n`
-        )
-      }
+      console.log(
+        `========================================\n`
+      )
     } catch (error) {
       console.error(
-        `\n❌ ERROR: Exception in sendBankDetailsNotificationToSuperAdmins`
+        `\n❌ ERROR: Exception in sendBankDetailsNotification`
       )
       console.error('Error details:', error)
       console.log(
@@ -1331,11 +1445,13 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   }
 
   /**
-   * Send email notification to all super admins when bank details are bulk created or updated
+   * Send email notification when bank details are bulk created or updated
+   * Sends to super admins and users with Client Portfolio Manager / VNP Admin roles
    */
-  private async sendBulkNotificationToSuperAdmins(
+  private async sendBulkNotification(
     propertyIds: string[],
-    action: 'created' | 'updated'
+    action: 'created' | 'updated',
+    location: string | null = null
   ): Promise<void> {
     try {
       console.log(
@@ -1372,114 +1488,58 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
       console.log(`✓ Found ${properties.length} properties`)
 
-      // Get all super admin users
-      const allUsers = await this.prisma.user.findMany({
-        where: {
-          is_verified: true
-        },
-        select: {
-          id: true,
-          email: true,
-          first_name: true,
-          last_name: true,
-          role: {
-            select: {
-              portfolio_permission: true,
-              property_permission: true,
-              audit_permission: true,
-              user_permission: true,
-              system_settings_permission: true
-            }
-          }
-        }
-      })
+      // Collect all recipients
+      const allRecipients: string[] = []
 
-      console.log(`✓ Found ${allUsers.length} verified user(s) in database`)
+      // Get super admin emails
+      const superAdminEmails = await this.getSuperAdminEmails()
+      allRecipients.push(...superAdminEmails)
+      console.log(`✓ Found ${superAdminEmails.length} super admin(s)`)
 
-      // Filter super admins using isUserSuperAdmin utility
-      const superAdminEmails: string[] = []
-      const superAdminDetails: Array<{email: string, name: string}> = []
-
-      for (const user of allUsers) {
-        // Check if user is super admin by checking all permissions
-        const allPermissions = [
-          user.role.portfolio_permission,
-          user.role.property_permission,
-          user.role.audit_permission,
-          user.role.user_permission,
-          user.role.system_settings_permission
-        ]
-
-        // User is super admin if all permissions have permission_level 'all' and access_level 'all'
-        const isSuperAdmin = allPermissions.every(
-          permission =>
-            permission &&
-            permission.permission_level === 'all' &&
-            permission.access_level === 'all'
+      // Get users with specific roles for each property
+      const roleUserEmailsSet = new Set<string>()
+      for (const property of properties) {
+        const roleUserEmails = await this.getUsersWithRolesAndPropertyAccess(
+          property.id,
+          BANK_DETAILS_NOTIFICATION_ROLE_NAMES
         )
-
-        if (isSuperAdmin) {
-          superAdminEmails.push(user.email)
-          superAdminDetails.push({
-            email: user.email,
-            name: `${user.first_name} ${user.last_name}`.trim()
-          })
-        }
+        roleUserEmails.forEach(email => roleUserEmailsSet.add(email))
       }
+      allRecipients.push(...Array.from(roleUserEmailsSet))
+      console.log(
+        `✓ Found ${roleUserEmailsSet.size} user(s) with roles ${BANK_DETAILS_NOTIFICATION_ROLE_NAMES.join(', ')}`
+      )
 
-      if (superAdminEmails.length === 0) {
-        console.warn(
-          `⚠️  No super admin users found to notify`
-        )
-        console.log(
-          `A super admin must have ALL permissions with permission_level='all' AND access_level='all'`
-        )
+      // Remove duplicates
+      const uniqueRecipients = [...new Set(allRecipients)]
+
+      if (uniqueRecipients.length === 0) {
+        console.warn(`⚠️  No recipients found to notify`)
         return
       }
 
       console.log(
-        `✓ Found ${superAdminEmails.length} super admin(s):`
+        `✓ Total unique recipients: ${uniqueRecipients.length}`
       )
-      superAdminDetails.forEach((admin, idx) => {
-        console.log(`   ${idx + 1}. ${admin.name} (${admin.email})`)
-      })
 
-      // Create property names list
-      const propertyNames = properties.map(p => p.name).join(', ')
-
-      // Send email to all super admins
-      const actionLabel = action === 'created' ? 'Added' : 'Updated'
-      const subject = `Bank Details Bulk ${actionLabel} - ${properties.length} Property(s)`
-      const body = `Bank details have been bulk ${action} for the following properties:\n\n${propertyNames}\n\nPlease review the changes in VNP Solutions Dashboard.\n\nThis is an automated notification.`
+      // Send email using the new method with location
+      const propertyNames = properties.map(p => p.name)
+      await this.emailUtil.sendBankDetailsUpdateEmail(
+        uniqueRecipients,
+        propertyNames,
+        location,
+        new Date()
+      )
 
       console.log(
-        `\n📧 Attempting to send email...`
+        `\n✅ SUCCESS: Sent bulk update notification to ${uniqueRecipients.length} recipient(s)`
       )
-      console.log(`Subject: ${subject}`)
-      console.log(`Recipients: ${superAdminEmails.join(', ')}`)
-      console.log(`Properties: ${propertyNames}`)
-
-      try {
-        await this.emailUtil.sendEmail(superAdminEmails, subject, body)
-
-        console.log(
-          `\n✅ SUCCESS: Sent bulk update notification to ${superAdminEmails.length} super admin(s)`
-        )
-        console.log(
-          `========================================\n`
-        )
-      } catch (emailError) {
-        console.error(
-          `\n❌ FAILED: Could not send bulk update notification`
-        )
-        console.error('Error details:', emailError)
-        console.log(
-          `========================================\n`
-        )
-      }
+      console.log(
+        `========================================\n`
+      )
     } catch (error) {
       console.error(
-        `\n❌ ERROR: Exception in sendBulkUpdateNotificationToSuperAdmins`
+        `\n❌ ERROR: Exception in sendBulkNotification`
       )
       console.error('Error details:', error)
       console.log(

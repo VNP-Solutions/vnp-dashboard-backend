@@ -164,12 +164,14 @@ export interface IPropertyService {
   ): Promise<PropertyWithRelations>
   completeCreate(
     data: CompleteCreatePropertyDto,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    location?: string | null
   ): Promise<PropertyWithFullDetails>
   completeUpdate(
     id: string,
     data: CompleteUpdatePropertyDto,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    location?: string | null
   ): Promise<PropertyWithFullDetails>
   findAll(
     query: PropertyQueryDto,
@@ -251,11 +253,13 @@ export interface IPropertyService {
   ): Promise<{ message: string; pending_action?: any }>
   bulkImport(
     file: Express.Multer.File,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    location?: string | null
   ): Promise<any>
   bulkUpdate(
     file: Express.Multer.File,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    location?: string | null
   ): Promise<BulkUpdateResultDto>
   getStats(
     propertyId: string,
