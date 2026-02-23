@@ -966,6 +966,18 @@ export class PortfolioService implements IPortfolioService {
     attachmentUrls?: AttachmentUrlDto[]
   ) {
     const isSuperAdmin = isUserSuperAdmin(user)
+
+    // CRITICAL: Explicit permission check to ensure user has access to this portfolio
+    // This prevents partial access users from sending emails to portfolios they cannot access
+    if (!isSuperAdmin) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PORTFOLIO,
+        PermissionAction.READ,
+        id
+      )
+    }
+
     const portfolio = await this.portfolioRepository.findById(
       id,
       user.id,
