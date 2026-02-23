@@ -193,6 +193,9 @@ export class PropertyRepository implements IPropertyRepository {
               name: true,
               is_active: true,
               service_type_id: true,
+              contact_email: true,
+              access_email: true,
+              access_phone: true,
               serviceType: {
                 select: {
                   id: true,
@@ -423,6 +426,9 @@ export class PropertyRepository implements IPropertyRepository {
                 name: true,
                 is_active: true,
                 service_type_id: true,
+                contact_email: true,
+                access_email: true,
+                access_phone: true,
                 serviceType: {
                   select: {
                     id: true,
@@ -487,6 +493,8 @@ export class PropertyRepository implements IPropertyRepository {
             is_active: true,
             service_type_id: true,
             contact_email: true,
+            access_email: true,
+            access_phone: true,
             serviceType: {
               select: {
                 id: true,
@@ -613,6 +621,9 @@ export class PropertyRepository implements IPropertyRepository {
             name: true,
             is_active: true,
             service_type_id: true,
+            contact_email: true,
+            access_email: true,
+            access_phone: true,
             serviceType: {
               select: {
                 id: true,
