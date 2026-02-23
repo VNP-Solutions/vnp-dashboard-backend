@@ -33,7 +33,8 @@ export interface IPropertyBankDetailsRepository {
 export interface IPropertyBankDetailsService {
   create(
     data: CreatePropertyBankDetailsDto,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    location?: string | null
   ): Promise<PropertyBankDetails>
   findByPropertyId(
     propertyId: string,
@@ -42,11 +43,13 @@ export interface IPropertyBankDetailsService {
   update(
     propertyId: string,
     data: UpdatePropertyBankDetailsDto,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    location?: string | null
   ): Promise<PropertyBankDetails>
   bulkUpdate(
     file: Express.Multer.File,
     password: string,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    location?: string | null
   ): Promise<BulkUpdateBankDetailsResultDto>
 }

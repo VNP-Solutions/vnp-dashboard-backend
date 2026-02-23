@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  ExecutionContext,
   Get,
   Inject,
   Param,
   Patch,
   Post,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors
@@ -26,6 +28,7 @@ import {
   ModuleType,
   PermissionAction
 } from '../../common/interfaces/permission.interface'
+import { getLocationFromRequest } from '../../common/utils/ip.util'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
@@ -170,13 +173,18 @@ export class PropertyBankDetailsController {
     description:
       'Forbidden - Insufficient permissions'
   })
-  create(
+  async create(
     @Body() createPropertyBankDetailsDto: CreatePropertyBankDetailsDto,
-    @CurrentUser() user: IUserWithPermissions
+    @CurrentUser() user: IUserWithPermissions,
+    @Req() req: any
   ) {
+    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const location = await getLocationFromRequest(context)
+
     return this.propertyBankDetailsService.create(
       createPropertyBankDetailsDto,
-      user
+      user,
+      location
     )
   }
 
@@ -318,15 +326,20 @@ export class PropertyBankDetailsController {
     description:
       'Forbidden - Insufficient permissions'
   })
-  update(
+  async update(
     @Param('propertyId') propertyId: string,
     @Body() updatePropertyBankDetailsDto: UpdatePropertyBankDetailsDto,
-    @CurrentUser() user: IUserWithPermissions
+    @CurrentUser() user: IUserWithPermissions,
+    @Req() req: any
   ) {
+    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const location = await getLocationFromRequest(context)
+
     return this.propertyBankDetailsService.update(
       propertyId,
       updatePropertyBankDetailsDto,
-      user
+      user,
+      location
     )
   }
 
@@ -415,11 +428,15 @@ export class PropertyBankDetailsController {
     description:
       'Forbidden - Insufficient permissions'
   })
-  bulkUpdate(
+  async bulkUpdate(
     @UploadedFile() file: Express.Multer.File,
     @Body('password') password: string,
-    @CurrentUser() user: IUserWithPermissions
+    @CurrentUser() user: IUserWithPermissions,
+    @Req() req: any
   ) {
-    return this.propertyBankDetailsService.bulkUpdate(file, password, user)
+    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const location = await getLocationFromRequest(context)
+
+    return this.propertyBankDetailsService.bulkUpdate(file, password, user, location)
   }
 }

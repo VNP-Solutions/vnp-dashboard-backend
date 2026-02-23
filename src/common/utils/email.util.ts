@@ -1348,4 +1348,86 @@ export class EmailUtil {
       }
     }
   }
+
+  async sendBankDetailsUpdateEmail(
+    recipientEmails: string[],
+    propertyNames: string[],
+    location: string | null,
+    timestamp: Date
+  ): Promise<void> {
+    // Remove duplicates and filter out empty emails
+    const uniqueEmails = [
+      ...new Set(recipientEmails.filter(email => email && email.trim()))
+    ]
+
+    if (uniqueEmails.length === 0) {
+      console.warn(
+        'No valid recipient emails provided for bank details update notification'
+      )
+      return
+    }
+
+    // Format the timestamp
+    const formattedTimestamp = timestamp.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    })
+
+    // Create property list for email body
+    const propertyList = propertyNames
+      .map(name => `<li>🏢 ${name}</li>`)
+      .join('')
+
+    // Send individual emails to each recipient
+    for (const userEmail of uniqueEmails) {
+      try {
+        // Fetch user's first name from database
+        const user = await this.prisma.user.findUnique({
+          where: { email: userEmail },
+          select: { first_name: true }
+        })
+
+        const firstName = user?.first_name?.split(' ')[0] || ''
+        const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+
+        const mailOptions = {
+          from: this.configService.get('smtp.email', { infer: true }),
+          to: userEmail,
+          subject: 'Banking Details have been updated',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <p><strong>${greeting}</strong></p>
+              <p>We are writing to inform you that banking details have been updated for the following properties:</p>
+              <ul style="list-style: none; padding-left: 0;">
+                ${propertyList}
+              </ul>
+              <p><strong>🕒 Update Time:</strong> ${formattedTimestamp}</p>
+              ${location ? `<p><strong>📍 Location:</strong> ${location}</p>` : ''}
+              <p style="color: #dc3545; font-weight: bold;">If you or your team didn't make the changes please contact admin immediately.</p>
+              <div style="margin-top: 30px; color: #666;">
+                <p>Warm regards,<br><strong>VNP Solutions Support Team</strong></p>
+              </div>
+            </div>
+          `,
+          text: `${greeting}\n\nWe are writing to inform you that banking details have been updated for the following properties:\n\n${propertyNames.join('\n')}\n\n🕒 Update Time: ${formattedTimestamp}\n${location ? `\n📍 Location: ${location}` : ''}\n\nIf you or your team didn't make the changes please contact admin immediately.\n\nWarm regards,\nVNP Solutions Support Team`
+        }
+
+        const info = await this.transporter.sendMail(mailOptions)
+        console.log('✓ Bank details update email sent:', {
+          to: userEmail,
+          messageId: info.messageId
+        })
+      } catch (error) {
+        console.error(
+          `✗ Failed to send bank details update email to ${userEmail}:`,
+          error
+        )
+        // Continue sending to other recipients even if one fails
+      }
+    }
+  }
 }

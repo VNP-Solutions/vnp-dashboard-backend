@@ -3,12 +3,14 @@ import {
   Body,
   Controller,
   Delete,
+  ExecutionContext,
   Get,
   Inject,
   Param,
   Patch,
   Post,
   Query,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors
@@ -29,6 +31,7 @@ import {
   ModuleType,
   PermissionAction
 } from '../../common/interfaces/permission.interface'
+import { getLocationFromRequest } from '../../common/utils/ip.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import type { IAuthRepository } from '../auth/auth.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -223,11 +226,15 @@ export class PropertyController {
     status: 409,
     description: 'Conflict - Property name already exists'
   })
-  completeCreate(
+  async completeCreate(
     @Body() completeCreateDto: CompleteCreatePropertyDto,
-    @CurrentUser() user: IUserWithPermissions
+    @CurrentUser() user: IUserWithPermissions,
+    @Req() req: any
   ) {
-    return this.propertyService.completeCreate(completeCreateDto, user)
+    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const location = await getLocationFromRequest(context)
+
+    return this.propertyService.completeCreate(completeCreateDto, user, location)
   }
 
   @Patch(':id/complete-update')
@@ -367,12 +374,16 @@ export class PropertyController {
     status: 409,
     description: 'Conflict - Property name already exists'
   })
-  completeUpdate(
+  async completeUpdate(
     @Param('id') id: string,
     @Body() completeUpdateDto: CompleteUpdatePropertyDto,
-    @CurrentUser() user: IUserWithPermissions
+    @CurrentUser() user: IUserWithPermissions,
+    @Req() req: any
   ) {
-    return this.propertyService.completeUpdate(id, completeUpdateDto, user)
+    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const location = await getLocationFromRequest(context)
+
+    return this.propertyService.completeUpdate(id, completeUpdateDto, user, location)
   }
 
   @Get()
@@ -881,11 +892,15 @@ export class PropertyController {
     status: 403,
     description: 'Forbidden - Insufficient permissions or not an internal user'
   })
-  bulkImport(
+  async bulkImport(
     @UploadedFile() file: Express.Multer.File,
-    @CurrentUser() user: IUserWithPermissions
+    @CurrentUser() user: IUserWithPermissions,
+    @Req() req: any
   ) {
-    return this.propertyService.bulkImport(file, user)
+    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const location = await getLocationFromRequest(context)
+
+    return this.propertyService.bulkImport(file, user, location)
   }
 
   @Post('bulk-update')
@@ -977,11 +992,15 @@ export class PropertyController {
     status: 403,
     description: 'Forbidden - Insufficient permissions or not an internal user'
   })
-  bulkUpdate(
+  async bulkUpdate(
     @UploadedFile() file: Express.Multer.File,
-    @CurrentUser() user: IUserWithPermissions
+    @CurrentUser() user: IUserWithPermissions,
+    @Req() req: any
   ) {
-    return this.propertyService.bulkUpdate(file, user)
+    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const location = await getLocationFromRequest(context)
+
+    return this.propertyService.bulkUpdate(file, user, location)
   }
 
   @Get(':id/stats')
