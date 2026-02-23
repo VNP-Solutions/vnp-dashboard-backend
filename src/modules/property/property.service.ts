@@ -1138,7 +1138,14 @@ export class PropertyService implements IPropertyService {
       )
     }
 
-    // No ownership validation needed - any user with UPDATE permission and property access can request transfer
+    // CRITICAL: Check if user has access to THIS specific property before allowing transfer
+    // This prevents partial access users from transferring properties they don't have access to
+    await this.permissionService.requirePermission(
+      user,
+      ModuleType.PROPERTY,
+      PermissionAction.UPDATE,
+      id
+    )
 
     // Validate the new portfolio exists
     const newPortfolio = await this.portfolioRepository.findById(
@@ -1287,6 +1294,25 @@ export class PropertyService implements IPropertyService {
             property_id: propertyId,
             success: false,
             message: 'Property not found'
+          })
+          failedCount++
+          continue
+        }
+
+        // CRITICAL: Check if user has access to THIS specific property before transferring
+        // This prevents partial access users from bulk transferring properties they don't have access to
+        try {
+          await this.permissionService.requirePermission(
+            user,
+            ModuleType.PROPERTY,
+            PermissionAction.UPDATE,
+            propertyId
+          )
+        } catch {
+          results.push({
+            property_id: propertyId,
+            success: false,
+            message: 'You do not have permission to transfer this property'
           })
           failedCount++
           continue
@@ -1504,12 +1530,23 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Property not found')
     }
 
+    const isSuperAdmin = isUserSuperAdmin(user)
+
+    // Check if user has access to this property before proceeding
+    // Non-super-admin users must have explicit access to request deactivation
+    if (!isSuperAdmin) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PROPERTY,
+        PermissionAction.UPDATE,
+        id
+      )
+    }
+
     // Check if property is already deactivated
     if (!property.is_active) {
       throw new BadRequestException('Property is already deactivated')
     }
-
-    const isSuperAdmin = isUserSuperAdmin(user)
 
     // Non-super admin users must provide a reason
     if (!isSuperAdmin && !reason) {
@@ -1550,12 +1587,23 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Property not found')
     }
 
+    const isSuperAdmin = isUserSuperAdmin(user)
+
+    // Check if user has access to this property before proceeding
+    // Non-super-admin users must have explicit access to request activation
+    if (!isSuperAdmin) {
+      await this.permissionService.requirePermission(
+        user,
+        ModuleType.PROPERTY,
+        PermissionAction.UPDATE,
+        id
+      )
+    }
+
     // Check if property is already active
     if (property.is_active) {
       throw new BadRequestException('Property is already active')
     }
-
-    const isSuperAdmin = isUserSuperAdmin(user)
 
     // Non-super admin users must provide a reason
     if (!isSuperAdmin && !reason) {
@@ -3194,6 +3242,14 @@ export class PropertyService implements IPropertyService {
     ) {
       throw new NotFoundException('Property not found')
     }
+
+    // CRITICAL: Check if user has audit access before revealing audit statistics
+    // Users with audit_permission.access_level === 'none' should not see any audit data
+    await this.permissionService.requirePermission(
+      user,
+      ModuleType.AUDIT,
+      PermissionAction.READ
+    )
 
     // Aggregate audit amounts for this property
     const auditAggregates = await this.prisma.audit.aggregate({
