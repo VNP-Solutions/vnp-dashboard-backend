@@ -24,6 +24,7 @@ import { FileUploadModule } from './modules/file-upload/file-upload.module'
 import { GlobalReportModule } from './modules/global-report/global-report.module'
 import { NoteModule } from './modules/note/note.module'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
+import { PortfolioBankDetailsModule } from './modules/portfolio-bank-details/portfolio-bank-details.module'
 import { PrismaService } from './modules/prisma/prisma.service'
 import { PropertyBankDetailsModule } from './modules/property-bank-details/property-bank-details.module'
 import { PropertyCredentialsModule } from './modules/property-credentials/property-credentials.module'
@@ -55,6 +56,7 @@ import { UserModule } from './modules/user/user.module'
     GlobalReportModule,
     NoteModule,
     PortfolioModule,
+    PortfolioBankDetailsModule,
     TaskModule,
     PropertyBankDetailsModule,
     PropertyCredentialsModule,
