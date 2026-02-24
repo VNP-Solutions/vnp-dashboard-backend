@@ -124,14 +124,35 @@ export class AuditService implements IAuditService {
     // Round amount fields to 2 decimal places
     const createData = {
       ...data,
-      amount_collectable:
-        data.amount_collectable !== undefined &&
-        data.amount_collectable !== null
-          ? (roundToDecimals(data.amount_collectable) ?? undefined)
+      expedia_amount_collectable:
+        data.expedia_amount_collectable !== undefined &&
+        data.expedia_amount_collectable !== null
+          ? (roundToDecimals(data.expedia_amount_collectable) ?? undefined)
           : undefined,
-      amount_confirmed:
-        data.amount_confirmed !== undefined && data.amount_confirmed !== null
-          ? (roundToDecimals(data.amount_confirmed) ?? undefined)
+      expedia_amount_confirmed:
+        data.expedia_amount_confirmed !== undefined &&
+        data.expedia_amount_confirmed !== null
+          ? (roundToDecimals(data.expedia_amount_confirmed) ?? undefined)
+          : undefined,
+      agoda_amount_collectable:
+        data.agoda_amount_collectable !== undefined &&
+        data.agoda_amount_collectable !== null
+          ? (roundToDecimals(data.agoda_amount_collectable) ?? undefined)
+          : undefined,
+      agoda_amount_confirmed:
+        data.agoda_amount_confirmed !== undefined &&
+        data.agoda_amount_confirmed !== null
+          ? (roundToDecimals(data.agoda_amount_confirmed) ?? undefined)
+          : undefined,
+      booking_amount_collectable:
+        data.booking_amount_collectable !== undefined &&
+        data.booking_amount_collectable !== null
+          ? (roundToDecimals(data.booking_amount_collectable) ?? undefined)
+          : undefined,
+      booking_amount_confirmed:
+        data.booking_amount_confirmed !== undefined &&
+        data.booking_amount_confirmed !== null
+          ? (roundToDecimals(data.booking_amount_confirmed) ?? undefined)
           : undefined
     }
 
@@ -721,19 +742,28 @@ export class AuditService implements IAuditService {
     }
 
     // Check amount_confirmed update restriction for non-super-admin internal users
-    if (
-      data.amount_confirmed !== undefined &&
-      data.amount_confirmed !== null &&
-      !isUserSuperAdmin(user)
-    ) {
-      // If amount_confirmed is already set, non-super-admin internal users cannot update it
-      if (
-        audit.amount_confirmed !== null &&
-        audit.amount_confirmed !== undefined
-      ) {
-        throw new BadRequestException(
-          'Amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
-        )
+    if (!isUserSuperAdmin(user)) {
+      // For each OTA type, check if the amount_confirmed is already set
+      if (data.expedia_amount_confirmed !== undefined && data.expedia_amount_confirmed !== null) {
+        if (audit.expedia_amount_confirmed !== null && audit.expedia_amount_confirmed !== undefined) {
+          throw new BadRequestException(
+            'Expedia amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
+          )
+        }
+      }
+      if (data.agoda_amount_confirmed !== undefined && data.agoda_amount_confirmed !== null) {
+        if (audit.agoda_amount_confirmed !== null && audit.agoda_amount_confirmed !== undefined) {
+          throw new BadRequestException(
+            'Agoda amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
+          )
+        }
+      }
+      if (data.booking_amount_confirmed !== undefined && data.booking_amount_confirmed !== null) {
+        if (audit.booking_amount_confirmed !== null && audit.booking_amount_confirmed !== undefined) {
+          throw new BadRequestException(
+            'Booking amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
+          )
+        }
       }
     }
 
@@ -775,15 +805,36 @@ export class AuditService implements IAuditService {
     // Round amount fields to 2 decimal places if provided
     const updateData = {
       ...data,
-      amount_collectable:
-        data.amount_collectable !== undefined &&
-        data.amount_collectable !== null
-          ? (roundToDecimals(data.amount_collectable) ?? undefined)
-          : data.amount_collectable,
-      amount_confirmed:
-        data.amount_confirmed !== undefined && data.amount_confirmed !== null
-          ? (roundToDecimals(data.amount_confirmed) ?? undefined)
-          : data.amount_confirmed
+      expedia_amount_collectable:
+        data.expedia_amount_collectable !== undefined &&
+        data.expedia_amount_collectable !== null
+          ? (roundToDecimals(data.expedia_amount_collectable) ?? undefined)
+          : data.expedia_amount_collectable,
+      expedia_amount_confirmed:
+        data.expedia_amount_confirmed !== undefined &&
+        data.expedia_amount_confirmed !== null
+          ? (roundToDecimals(data.expedia_amount_confirmed) ?? undefined)
+          : data.expedia_amount_confirmed,
+      agoda_amount_collectable:
+        data.agoda_amount_collectable !== undefined &&
+        data.agoda_amount_collectable !== null
+          ? (roundToDecimals(data.agoda_amount_collectable) ?? undefined)
+          : data.agoda_amount_collectable,
+      agoda_amount_confirmed:
+        data.agoda_amount_confirmed !== undefined &&
+        data.agoda_amount_confirmed !== null
+          ? (roundToDecimals(data.agoda_amount_confirmed) ?? undefined)
+          : data.agoda_amount_confirmed,
+      booking_amount_collectable:
+        data.booking_amount_collectable !== undefined &&
+        data.booking_amount_collectable !== null
+          ? (roundToDecimals(data.booking_amount_collectable) ?? undefined)
+          : data.booking_amount_collectable,
+      booking_amount_confirmed:
+        data.booking_amount_confirmed !== undefined &&
+        data.booking_amount_confirmed !== null
+          ? (roundToDecimals(data.booking_amount_confirmed) ?? undefined)
+          : data.booking_amount_confirmed
     }
 
     return this.auditRepository.update(id, updateData)
@@ -825,13 +876,45 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Check if amount_confirmed is already set
-    if (
-      audit.amount_confirmed !== null &&
-      audit.amount_confirmed !== undefined
-    ) {
+    // Validate that at least one amount is provided
+    const hasAnyAmount =
+      data.expedia_amount_confirmed !== undefined ||
+      data.agoda_amount_confirmed !== undefined ||
+      data.booking_amount_confirmed !== undefined
+
+    if (!hasAnyAmount) {
       throw new BadRequestException(
-        'Amount confirmed is already set for this audit. You cannot request an update.'
+        'At least one OTA amount confirmed must be provided.'
+      )
+    }
+
+    // Check if any of the requested amounts are already set
+    const alreadySetAmounts: string[] = []
+    if (
+      data.expedia_amount_confirmed !== undefined &&
+      audit.expedia_amount_confirmed !== null &&
+      audit.expedia_amount_confirmed !== undefined
+    ) {
+      alreadySetAmounts.push('Expedia')
+    }
+    if (
+      data.agoda_amount_confirmed !== undefined &&
+      audit.agoda_amount_confirmed !== null &&
+      audit.agoda_amount_confirmed !== undefined
+    ) {
+      alreadySetAmounts.push('Agoda')
+    }
+    if (
+      data.booking_amount_confirmed !== undefined &&
+      audit.booking_amount_confirmed !== null &&
+      audit.booking_amount_confirmed !== undefined
+    ) {
+      alreadySetAmounts.push('Booking')
+    }
+
+    if (alreadySetAmounts.length > 0) {
+      throw new BadRequestException(
+        `The following amounts are already set for this audit: ${alreadySetAmounts.join(', ')}. You cannot request an update for these.`
       )
     }
 
@@ -844,16 +927,24 @@ export class AuditService implements IAuditService {
       )
     }
 
-    // Create the pending action with rounded amount
+    // Create the pending action with rounded amounts
+    const auditUpdateData: any = {}
+    if (data.expedia_amount_confirmed !== undefined) {
+      auditUpdateData.expedia_amount_confirmed = roundToDecimals(data.expedia_amount_confirmed) ?? data.expedia_amount_confirmed
+    }
+    if (data.agoda_amount_confirmed !== undefined) {
+      auditUpdateData.agoda_amount_confirmed = roundToDecimals(data.agoda_amount_confirmed) ?? data.agoda_amount_confirmed
+    }
+    if (data.booking_amount_confirmed !== undefined) {
+      auditUpdateData.booking_amount_confirmed = roundToDecimals(data.booking_amount_confirmed) ?? data.booking_amount_confirmed
+    }
+
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'audit',
       audit_id: id,
       action_type: PendingActionType.AUDIT_UPDATE_AMOUNT_CONFIRMED,
       requested_user_id: user.id,
-      audit_update_data: {
-        amount_confirmed:
-          roundToDecimals(data.amount_confirmed) ?? data.amount_confirmed
-      },
+      audit_update_data: auditUpdateData,
       reason: data.reason
     })
 
@@ -1273,48 +1364,129 @@ export class AuditService implements IAuditService {
             updateData.audit_status_id = auditStatus.id
           }
 
-          // Extract amount collectable (if provided)
-          const amountCollectableValue = findHeaderValue(row, [
-            'Amount Collectable',
-            'Amount collectable',
-            'amount_collectable',
-            'Collectable'
+          // Extract Expedia amount collectable (if provided)
+          const expediaAmountCollectableValue = findHeaderValue(row, [
+            'Expedia Amount Collectable',
+            'Expedia Collectable',
+            'expedia_amount_collectable'
           ])
-          if (amountCollectableValue) {
-            const amountCollectable = parseFloat(amountCollectableValue)
-            if (!isNaN(amountCollectable)) {
-              updateData.amount_collectable = roundToDecimals(amountCollectable)
+          if (expediaAmountCollectableValue) {
+            const expediaAmountCollectable = parseFloat(expediaAmountCollectableValue)
+            if (!isNaN(expediaAmountCollectable)) {
+              updateData.expedia_amount_collectable = roundToDecimals(expediaAmountCollectable)
             }
           }
 
-          // Extract amount confirmed (if provided)
-          const amountConfirmedValue = findHeaderValue(row, [
-            'Amount Confirmed',
-            'Amount confirmed',
-            'amount_confirmed',
-            'Confirmed'
+          // Extract Expedia amount confirmed (if provided)
+          const expediaAmountConfirmedValue = findHeaderValue(row, [
+            'Expedia Amount Confirmed',
+            'Expedia Confirmed',
+            'expedia_amount_confirmed'
           ])
-          if (amountConfirmedValue) {
-            const amountConfirmed = parseFloat(amountConfirmedValue)
-            if (!isNaN(amountConfirmed)) {
-              // Check amount_confirmed update restriction for non-super-admin internal users
+          if (expediaAmountConfirmedValue) {
+            const expediaAmountConfirmed = parseFloat(expediaAmountConfirmedValue)
+            if (!isNaN(expediaAmountConfirmed)) {
+              // Check expedia_amount_confirmed update restriction for non-super-admin internal users
               if (!isUserSuperAdmin(user)) {
-                // If amount_confirmed is already set, non-super-admin internal users cannot update it
                 if (
-                  existingAudit.amount_confirmed !== null &&
-                  existingAudit.amount_confirmed !== undefined
+                  existingAudit.expedia_amount_confirmed !== null &&
+                  existingAudit.expedia_amount_confirmed !== undefined
                 ) {
                   result.errors.push({
                     row: rowNumber,
                     auditId: auditIdValue,
                     error:
-                      'Amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
+                      'Expedia amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
                   })
                   result.failureCount++
                   continue
                 }
               }
-              updateData.amount_confirmed = roundToDecimals(amountConfirmed)
+              updateData.expedia_amount_confirmed = roundToDecimals(expediaAmountConfirmed)
+            }
+          }
+
+          // Extract Agoda amount collectable (if provided)
+          const agodaAmountCollectableValue = findHeaderValue(row, [
+            'Agoda Amount Collectable',
+            'Agoda Collectable',
+            'agoda_amount_collectable'
+          ])
+          if (agodaAmountCollectableValue) {
+            const agodaAmountCollectable = parseFloat(agodaAmountCollectableValue)
+            if (!isNaN(agodaAmountCollectable)) {
+              updateData.agoda_amount_collectable = roundToDecimals(agodaAmountCollectable)
+            }
+          }
+
+          // Extract Agoda amount confirmed (if provided)
+          const agodaAmountConfirmedValue = findHeaderValue(row, [
+            'Agoda Amount Confirmed',
+            'Agoda Confirmed',
+            'agoda_amount_confirmed'
+          ])
+          if (agodaAmountConfirmedValue) {
+            const agodaAmountConfirmed = parseFloat(agodaAmountConfirmedValue)
+            if (!isNaN(agodaAmountConfirmed)) {
+              // Check agoda_amount_confirmed update restriction for non-super-admin internal users
+              if (!isUserSuperAdmin(user)) {
+                if (
+                  existingAudit.agoda_amount_confirmed !== null &&
+                  existingAudit.agoda_amount_confirmed !== undefined
+                ) {
+                  result.errors.push({
+                    row: rowNumber,
+                    auditId: auditIdValue,
+                    error:
+                      'Agoda amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
+                  })
+                  result.failureCount++
+                  continue
+                }
+              }
+              updateData.agoda_amount_confirmed = roundToDecimals(agodaAmountConfirmed)
+            }
+          }
+
+          // Extract Booking amount collectable (if provided)
+          const bookingAmountCollectableValue = findHeaderValue(row, [
+            'Booking Amount Collectable',
+            'Booking Collectable',
+            'booking_amount_collectable'
+          ])
+          if (bookingAmountCollectableValue) {
+            const bookingAmountCollectable = parseFloat(bookingAmountCollectableValue)
+            if (!isNaN(bookingAmountCollectable)) {
+              updateData.booking_amount_collectable = roundToDecimals(bookingAmountCollectable)
+            }
+          }
+
+          // Extract Booking amount confirmed (if provided)
+          const bookingAmountConfirmedValue = findHeaderValue(row, [
+            'Booking Amount Confirmed',
+            'Booking Confirmed',
+            'booking_amount_confirmed'
+          ])
+          if (bookingAmountConfirmedValue) {
+            const bookingAmountConfirmed = parseFloat(bookingAmountConfirmedValue)
+            if (!isNaN(bookingAmountConfirmed)) {
+              // Check booking_amount_confirmed update restriction for non-super-admin internal users
+              if (!isUserSuperAdmin(user)) {
+                if (
+                  existingAudit.booking_amount_confirmed !== null &&
+                  existingAudit.booking_amount_confirmed !== undefined
+                ) {
+                  result.errors.push({
+                    row: rowNumber,
+                    auditId: auditIdValue,
+                    error:
+                      'Booking amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
+                  })
+                  result.failureCount++
+                  continue
+                }
+              }
+              updateData.booking_amount_confirmed = roundToDecimals(bookingAmountConfirmed)
             }
           }
 
@@ -1891,32 +2063,82 @@ export class AuditService implements IAuditService {
             })
           }
 
-          // Extract amount collectable
-          const amountCollectableValue = findHeaderValue(row, [
-            'Amount Collectable',
-            'Amount collectable',
-            'amount_collectable',
-            'Collectable'
+          // Extract Expedia amount collectable
+          const expediaAmountCollectableValue = findHeaderValue(row, [
+            'Expedia Amount Collectable',
+            'Expedia Collectable',
+            'expedia_amount_collectable'
           ])
-          const parsedCollectable = amountCollectableValue
-            ? parseFloat(amountCollectableValue)
+          const parsedExpediaCollectable = expediaAmountCollectableValue
+            ? parseFloat(expediaAmountCollectableValue)
             : NaN
-          const amountCollectable = !isNaN(parsedCollectable)
-            ? (roundToDecimals(parsedCollectable) ?? undefined)
+          const expediaAmountCollectable = !isNaN(parsedExpediaCollectable)
+            ? (roundToDecimals(parsedExpediaCollectable) ?? undefined)
             : undefined
 
-          // Extract amount confirmed
-          const amountConfirmedValue = findHeaderValue(row, [
-            'Amount Confirmed',
-            'Amount confirmed',
-            'amount_confirmed',
-            'Confirmed'
+          // Extract Expedia amount confirmed
+          const expediaAmountConfirmedValue = findHeaderValue(row, [
+            'Expedia Amount Confirmed',
+            'Expedia Confirmed',
+            'expedia_amount_confirmed'
           ])
-          const parsedConfirmed = amountConfirmedValue
-            ? parseFloat(amountConfirmedValue)
+          const parsedExpediaConfirmed = expediaAmountConfirmedValue
+            ? parseFloat(expediaAmountConfirmedValue)
             : NaN
-          const amountConfirmed = !isNaN(parsedConfirmed)
-            ? (roundToDecimals(parsedConfirmed) ?? undefined)
+          const expediaAmountConfirmed = !isNaN(parsedExpediaConfirmed)
+            ? (roundToDecimals(parsedExpediaConfirmed) ?? undefined)
+            : undefined
+
+          // Extract Agoda amount collectable
+          const agodaAmountCollectableValue = findHeaderValue(row, [
+            'Agoda Amount Collectable',
+            'Agoda Collectable',
+            'agoda_amount_collectable'
+          ])
+          const parsedAgodaCollectable = agodaAmountCollectableValue
+            ? parseFloat(agodaAmountCollectableValue)
+            : NaN
+          const agodaAmountCollectable = !isNaN(parsedAgodaCollectable)
+            ? (roundToDecimals(parsedAgodaCollectable) ?? undefined)
+            : undefined
+
+          // Extract Agoda amount confirmed
+          const agodaAmountConfirmedValue = findHeaderValue(row, [
+            'Agoda Amount Confirmed',
+            'Agoda Confirmed',
+            'agoda_amount_confirmed'
+          ])
+          const parsedAgodaConfirmed = agodaAmountConfirmedValue
+            ? parseFloat(agodaAmountConfirmedValue)
+            : NaN
+          const agodaAmountConfirmed = !isNaN(parsedAgodaConfirmed)
+            ? (roundToDecimals(parsedAgodaConfirmed) ?? undefined)
+            : undefined
+
+          // Extract Booking amount collectable
+          const bookingAmountCollectableValue = findHeaderValue(row, [
+            'Booking Amount Collectable',
+            'Booking Collectable',
+            'booking_amount_collectable'
+          ])
+          const parsedBookingCollectable = bookingAmountCollectableValue
+            ? parseFloat(bookingAmountCollectableValue)
+            : NaN
+          const bookingAmountCollectable = !isNaN(parsedBookingCollectable)
+            ? (roundToDecimals(parsedBookingCollectable) ?? undefined)
+            : undefined
+
+          // Extract Booking amount confirmed
+          const bookingAmountConfirmedValue = findHeaderValue(row, [
+            'Booking Amount Confirmed',
+            'Booking Confirmed',
+            'booking_amount_confirmed'
+          ])
+          const parsedBookingConfirmed = bookingAmountConfirmedValue
+            ? parseFloat(bookingAmountConfirmedValue)
+            : NaN
+          const bookingAmountConfirmed = !isNaN(parsedBookingConfirmed)
+            ? (roundToDecimals(parsedBookingConfirmed) ?? undefined)
             : undefined
 
           // Extract start date (use raw value to preserve Excel date format) - optional
@@ -2023,8 +2245,12 @@ export class AuditService implements IAuditService {
             start_date: startDate ? startDate.toISOString() : undefined,
             end_date: endDate ? endDate.toISOString() : undefined,
             type_of_ota: typeOfOtaArray.length > 0 ? typeOfOtaArray : undefined,
-            amount_collectable: amountCollectable,
-            amount_confirmed: amountConfirmed,
+            expedia_amount_collectable: expediaAmountCollectable,
+            expedia_amount_confirmed: expediaAmountConfirmed,
+            agoda_amount_collectable: agodaAmountCollectable,
+            agoda_amount_confirmed: agodaAmountConfirmed,
+            booking_amount_collectable: bookingAmountCollectable,
+            booking_amount_confirmed: bookingAmountConfirmed,
             report_url: reportUrl,
             batch_id: batchId
           }
@@ -2169,8 +2395,12 @@ export class AuditService implements IAuditService {
       where: whereClause,
       select: {
         type_of_ota: true,
-        amount_collectable: true,
-        amount_confirmed: true
+        expedia_amount_collectable: true,
+        expedia_amount_confirmed: true,
+        agoda_amount_collectable: true,
+        agoda_amount_confirmed: true,
+        booking_amount_collectable: true,
+        booking_amount_confirmed: true
       }
     })
 
@@ -2201,31 +2431,26 @@ export class AuditService implements IAuditService {
       agoda: 0
     }
 
-    // Process each audit and count amounts by OTA type
-    // Note: An audit with multiple OTA types contributes to each OTA's total
+    // Process each audit and sum amounts by OTA type
     audits.forEach(audit => {
-      const collectableAmount = audit.amount_collectable || 0
-      const confirmedAmount = audit.amount_confirmed || 0
+      const expediaCollectable = audit.expedia_amount_collectable || 0
+      const expediaConfirmed = audit.expedia_amount_confirmed || 0
+      const agodaCollectable = audit.agoda_amount_collectable || 0
+      const agodaConfirmed = audit.agoda_amount_confirmed || 0
+      const bookingCollectable = audit.booking_amount_collectable || 0
+      const bookingConfirmed = audit.booking_amount_confirmed || 0
 
-      // Add to total (each audit counted once for total)
-      amountCollectable.total += collectableAmount
-      amountConfirmed.total += confirmedAmount
+      // Add to each OTA type's total
+      amountCollectable.expedia += expediaCollectable
+      amountConfirmed.expedia += expediaConfirmed
+      amountCollectable.agoda += agodaCollectable
+      amountConfirmed.agoda += agodaConfirmed
+      amountCollectable.booking += bookingCollectable
+      amountConfirmed.booking += bookingConfirmed
 
-      // Add to each OTA type's total if present in the array
-      if (audit.type_of_ota && Array.isArray(audit.type_of_ota)) {
-        audit.type_of_ota.forEach((ota: string) => {
-          if (ota === 'expedia') {
-            amountCollectable.expedia += collectableAmount
-            amountConfirmed.expedia += confirmedAmount
-          } else if (ota === 'booking') {
-            amountCollectable.booking += collectableAmount
-            amountConfirmed.booking += confirmedAmount
-          } else if (ota === 'agoda') {
-            amountCollectable.agoda += collectableAmount
-            amountConfirmed.agoda += confirmedAmount
-          }
-        })
-      }
+      // Calculate total (sum of all OTA types)
+      amountCollectable.total += expediaCollectable + agodaCollectable + bookingCollectable
+      amountConfirmed.total += expediaConfirmed + agodaConfirmed + bookingConfirmed
     })
 
     // Round all amounts to 2 decimal places

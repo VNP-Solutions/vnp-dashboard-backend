@@ -380,24 +380,51 @@ export class PendingActionService implements IPendingActionService {
         break
 
       case PendingActionType.AUDIT_UPDATE_AMOUNT_CONFIRMED:
-        // Update the audit's amount_confirmed field
+        // Update the audit's amount_confirmed fields for each OTA type
         if (!pendingAction.audit_id) {
           throw new BadRequestException(
             'Audit ID is missing for AUDIT_UPDATE_AMOUNT_CONFIRMED action'
           )
         }
-        if (!pendingAction.audit_update_data?.amount_confirmed) {
+        if (!pendingAction.audit_update_data) {
           throw new BadRequestException(
             'Audit update data is missing for AUDIT_UPDATE_AMOUNT_CONFIRMED action'
           )
         }
+
+        // Check that at least one amount is provided
+        const hasAnyAmount =
+          pendingAction.audit_update_data.expedia_amount_confirmed !== undefined ||
+          pendingAction.audit_update_data.agoda_amount_confirmed !== undefined ||
+          pendingAction.audit_update_data.booking_amount_confirmed !== undefined
+
+        if (!hasAnyAmount) {
+          throw new BadRequestException(
+            'At least one OTA amount confirmed must be provided in audit update data'
+          )
+        }
+
+        // Build update data with only the fields that are provided
+        const updateData: any = {}
+        if (pendingAction.audit_update_data.expedia_amount_confirmed !== undefined) {
+          updateData.expedia_amount_confirmed = roundToDecimals(
+            pendingAction.audit_update_data.expedia_amount_confirmed
+          )
+        }
+        if (pendingAction.audit_update_data.agoda_amount_confirmed !== undefined) {
+          updateData.agoda_amount_confirmed = roundToDecimals(
+            pendingAction.audit_update_data.agoda_amount_confirmed
+          )
+        }
+        if (pendingAction.audit_update_data.booking_amount_confirmed !== undefined) {
+          updateData.booking_amount_confirmed = roundToDecimals(
+            pendingAction.audit_update_data.booking_amount_confirmed
+          )
+        }
+
         await this.prisma.audit.update({
           where: { id: pendingAction.audit_id },
-          data: {
-            amount_confirmed: roundToDecimals(
-              pendingAction.audit_update_data.amount_confirmed
-            )
-          }
+          data: updateData
         })
         break
 
