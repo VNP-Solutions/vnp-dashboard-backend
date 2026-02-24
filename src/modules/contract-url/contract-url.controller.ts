@@ -44,14 +44,16 @@ export class ContractUrlController {
 
   @Post()
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
-  @ApiOperation({ summary: 'Create a new contract URL (Super Admin only)' })
+  @ApiOperation({
+    summary: 'Create a new contract URL (Super Admin or internal users with portfolio update permission and partial access)'
+  })
   @ApiResponse({
     status: 201,
     description: 'Contract URL created successfully'
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only Super Admin can upload contracts'
+    description: 'Forbidden - Only Super Admin or internal users with portfolio update permission and partial access can upload contracts'
   })
   create(
     @Body() createContractUrlDto: CreateContractUrlDto,

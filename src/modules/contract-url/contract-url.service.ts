@@ -64,9 +64,38 @@ export class ContractUrlService implements IContractUrlService {
   }
 
   async create(data: CreateContractUrlDto, user: IUserWithPermissions) {
-    // Only super admin can upload/create contract URLs
+    // Check if user can upload contract URLs
+    // - Super admin can always upload
+    // - Internal users with portfolio permission level 'update' or 'all' and access level 'partial' or 'all' can upload
     if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException('Only Super Admin can upload contract URLs')
+      // Must be internal user
+      if (user.role.is_external !== false) {
+        throw new ForbiddenException('Only Super Admin or internal users can upload contract URLs')
+      }
+
+      const portfolioPermission = user.role.portfolio_permission
+
+      if (!portfolioPermission) {
+        throw new ForbiddenException('No portfolio permission found')
+      }
+
+      // Check permission level: must be 'update' or 'all'
+      const hasUpdatePermission =
+        portfolioPermission.permission_level === PermissionLevel.update ||
+        portfolioPermission.permission_level === PermissionLevel.all
+
+      if (!hasUpdatePermission) {
+        throw new ForbiddenException('Portfolio permission level must be update or all')
+      }
+
+      // Check access level: must be 'partial' or 'all'
+      const hasPartialAccess =
+        portfolioPermission.access_level === AccessLevel.partial ||
+        portfolioPermission.access_level === AccessLevel.all
+
+      if (!hasPartialAccess) {
+        throw new ForbiddenException('Portfolio access level must be partial or all')
+      }
     }
 
     // Verify user has access to the portfolio
