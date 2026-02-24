@@ -26,19 +26,39 @@ export function roundToDecimals(value: number | null | undefined): number | null
 
 /**
  * Round all amount fields in an audit object to 2 decimal places
- * @param audit - Audit object with amount_collectable and/or amount_confirmed
+ * @param audit - Audit object with OTA-specific amount fields
  * @returns The same audit object with rounded amounts
  */
 export function roundAuditAmounts<T extends {
-  amount_collectable?: number | null
-  amount_confirmed?: number | null
+  expedia_amount_collectable?: number | null
+  expedia_amount_confirmed?: number | null
+  agoda_amount_collectable?: number | null
+  agoda_amount_confirmed?: number | null
+  booking_amount_collectable?: number | null
+  booking_amount_confirmed?: number | null
 }>(audit: T): T {
-  if (audit.amount_collectable !== null && audit.amount_collectable !== undefined) {
-    audit.amount_collectable = roundToDecimals(audit.amount_collectable)
+  if (audit.expedia_amount_collectable !== null && audit.expedia_amount_collectable !== undefined) {
+    audit.expedia_amount_collectable = roundToDecimals(audit.expedia_amount_collectable)
   }
 
-  if (audit.amount_confirmed !== null && audit.amount_confirmed !== undefined) {
-    audit.amount_confirmed = roundToDecimals(audit.amount_confirmed)
+  if (audit.expedia_amount_confirmed !== null && audit.expedia_amount_confirmed !== undefined) {
+    audit.expedia_amount_confirmed = roundToDecimals(audit.expedia_amount_confirmed)
+  }
+
+  if (audit.agoda_amount_collectable !== null && audit.agoda_amount_collectable !== undefined) {
+    audit.agoda_amount_collectable = roundToDecimals(audit.agoda_amount_collectable)
+  }
+
+  if (audit.agoda_amount_confirmed !== null && audit.agoda_amount_confirmed !== undefined) {
+    audit.agoda_amount_confirmed = roundToDecimals(audit.agoda_amount_confirmed)
+  }
+
+  if (audit.booking_amount_collectable !== null && audit.booking_amount_collectable !== undefined) {
+    audit.booking_amount_collectable = roundToDecimals(audit.booking_amount_collectable)
+  }
+
+  if (audit.booking_amount_confirmed !== null && audit.booking_amount_confirmed !== undefined) {
+    audit.booking_amount_confirmed = roundToDecimals(audit.booking_amount_confirmed)
   }
 
   return audit

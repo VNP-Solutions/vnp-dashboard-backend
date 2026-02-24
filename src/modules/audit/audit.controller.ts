@@ -178,21 +178,25 @@ export class AuditController {
     summary: 'Bulk update audits from Excel file (Internal users only)',
     description: `
     Upload an Excel file (.xlsx or .xls) to bulk update existing audits.
-    
+
     Required column:
     - Audit ID/Audit Id/Audit id/ID/Id/id: ID of the audit to update (must exist)
-    
+
     Optional columns (only update if provided):
     - Property Name/Property name/Property/Name: Name of the property (must exist)
     - OTA/OTA Type/Ota Type/Ota type: OTA type (expedia, agoda, booking)
     - Audit Status/Audit status/Status: Status name (will be created if doesn't exist)
-    - Amount Collectable/Amount collectable/amount_collectable: Collectable amount
-    - Amount Confirmed/Amount confirmed/amount_confirmed: Confirmed amount (Note: Non-super-admin internal users can only set this once. Once it has been set, only super admins can update it.)
+    - Expedia Amount Collectable/Expedia Collectable/expedia_amount_collectable: Expedia collectable amount
+    - Expedia Amount Confirmed/Expedia Confirmed/expedia_amount_confirmed: Expedia confirmed amount (Note: Non-super-admin internal users can only set this once. Once it has been set, only super admins can update it.)
+    - Agoda Amount Collectable/Agoda Collectable/agoda_amount_collectable: Agoda collectable amount
+    - Agoda Amount Confirmed/Agoda Confirmed/agoda_amount_confirmed: Agoda confirmed amount (Note: Non-super-admin internal users can only set this once. Once it has been set, only super admins can update it.)
+    - Booking Amount Collectable/Booking Collectable/booking_amount_collectable: Booking collectable amount
+    - Booking Amount Confirmed/Booking Confirmed/booking_amount_confirmed: Booking confirmed amount (Note: Non-super-admin internal users can only set this once. Once it has been set, only super admins can update it.)
     - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
     - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)
     - Report URL/Report url/report_url/Report/URL: Report URL
     - Batch/Batch No: Batch number (will be created if doesn't exist)
-    
+
     Note: Empty cells will keep existing values unchanged.
     `
   })
@@ -344,8 +348,12 @@ export class AuditController {
     - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
     - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)
     - OTA/OTA Type/Ota Type/Ota type: OTA type (expedia, agoda, booking)
-    - Amount Collectable/Amount collectable/amount_collectable: Collectable amount
-    - Amount Confirmed/Amount confirmed/amount_confirmed: Confirmed amount
+    - Expedia Amount Collectable/Expedia Collectable/expedia_amount_collectable: Expedia collectable amount
+    - Expedia Amount Confirmed/Expedia Confirmed/expedia_amount_confirmed: Expedia confirmed amount
+    - Agoda Amount Collectable/Agoda Collectable/agoda_amount_collectable: Agoda collectable amount
+    - Agoda Amount Confirmed/Agoda Confirmed/agoda_amount_confirmed: Agoda confirmed amount
+    - Booking Amount Collectable/Booking Collectable/booking_amount_collectable: Booking collectable amount
+    - Booking Amount Confirmed/Booking Confirmed/booking_amount_confirmed: Booking confirmed amount
     - Report URL/Report url/report_url/Report/URL: Report URL
     - Batch/Batch No: Batch number (will be created if doesn't exist)
 
@@ -601,7 +609,7 @@ export class AuditController {
   @ApiOperation({
     summary: 'Update an audit (Internal users only)',
     description:
-      'Only internal users can update audits. This includes editing audit details and adding audits to batches. Note: Non-super-admin internal users can only set amount_confirmed once. Once it has been set, only super admins can update it.'
+      'Only internal users can update audits. This includes editing audit details and adding audits to batches. Note: Non-super-admin internal users can only set amount_confirmed fields once per OTA type. Once an OTA type\'s amount_confirmed has been set, only super admins can update it.'
   })
   @ApiResponse({ status: 200, description: 'Audit updated successfully' })
   @ApiResponse({ status: 404, description: 'Audit not found' })
@@ -612,7 +620,7 @@ export class AuditController {
   @ApiResponse({
     status: 400,
     description:
-      'Bad Request - Invalid data or attempting to update amount_confirmed when it is already set (non-super-admin users only)'
+      'Bad Request - Invalid data or attempting to update OTA amount_confirmed when it is already set (non-super-admin users only)'
   })
   update(
     @Param('id') id: string,
@@ -626,7 +634,7 @@ export class AuditController {
   @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Request to update amount confirmed (external users only, when amount_confirmed is not set). Creates a pending action for super admin approval.'
+      'Request to update amount confirmed for specific OTA types (external users only, when the amount is not yet set). Creates a pending action for super admin approval. At least one OTA amount must be provided.'
   })
   @ApiResponse({
     status: 201,

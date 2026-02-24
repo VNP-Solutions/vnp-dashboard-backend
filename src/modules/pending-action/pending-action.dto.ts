@@ -66,7 +66,9 @@ export class CreatePendingActionDto {
   })
   @IsOptional()
   audit_update_data?: {
-    amount_confirmed: number
+    expedia_amount_confirmed?: number
+    agoda_amount_confirmed?: number
+    booking_amount_confirmed?: number
   }
 
   @ApiPropertyOptional({

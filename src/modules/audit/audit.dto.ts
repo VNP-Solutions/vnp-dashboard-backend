@@ -42,21 +42,56 @@ export class CreateAuditDto {
   @IsNotEmpty()
   audit_status_id: string
 
+  // Expedia amounts
   @ApiPropertyOptional({
     example: 5000.50,
-    description: 'Amount collectable'
+    description: 'Expedia amount collectable'
   })
   @IsNumber()
   @IsOptional()
-  amount_collectable?: number
+  expedia_amount_collectable?: number
 
   @ApiPropertyOptional({
     example: 4500.75,
-    description: 'Amount confirmed'
+    description: 'Expedia amount confirmed'
   })
   @IsNumber()
   @IsOptional()
-  amount_confirmed?: number
+  expedia_amount_confirmed?: number
+
+  // Agoda amounts
+  @ApiPropertyOptional({
+    example: 3000.00,
+    description: 'Agoda amount collectable'
+  })
+  @IsNumber()
+  @IsOptional()
+  agoda_amount_collectable?: number
+
+  @ApiPropertyOptional({
+    example: 2800.50,
+    description: 'Agoda amount confirmed'
+  })
+  @IsNumber()
+  @IsOptional()
+  agoda_amount_confirmed?: number
+
+  // Booking amounts
+  @ApiPropertyOptional({
+    example: 2000.00,
+    description: 'Booking amount collectable'
+  })
+  @IsNumber()
+  @IsOptional()
+  booking_amount_collectable?: number
+
+  @ApiPropertyOptional({
+    example: 1900.25,
+    description: 'Booking amount confirmed'
+  })
+  @IsNumber()
+  @IsOptional()
+  booking_amount_confirmed?: number
 
   @ApiPropertyOptional({
     example: '2024-01-01T00:00:00Z',
@@ -337,13 +372,30 @@ export class RequestUpdateAmountConfirmedDto {
   @IsNotEmpty()
   password: string
 
-  @ApiProperty({
+  // At least one OTA amount confirmed must be provided
+  @ApiPropertyOptional({
     example: 5000.50,
-    description: 'New amount confirmed value'
+    description: 'New Expedia amount confirmed value'
   })
   @IsNumber()
-  @IsNotEmpty()
-  amount_confirmed: number
+  @IsOptional()
+  expedia_amount_confirmed?: number
+
+  @ApiPropertyOptional({
+    example: 3000.00,
+    description: 'New Agoda amount confirmed value'
+  })
+  @IsNumber()
+  @IsOptional()
+  agoda_amount_confirmed?: number
+
+  @ApiPropertyOptional({
+    example: 2000.00,
+    description: 'New Booking amount confirmed value'
+  })
+  @IsNumber()
+  @IsOptional()
+  booking_amount_confirmed?: number
 
   @ApiPropertyOptional({
     description: 'Optional reason for the change request'

@@ -32,7 +32,9 @@ type PendingActionWithRelations = Prisma.PendingActionGetPayload<{
       select: {
         id: true
         type_of_ota: true
-        amount_confirmed: true
+        expedia_amount_confirmed: true
+        agoda_amount_confirmed: true
+        booking_amount_confirmed: true
         property: {
           select: {
             id: true
@@ -87,7 +89,9 @@ export interface IPendingActionRepository {
       }
     }
     audit_update_data?: {
-      amount_confirmed: number
+      expedia_amount_confirmed?: number
+      agoda_amount_confirmed?: number
+      booking_amount_confirmed?: number
     }
     reason?: string
   }): Promise<PendingActionWithRelations>

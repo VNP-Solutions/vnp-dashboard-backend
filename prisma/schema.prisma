@@ -121,21 +121,25 @@ model Otp {
 }
 
 model Audit {
-  id                 String       @id @default(auto()) @map("_id") @db.ObjectId
-  type_of_ota        OtaType[]    @default([])
-  billing_type       BillingType?
-  audit_status_id    String       @db.ObjectId
-  auditStatus        AuditStatus  @relation(fields: [audit_status_id], references: [id])
-  amount_collectable Float?
-  amount_confirmed   Float?
-  is_archived        Boolean      @default(false)
-  start_date         DateTime?
-  end_date           DateTime?
-  property_id        String       @db.ObjectId
-  property           Property     @relation(fields: [property_id], references: [id], onDelete: Cascade)
-  batch_id           String?      @db.ObjectId
-  batch              AuditBatch?  @relation(fields: [batch_id], references: [id])
-  report_url         String?
+  id                      String       @id @default(auto()) @map("_id") @db.ObjectId
+  type_of_ota             OtaType[]    @default([])
+  billing_type            BillingType?
+  audit_status_id         String       @db.ObjectId
+  auditStatus             AuditStatus  @relation(fields: [audit_status_id], references: [id])
+  expedia_amount_collectable Float?
+  expedia_amount_confirmed  Float?
+  agoda_amount_collectable  Float?
+  agoda_amount_confirmed    Float?
+  booking_amount_collectable Float?
+  booking_amount_confirmed  Float?
+  is_archived             Boolean      @default(false)
+  start_date              DateTime?
+  end_date                DateTime?
+  property_id             String       @db.ObjectId
+  property                Property     @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  batch_id                String?      @db.ObjectId
+  batch                   AuditBatch?  @relation(fields: [batch_id], references: [id])
+  report_url              String?
 
   notes          Note[]
   tasks          Task[]
@@ -519,7 +523,9 @@ type PortfolioInfo {
 }
 
 type AuditUpdateData {
-  amount_confirmed Float
+  expedia_amount_confirmed Float?
+  agoda_amount_confirmed Float?
+  booking_amount_confirmed Float?
 }
 
 model PendingAction {
