@@ -1,5 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
+import { Injectable, Logger, Inject } from '@nestjs/common'
+import { Cron } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
 import { EmailUtil } from '../../common/utils/email.util'
 import {
@@ -12,7 +12,7 @@ export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name)
 
   constructor(
-    @Inject('PrismaService') private prisma: PrismaService,
+    private prisma: PrismaService,
     @Inject(EmailUtil) private emailUtil: EmailUtil
   ) {}
 
