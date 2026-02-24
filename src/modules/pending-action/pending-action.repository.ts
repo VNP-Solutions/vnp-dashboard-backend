@@ -1,67 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
-import type { IPendingActionRepository } from './pending-action.interface'
-
-type PendingActionWithRelations = Prisma.PendingActionGetPayload<{
-  include: {
-    property: {
-      select: {
-        id: true
-        name: true
-        portfolio_id: true
-        portfolio: {
-          select: {
-            id: true
-            name: true
-          }
-        }
-      }
-    }
-    portfolio: {
-      select: {
-        id: true
-        name: true
-      }
-    }
-    audit: {
-      select: {
-        id: true
-        type_of_ota: true
-        amount_confirmed: true
-        property: {
-          select: {
-            id: true
-            name: true
-            portfolio: {
-              select: {
-                id: true
-                name: true
-                contact_email: true
-              }
-            }
-          }
-        }
-      }
-    }
-    requestedBy: {
-      select: {
-        id: true
-        email: true
-        first_name: true
-        last_name: true
-      }
-    }
-    approvedBy: {
-      select: {
-        id: true
-        email: true
-        first_name: true
-        last_name: true
-      }
-    }
-  }
-}>
+import type { IPendingActionRepository, PendingActionWithRelations } from './pending-action.interface'
 
 @Injectable()
 export class PendingActionRepository implements IPendingActionRepository {
@@ -86,7 +26,9 @@ export class PendingActionRepository implements IPendingActionRepository {
       }
     }
     audit_update_data?: {
-      amount_confirmed: number
+      expedia_amount_confirmed?: number
+      agoda_amount_confirmed?: number
+      booking_amount_confirmed?: number
     }
     reason?: string
   }): Promise<PendingActionWithRelations> {
@@ -107,7 +49,9 @@ export class PendingActionRepository implements IPendingActionRepository {
           : undefined,
         audit_update_data: data.audit_update_data
           ? {
-              amount_confirmed: data.audit_update_data.amount_confirmed
+              expedia_amount_confirmed: data.audit_update_data.expedia_amount_confirmed,
+              agoda_amount_confirmed: data.audit_update_data.agoda_amount_confirmed,
+              booking_amount_confirmed: data.audit_update_data.booking_amount_confirmed
             }
           : undefined,
         reason: data.reason,
@@ -137,7 +81,12 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             type_of_ota: true,
-            amount_confirmed: true,
+            expedia_amount_collectable: true,
+            expedia_amount_confirmed: true,
+            agoda_amount_collectable: true,
+            agoda_amount_confirmed: true,
+            booking_amount_collectable: true,
+            booking_amount_confirmed: true,
             property: {
               select: {
                 id: true,
@@ -206,7 +155,12 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             type_of_ota: true,
-            amount_confirmed: true,
+            expedia_amount_collectable: true,
+            expedia_amount_confirmed: true,
+            agoda_amount_collectable: true,
+            agoda_amount_confirmed: true,
+            booking_amount_collectable: true,
+            booking_amount_confirmed: true,
             property: {
               select: {
                 id: true,
@@ -277,7 +231,12 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             type_of_ota: true,
-            amount_confirmed: true,
+            expedia_amount_collectable: true,
+            expedia_amount_confirmed: true,
+            agoda_amount_collectable: true,
+            agoda_amount_confirmed: true,
+            booking_amount_collectable: true,
+            booking_amount_confirmed: true,
             property: {
               select: {
                 id: true,
@@ -354,7 +313,12 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             type_of_ota: true,
-            amount_confirmed: true,
+            expedia_amount_collectable: true,
+            expedia_amount_confirmed: true,
+            agoda_amount_collectable: true,
+            agoda_amount_confirmed: true,
+            booking_amount_collectable: true,
+            booking_amount_confirmed: true,
             property: {
               select: {
                 id: true,
@@ -422,7 +386,12 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             type_of_ota: true,
-            amount_confirmed: true,
+            expedia_amount_collectable: true,
+            expedia_amount_confirmed: true,
+            agoda_amount_collectable: true,
+            agoda_amount_confirmed: true,
+            booking_amount_collectable: true,
+            booking_amount_confirmed: true,
             property: {
               select: {
                 id: true,
@@ -491,7 +460,12 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             type_of_ota: true,
-            amount_confirmed: true,
+            expedia_amount_collectable: true,
+            expedia_amount_confirmed: true,
+            agoda_amount_collectable: true,
+            agoda_amount_confirmed: true,
+            booking_amount_collectable: true,
+            booking_amount_confirmed: true,
             property: {
               select: {
                 id: true,
@@ -558,7 +532,12 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             type_of_ota: true,
-            amount_confirmed: true,
+            expedia_amount_collectable: true,
+            expedia_amount_confirmed: true,
+            agoda_amount_collectable: true,
+            agoda_amount_confirmed: true,
+            booking_amount_collectable: true,
+            booking_amount_confirmed: true,
             property: {
               select: {
                 id: true,
@@ -624,7 +603,12 @@ export class PendingActionRepository implements IPendingActionRepository {
           select: {
             id: true,
             type_of_ota: true,
-            amount_confirmed: true,
+            expedia_amount_collectable: true,
+            expedia_amount_confirmed: true,
+            agoda_amount_collectable: true,
+            agoda_amount_confirmed: true,
+            booking_amount_collectable: true,
+            booking_amount_confirmed: true,
             property: {
               select: {
                 id: true,

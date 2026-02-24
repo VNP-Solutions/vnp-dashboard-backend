@@ -260,19 +260,31 @@ export class PortfolioStatsAuditDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Audit ID' })
   id: string
 
-  @ApiProperty({ 
-    example: ['expedia', 'agoda'], 
+  @ApiProperty({
+    example: ['expedia', 'agoda'],
     description: 'OTA types array',
     isArray: true,
     type: [String]
   })
   type_of_ota: string[]
 
-  @ApiProperty({ example: 25000, description: 'Amount collectable' })
-  amount_collectable: number | null
+  @ApiPropertyOptional({ example: 10000, description: 'Expedia amount collectable' })
+  expedia_amount_collectable: number | null
 
-  @ApiProperty({ example: 20000, description: 'Amount confirmed' })
-  amount_confirmed: number | null
+  @ApiPropertyOptional({ example: 8000, description: 'Expedia amount confirmed' })
+  expedia_amount_confirmed: number | null
+
+  @ApiPropertyOptional({ example: 8000, description: 'Agoda amount collectable' })
+  agoda_amount_collectable: number | null
+
+  @ApiPropertyOptional({ example: 7000, description: 'Agoda amount confirmed' })
+  agoda_amount_confirmed: number | null
+
+  @ApiPropertyOptional({ example: 7000, description: 'Booking amount collectable' })
+  booking_amount_collectable: number | null
+
+  @ApiPropertyOptional({ example: 5000, description: 'Booking amount confirmed' })
+  booking_amount_confirmed: number | null
 
   @ApiPropertyOptional({ example: '2024-01-01', description: 'Start date' })
   start_date: Date | null

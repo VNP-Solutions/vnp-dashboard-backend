@@ -341,14 +341,26 @@ async function main() {
           ? amountCollectable
           : Math.floor(amountCollectable * Math.random())
 
-        await prisma.audit.create({
-          data: {
-            property_id: property.id,
-            type_of_ota: [otaType], // Convert to array
-            billing_type: billingType,
-            audit_status_id: status.id,
-          amount_collectable: amountCollectable,
-          amount_confirmed: amountConfirmed,
+      // Set amounts based on OTA type
+      const expediaAmountCollectable = otaType === OtaType.expedia ? amountCollectable : null
+      const expediaAmountConfirmed = otaType === OtaType.expedia ? amountConfirmed : null
+      const agodaAmountCollectable = otaType === OtaType.agoda ? amountCollectable : null
+      const agodaAmountConfirmed = otaType === OtaType.agoda ? amountConfirmed : null
+      const bookingAmountCollectable = otaType === OtaType.booking ? amountCollectable : null
+      const bookingAmountConfirmed = otaType === OtaType.booking ? amountConfirmed : null
+
+      await prisma.audit.create({
+        data: {
+          property_id: property.id,
+          type_of_ota: [otaType], // Convert to array
+          billing_type: billingType,
+          audit_status_id: status.id,
+          expedia_amount_collectable: expediaAmountCollectable,
+          expedia_amount_confirmed: expediaAmountConfirmed,
+          agoda_amount_collectable: agodaAmountCollectable,
+          agoda_amount_confirmed: agodaAmountConfirmed,
+          booking_amount_collectable: bookingAmountCollectable,
+          booking_amount_confirmed: bookingAmountConfirmed,
           is_archived: Math.random() < 0.1, // 10% archived
           start_date: startDate,
           end_date: endDate

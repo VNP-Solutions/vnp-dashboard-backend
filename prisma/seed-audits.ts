@@ -186,14 +186,26 @@ async function main() {
         const isArchived = Math.random() > 0.85 // 15% archived
         const reportUrl = generateReportUrl(property.id, i)
 
+        // Generate amounts for each OTA type
+        const expediaAmountCollectable = selectedOtaTypes.includes('expedia') ? amount_collectable : null
+        const expediaAmountConfirmed = selectedOtaTypes.includes('expedia') ? amount_confirmed : null
+        const agodaAmountCollectable = selectedOtaTypes.includes('agoda') ? amount_collectable : null
+        const agodaAmountConfirmed = selectedOtaTypes.includes('agoda') ? amount_confirmed : null
+        const bookingAmountCollectable = selectedOtaTypes.includes('booking') ? amount_collectable : null
+        const bookingAmountConfirmed = selectedOtaTypes.includes('booking') ? amount_confirmed : null
+
         await prisma.audit.create({
           data: {
             property_id: property.id,
             type_of_ota: selectedOtaTypes,
             billing_type: billingType,
             audit_status_id: status.id,
-            amount_collectable,
-            amount_confirmed,
+            expedia_amount_collectable: expediaAmountCollectable,
+            expedia_amount_confirmed: expediaAmountConfirmed,
+            agoda_amount_collectable: agodaAmountCollectable,
+            agoda_amount_confirmed: agodaAmountConfirmed,
+            booking_amount_collectable: bookingAmountCollectable,
+            booking_amount_confirmed: bookingAmountConfirmed,
             is_archived: isArchived,
             start_date,
             end_date,
@@ -279,28 +291,44 @@ async function main() {
   // Amount statistics
   const auditStats = await prisma.audit.aggregate({
     _sum: {
-      amount_collectable: true,
-      amount_confirmed: true
+      expedia_amount_collectable: true,
+      expedia_amount_confirmed: true,
+      agoda_amount_collectable: true,
+      agoda_amount_confirmed: true,
+      booking_amount_collectable: true,
+      booking_amount_confirmed: true
     },
     _avg: {
-      amount_collectable: true,
-      amount_confirmed: true
+      expedia_amount_collectable: true,
+      expedia_amount_confirmed: true,
+      agoda_amount_collectable: true,
+      agoda_amount_confirmed: true,
+      booking_amount_collectable: true,
+      booking_amount_confirmed: true
     }
   })
 
+  const totalCollectable = (auditStats._sum.expedia_amount_collectable || 0) +
+    (auditStats._sum.agoda_amount_collectable || 0) +
+    (auditStats._sum.booking_amount_collectable || 0)
+
+  const totalConfirmed = (auditStats._sum.expedia_amount_confirmed || 0) +
+    (auditStats._sum.agoda_amount_confirmed || 0) +
+    (auditStats._sum.booking_amount_confirmed || 0)
+
+  const avgCollectable = ((auditStats._avg.expedia_amount_collectable || 0) +
+    (auditStats._avg.agoda_amount_collectable || 0) +
+    (auditStats._avg.booking_amount_collectable || 0)) / 3
+
+  const avgConfirmed = ((auditStats._avg.expedia_amount_confirmed || 0) +
+    (auditStats._avg.agoda_amount_confirmed || 0) +
+    (auditStats._avg.booking_amount_confirmed || 0)) / 3
+
   console.log('\n💰 Financial Summary:')
-  console.log(
-    `  Total Collectable: $${auditStats._sum.amount_collectable?.toLocaleString() || 0}`
-  )
-  console.log(
-    `  Total Confirmed: $${auditStats._sum.amount_confirmed?.toLocaleString() || 0}`
-  )
-  console.log(
-    `  Average Collectable: $${Math.round(auditStats._avg.amount_collectable || 0).toLocaleString()}`
-  )
-  console.log(
-    `  Average Confirmed: $${Math.round(auditStats._avg.amount_confirmed || 0).toLocaleString()}`
-  )
+  console.log(`  Total Collectable: $${totalCollectable.toLocaleString()}`)
+  console.log(`  Total Confirmed: $${totalConfirmed.toLocaleString()}`)
+  console.log(`  Average Collectable: $${Math.round(avgCollectable).toLocaleString()}`)
+  console.log(`  Average Confirmed: $${Math.round(avgConfirmed).toLocaleString()}`)
 
   // Archive status
   const archivedCount = await prisma.audit.count({

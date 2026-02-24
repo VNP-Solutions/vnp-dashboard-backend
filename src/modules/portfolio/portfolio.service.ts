@@ -1918,8 +1918,12 @@ export class PortfolioService implements IPortfolioService {
         }
       },
       _sum: {
-        amount_collectable: true,
-        amount_confirmed: true
+        expedia_amount_collectable: true,
+        expedia_amount_confirmed: true,
+        agoda_amount_collectable: true,
+        agoda_amount_confirmed: true,
+        booking_amount_collectable: true,
+        booking_amount_confirmed: true
       }
     })
 
@@ -1957,31 +1961,24 @@ export class PortfolioService implements IPortfolioService {
       agoda: 0
     }
 
-    // Process aggregated data
+    // Process aggregated data - sum across all audits
     auditAggregates.forEach(aggregate => {
-      const collectableAmount = aggregate._sum.amount_collectable || 0
-      const confirmedAmount = aggregate._sum.amount_confirmed || 0
+      const expediaCollectable = aggregate._sum.expedia_amount_collectable || 0
+      const expediaConfirmed = aggregate._sum.expedia_amount_confirmed || 0
+      const agodaCollectable = aggregate._sum.agoda_amount_collectable || 0
+      const agodaConfirmed = aggregate._sum.agoda_amount_confirmed || 0
+      const bookingCollectable = aggregate._sum.booking_amount_collectable || 0
+      const bookingConfirmed = aggregate._sum.booking_amount_confirmed || 0
 
-      amountCollectable.total += collectableAmount
-      amountConfirmed.total += confirmedAmount
+      amountCollectable.expedia += expediaCollectable
+      amountConfirmed.expedia += expediaConfirmed
+      amountCollectable.agoda += agodaCollectable
+      amountConfirmed.agoda += agodaConfirmed
+      amountCollectable.booking += bookingCollectable
+      amountConfirmed.booking += bookingConfirmed
 
-      // Since type_of_ota is now an array, we need to handle it differently
-      // This aggregation won't work as expected with arrays
-      // We'll fetch individual audits instead (see alternative approach above in audit service)
-      if (Array.isArray(aggregate.type_of_ota)) {
-        aggregate.type_of_ota.forEach((ota: string) => {
-          if (ota === 'expedia') {
-            amountCollectable.expedia += collectableAmount
-            amountConfirmed.expedia += confirmedAmount
-          } else if (ota === 'booking') {
-            amountCollectable.booking += collectableAmount
-            amountConfirmed.booking += confirmedAmount
-          } else if (ota === 'agoda') {
-            amountCollectable.agoda += collectableAmount
-            amountConfirmed.agoda += confirmedAmount
-          }
-        })
-      }
+      amountCollectable.total += expediaCollectable + agodaCollectable + bookingCollectable
+      amountConfirmed.total += expediaConfirmed + agodaConfirmed + bookingConfirmed
     })
 
     // Get recent 10 audits for the portfolio
@@ -2014,8 +2011,12 @@ export class PortfolioService implements IPortfolioService {
     const formattedRecentAudits = recentAudits.map(audit => ({
       id: audit.id,
       type_of_ota: audit.type_of_ota,
-      amount_collectable: audit.amount_collectable,
-      amount_confirmed: audit.amount_confirmed,
+      expedia_amount_collectable: audit.expedia_amount_collectable,
+      expedia_amount_confirmed: audit.expedia_amount_confirmed,
+      agoda_amount_collectable: audit.agoda_amount_collectable,
+      agoda_amount_confirmed: audit.agoda_amount_confirmed,
+      booking_amount_collectable: audit.booking_amount_collectable,
+      booking_amount_confirmed: audit.booking_amount_confirmed,
       start_date: audit.start_date,
       end_date: audit.end_date,
       property_name: audit.property.name,
@@ -2038,15 +2039,35 @@ export class PortfolioService implements IPortfolioService {
       completed_audit_count: completedAuditCount,
       recent_audits: formattedRecentAudits.map(audit => ({
         ...audit,
-        amount_collectable:
-          audit.amount_collectable !== null &&
-          audit.amount_collectable !== undefined
-            ? roundAmount(audit.amount_collectable)
+        expedia_amount_collectable:
+          audit.expedia_amount_collectable !== null &&
+          audit.expedia_amount_collectable !== undefined
+            ? roundAmount(audit.expedia_amount_collectable)
             : null,
-        amount_confirmed:
-          audit.amount_confirmed !== null &&
-          audit.amount_confirmed !== undefined
-            ? roundAmount(audit.amount_confirmed)
+        expedia_amount_confirmed:
+          audit.expedia_amount_confirmed !== null &&
+          audit.expedia_amount_confirmed !== undefined
+            ? roundAmount(audit.expedia_amount_confirmed)
+            : null,
+        agoda_amount_collectable:
+          audit.agoda_amount_collectable !== null &&
+          audit.agoda_amount_collectable !== undefined
+            ? roundAmount(audit.agoda_amount_collectable)
+            : null,
+        agoda_amount_confirmed:
+          audit.agoda_amount_confirmed !== null &&
+          audit.agoda_amount_confirmed !== undefined
+            ? roundAmount(audit.agoda_amount_confirmed)
+            : null,
+        booking_amount_collectable:
+          audit.booking_amount_collectable !== null &&
+          audit.booking_amount_collectable !== undefined
+            ? roundAmount(audit.booking_amount_collectable)
+            : null,
+        booking_amount_confirmed:
+          audit.booking_amount_confirmed !== null &&
+          audit.booking_amount_confirmed !== undefined
+            ? roundAmount(audit.booking_amount_confirmed)
             : null
       }))
     }

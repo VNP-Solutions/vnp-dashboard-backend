@@ -7,7 +7,7 @@ import {
   PendingActionQueryDto
 } from './pending-action.dto'
 
-type PendingActionWithRelations = Prisma.PendingActionGetPayload<{
+export type PendingActionWithRelations = Prisma.PendingActionGetPayload<{
   include: {
     property: {
       select: {

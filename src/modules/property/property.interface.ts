@@ -118,8 +118,12 @@ type PropertyWithFullDetails = Prisma.PropertyGetPayload<{
         id: true
         type_of_ota: true
         audit_status_id: true
-        amount_collectable: true
-        amount_confirmed: true
+        expedia_amount_collectable: true
+        expedia_amount_confirmed: true
+        agoda_amount_collectable: true
+        agoda_amount_confirmed: true
+        booking_amount_collectable: true
+        booking_amount_confirmed: true
         start_date: true
         end_date: true
       }
