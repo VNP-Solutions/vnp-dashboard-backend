@@ -281,6 +281,72 @@ export class GlobalReportController {
     return await this.globalReportService.getProperties(user)
   }
 
+  @Get('expedia-amount-collectable')
+  @ApiOperation({
+    summary: 'Get Expedia amount collectable list (Super Admin only)',
+    description: 'Returns all unique Expedia amount collectable values from audits.'
+  })
+  @ApiResponse({ status: 200, description: 'Expedia amount collectable retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
+  async getExpediaAmountCollectable(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+    return this.globalReportService.getExpediaAmountCollectable(user)
+  }
+
+  @Get('expedia-amount-confirmed')
+  @ApiOperation({
+    summary: 'Get Expedia amount confirmed list (Super Admin only)',
+    description: 'Returns all unique Expedia amount confirmed values from audits.'
+  })
+  @ApiResponse({ status: 200, description: 'Expedia amount confirmed retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
+  async getExpediaAmountConfirmed(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+    return this.globalReportService.getExpediaAmountConfirmed(user)
+  }
+
+  @Get('agoda-amount-collectable')
+  @ApiOperation({
+    summary: 'Get Agoda amount collectable list (Super Admin only)',
+    description: 'Returns all unique Agoda amount collectable values from audits.'
+  })
+  @ApiResponse({ status: 200, description: 'Agoda amount collectable retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
+  async getAgodaAmountCollectable(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+    return this.globalReportService.getAgodaAmountCollectable(user)
+  }
+
+  @Get('agoda-amount-confirmed')
+  @ApiOperation({
+    summary: 'Get Agoda amount confirmed list (Super Admin only)',
+    description: 'Returns all unique Agoda amount confirmed values from audits.'
+  })
+  @ApiResponse({ status: 200, description: 'Agoda amount confirmed retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
+  async getAgodaAmountConfirmed(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+    return this.globalReportService.getAgodaAmountConfirmed(user)
+  }
+
+  @Get('booking-amount-collectable')
+  @ApiOperation({
+    summary: 'Get Booking amount collectable list (Super Admin only)',
+    description: 'Returns all unique Booking amount collectable values from audits.'
+  })
+  @ApiResponse({ status: 200, description: 'Booking amount collectable retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
+  async getBookingAmountCollectable(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+    return this.globalReportService.getBookingAmountCollectable(user)
+  }
+
+  @Get('booking-amount-confirmed')
+  @ApiOperation({
+    summary: 'Get Booking amount confirmed list (Super Admin only)',
+    description: 'Returns all unique Booking amount confirmed values from audits.'
+  })
+  @ApiResponse({ status: 200, description: 'Booking amount confirmed retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
+  async getBookingAmountConfirmed(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+    return this.globalReportService.getBookingAmountConfirmed(user)
+  }
+
   @Post()
   @ApiOperation({
     summary: 'Get global report data (Super Admin only)',

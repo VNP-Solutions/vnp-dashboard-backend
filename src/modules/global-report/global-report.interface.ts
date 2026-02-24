@@ -130,7 +130,38 @@ export interface IGlobalReportRepository {
    * Invalidate all cached data (call when credentials/portfolios are modified)
    */
   invalidateCache(): void
+
+  /**
+   * Get all unique Expedia amount collectable values
+   */
+  findAllExpediaAmountCollectable(): Promise<number[]>
+
+  /**
+   * Get all unique Expedia amount confirmed values
+   */
+  findAllExpediaAmountConfirmed(): Promise<number[]>
+
+  /**
+   * Get all unique Agoda amount collectable values
+   */
+  findAllAgodaAmountCollectable(): Promise<number[]>
+
+  /**
+   * Get all unique Agoda amount confirmed values
+   */
+  findAllAgodaAmountConfirmed(): Promise<number[]>
+
+  /**
+   * Get all unique Booking amount collectable values
+   */
+  findAllBookingAmountCollectable(): Promise<number[]>
+
+  /**
+   * Get all unique Booking amount confirmed values
+   */
+  findAllBookingAmountConfirmed(): Promise<number[]>
 }
+
 
 /**
  * Global Report Service Interface
@@ -231,4 +262,34 @@ export interface IGlobalReportService {
    * Get all properties (id and name only) for filtering
    */
   getProperties(user: IUserWithPermissions): Promise<PropertiesListResponseDto>
+
+  /**
+   * Get Expedia amount collectable list
+   */
+  getExpediaAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }>
+
+  /**
+   * Get Expedia amount confirmed list
+   */
+  getExpediaAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }>
+
+  /**
+   * Get Agoda amount collectable list
+   */
+  getAgodaAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }>
+
+  /**
+   * Get Agoda amount confirmed list
+   */
+  getAgodaAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }>
+
+  /**
+   * Get Booking amount collectable list
+   */
+  getBookingAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }>
+
+  /**
+   * Get Booking amount confirmed list
+   */
+  getBookingAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }>
 }

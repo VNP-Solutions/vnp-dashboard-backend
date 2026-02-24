@@ -244,11 +244,26 @@ export class ReportRowDto {
   @ApiProperty({ description: 'Currency Code' })
   currency: string
 
-  @ApiPropertyOptional({ description: 'Amount Collectable' })
-  amountCollectable: number | null
+  // Expedia amounts
+  @ApiPropertyOptional({ description: 'Expedia Amount Collectable' })
+  expediaAmountCollectable: number | null
 
-  @ApiPropertyOptional({ description: 'Amount Confirmed' })
-  amountConfirmed: number | null
+  @ApiPropertyOptional({ description: 'Expedia Amount Confirmed' })
+  expediaAmountConfirmed: number | null
+
+  // Agoda amounts
+  @ApiPropertyOptional({ description: 'Agoda Amount Collectable' })
+  agodaAmountCollectable: number | null
+
+  @ApiPropertyOptional({ description: 'Agoda Amount Confirmed' })
+  agodaAmountConfirmed: number | null
+
+  // Booking amounts
+  @ApiPropertyOptional({ description: 'Booking Amount Collectable' })
+  bookingAmountCollectable: number | null
+
+  @ApiPropertyOptional({ description: 'Booking Amount Confirmed' })
+  bookingAmountConfirmed: number | null
 
   @ApiPropertyOptional({ description: 'Portfolio Contact Email' })
   portfolioContactEmail: string | null
@@ -548,4 +563,76 @@ export class PropertyListItemDto {
 export class PropertiesListResponseDto {
   @ApiProperty({ type: [PropertyListItemDto] })
   data: PropertyListItemDto[]
+}
+
+/**
+ * Response for Expedia Amount Collectable list
+ */
+export class ExpediaAmountCollectableResponseDto {
+  @ApiProperty({
+    type: [Number],
+    description: 'List of unique Expedia amount collectable values',
+    example: [5000, 7500.5, 10000]
+  })
+  data: number[]
+}
+
+/**
+ * Response for Expedia Amount Confirmed list
+ */
+export class ExpediaAmountConfirmedResponseDto {
+  @ApiProperty({
+    type: [Number],
+    description: 'List of unique Expedia amount confirmed values',
+    example: [4500, 7000.25, 9500]
+  })
+  data: number[]
+}
+
+/**
+ * Response for Agoda Amount Collectable list
+ */
+export class AgodaAmountCollectableResponseDto {
+  @ApiProperty({
+    type: [Number],
+    description: 'List of unique Agoda amount collectable values',
+    example: [3000, 4500.5, 6000]
+  })
+  data: number[]
+}
+
+/**
+ * Response for Agoda Amount Confirmed list
+ */
+export class AgodaAmountConfirmedResponseDto {
+  @ApiProperty({
+    type: [Number],
+    description: 'List of unique Agoda amount confirmed values',
+    example: [2800, 4200.25, 5700]
+  })
+  data: number[]
+}
+
+/**
+ * Response for Booking Amount Collectable list
+ */
+export class BookingAmountCollectableResponseDto {
+  @ApiProperty({
+    type: [Number],
+    description: 'List of unique Booking amount collectable values',
+    example: [2000, 3500.5, 5000]
+  })
+  data: number[]
+}
+
+/**
+ * Response for Booking Amount Confirmed list
+ */
+export class BookingAmountConfirmedResponseDto {
+  @ApiProperty({
+    type: [Number],
+    description: 'List of unique Booking amount confirmed values',
+    example: [1900, 3300.25, 4750]
+  })
+  data: number[]
 }

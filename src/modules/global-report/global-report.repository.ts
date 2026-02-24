@@ -61,6 +61,194 @@ export class GlobalReportRepository implements IGlobalReportRepository {
   }
 
   /**
+   * Get all unique Expedia amount collectable values
+   */
+  async findAllExpediaAmountCollectable(): Promise<number[]> {
+    const result = await this.prisma.audit.aggregateRaw({
+      pipeline: [
+        {
+          $match: {
+            expedia_amount_collectable: { $ne: null, $ne: undefined }
+          }
+        },
+        {
+          $group: {
+            _id: '$expedia_amount_collectable'
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            value: '$_id'
+          }
+        },
+        {
+          $sort: { value: 1 }
+        }
+      ]
+    })
+
+    return result.map((item: any) => item.value)
+  }
+
+  /**
+   * Get all unique Expedia amount confirmed values
+   */
+  async findAllExpediaAmountConfirmed(): Promise<number[]> {
+    const result = await this.prisma.audit.aggregateRaw({
+      pipeline: [
+        {
+          $match: {
+            expedia_amount_confirmed: { $ne: null, $ne: undefined }
+          }
+        },
+        {
+          $group: {
+            _id: '$expedia_amount_confirmed'
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            value: '$_id'
+          }
+        },
+        {
+          $sort: { value: 1 }
+        }
+      ]
+    })
+
+    return result.map((item: any) => item.value)
+  }
+
+  /**
+   * Get all unique Agoda amount collectable values
+   */
+  async findAllAgodaAmountCollectable(): Promise<number[]> {
+    const result = await this.prisma.audit.aggregateRaw({
+      pipeline: [
+        {
+          $match: {
+            agoda_amount_collectable: { $ne: null, $ne: undefined }
+          }
+        },
+        {
+          $group: {
+            _id: '$agoda_amount_collectable'
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            value: '$_id'
+          }
+        },
+        {
+          $sort: { value: 1 }
+        }
+      ]
+    })
+
+    return result.map((item: any) => item.value)
+  }
+
+  /**
+   * Get all unique Agoda amount confirmed values
+   */
+  async findAllAgodaAmountConfirmed(): Promise<number[]> {
+    const result = await this.prisma.audit.aggregateRaw({
+      pipeline: [
+        {
+          $match: {
+            agoda_amount_confirmed: { $ne: null, $ne: undefined }
+          }
+        },
+        {
+          $group: {
+            _id: '$agoda_amount_confirmed'
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            value: '$_id'
+          }
+        },
+        {
+          $sort: { value: 1 }
+        }
+      ]
+    })
+
+    return result.map((item: any) => item.value)
+  }
+
+  /**
+   * Get all unique Booking amount collectable values
+   */
+  async findAllBookingAmountCollectable(): Promise<number[]> {
+    const result = await this.prisma.audit.aggregateRaw({
+      pipeline: [
+        {
+          $match: {
+            booking_amount_collectable: { $ne: null, $ne: undefined }
+          }
+        },
+        {
+          $group: {
+            _id: '$booking_amount_collectable'
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            value: '$_id'
+          }
+        },
+        {
+          $sort: { value: 1 }
+        }
+      ]
+    })
+
+    return result.map((item: any) => item.value)
+  }
+
+  /**
+   * Get all unique Booking amount confirmed values
+   */
+  async findAllBookingAmountConfirmed(): Promise<number[]> {
+    const result = await this.prisma.audit.aggregateRaw({
+      pipeline: [
+        {
+          $match: {
+            booking_amount_confirmed: { $ne: null, $ne: undefined }
+          }
+        },
+        {
+          $group: {
+            _id: '$booking_amount_confirmed'
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            value: '$_id'
+          }
+        },
+        {
+          $sort: { value: 1 }
+        }
+      ]
+    })
+
+    return result.map((item: any) => item.value)
+  }
+}
+
+
+  /**
    * Execute aggregation pipeline and return paginated results
    */
   async findAll(options: AggregationOptions): Promise<AggregationResult<any>> {
