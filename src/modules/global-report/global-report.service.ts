@@ -493,6 +493,78 @@ export class GlobalReportService implements IGlobalReportService {
   }
 
   /**
+   * Get Expedia amount collectable list
+   */
+  async getExpediaAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access amount data')
+    }
+
+    const amounts = await this.globalReportRepository.findAllExpediaAmountCollectable()
+    return { data: amounts }
+  }
+
+  /**
+   * Get Expedia amount confirmed list
+   */
+  async getExpediaAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access amount data')
+    }
+
+    const amounts = await this.globalReportRepository.findAllExpediaAmountConfirmed()
+    return { data: amounts }
+  }
+
+  /**
+   * Get Agoda amount collectable list
+   */
+  async getAgodaAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access amount data')
+    }
+
+    const amounts = await this.globalReportRepository.findAllAgodaAmountCollectable()
+    return { data: amounts }
+  }
+
+  /**
+   * Get Agoda amount confirmed list
+   */
+  async getAgodaAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access amount data')
+    }
+
+    const amounts = await this.globalReportRepository.findAllAgodaAmountConfirmed()
+    return { data: amounts }
+  }
+
+  /**
+   * Get Booking amount collectable list
+   */
+  async getBookingAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access amount data')
+    }
+
+    const amounts = await this.globalReportRepository.findAllBookingAmountCollectable()
+    return { data: amounts }
+  }
+
+  /**
+   * Get Booking amount confirmed list
+   */
+  async getBookingAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }> {
+    if (!canAccessGlobalReport(user)) {
+      throw new ForbiddenException('You do not have permission to access amount data')
+    }
+
+    const amounts = await this.globalReportRepository.findAllBookingAmountConfirmed()
+    return { data: amounts }
+  }
+
+  /**
    * Validate filters against column metadata
    */
   private validateFilters(filters: ColumnFilterDto[]): void {
@@ -647,8 +719,12 @@ export class GlobalReportService implements IGlobalReportService {
       endDate: this.extractDate(doc.end_date),
       nextDueDate: this.extractDate(doc.property?.next_due_date),
       currency: doc.currency?.code || '',
-      amountCollectable: roundToDecimals(doc.amount_collectable) ?? null,
-      amountConfirmed: roundToDecimals(doc.amount_confirmed) ?? null,
+      expediaAmountCollectable: roundToDecimals(doc.expedia_amount_collectable) ?? null,
+      expediaAmountConfirmed: roundToDecimals(doc.expedia_amount_confirmed) ?? null,
+      agodaAmountCollectable: roundToDecimals(doc.agoda_amount_collectable) ?? null,
+      agodaAmountConfirmed: roundToDecimals(doc.agoda_amount_confirmed) ?? null,
+      bookingAmountCollectable: roundToDecimals(doc.booking_amount_collectable) ?? null,
+      bookingAmountConfirmed: roundToDecimals(doc.booking_amount_confirmed) ?? null,
       portfolioContactEmail: doc.portfolio?.contact_email || null
     }
 

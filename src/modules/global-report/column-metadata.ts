@@ -524,27 +524,75 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     requiresLookup: [PROPERTY_LOOKUP, CURRENCY_LOOKUP]
   },
 
-  // Amount Collectable
-  amountCollectable: {
-    key: 'amountCollectable',
-    label: 'Amount Collectable',
+  // Expedia Amount Collectable
+  expediaAmountCollectable: {
+    key: 'expediaAmountCollectable',
+    label: 'Expedia Amount Collectable',
     dataType: ColumnDataType.NUMBER,
     filterable: true,
     sortable: true,
     source: 'audit',
-    fieldPath: 'amount_collectable',
+    fieldPath: 'expedia_amount_collectable',
     allowedOperators: NUMBER_OPERATORS
   },
 
-  // Amount Confirmed
-  amountConfirmed: {
-    key: 'amountConfirmed',
-    label: 'Amount Confirmed',
+  // Expedia Amount Confirmed
+  expediaAmountConfirmed: {
+    key: 'expediaAmountConfirmed',
+    label: 'Expedia Amount Confirmed',
     dataType: ColumnDataType.NUMBER,
     filterable: true,
     sortable: true,
     source: 'audit',
-    fieldPath: 'amount_confirmed',
+    fieldPath: 'expedia_amount_confirmed',
+    allowedOperators: NUMBER_OPERATORS
+  },
+
+  // Agoda Amount Collectable
+  agodaAmountCollectable: {
+    key: 'agodaAmountCollectable',
+    label: 'Agoda Amount Collectable',
+    dataType: ColumnDataType.NUMBER,
+    filterable: true,
+    sortable: true,
+    source: 'audit',
+    fieldPath: 'agoda_amount_collectable',
+    allowedOperators: NUMBER_OPERATORS
+  },
+
+  // Agoda Amount Confirmed
+  agodaAmountConfirmed: {
+    key: 'agodaAmountConfirmed',
+    label: 'Agoda Amount Confirmed',
+    dataType: ColumnDataType.NUMBER,
+    filterable: true,
+    sortable: true,
+    source: 'audit',
+    fieldPath: 'agoda_amount_confirmed',
+    allowedOperators: NUMBER_OPERATORS
+  },
+
+  // Booking Amount Collectable
+  bookingAmountCollectable: {
+    key: 'bookingAmountCollectable',
+    label: 'Booking Amount Collectable',
+    dataType: ColumnDataType.NUMBER,
+    filterable: true,
+    sortable: true,
+    source: 'audit',
+    fieldPath: 'booking_amount_collectable',
+    allowedOperators: NUMBER_OPERATORS
+  },
+
+  // Booking Amount Confirmed
+  bookingAmountConfirmed: {
+    key: 'bookingAmountConfirmed',
+    label: 'Booking Amount Confirmed',
+    dataType: ColumnDataType.NUMBER,
+    filterable: true,
+    sortable: true,
+    source: 'audit',
+    fieldPath: 'booking_amount_confirmed',
     allowedOperators: NUMBER_OPERATORS
   },
 
