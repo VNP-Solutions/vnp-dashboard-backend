@@ -93,6 +93,8 @@ const OBJECT_ID_OPERATORS = [
 const NUMBER_OPERATORS = [
   FilterOperator.EQ,
   FilterOperator.NEQ,
+  FilterOperator.IN,
+  FilterOperator.NIN,
   FilterOperator.GT,
   FilterOperator.GTE,
   FilterOperator.LT,

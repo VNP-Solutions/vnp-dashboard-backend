@@ -664,12 +664,19 @@ export class AggregationBuilder {
   private buildProjection(): any {
     return {
       // Audit fields needed
+      _id: 1,
       type_of_ota: 1,
       billing_type: 1,
       start_date: 1,
       end_date: 1,
-      amount_collectable: 1,
-      amount_confirmed: 1,
+
+      // OTA-specific amount fields
+      expedia_amount_collectable: 1,
+      expedia_amount_confirmed: 1,
+      agoda_amount_collectable: 1,
+      agoda_amount_confirmed: 1,
+      booking_amount_collectable: 1,
+      booking_amount_confirmed: 1,
 
       // Audit Status (OTA Review Status)
       'auditStatus.status': 1,
