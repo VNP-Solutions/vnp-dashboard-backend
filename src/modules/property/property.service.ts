@@ -3258,18 +3258,29 @@ export class PropertyService implements IPropertyService {
         is_archived: false
       },
       _sum: {
-        amount_collectable: true,
-        amount_confirmed: true
+        expedia_amount_collectable: true,
+        expedia_amount_confirmed: true,
+        agoda_amount_collectable: true,
+        agoda_amount_confirmed: true,
+        booking_amount_collectable: true,
+        booking_amount_confirmed: true
       }
     })
 
+    // Calculate total amounts across all OTAs
+    const totalAmountCollectable =
+      (auditAggregates._sum.expedia_amount_collectable || 0) +
+      (auditAggregates._sum.agoda_amount_collectable || 0) +
+      (auditAggregates._sum.booking_amount_collectable || 0)
+
+    const totalAmountConfirmed =
+      (auditAggregates._sum.expedia_amount_confirmed || 0) +
+      (auditAggregates._sum.agoda_amount_confirmed || 0) +
+      (auditAggregates._sum.booking_amount_confirmed || 0)
+
     return {
-      total_amount_collectable: roundAmount(
-        auditAggregates._sum.amount_collectable
-      ),
-      total_amount_confirmed: roundAmount(
-        auditAggregates._sum.amount_confirmed
-      ),
+      total_amount_collectable: roundAmount(totalAmountCollectable),
+      total_amount_confirmed: roundAmount(totalAmountConfirmed),
       property: {
         id: property.id,
         name: property.name,
