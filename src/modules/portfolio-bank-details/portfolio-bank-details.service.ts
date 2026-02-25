@@ -214,8 +214,11 @@ export class PortfolioBankDetailsService
           where: { property_id: property.id }
         })
 
-      const propertyBankData = {
-        ...bankDetailsData,
+      // Exclude portfolio_id as PropertyBankDetails doesn't have this field
+      const { portfolio_id: _portfolio_id, ...propertyBankData } = bankDetailsData
+
+      const dataForProperty = {
+        ...propertyBankData,
         property_id: property.id,
         associated_user_id: userId
       }
@@ -224,12 +227,12 @@ export class PortfolioBankDetailsService
         // Update existing bank details
         await this.prisma.propertyBankDetails.update({
           where: { property_id: property.id },
-          data: propertyBankData
+          data: dataForProperty
         })
       } else {
         // Create new bank details
         await this.prisma.propertyBankDetails.create({
-          data: propertyBankData
+          data: dataForProperty
         })
       }
     }
