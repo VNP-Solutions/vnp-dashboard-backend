@@ -30,6 +30,32 @@ export class PortfolioRepository implements IPortfolioRepository {
             type: true,
             is_active: true
           }
+        },
+        bankDetails: {
+          select: {
+            id: true,
+            bank_type: true,
+            bank_sub_type: true,
+            hotel_portfolio_name: true,
+            beneficiary_name: true,
+            beneficiary_address: true,
+            account_number: true,
+            account_name: true,
+            bank_name: true,
+            bank_branch: true,
+            iban_number: true,
+            swift_bic_number: true,
+            routing_number: true,
+            bank_wiring_routing_number: true,
+            bank_account_type: true,
+            currency: true,
+            stripe_account_email: true,
+            contact_name: true,
+            email_address: true,
+            bank_address: true,
+            comments: true,
+            associated_user_id: true
+          }
         }
       }
     })
@@ -55,6 +81,32 @@ export class PortfolioRepository implements IPortfolioRepository {
             id: true,
             type: true,
             is_active: true
+          }
+        },
+        bankDetails: {
+          select: {
+            id: true,
+            bank_type: true,
+            bank_sub_type: true,
+            hotel_portfolio_name: true,
+            beneficiary_name: true,
+            beneficiary_address: true,
+            account_number: true,
+            account_name: true,
+            bank_name: true,
+            bank_branch: true,
+            iban_number: true,
+            swift_bic_number: true,
+            routing_number: true,
+            bank_wiring_routing_number: true,
+            bank_account_type: true,
+            currency: true,
+            stripe_account_email: true,
+            contact_name: true,
+            email_address: true,
+            bank_address: true,
+            comments: true,
+            associated_user_id: true
           }
         },
         pendingActions: {
@@ -175,6 +227,32 @@ export class PortfolioRepository implements IPortfolioRepository {
             type: true,
             is_active: true
           }
+        },
+        bankDetails: {
+          select: {
+            id: true,
+            bank_type: true,
+            bank_sub_type: true,
+            hotel_portfolio_name: true,
+            beneficiary_name: true,
+            beneficiary_address: true,
+            account_number: true,
+            account_name: true,
+            bank_name: true,
+            bank_branch: true,
+            iban_number: true,
+            swift_bic_number: true,
+            routing_number: true,
+            bank_wiring_routing_number: true,
+            bank_account_type: true,
+            currency: true,
+            stripe_account_email: true,
+            contact_name: true,
+            email_address: true,
+            bank_address: true,
+            comments: true,
+            associated_user_id: true
+          }
         }
       }
     })
@@ -255,6 +333,32 @@ export class PortfolioRepository implements IPortfolioRepository {
             id: true,
             type: true,
             is_active: true
+          }
+        },
+        bankDetails: {
+          select: {
+            id: true,
+            bank_type: true,
+            bank_sub_type: true,
+            hotel_portfolio_name: true,
+            beneficiary_name: true,
+            beneficiary_address: true,
+            account_number: true,
+            account_name: true,
+            bank_name: true,
+            bank_branch: true,
+            iban_number: true,
+            swift_bic_number: true,
+            routing_number: true,
+            bank_wiring_routing_number: true,
+            bank_account_type: true,
+            currency: true,
+            stripe_account_email: true,
+            contact_name: true,
+            email_address: true,
+            bank_address: true,
+            comments: true,
+            associated_user_id: true
           }
         },
         contractUrls: userId
