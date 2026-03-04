@@ -17,7 +17,8 @@ import {
 import { QueryDto } from '../../common/dto/query.dto'
 import {
   ExpediaCredentialsDto,
-  OtaCredentialsDto
+  OtaCredentialsDto,
+  AgodaCredentialsDto
 } from '../property-credentials/property-credentials.dto'
 
 export type AccessType = 'owned' | 'shared'
@@ -414,7 +415,7 @@ export class ActivatePropertyDto {
 
 export class CompletePropertyCredentialsDto {
   @ApiProperty({
-    description: 'Expedia credentials (required)',
+    description: 'Expedia credentials (required, username and password must be provided together)',
     type: ExpediaCredentialsDto
   })
   @ValidateNested()
@@ -423,16 +424,16 @@ export class CompletePropertyCredentialsDto {
   expedia: ExpediaCredentialsDto
 
   @ApiPropertyOptional({
-    description: 'Agoda credentials (optional)',
-    type: OtaCredentialsDto
+    description: 'Agoda credentials (optional, username can be provided without password)',
+    type: AgodaCredentialsDto
   })
   @ValidateNested()
-  @Type(() => OtaCredentialsDto)
+  @Type(() => AgodaCredentialsDto)
   @IsOptional()
-  agoda?: OtaCredentialsDto
+  agoda?: AgodaCredentialsDto
 
   @ApiPropertyOptional({
-    description: 'Booking.com credentials (optional)',
+    description: 'Booking.com credentials (optional, username and password must be provided together)',
     type: OtaCredentialsDto
   })
   @ValidateNested()
