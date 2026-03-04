@@ -13,6 +13,7 @@ import {
 } from 'class-validator'
 
 // Custom validator to ensure username and password are provided together
+// Used for Expedia and Booking credentials
 function UsernamePasswordTogether(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
     registerDecorator({
@@ -41,9 +42,37 @@ function UsernamePasswordTogether(validationOptions?: ValidationOptions) {
   }
 }
 
+// Agoda Credentials DTO (username can be provided without password)
+export class AgodaCredentialsDto {
+  @ApiPropertyOptional({
+    example: 'AGD123456',
+    description: 'Agoda ID'
+  })
+  @IsString()
+  @IsOptional()
+  id?: string
+
+  @ApiPropertyOptional({
+    example: 'hotel_user@example.com',
+    description: 'Agoda username (can be provided without password)'
+  })
+  @IsString()
+  @IsOptional()
+  username?: string
+
+  @ApiPropertyOptional({
+    example: 'SecurePassword123!',
+    description: 'Agoda password (optional, will be encrypted if provided)'
+  })
+  @IsString()
+  @IsOptional()
+  password?: string
+}
+
+// OTA Credentials DTO for Booking (username and password must be provided together)
 export class OtaCredentialsDto {
   @ApiPropertyOptional({
-    example: 'EXP123456',
+    example: 'BKG123456',
     description: 'OTA ID'
   })
   @IsString()
@@ -112,14 +141,14 @@ export class CreatePropertyCredentialsDto {
   expedia: ExpediaCredentialsDto
 
   @ApiPropertyOptional({
-    description: 'Agoda credentials',
-    type: OtaCredentialsDto
+    description: 'Agoda credentials (username can be provided without password)',
+    type: AgodaCredentialsDto
   })
   @IsOptional()
-  agoda?: OtaCredentialsDto
+  agoda?: AgodaCredentialsDto
 
   @ApiPropertyOptional({
-    description: 'Booking.com credentials',
+    description: 'Booking.com credentials (username and password must be provided together)',
     type: OtaCredentialsDto
   })
   @IsOptional()
@@ -141,7 +170,7 @@ export class PropertyCredentialsResponseDto {
   expedia: ExpediaCredentialsDto
 
   @ApiPropertyOptional()
-  agoda?: OtaCredentialsDto
+  agoda?: AgodaCredentialsDto
 
   @ApiPropertyOptional()
   booking?: OtaCredentialsDto
@@ -155,7 +184,7 @@ export class PropertyCredentialsResponseDto {
 
 export class BulkUpdateCredentialsDto {
   @ApiPropertyOptional({
-    description: 'Expedia credentials to update',
+    description: 'Expedia credentials to update (username and password must be provided together)',
     type: OtaCredentialsDto
   })
   @ValidateNested()
@@ -164,16 +193,16 @@ export class BulkUpdateCredentialsDto {
   expedia?: OtaCredentialsDto
 
   @ApiPropertyOptional({
-    description: 'Agoda credentials to update',
-    type: OtaCredentialsDto
+    description: 'Agoda credentials to update (username can be provided without password)',
+    type: AgodaCredentialsDto
   })
   @ValidateNested()
-  @Type(() => OtaCredentialsDto)
+  @Type(() => AgodaCredentialsDto)
   @IsOptional()
-  agoda?: OtaCredentialsDto
+  agoda?: AgodaCredentialsDto
 
   @ApiPropertyOptional({
-    description: 'Booking.com credentials to update',
+    description: 'Booking.com credentials to update (username and password must be provided together)',
     type: OtaCredentialsDto
   })
   @ValidateNested()
