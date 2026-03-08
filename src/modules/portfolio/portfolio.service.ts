@@ -1218,19 +1218,20 @@ export class PortfolioService implements IPortfolioService {
             'Access contact'
           ])
 
-          // Extract contract URL/Documents (OPTIONAL)
-          const contractUrl = findHeaderValue(row, [
-            'Documents',
-            'Contract URL',
-            'Contract Url',
-            'Contract url'
-          ])
+        // Extract contract URL/Documents (OPTIONAL)
+        const contractUrl = findHeaderValue(row, [
+          'Documents',
+          'Contract URL',
+          'Contract Url',
+          'Contract url'
+        ])
 
-          // Extract commissionable (OPTIONAL) - map "Yes"/"No" to true/false          const commissionableRaw = findHeaderValue(row, [
-            'Commissionable',
-            'Is Commissionable',
-            'is_commissionable'
-          ])
+        // Extract commissionable (OPTIONAL) - map "Yes"/"No" to true/false
+        const commissionableRaw = findHeaderValue(row, [
+          'Commissionable',
+          'Is Commissionable',
+          'is_commissionable'
+        ])
 
           let isCommissionable = false
           if (commissionableRaw) {
