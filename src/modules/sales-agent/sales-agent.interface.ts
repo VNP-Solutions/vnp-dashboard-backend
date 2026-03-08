@@ -4,6 +4,7 @@ import { IUserWithPermissions } from '../../common/interfaces/permission.interfa
 import {
   CreateSalesAgentDto,
   SalesAgentQueryDto,
+  SalesAgentReportQueryDto,
   UpdateSalesAgentDto
 } from './sales-agent.dto'
 
@@ -45,4 +46,9 @@ export interface ISalesAgentService {
     user: IUserWithPermissions
   ): Promise<SalesAgent>
   remove(id: string, user: IUserWithPermissions): Promise<{ message: string }>
+  downloadReport(
+    id: string,
+    query: SalesAgentReportQueryDto,
+    user: IUserWithPermissions
+  ): Promise<Buffer>
 }

@@ -2,6 +2,7 @@ import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
   IsArray,
+  IsDateString,
   IsEmail,
   IsNotEmpty,
   IsNumber,
@@ -52,3 +53,21 @@ export class CreateSalesAgentDto {
 export class UpdateSalesAgentDto extends PartialType(CreateSalesAgentDto) {}
 
 export class SalesAgentQueryDto extends QueryDto {}
+
+export class SalesAgentReportQueryDto {
+  @ApiProperty({
+    example: '2024-01-01',
+    description: 'Start of date range (ISO date string) — filters audits whose start_date >= from'
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  from: string
+
+  @ApiProperty({
+    example: '2024-12-31',
+    description: 'End of date range (ISO date string) — filters audits whose end_date <= to'
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  to: string
+}
