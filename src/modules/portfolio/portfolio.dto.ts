@@ -88,6 +88,14 @@ export class CreatePortfolioDto {
   @IsString()
   @IsOptional()
   access_phone?: string
+
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439011',
+    description: 'Sales agent ID to assign to this portfolio'
+  })
+  @IsString()
+  @IsOptional()
+  sales_agent_id?: string
 }
 
 // Exclude is_active from UpdatePortfolioDto - use dedicated deactivate API instead
