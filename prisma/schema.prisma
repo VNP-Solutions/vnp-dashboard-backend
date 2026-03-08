@@ -52,7 +52,6 @@ model Portfolio {
   is_active         Boolean
   contact_email     String?
   is_commissionable Boolean
-  sales_agent       String?
   access_email      String?
   access_phone      String?
 
