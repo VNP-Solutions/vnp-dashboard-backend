@@ -48,15 +48,20 @@ export class SalesAgentService implements ISalesAgentService {
     const queryConfig = {
       searchFields: ['full_name', 'email', 'phone'],
       filterableFields: [],
-      sortableFields: ['full_name', 'email', 'commission', 'created_at', 'updated_at'],
+      sortableFields: ['full_name', 'commission', 'created_at'],
       defaultSortField: 'created_at',
       defaultSortOrder: 'desc' as const
+    }
+
+    const baseWhere: any = {}
+    if (query.portfolio_id) {
+      baseWhere.portfolios = { some: { id: query.portfolio_id } }
     }
 
     const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
       query,
       queryConfig,
-      {}
+      baseWhere
     )
 
     const [data, total] = await Promise.all([

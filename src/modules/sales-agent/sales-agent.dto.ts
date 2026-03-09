@@ -52,7 +52,41 @@ export class CreateSalesAgentDto {
 
 export class UpdateSalesAgentDto extends PartialType(CreateSalesAgentDto) {}
 
-export class SalesAgentQueryDto extends QueryDto {}
+export class SalesAgentQueryDto extends QueryDto {
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439011',
+    description: 'Filter sales agents assigned to a specific portfolio'
+  })
+  @IsString()
+  @IsOptional()
+  portfolio_id?: string
+
+  @ApiPropertyOptional({
+    example: 'John',
+    description: 'Search by full name, email, or phone (case-insensitive)'
+  })
+  @IsString()
+  @IsOptional()
+  declare search?: string
+
+  @ApiPropertyOptional({
+    example: 'created_at',
+    description: 'Field to sort by',
+    enum: ['full_name', 'commission', 'created_at']
+  })
+  @IsString()
+  @IsOptional()
+  declare sortBy?: string
+
+  @ApiPropertyOptional({
+    example: 'desc',
+    description: 'Sort direction',
+    enum: ['asc', 'desc']
+  })
+  @IsString()
+  @IsOptional()
+  declare sortOrder?: 'asc' | 'desc'
+}
 
 export class SalesAgentReportQueryDto {
   @ApiProperty({

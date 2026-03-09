@@ -18,11 +18,13 @@ export type SalesAgentWithPortfolios = Prisma.SalesAgentGetPayload<{
       }
     }
   }
-}>
+}> & { total_portfolios: number }
+
+export type SalesAgentWithCount = SalesAgent & { total_portfolios: number }
 
 export interface ISalesAgentRepository {
   create(data: CreateSalesAgentDto): Promise<SalesAgent>
-  findAll(queryOptions: any): Promise<SalesAgent[]>
+  findAll(queryOptions: any): Promise<SalesAgentWithCount[]>
   count(whereClause: any): Promise<number>
   findById(id: string): Promise<SalesAgentWithPortfolios | null>
   findByEmail(email: string): Promise<SalesAgent | null>
@@ -38,7 +40,7 @@ export interface ISalesAgentService {
   findAll(
     query: SalesAgentQueryDto,
     user: IUserWithPermissions
-  ): Promise<PaginatedResult<SalesAgent>>
+  ): Promise<PaginatedResult<SalesAgentWithCount>>
   findOne(id: string, user: IUserWithPermissions): Promise<SalesAgentWithPortfolios>
   update(
     id: string,

@@ -22,7 +22,22 @@ export class SalesAgentRepository implements ISalesAgentRepository {
 
   async findAll(queryOptions: any) {
     const { where, skip, take, orderBy } = queryOptions
-    return this.prisma.salesAgent.findMany({ where, skip, take, orderBy })
+    const agents = await this.prisma.salesAgent.findMany({
+      where,
+      skip,
+      take,
+      orderBy,
+      include: {
+        _count: {
+          select: { portfolios: true }
+        }
+      }
+    })
+
+    return agents.map(({ _count, ...agent }) => ({
+      ...agent,
+      total_portfolios: _count.portfolios
+    }))
   }
 
   async count(whereClause: any): Promise<number> {
@@ -30,7 +45,7 @@ export class SalesAgentRepository implements ISalesAgentRepository {
   }
 
   async findById(id: string) {
-    return this.prisma.salesAgent.findUnique({
+    const agent = await this.prisma.salesAgent.findUnique({
       where: { id },
       include: {
         portfolios: {
@@ -39,9 +54,20 @@ export class SalesAgentRepository implements ISalesAgentRepository {
             name: true,
             is_active: true
           }
+        },
+        _count: {
+          select: { portfolios: true }
         }
       }
     })
+
+    if (!agent) return null
+
+    const { _count, ...rest } = agent
+    return {
+      ...rest,
+      total_portfolios: _count.portfolios
+    }
   }
 
   async findByEmail(email: string) {
