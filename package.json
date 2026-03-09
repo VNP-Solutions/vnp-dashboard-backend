@@ -29,6 +29,7 @@
     "verify:audit-ota": "ts-node scripts/verify-audit-ota-migration.ts",
     "validate:migration": "ts-node scripts/validate-migration.ts",
     "delete:stripe-bank-details": "ts-node scripts/delete-stripe-bank-details.ts",
+    "remove:sales-agent": "ts-node scripts/remove-sales-agent.ts",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "push": "prisma db push",

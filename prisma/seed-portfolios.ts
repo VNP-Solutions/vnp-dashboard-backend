@@ -43,7 +43,6 @@ async function main() {
       is_active: true,
       contact_email: 'contact@marriott.com',
       is_commissionable: true,
-      sales_agent: 'John Smith',
       access_email: 'access@marriott.com',
       access_phone: '+1-555-0101'
     },
@@ -54,7 +53,6 @@ async function main() {
       is_active: true,
       contact_email: 'contact@hilton.com',
       is_commissionable: true,
-      sales_agent: 'Sarah Johnson',
       access_email: 'access@hilton.com',
       access_phone: '+1-555-0102'
     },
@@ -65,7 +63,6 @@ async function main() {
       is_active: true,
       contact_email: 'contact@hyatt.com',
       is_commissionable: false,
-      sales_agent: null,
       access_email: 'access@hyatt.com',
       access_phone: '+44-20-5555-0103'
     },
@@ -76,7 +73,6 @@ async function main() {
       is_active: true,
       contact_email: 'contact@ihg.com',
       is_commissionable: true,
-      sales_agent: 'Michael Brown',
       access_email: 'access@ihg.com',
       access_phone: '+44-20-5555-0104'
     },
@@ -87,7 +83,6 @@ async function main() {
       is_active: true,
       contact_email: 'contact@wyndham.com',
       is_commissionable: false,
-      sales_agent: null,
       access_email: 'access@wyndham.com',
       access_phone: '+1-555-0105'
     }
@@ -106,7 +101,6 @@ async function main() {
           is_active: data.is_active,
           contact_email: data.contact_email,
           is_commissionable: data.is_commissionable,
-          sales_agent: data.sales_agent,
           access_email: data.access_email,
           access_phone: data.access_phone
         },
@@ -117,7 +111,6 @@ async function main() {
           is_active: data.is_active,
           contact_email: data.contact_email,
           is_commissionable: data.is_commissionable,
-          sales_agent: data.sales_agent,
           access_email: data.access_email,
           access_phone: data.access_phone
         },
@@ -148,9 +141,6 @@ async function main() {
     console.log(
       `   Commissionable:  ${portfolio.is_commissionable ? 'Yes' : 'No'}`
     )
-    if (portfolio.sales_agent) {
-      console.log(`   Sales Agent:     ${portfolio.sales_agent}`)
-    }
     console.log(`   Contact Email:   ${portfolio.contact_email}`)
     console.log(`   Access Email:    ${portfolio.access_email}`)
     console.log(`   Access Phone:    ${portfolio.access_phone}`)

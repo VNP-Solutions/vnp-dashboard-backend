@@ -165,7 +165,6 @@ async function main() {
         is_active: true,
         contact_email: data.contact_email,
         is_commissionable: data.is_commissionable,
-        sales_agent: 'Sales Team',
         access_email: data.contact_email,
         access_phone: '+1-555-0100'
       }
