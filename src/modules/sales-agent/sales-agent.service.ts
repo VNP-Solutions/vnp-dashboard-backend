@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import * as XLSX from 'xlsx'
+import ExcelJS = require('exceljs')
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { isInternalUser, isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
@@ -17,6 +17,20 @@ import {
   UpdateSalesAgentDto
 } from './sales-agent.dto'
 import type { ISalesAgentRepository, ISalesAgentService } from './sales-agent.interface'
+
+const REPORT_AUDIT_STATUSES = [
+  'OTA POST Completed',
+  'VCC Invoiced',
+  'MOR completed and Invoiced',
+  'Direct Bill Invoiced'
+]
+
+const THIN_BORDER: Partial<ExcelJS.Borders> = {
+  top: { style: 'thin' },
+  left: { style: 'thin' },
+  bottom: { style: 'thin' },
+  right: { style: 'thin' }
+}
 
 @Injectable()
 export class SalesAgentService implements ISalesAgentService {
@@ -168,13 +182,20 @@ export class SalesAgentService implements ISalesAgentService {
 
     // Fetch all matching audits across those portfolios
     // Only audits that have both start_date and end_date, not archived,
-    // and whose start_date >= from AND end_date <= to
+    // and whose start_date >= from AND end_date <= to,
+    // and whose status is one of the 4 report-eligible statuses (case-insensitive)
     const audits = await this.prisma.audit.findMany({
       where: {
         is_archived: false,
         start_date: { not: null, gte: fromDate },
         end_date: { not: null, lte: toDate },
-        property: { portfolio_id: { in: portfolioIds } }
+        property: { portfolio_id: { in: portfolioIds } },
+        auditStatus: {
+          status: {
+            in: REPORT_AUDIT_STATUSES,
+            mode: 'insensitive'
+          }
+        }
       },
       include: {
         property: {
@@ -200,126 +221,189 @@ export class SalesAgentService implements ISalesAgentService {
       auditsByCurrency.get(currency)!.push(audit)
     }
 
-    const workbook = XLSX.utils.book_new()
-
+    const workbook = new ExcelJS.Workbook()
     const commissionPct = salesAgent.commission
 
-    for (const [currency, currencyAudits] of auditsByCurrency.entries()) {
-      const rows: any[] = []
+    // Table column definitions: [header, width, alignment]
+    const TABLE_COLS: Array<{ header: string; width: number; align: ExcelJS.Alignment['horizontal'] }> = [
+      { header: 'Portfolio',          width: 22, align: 'left'  },
+      { header: 'Property',           width: 22, align: 'left'  },
+      { header: 'Audit Status',       width: 22, align: 'left'  },
+      { header: 'OTA Types',          width: 22, align: 'left'  },
+      { header: 'Start Date',         width: 14, align: 'center' },
+      { header: 'End Date',           width: 14, align: 'center' },
+      { header: 'Expedia Confirmed',  width: 20, align: 'right' },
+      { header: 'Agoda Confirmed',    width: 20, align: 'right' },
+      { header: 'Booking Confirmed',  width: 20, align: 'right' },
+      { header: 'Total Confirmed',    width: 20, align: 'right' }
+    ]
+    const NUM_COLS = TABLE_COLS.length // 10
 
-      // Header info rows at the top
-      rows.push({ A: 'Sales Agent Report' })
-      rows.push({ A: `Agent: ${salesAgent.full_name}` })
-      rows.push({ A: `Email: ${salesAgent.email}` })
-      rows.push({ A: `Phone: ${salesAgent.phone}` })
-      rows.push({ A: `Period: ${query.from} to ${query.to}` })
-      rows.push({ A: `Currency: ${currency}` })
-      rows.push({}) // blank separator
+    const buildSheet = (currency: string, currencyAudits: typeof audits) => {
+      const sheet = workbook.addWorksheet(currency.substring(0, 31))
 
-      // Column headers row
-      rows.push({
-        A: 'Portfolio',
-        B: 'Property',
-        C: 'Audit Status',
-        D: 'OTA Types',
-        E: 'Start Date',
-        F: 'End Date',
-        G: 'Expedia Confirmed',
-        H: 'Agoda Confirmed',
-        I: 'Booking Confirmed',
-        J: 'Total Confirmed'
+      // ── Column widths ──────────────────────────────────────────────────────
+      // First two cols used for agent info key/value
+      sheet.getColumn(1).width = 18
+      sheet.getColumn(2).width = 30
+      TABLE_COLS.forEach((col, i) => {
+        sheet.getColumn(i + 1).width = col.width
       })
 
+      let currentRow = 1
+
+      // ── Row 1: "Sales Agent Report" title ─────────────────────────────────
+      const titleRow = sheet.getRow(currentRow++)
+      const titleCell = titleRow.getCell(1)
+      titleCell.value = 'Sales Agent Report'
+      titleCell.font = { bold: true, size: 13 }
+      titleRow.commit()
+
+      // ── Rows 2–6: Agent details (two-column: bold label | value) ──────────
+      const agentDetails: Array<[string, string]> = [
+        ['Agent:', salesAgent.full_name],
+        ['Email:', salesAgent.email],
+        ['Phone:', salesAgent.phone],
+        ['Period:', `${query.from} to ${query.to}`],
+        ['Currency:', currency]
+      ]
+      for (const [label, value] of agentDetails) {
+        const row = sheet.getRow(currentRow++)
+        const labelCell = row.getCell(1)
+        labelCell.value = label
+        labelCell.font = { bold: true }
+        const valueCell = row.getCell(2)
+        valueCell.value = value
+        row.commit()
+      }
+
+      // ── Blank gap ──────────────────────────────────────────────────────────
+      currentRow++
+
+      // ── Table header row ───────────────────────────────────────────────────
+      const headerRow = sheet.getRow(currentRow++)
+      TABLE_COLS.forEach((col, i) => {
+        const cell = headerRow.getCell(i + 1)
+        cell.value = col.header
+        cell.font = { bold: true }
+        cell.alignment = { horizontal: col.align, vertical: 'middle', wrapText: true }
+        cell.border = THIN_BORDER
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFD9D9D9' }
+        }
+      })
+      headerRow.height = 20
+      headerRow.commit()
+
+      // ── Audit data rows ────────────────────────────────────────────────────
       let grandTotalConfirmed = 0
 
       for (const audit of currencyAudits) {
         const portfolio = portfolioMap.get(audit.property.portfolio_id)
         const expediaConfirmed = audit.expedia_amount_confirmed ?? 0
-        const agodaConfirmed = audit.agoda_amount_confirmed ?? 0
+        const agodaConfirmed   = audit.agoda_amount_confirmed   ?? 0
         const bookingConfirmed = audit.booking_amount_confirmed ?? 0
         const rowTotal = expediaConfirmed + agodaConfirmed + bookingConfirmed
         grandTotalConfirmed += rowTotal
 
-        rows.push({
-          A: portfolio?.name ?? '',
-          B: audit.property.name,
-          C: audit.auditStatus.status,
-          D: audit.type_of_ota.join(', '),
-          E: audit.start_date
-            ? new Date(audit.start_date).toISOString().split('T')[0]
-            : '',
-          F: audit.end_date
-            ? new Date(audit.end_date).toISOString().split('T')[0]
-            : '',
-          G: expediaConfirmed,
-          H: agodaConfirmed,
-          I: bookingConfirmed,
-          J: rowTotal
+        const startDateStr = audit.start_date
+          ? new Date(audit.start_date).toISOString().split('T')[0]
+          : ''
+        const endDateStr = audit.end_date
+          ? new Date(audit.end_date).toISOString().split('T')[0]
+          : ''
+
+        const dataRow = sheet.getRow(currentRow++)
+        const values = [
+          portfolio?.name ?? '',
+          audit.property.name,
+          audit.auditStatus.status,
+          audit.type_of_ota.join(', '),
+          startDateStr,
+          endDateStr,
+          expediaConfirmed,
+          agodaConfirmed,
+          bookingConfirmed,
+          rowTotal
+        ]
+        values.forEach((val, i) => {
+          const cell = dataRow.getCell(i + 1)
+          cell.value = val
+          cell.alignment = { horizontal: TABLE_COLS[i].align, vertical: 'middle' }
+          cell.border = THIN_BORDER
         })
+        dataRow.commit()
       }
+
+      // ── Blank gap before summary ───────────────────────────────────────────
+      currentRow++
+
+      // ── Summary section: placed in last two columns (I & J = cols 9 & 10) ─
+      // Label in col 9 (bold), value in col 10 (right-aligned)
+      const summaryLabelCol = NUM_COLS - 1 // col 9
+      const summaryValueCol = NUM_COLS     // col 10
 
       const commissionAmount = (grandTotalConfirmed * commissionPct) / 100
 
-      // Blank separator before summary
-      rows.push({})
-
-      // Summary rows
-      rows.push({ A: `Currency: ${currency}` })
-      rows.push({ A: 'Total Amount Confirmed', J: grandTotalConfirmed })
-      rows.push({ A: '% Commission', J: `${commissionPct}%` })
-      rows.push({ A: 'Commission for Agent', J: commissionAmount })
-
-      // Build worksheet from raw array of objects using sheet_from_array_of_arrays
-      // We use aoa_to_sheet so we fully control the layout
-      const aoa = rows.map(row => [
-        row.A ?? '',
-        row.B ?? '',
-        row.C ?? '',
-        row.D ?? '',
-        row.E ?? '',
-        row.F ?? '',
-        row.G ?? '',
-        row.H ?? '',
-        row.I ?? '',
-        row.J ?? ''
-      ])
-
-      const worksheet = XLSX.utils.aoa_to_sheet(aoa)
-
-      // Set column widths
-      worksheet['!cols'] = [
-        { wch: 30 }, // Portfolio
-        { wch: 30 }, // Property
-        { wch: 20 }, // Status
-        { wch: 20 }, // OTA Types
-        { wch: 14 }, // Start Date
-        { wch: 14 }, // End Date
-        { wch: 20 }, // Expedia
-        { wch: 20 }, // Agoda
-        { wch: 20 }, // Booking
-        { wch: 22 }  // Total
+      const summaryRows: Array<[string, string | number]> = [
+        ['Currency',              currency],
+        ['Total Amount Confirmed', grandTotalConfirmed],
+        ['Commission',            `${commissionPct}%`],
+        ['Commission for Agent',  commissionAmount]
       ]
 
-      const sheetName = currency.substring(0, 31)
-      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
+      for (const [label, value] of summaryRows) {
+        const row = sheet.getRow(currentRow++)
+        const labelCell = row.getCell(summaryLabelCol)
+        labelCell.value = label
+        labelCell.font = { bold: true }
+        if (value !== '') {
+          const valueCell = row.getCell(summaryValueCol)
+          valueCell.value = value
+          valueCell.alignment = { horizontal: 'right' }
+        }
+        row.commit()
+      }
+
+      return sheet
     }
 
-    // If no audits found at all, create a single sheet with just the agent info
     if (auditsByCurrency.size === 0) {
-      const aoa = [
-        ['Sales Agent Report'],
-        [`Agent: ${salesAgent.full_name}`],
-        [`Email: ${salesAgent.email}`],
-        [`Phone: ${salesAgent.phone}`],
-        [`Period: ${query.from} to ${query.to}`],
-        [],
-        ['No audits found for this period.']
+      // No audits found — single sheet with agent info and message
+      const sheet = workbook.addWorksheet('Report')
+      sheet.getColumn(1).width = 18
+      sheet.getColumn(2).width = 40
+
+      let r = 1
+      const titleCell = sheet.getRow(r++).getCell(1)
+      titleCell.value = 'Sales Agent Report'
+      titleCell.font = { bold: true, size: 13 }
+
+      const agentDetails: Array<[string, string]> = [
+        ['Agent:', salesAgent.full_name],
+        ['Email:', salesAgent.email],
+        ['Phone:', salesAgent.phone],
+        ['Period:', `${query.from} to ${query.to}`]
       ]
-      const worksheet = XLSX.utils.aoa_to_sheet(aoa)
-      worksheet['!cols'] = [{ wch: 50 }]
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Report')
+      for (const [label, value] of agentDetails) {
+        const row = sheet.getRow(r++)
+        row.getCell(1).value = label
+        row.getCell(1).font = { bold: true }
+        row.getCell(2).value = value
+        row.commit()
+      }
+
+      r++
+      sheet.getRow(r).getCell(1).value = 'No audits found for this period.'
+    } else {
+      for (const [currency, currencyAudits] of auditsByCurrency.entries()) {
+        buildSheet(currency, currencyAudits)
+      }
     }
 
-    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+    const buffer = await workbook.xlsx.writeBuffer()
+    return Buffer.from(buffer)
   }
 }
