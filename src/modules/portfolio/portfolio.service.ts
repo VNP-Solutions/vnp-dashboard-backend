@@ -107,13 +107,6 @@ export class PortfolioService implements IPortfolioService {
       throw new ConflictException('Portfolio with this name already exists')
     }
 
-    // Validate sales_agent requirement
-    if (data.is_commissionable && !data.sales_agent) {
-      throw new BadRequestException(
-        'Sales agent is required when portfolio is commissionable'
-      )
-    }
-
     // Extract contract_url from data before creating portfolio
     const { contract_url, ...portfolioData } = data
 
@@ -289,17 +282,10 @@ export class PortfolioService implements IPortfolioService {
         ...portfolioWithoutPendingActions
       } = portfolio
 
-      // Conditionally hide sales_agent for external users
-      const isInternal = userIsInternal || userIsSuperAdmin
       const portfolioData = {
         ...portfolioWithoutPendingActions,
         has_pending_action: pendingActions.length > 0,
         pending_actions: pendingActions
-      }
-
-      // Remove sales_agent field if user is not internal
-      if (!isInternal) {
-        delete portfolioData.sales_agent
       }
 
       return portfolioData
@@ -428,17 +414,10 @@ export class PortfolioService implements IPortfolioService {
         ...portfolioWithoutPendingActions
       } = portfolio
 
-      // Conditionally hide sales_agent for external users (though only super admin can export)
-      const isInternal = userIsInternal || userIsSuperAdmin
       const portfolioData = {
         ...portfolioWithoutPendingActions,
         has_pending_action: pendingActions.length > 0,
         pending_actions: pendingActions
-      }
-
-      // Remove sales_agent field if user is not internal
-      if (!isInternal) {
-        delete portfolioData.sales_agent
       }
 
       return portfolioData
@@ -472,13 +451,6 @@ export class PortfolioService implements IPortfolioService {
     // External users cannot see deactivated portfolios
     if (!isSuperAdmin && !isInternal && !portfolio.is_active) {
       throw new NotFoundException('Portfolio not found')
-    }
-
-    // Conditionally hide sales_agent for external users
-    if (!isInternal && !isSuperAdmin) {
-      const { sales_agent: _sales_agent, ...portfolioWithoutSalesAgent } =
-        portfolio as any
-      return portfolioWithoutSalesAgent
     }
 
     return portfolio
@@ -524,21 +496,6 @@ export class PortfolioService implements IPortfolioService {
       if (!serviceType) {
         throw new NotFoundException('Service type not found')
       }
-    }
-
-    // Validate sales_agent requirement
-    const isCommissionable =
-      data.is_commissionable !== undefined
-        ? data.is_commissionable
-        : portfolio.is_commissionable
-
-    const salesAgent =
-      data.sales_agent !== undefined ? data.sales_agent : portfolio.sales_agent
-
-    if (isCommissionable && !salesAgent) {
-      throw new BadRequestException(
-        'Sales agent is required when portfolio is commissionable'
-      )
     }
 
     return this.portfolioRepository.update(id, data, user.id, isSuperAdmin)
@@ -1261,20 +1218,20 @@ export class PortfolioService implements IPortfolioService {
             'Access contact'
           ])
 
-          // Extract contract URL/Documents (OPTIONAL)
-          const contractUrl = findHeaderValue(row, [
-            'Documents',
-            'Contract URL',
-            'Contract Url',
-            'Contract url'
-          ])
+        // Extract contract URL/Documents (OPTIONAL)
+        const contractUrl = findHeaderValue(row, [
+          'Documents',
+          'Contract URL',
+          'Contract Url',
+          'Contract url'
+        ])
 
-          // Extract commissionable (OPTIONAL) - map "Yes"/"No" to true/false
-          const commissionableRaw = findHeaderValue(row, [
-            'Commissionable',
-            'Is Commissionable',
-            'is_commissionable'
-          ])
+        // Extract commissionable (OPTIONAL) - map "Yes"/"No" to true/false
+        const commissionableRaw = findHeaderValue(row, [
+          'Commissionable',
+          'Is Commissionable',
+          'is_commissionable'
+        ])
 
           let isCommissionable = false
           if (commissionableRaw) {
@@ -1296,23 +1253,6 @@ export class PortfolioService implements IPortfolioService {
             }
           }
 
-          // Extract sales agent (OPTIONAL)
-          const salesAgent = findHeaderValue(row, [
-            'Sales Agent',
-            'Sales agent'
-          ])
-
-          // Validate: If commissionable is true, sales_agent is required
-          if (isCommissionable && !salesAgent) {
-            result.errors.push({
-              row: rowNumber,
-              portfolio: portfolioName,
-              error: 'Sales Agent is required when portfolio is commissionable'
-            })
-            result.failureCount++
-            continue
-          }
-
           // Create portfolio
           const portfolioData: Omit<CreatePortfolioDto, 'contract_url'> = {
             name: portfolioName,
@@ -1321,7 +1261,6 @@ export class PortfolioService implements IPortfolioService {
             is_active: isActive,
             contact_email: contactEmail || undefined,
             is_commissionable: isCommissionable,
-            sales_agent: salesAgent || undefined,
             access_email: accessEmail || undefined,
             access_phone: accessPhone || undefined
           }
@@ -1709,36 +1648,6 @@ export class PortfolioService implements IPortfolioService {
               result.failureCount++
               continue
             }
-          }
-
-          // Extract sales agent (if provided)
-          const salesAgent = findHeaderValue(row, [
-            'Sales Agent',
-            'Sales agent'
-          ])
-          if (salesAgent !== undefined) {
-            updateData.sales_agent = salesAgent || undefined
-          }
-
-          // Validate: If commissionable is true, sales_agent is required
-          const isCommissionable =
-            updateData.is_commissionable !== undefined
-              ? updateData.is_commissionable
-              : existingPortfolio.is_commissionable
-
-          const finalSalesAgent =
-            updateData.sales_agent !== undefined
-              ? updateData.sales_agent
-              : existingPortfolio.sales_agent
-
-          if (isCommissionable && !finalSalesAgent) {
-            result.errors.push({
-              row: rowNumber,
-              portfolioId: portfolioIdValue,
-              error: 'Sales Agent is required when portfolio is commissionable'
-            })
-            result.failureCount++
-            continue
           }
 
           // Only update if there's something to update

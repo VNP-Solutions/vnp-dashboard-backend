@@ -12,7 +12,7 @@ export class PortfolioRepository implements IPortfolioRepository {
     _userId?: string,
     _isSuperAdmin?: boolean
   ) {
-    const { service_type_id, ...portfolioData } = data
+    const { service_type_id, sales_agent_id, ...portfolioData } = data
 
     return this.prisma.portfolio.create({
       data: {
@@ -21,7 +21,10 @@ export class PortfolioRepository implements IPortfolioRepository {
           connect: {
             id: service_type_id
           }
-        }
+        },
+        ...(sales_agent_id && {
+          salesAgent: { connect: { id: sales_agent_id } }
+        })
       },
       include: {
         serviceType: {
@@ -29,6 +32,17 @@ export class PortfolioRepository implements IPortfolioRepository {
             id: true,
             type: true,
             is_active: true
+          }
+        },
+        salesAgent: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+            phone: true,
+            address: true,
+            commission: true,
+            documents: true
           }
         },
         bankDetails: {
@@ -81,6 +95,17 @@ export class PortfolioRepository implements IPortfolioRepository {
             id: true,
             type: true,
             is_active: true
+          }
+        },
+        salesAgent: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+            phone: true,
+            address: true,
+            commission: true,
+            documents: true
           }
         },
         bankDetails: {
@@ -228,6 +253,17 @@ export class PortfolioRepository implements IPortfolioRepository {
             is_active: true
           }
         },
+        salesAgent: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+            phone: true,
+            address: true,
+            commission: true,
+            documents: true
+          }
+        },
         bankDetails: {
           select: {
             id: true,
@@ -309,7 +345,7 @@ export class PortfolioRepository implements IPortfolioRepository {
     userId?: string,
     isSuperAdmin?: boolean
   ) {
-    const { service_type_id, ...portfolioData } = data
+    const { service_type_id, sales_agent_id, ...portfolioData } = data
 
     const updateData: any = {
       ...portfolioData
@@ -324,6 +360,13 @@ export class PortfolioRepository implements IPortfolioRepository {
       }
     }
 
+    // Handle salesAgent relation: connect, disconnect (null), or leave unchanged
+    if (sales_agent_id === null) {
+      updateData.salesAgent = { disconnect: true }
+    } else if (sales_agent_id) {
+      updateData.salesAgent = { connect: { id: sales_agent_id } }
+    }
+
     return this.prisma.portfolio.update({
       where: { id },
       data: updateData,
@@ -333,6 +376,17 @@ export class PortfolioRepository implements IPortfolioRepository {
             id: true,
             type: true,
             is_active: true
+          }
+        },
+        salesAgent: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+            phone: true,
+            address: true,
+            commission: true,
+            documents: true
           }
         },
         bankDetails: {

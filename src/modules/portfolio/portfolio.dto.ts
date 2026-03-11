@@ -8,7 +8,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  ValidateIf,
   ValidateNested
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
@@ -74,19 +73,6 @@ export class CreatePortfolioDto {
   is_commissionable: boolean
 
   @ApiPropertyOptional({
-    example: 'John Doe',
-    description: 'Sales agent name (required if is_commissionable is true)'
-  })
-  @ValidateIf(o => o.is_commissionable === true)
-  @IsNotEmpty({
-    message: 'Sales agent is required when portfolio is commissionable'
-  })
-  @IsString()
-  @ValidateIf(o => o.is_commissionable === false || o.sales_agent !== undefined)
-  @IsOptional()
-  sales_agent?: string
-
-  @ApiPropertyOptional({
     example: 'access@example.com',
     description: 'Access email for portfolio'
   })
@@ -102,6 +88,14 @@ export class CreatePortfolioDto {
   @IsString()
   @IsOptional()
   access_phone?: string
+
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439011',
+    description: 'Sales agent ID to assign to this portfolio'
+  })
+  @IsString()
+  @IsOptional()
+  sales_agent_id?: string
 }
 
 // Exclude is_active from UpdatePortfolioDto - use dedicated deactivate API instead

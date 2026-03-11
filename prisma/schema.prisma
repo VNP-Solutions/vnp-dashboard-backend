@@ -52,9 +52,10 @@ model Portfolio {
   is_active         Boolean
   contact_email     String?
   is_commissionable Boolean
-  sales_agent       String?
   access_email      String?
   access_phone      String?
+  sales_agent_id    String?                 @db.ObjectId
+  salesAgent        SalesAgent?             @relation(fields: [sales_agent_id], references: [id])
 
   properties           Property[]
   notes                Note[]
@@ -70,6 +71,22 @@ model Portfolio {
   @@index([service_type_id])
   @@index([is_active])
   @@index([is_commissionable])
+  @@index([sales_agent_id])
+}
+
+model SalesAgent {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  full_name  String
+  address    String
+  phone      String
+  email      String      @unique
+  commission Float
+  documents  String[]    @default([])
+
+  portfolios Portfolio[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
 model Property {
