@@ -31,6 +31,7 @@ model User {
   notes                   Note[]
   tasks                   Task[]
   contractUrls            ContractUrl[]
+  propertyContractUrls    PropertyContractUrl[]
   consolidatedReports     ConsolidatedReport[]
   requestedPendingActions PendingAction[]        @relation("PendingActionRequestedBy")
   approvedPendingActions  PendingAction[]        @relation("PendingActionApprovedBy")
@@ -103,12 +104,13 @@ model Property {
   previous_portfolio_id String?   @db.ObjectId
   show_in_portfolio     String[]  @db.ObjectId
 
-  audits         Audit[]
-  credentials    PropertyCredentials?
-  bankDetails    PropertyBankDetails?
-  notes          Note[]
-  tasks          Task[]
-  pendingActions PendingAction[]
+  audits               Audit[]
+  credentials          PropertyCredentials?
+  bankDetails          PropertyBankDetails?
+  notes                Note[]
+  tasks                Task[]
+  pendingActions       PendingAction[]
+  propertyContractUrls PropertyContractUrl[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -455,6 +457,25 @@ model ContractUrl {
   @@index([user_id])
   @@index([is_active])
   @@index([portfolio_id, user_id])
+}
+
+model PropertyContractUrl {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  url         String
+  description String?
+  is_active   Boolean  @default(true)
+  property_id String   @db.ObjectId
+  property    Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  user_id     String   @db.ObjectId
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([property_id])
+  @@index([user_id])
+  @@index([is_active])
+  @@index([property_id, user_id])
 }
 
 model ConsolidatedReport {

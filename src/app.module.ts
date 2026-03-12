@@ -29,6 +29,7 @@ import { PrismaService } from './modules/prisma/prisma.service'
 import { PropertyBankDetailsModule } from './modules/property-bank-details/property-bank-details.module'
 import { PropertyCredentialsModule } from './modules/property-credentials/property-credentials.module'
 import { PendingActionModule } from './modules/pending-action/pending-action.module'
+import { PropertyContractUrlModule } from './modules/property-contract-url/property-contract-url.module'
 import { PropertyModule } from './modules/property/property.module'
 import { SalesAgentModule } from './modules/sales-agent/sales-agent.module'
 import { SchedulerModule } from './modules/scheduler/scheduler.module'
@@ -62,6 +63,7 @@ import { UserModule } from './modules/user/user.module'
     PropertyBankDetailsModule,
     PropertyCredentialsModule,
     PendingActionModule,
+    PropertyContractUrlModule,
     PropertyModule,
     SalesAgentModule,
     SchedulerModule,

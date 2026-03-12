@@ -85,6 +85,7 @@ type PropertyWithPendingActions = Prisma.PropertyGetPayload<{
   }
 }> & {
   total_audits: number
+  total_contract_urls: number
 }
 
 type PropertyWithFullDetails = Prisma.PropertyGetPayload<{
@@ -129,7 +130,10 @@ type PropertyWithFullDetails = Prisma.PropertyGetPayload<{
       }
     }
   }
-}>
+}> & {
+  total_notes?: number
+  total_contract_urls?: number
+}
 
 export interface IPropertyRepository {
   create(data: CreatePropertyDto): Promise<PropertyWithRelations>
