@@ -592,13 +592,28 @@ export class PropertyRepository implements IPropertyRepository {
 
     const noteCountMap = new Map(noteCounts.map(nc => [nc.propertyId, nc.count]))
 
-    // Enrich each property with total_audits count, total_notes count, and previous_portfolio data
+    // Get contract URL counts for each property
+    const contractUrlCounts = await Promise.all(
+      propertyIds.map(async propertyId => ({
+        propertyId,
+        count: await this.prisma.propertyContractUrl.count({
+          where: { property_id: propertyId }
+        })
+      }))
+    )
+
+    const contractUrlCountMap = new Map(
+      contractUrlCounts.map(cc => [cc.propertyId, cc.count])
+    )
+
+    // Enrich each property with total_audits count, total_notes count, total_contract_urls count, and previous_portfolio data
     // If user doesn't have audit access, total_audits will be 0
     return properties.map(property => ({
       ...property,
       total_audits:
         hasAuditAccess !== false ? auditCountMap.get(property.id) || 0 : 0,
       total_notes: noteCountMap.get(property.id) || 0,
+      total_contract_urls: contractUrlCountMap.get(property.id) || 0,
       previous_portfolio: property.previous_portfolio_id
         ? previousPortfolioMap.get(property.previous_portfolio_id) || null
         : null
@@ -682,10 +697,16 @@ export class PropertyRepository implements IPropertyRepository {
       where: { property_id: id }
     })
 
+    // Get contract URL count for this property
+    const contractUrlCount = await this.prisma.propertyContractUrl.count({
+      where: { property_id: id }
+    })
+
     return {
       ...property,
       previous_portfolio,
-      total_notes: noteCount
+      total_notes: noteCount,
+      total_contract_urls: contractUrlCount
     } as any
   }
 
