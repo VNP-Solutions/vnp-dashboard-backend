@@ -392,7 +392,7 @@ export class PortfolioController {
   @ApiOperation({
     summary: 'Bulk import portfolios from Excel file (Internal users only)',
     description: `
-    Upload an Excel file (.xlsx or .xls) to bulk import portfolios.
+    Upload an Excel (.xlsx, .xls) or CSV file to bulk import portfolios.
     
     Required columns:
     - Portfolio Name: Name of the portfolio
@@ -416,7 +416,7 @@ export class PortfolioController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Excel file (.xlsx) containing portfolio data'
+          description: 'Excel (.xlsx/.xls) or CSV file containing portfolio data'
         }
       }
     }
@@ -447,7 +447,7 @@ export class PortfolioController {
   @ApiOperation({
     summary: 'Bulk update portfolios from Excel file',
     description: `
-    Upload an Excel file (.xlsx or .xls) to bulk update existing portfolios.
+    Upload an Excel (.xlsx, .xls) or CSV file to bulk update existing portfolios.
     Only Super Admin and internal users can use this endpoint.
     
     Required column:
@@ -468,7 +468,7 @@ export class PortfolioController {
     `
   })
   @ApiBody({
-    description: 'Excel file containing portfolio update data',
+    description: 'Excel (.xlsx/.xls) or CSV file containing portfolio update data',
     schema: {
       type: 'object',
       properties: {

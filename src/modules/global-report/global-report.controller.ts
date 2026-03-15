@@ -4,6 +4,7 @@ import {
   Get,
   Inject,
   Post,
+  Query,
   Res,
   UseGuards
 } from '@nestjs/common'
@@ -18,6 +19,7 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
+  GlobalReportExportFormatQueryDto,
   GlobalReportQueryDto,
   GlobalReportExportDto,
   GlobalReportResponseDto,
@@ -397,8 +399,11 @@ Query audit data across all properties and portfolios with Excel-like filtering.
 Export all matching audit data to CSV or Excel format.
 Uses the same filtering as the main report endpoint.
 
-**Options:**
-- format: 'csv' or 'xlsx'
+**Query params:**
+- format: 'csv' | 'xlsx' (default: 'xlsx') — e.g. ?format=csv or ?format=xlsx
+
+**Body:**
+- filters, sort, columns, includeArchived (same as main report)
 - columns: Optional array of column keys to include (default: all)
 
 **Note:** For large datasets, this may take longer. The response is a file download.
@@ -421,16 +426,21 @@ Uses the same filtering as the main report endpoint.
     description: 'Forbidden - Super admin access required'
   })
   async exportReport(
-    @Body() query: GlobalReportExportDto,
+    @Query() formatQuery: GlobalReportExportFormatQueryDto,
+    @Body() body: GlobalReportExportDto,
     @CurrentUser() user: IUserWithPermissions,
     @Res() res: Response
   ): Promise<void> {
-    const buffer = await this.globalReportService.exportReport(query, user)
+    const format = formatQuery.format ?? 'xlsx'
+    const buffer = await this.globalReportService.exportReport(
+      { ...body, format },
+      user
+    )
 
     const timestamp = new Date().toISOString().split('T')[0]
     const filename = `global-report-${timestamp}`
 
-    if (query.format === 'xlsx') {
+    if (format === 'xlsx') {
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

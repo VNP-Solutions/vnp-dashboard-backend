@@ -348,9 +348,9 @@ export class PropertyBankDetailsController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk update property bank details from Excel file (Requires password verification)',
+    summary: 'Bulk update property bank details from Excel/CSV file (Requires password verification)',
     description:
-      'Updates bank details for multiple properties from an Excel file. Requires bank_details UPDATE permission and password verification. ' +
+      'Updates bank details for multiple properties from an Excel or CSV file. Requires bank_details UPDATE permission and password verification. ' +
       'The first column must be "Expedia ID" to identify the property. ' +
       'Bank sub-type is AUTO-DETECTED from sheet columns (no Bank Sub Type column needed). ' +
       'Detection: SWIFT/BIC/IBAN columns → International Wire; Bank Account Type column → ACH; Otherwise → Domestic Wire. ' +
@@ -369,7 +369,7 @@ export class PropertyBankDetailsController {
           type: 'string',
           format: 'binary',
           description:
-            'Excel file (.xlsx or .xls) containing property bank details. ' +
+            'Excel (.xlsx/.xls) or CSV file containing property bank details. ' +
             'Required columns: Expedia ID, Hotel Portfolio Name, Account Number, Bank Name + sub-type specific fields. ' +
             'Bank sub-type is auto-detected from columns present in the sheet.'
         },

@@ -134,16 +134,33 @@ export class GlobalReportQueryDto {
 }
 
 /**
- * Export DTO extends query DTO with format and column selection
+ * Query params for export endpoint - format is specified via query for download type
+ */
+export class GlobalReportExportFormatQueryDto {
+  @ApiPropertyOptional({
+    description: 'Export format. Pass as query param: ?format=xlsx or ?format=csv',
+    enum: ['csv', 'xlsx'],
+    example: 'xlsx',
+    default: 'xlsx'
+  })
+  @IsOptional()
+  @IsIn(['csv', 'xlsx'])
+  format?: 'csv' | 'xlsx' = 'xlsx'
+}
+
+/**
+ * Export DTO extends query DTO with column selection.
+ * Format can be passed via query param (?format=xlsx|csv) or in body.
  */
 export class GlobalReportExportDto extends GlobalReportQueryDto {
-  @ApiProperty({
-    description: 'Export format',
+  @ApiPropertyOptional({
+    description: 'Export format (also accepted as query param ?format=xlsx|csv)',
     enum: ['csv', 'xlsx'],
-    example: 'xlsx'
+    default: 'xlsx'
   })
+  @IsOptional()
   @IsIn(['csv', 'xlsx'])
-  format: 'csv' | 'xlsx'
+  format?: 'csv' | 'xlsx'
 
   @ApiPropertyOptional({
     description:

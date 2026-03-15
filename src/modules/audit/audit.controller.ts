@@ -177,7 +177,7 @@ export class AuditController {
   @ApiOperation({
     summary: 'Bulk update audits from Excel file (Internal users only)',
     description: `
-    Upload an Excel file (.xlsx or .xls) to bulk update existing audits.
+    Upload an Excel (.xlsx, .xls) or CSV file to bulk update existing audits.
 
     Required column:
     - Audit ID/Audit Id/Audit id/ID/Id/id: ID of the audit to update (must exist)
@@ -201,7 +201,7 @@ export class AuditController {
     `
   })
   @ApiBody({
-    description: 'Excel file containing audit update data',
+    description: 'Excel (.xlsx/.xls) or CSV file containing audit update data',
     schema: {
       type: 'object',
       properties: {
@@ -338,7 +338,7 @@ export class AuditController {
   @ApiOperation({
     summary: 'Bulk import audits from Excel file (Internal users only)',
     description: `
-    Upload an Excel file (.xlsx or .xls) to bulk import audits.
+    Upload an Excel (.xlsx, .xls) or CSV file to bulk import audits.
 
     Required columns:
     - Expedia ID/Expedia Id/Expedia id/expedia_id: Expedia ID of the property (must exist)
@@ -361,7 +361,7 @@ export class AuditController {
     `
   })
   @ApiBody({
-    description: 'Excel file containing audit data',
+    description: 'Excel (.xlsx/.xls) or CSV file containing audit data',
     schema: {
       type: 'object',
       properties: {
