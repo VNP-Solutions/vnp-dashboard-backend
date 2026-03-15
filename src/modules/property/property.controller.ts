@@ -866,7 +866,7 @@ export class PropertyController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk import properties from Excel file (Internal users only)'
+    summary: 'Bulk import properties from Excel/CSV file (Internal users only)'
   })
   @ApiBody({
     schema: {
@@ -875,7 +875,7 @@ export class PropertyController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Excel file (.xlsx) containing property data'
+          description: 'Excel (.xlsx/.xls) or CSV file containing property data'
         }
       }
     }
@@ -908,9 +908,9 @@ export class PropertyController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk update properties from Excel file (Internal users only)',
+    summary: 'Bulk update properties from Excel/CSV file (Internal users only)',
     description: `
-    Upload an Excel file (.xlsx or .xls) to bulk update existing properties.
+    Upload an Excel (.xlsx, .xls) or CSV file to bulk update existing properties.
     Only internal users can use this endpoint.
     
     Required column:
@@ -950,7 +950,7 @@ export class PropertyController {
     `
   })
   @ApiBody({
-    description: 'Excel file containing property update data',
+    description: 'Excel (.xlsx/.xls) or CSV file containing property update data',
     schema: {
       type: 'object',
       properties: {

@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { BankType } from '@prisma/client'
-import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -19,6 +18,10 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount } from '../../common/utils/amount.util'
+import {
+  parseSpreadsheetToJson,
+  validateSpreadsheetFile
+} from '../../common/utils/spreadsheet.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
@@ -1653,14 +1656,7 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('No file provided')
     }
 
-    if (
-      !file.originalname.endsWith('.xlsx') &&
-      !file.originalname.endsWith('.xls')
-    ) {
-      throw new BadRequestException(
-        'File must be an Excel file (.xlsx or .xls)'
-      )
-    }
+    validateSpreadsheetFile(file)
 
     const result: BulkImportResultDto = {
       totalRows: 0,
@@ -1675,16 +1671,7 @@ export class PropertyService implements IPropertyService {
     const bankDetailsUpdatedPropertyIds: string[] = []
 
     try {
-      // Parse Excel file
-      const workbook = XLSX.read(file.buffer, { type: 'buffer' })
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const data = XLSX.utils.sheet_to_json(worksheet)
-
-      if (!data || data.length === 0) {
-        throw new BadRequestException('Excel file is empty')
-      }
-
+      const data = parseSpreadsheetToJson(file)
       result.totalRows = data.length
 
       console.log(
@@ -2529,14 +2516,7 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('No file provided')
     }
 
-    if (
-      !file.originalname.endsWith('.xlsx') &&
-      !file.originalname.endsWith('.xls')
-    ) {
-      throw new BadRequestException(
-        'File must be an Excel file (.xlsx or .xls)'
-      )
-    }
+    validateSpreadsheetFile(file)
 
     const result: BulkUpdateResultDto = {
       totalRows: 0,
@@ -2547,16 +2527,7 @@ export class PropertyService implements IPropertyService {
     }
 
     try {
-      // Parse Excel file
-      const workbook = XLSX.read(file.buffer, { type: 'buffer' })
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const data = XLSX.utils.sheet_to_json(worksheet)
-
-      if (!data || data.length === 0) {
-        throw new BadRequestException('Excel file is empty')
-      }
-
+      const data = parseSpreadsheetToJson(file)
       result.totalRows = data.length
 
       // Helper function to find header value with flexible naming
