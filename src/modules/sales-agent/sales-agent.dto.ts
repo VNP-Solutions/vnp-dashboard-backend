@@ -4,6 +4,7 @@ import {
   IsArray,
   IsDateString,
   IsEmail,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -104,4 +105,13 @@ export class SalesAgentReportQueryDto {
   @IsDateString()
   @IsNotEmpty()
   to: string
+
+  @ApiPropertyOptional({
+    example: 'xlsx',
+    description: 'Export format: ?format=xlsx or ?format=csv (default: xlsx)',
+    enum: ['csv', 'xlsx']
+  })
+  @IsOptional()
+  @IsIn(['csv', 'xlsx'])
+  format?: 'csv' | 'xlsx' = 'xlsx'
 }
