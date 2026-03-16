@@ -45,9 +45,12 @@ import {
   CreatePropertyDto,
   DeactivatePropertyDto,
   DeletePropertyDto,
+  GetPropertiesByIdsSecureDto,
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
+  SecurePropertyDto,
+  SecurePropertyListDto,
   SharePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
@@ -447,6 +450,121 @@ export class PropertyController {
       getPropertiesByPortfoliosDto,
       user
     )
+  }
+
+  @Post('secure')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Get all properties with full bank details (password required)',
+    description:
+      'Identical to GET /property (same query params, same pagination/filter/sort), ' +
+      'but returns unmasked bank details. Requires the current user to verify their password in the request body.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['password'],
+      properties: {
+        password: {
+          type: 'string',
+          example: 'MyPassword123!',
+          description: 'Current user password for verification'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated list of properties with full bank details'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  async findAllSecure(
+    @Query() query: PropertyQueryDto,
+    @Body() body: SecurePropertyListDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+    if (!dbUser) throw new BadRequestException('User not found')
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      body.password,
+      dbUser.password
+    )
+    if (!isPasswordValid) throw new BadRequestException('Invalid password')
+    return this.propertyService.findAllSecure(query, user)
+  }
+
+  @Post('by-ids/secure')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Get specific properties by IDs with full bank details (password required)',
+    description:
+      'Returns full details including unmasked bank details for the specified property IDs. ' +
+      'IDs the user has no access to are silently excluded from the results. ' +
+      'Requires the current user to verify their password.'
+  })
+  @ApiBody({ type: GetPropertiesByIdsSecureDto })
+  @ApiResponse({
+    status: 200,
+    description: 'List of properties with full bank details'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  async findManyByIdsSecure(
+    @Body() body: GetPropertiesByIdsSecureDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+    if (!dbUser) throw new BadRequestException('User not found')
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      body.password,
+      dbUser.password
+    )
+    if (!isPasswordValid) throw new BadRequestException('Invalid password')
+    return this.propertyService.findManyByIdsSecure(body.property_ids, user)
+  }
+
+  @Post(':id/secure')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ, true)
+  @ApiOperation({
+    summary: 'Get a property by ID with full bank details (password required)',
+    description:
+      'Identical to GET /property/:id but returns unmasked bank details. ' +
+      'Requires the current user to verify their password in the request body.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['password'],
+      properties: {
+        password: {
+          type: 'string',
+          example: 'MyPassword123!',
+          description: 'Current user password for verification'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Property with full bank details retrieved successfully'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - No access to this property' })
+  @ApiResponse({ status: 404, description: 'Property not found' })
+  async findOneSecure(
+    @Param('id') id: string,
+    @Body() body: SecurePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+    if (!dbUser) throw new BadRequestException('User not found')
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      body.password,
+      dbUser.password
+    )
+    if (!isPasswordValid) throw new BadRequestException('Invalid password')
+    return this.propertyService.findOneSecure(id, user)
   }
 
   @Get(':id')

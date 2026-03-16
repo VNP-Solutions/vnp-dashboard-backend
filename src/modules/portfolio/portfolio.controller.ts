@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -28,17 +29,22 @@ import {
   ModuleType,
   PermissionAction
 } from '../../common/interfaces/permission.interface'
+import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { EmailAttachment } from '../email/email.dto'
+import { PrismaService } from '../prisma/prisma.service'
 import {
   ActivatePortfolioDto,
   BulkDeletePortfolioDto,
   CreatePortfolioDto,
   DeactivatePortfolioDto,
   DeletePortfolioDto,
+  GetPortfoliosByIdsSecureDto,
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
+  SecurePortfolioDto,
+  SecurePortfolioListDto,
   SendPortfolioEmailDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
@@ -51,7 +57,9 @@ import type { IPortfolioService } from './portfolio.interface'
 export class PortfolioController {
   constructor(
     @Inject('IPortfolioService')
-    private readonly portfolioService: IPortfolioService
+    private readonly portfolioService: IPortfolioService,
+    @Inject(PrismaService)
+    private readonly prisma: PrismaService
   ) {}
 
   @Post()
@@ -107,6 +115,130 @@ export class PortfolioController {
     return this.portfolioService.findAllForExport(query, user)
   }
 
+  @Post('secure')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Get all portfolios with full bank details (password required)',
+    description:
+      'Identical to GET /portfolio (same query params, same pagination/filter/sort), ' +
+      'but returns unmasked bank details. Requires the current user to verify their password in the request body.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['password'],
+      properties: {
+        password: {
+          type: 'string',
+          example: 'MySecureP@ssw0rd',
+          description: 'Current user password for verification'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated list of portfolios with full bank details'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  async findAllSecure(
+    @Query() query: PortfolioQueryDto,
+    @Body() body: SecurePortfolioListDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+    if (!dbUser) throw new BadRequestException('User not found')
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      body.password,
+      dbUser.password
+    )
+    if (!isPasswordValid) throw new BadRequestException('Invalid password')
+    return this.portfolioService.findAllSecure(query, user)
+  }
+
+  @Post('by-ids/secure')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Get specific portfolios by IDs with full bank details (password required)',
+    description:
+      'Returns full details including unmasked bank details for the specified portfolio IDs. ' +
+      'IDs the user has no access to are silently excluded from the results. ' +
+      'Requires the current user to verify their password.'
+  })
+  @ApiBody({ type: GetPortfoliosByIdsSecureDto })
+  @ApiResponse({
+    status: 200,
+    description: 'List of portfolios with full bank details'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  async findManyByIdsSecure(
+    @Body() body: GetPortfoliosByIdsSecureDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+    if (!dbUser) throw new BadRequestException('User not found')
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      body.password,
+      dbUser.password
+    )
+    if (!isPasswordValid) throw new BadRequestException('Invalid password')
+    return this.portfolioService.findManyByIdsSecure(body.portfolio_ids, user)
+  }
+
+  @Post(':id/secure')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
+  @ApiOperation({
+    summary: 'Get a portfolio by ID with full bank details (password required)',
+    description:
+      'Identical to GET /portfolio/:id but returns unmasked bank details. ' +
+      'Requires the current user to verify their password in the request body.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['password'],
+      properties: {
+        password: {
+          type: 'string',
+          example: 'MySecureP@ssw0rd',
+          description: 'Current user password for verification'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Portfolio with full bank details retrieved successfully'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - No access to this portfolio' })
+  @ApiResponse({ status: 404, description: 'Portfolio not found' })
+  async findOneSecure(
+    @Param('id') id: string,
+    @Body() body: SecurePortfolioDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+    if (!dbUser) throw new BadRequestException('User not found')
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      body.password,
+      dbUser.password
+    )
+    if (!isPasswordValid) throw new BadRequestException('Invalid password')
+    return this.portfolioService.findOneSecure(id, user)
+  }
+
   @Get(':id')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get a portfolio by ID' })
@@ -119,6 +251,7 @@ export class PortfolioController {
   findOne(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.portfolioService.findOne(id, user)
   }
+
 
   @Patch(':id')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)

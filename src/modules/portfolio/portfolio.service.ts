@@ -12,6 +12,7 @@ import {
   PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { maskBankDetails } from '../../common/utils/bank-details.util'
 import { roundAmount } from '../../common/utils/amount.util'
 import {
   parseSpreadsheetToJson,
@@ -287,6 +288,7 @@ export class PortfolioService implements IPortfolioService {
 
       const portfolioData = {
         ...portfolioWithoutPendingActions,
+        bankDetails: maskBankDetails(portfolioWithoutPendingActions.bankDetails),
         has_pending_action: pendingActions.length > 0,
         pending_actions: pendingActions
       }
@@ -456,8 +458,204 @@ export class PortfolioService implements IPortfolioService {
       throw new NotFoundException('Portfolio not found')
     }
 
+    return {
+      ...portfolio,
+      bankDetails: maskBankDetails(portfolio.bankDetails)
+    }
+  }
+
+  async findOneSecure(id: string, user: IUserWithPermissions) {
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const isInternal = isInternalUser(user)
+
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
+    const portfolio = await this.portfolioRepository.findById(
+      id,
+      user.id,
+      isSuperAdmin,
+      accessiblePropertyIds
+    )
+
+    if (!portfolio) {
+      throw new NotFoundException('Portfolio not found')
+    }
+
+    if (!isSuperAdmin && !isInternal && !portfolio.is_active) {
+      throw new NotFoundException('Portfolio not found')
+    }
+
     return portfolio
   }
+
+  async findManyByIdsSecure(
+    portfolioIds: string[],
+    user: IUserWithPermissions
+  ) {
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const isInternal = isInternalUser(user)
+
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PORTFOLIO
+    )
+
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
+    const results = await Promise.all(
+      portfolioIds.map(async id => {
+        const portfolio = await this.portfolioRepository.findById(
+          id,
+          user.id,
+          isSuperAdmin,
+          accessiblePropertyIds
+        )
+
+        if (!portfolio) return null
+
+        // Respect access control
+        if (
+          accessibleIds !== 'all' &&
+          Array.isArray(accessibleIds) &&
+          !accessibleIds.includes(id)
+        ) {
+          return null
+        }
+
+        if (!isSuperAdmin && !isInternal && !portfolio.is_active) {
+          return null
+        }
+
+        return portfolio
+      })
+    )
+
+    return results.filter((p): p is NonNullable<typeof p> => p !== null)
+  }
+
+  async findAllSecure(
+    query: PortfolioQueryDto,
+    user: IUserWithPermissions
+  ) {
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PORTFOLIO
+    )
+
+    if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
+      return QueryBuilder.buildPaginatedResult(
+        [],
+        0,
+        query.page || 1,
+        query.limit || 10
+      )
+    }
+
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
+    const userIsSuperAdmin = isUserSuperAdmin(user)
+    const userIsInternal = isInternalUser(user)
+
+    const additionalFilters: any = {}
+    if (query.service_type_id) {
+      additionalFilters.service_type_id = query.service_type_id
+    }
+    if (query.is_active) {
+      const isActiveValue = query.is_active.toLowerCase().trim()
+      if (isActiveValue === 'all') {
+        // no filter
+      } else if (isActiveValue === 'true') {
+        additionalFilters.is_active = true
+      } else if (isActiveValue === 'false') {
+        additionalFilters.is_active = false
+      } else {
+        additionalFilters.is_active = true
+      }
+    }
+
+    if (!userIsSuperAdmin && !userIsInternal) {
+      if (!query.is_active || query.is_active.toLowerCase().trim() !== 'all') {
+        additionalFilters.is_active = true
+      }
+    }
+
+    const mergedQuery = {
+      ...query,
+      filters: {
+        ...(typeof query.filters === 'object' ? query.filters : {}),
+        ...additionalFilters
+      }
+    }
+
+    const queryConfig = {
+      searchFields: ['name'],
+      filterableFields: ['service_type_id', 'is_active'],
+      sortableFields: [
+        'name',
+        'created_at',
+        'updated_at',
+        'is_active',
+        'is_commissionable'
+      ],
+      defaultSortField: 'created_at',
+      defaultSortOrder: 'desc' as const,
+      nestedFieldMap: {
+        service_type_name: 'serviceType.type'
+      }
+    }
+
+    const baseWhere =
+      accessibleIds === 'all'
+        ? {}
+        : { id: { in: accessibleIds } }
+
+    const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      baseWhere
+    )
+
+    const [data, total] = await Promise.all([
+      this.portfolioRepository.findAll(
+        { where, skip, take, orderBy },
+        undefined,
+        user.id,
+        userIsSuperAdmin,
+        accessiblePropertyIds
+      ),
+      this.portfolioRepository.count(where, undefined)
+    ])
+
+    const enrichedData = data.map((portfolio: any) => {
+      const pendingActions = portfolio.pendingActions || []
+      const { pendingActions: _pendingActions, ...portfolioWithoutPendingActions } = portfolio
+      return {
+        ...portfolioWithoutPendingActions,
+        has_pending_action: pendingActions.length > 0,
+        pending_actions: pendingActions
+      }
+    })
+
+    return QueryBuilder.buildPaginatedResult(
+      enrichedData,
+      total,
+      query.page || 1,
+      query.limit || 10
+    )
+  }
+
 
   async update(
     id: string,
