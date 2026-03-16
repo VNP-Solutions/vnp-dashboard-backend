@@ -141,12 +141,7 @@ export class ContractUrlService implements IContractUrlService {
       Array.isArray(accessiblePortfolioIds) &&
       accessiblePortfolioIds.length === 0
     ) {
-      return QueryBuilder.buildPaginatedResult(
-        [],
-        0,
-        query.page || 1,
-        query.limit || 10
-      )
+      return []
     }
 
     // Build additional filters from query params
@@ -196,28 +191,14 @@ export class ContractUrlService implements IContractUrlService {
             }
           }
 
-    // Build Prisma query options
-    const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
+    // Build Prisma query options (without pagination)
+    const { where, orderBy } = QueryBuilder.buildPrismaQuery(
       mergedQuery,
       queryConfig,
       baseWhere
     )
 
-    // Fetch data and count
-    const [data, total] = await Promise.all([
-      this.contractUrlRepository.findAll(
-        { where, skip, take, orderBy },
-        undefined
-      ),
-      this.contractUrlRepository.count(where, undefined)
-    ])
-
-    return QueryBuilder.buildPaginatedResult(
-      data,
-      total,
-      query.page || 1,
-      query.limit || 10
-    )
+    return this.contractUrlRepository.findAll({ where, orderBy }, undefined)
   }
 
   async findAllForExport(
