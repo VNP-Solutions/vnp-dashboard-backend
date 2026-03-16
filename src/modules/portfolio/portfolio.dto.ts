@@ -334,6 +334,26 @@ export class SecurePortfolioDto {
   password: string
 }
 
+export class GetPortfoliosByIdsSecureDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of Portfolio IDs to retrieve with full bank details',
+    type: [String]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  portfolio_ids: string[]
+
+  @ApiProperty({
+    example: 'MySecureP@ssw0rd',
+    description: 'Current user password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
 export class SecurePortfolioListDto {
   @ApiProperty({
     example: 'MySecureP@ssw0rd',

@@ -40,6 +40,7 @@ import {
   CreatePortfolioDto,
   DeactivatePortfolioDto,
   DeletePortfolioDto,
+  GetPortfoliosByIdsSecureDto,
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
   SecurePortfolioDto,
@@ -157,6 +158,39 @@ export class PortfolioController {
     )
     if (!isPasswordValid) throw new BadRequestException('Invalid password')
     return this.portfolioService.findAllSecure(query, user)
+  }
+
+  @Post('by-ids/secure')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Get specific portfolios by IDs with full bank details (password required)',
+    description:
+      'Returns full details including unmasked bank details for the specified portfolio IDs. ' +
+      'IDs the user has no access to are silently excluded from the results. ' +
+      'Requires the current user to verify their password.'
+  })
+  @ApiBody({ type: GetPortfoliosByIdsSecureDto })
+  @ApiResponse({
+    status: 200,
+    description: 'List of portfolios with full bank details'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  async findManyByIdsSecure(
+    @Body() body: GetPortfoliosByIdsSecureDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    })
+    if (!dbUser) throw new BadRequestException('User not found')
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      body.password,
+      dbUser.password
+    )
+    if (!isPasswordValid) throw new BadRequestException('Invalid password')
+    return this.portfolioService.findManyByIdsSecure(body.portfolio_ids, user)
   }
 
   @Post(':id/secure')

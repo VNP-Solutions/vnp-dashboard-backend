@@ -197,6 +197,10 @@ export interface IPropertyService {
     query: PropertyQueryDto,
     user: IUserWithPermissions
   ): Promise<PaginatedResult<PropertyWithPendingActions>>
+  findManyByIdsSecure(
+    propertyIds: string[],
+    user: IUserWithPermissions
+  ): Promise<PropertyWithFullDetails[]>
   getPropertiesByPortfolios(
     data: GetPropertiesByPortfoliosDto,
     user: IUserWithPermissions

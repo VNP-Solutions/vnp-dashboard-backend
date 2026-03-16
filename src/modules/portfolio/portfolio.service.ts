@@ -492,6 +492,55 @@ export class PortfolioService implements IPortfolioService {
     return portfolio
   }
 
+  async findManyByIdsSecure(
+    portfolioIds: string[],
+    user: IUserWithPermissions
+  ) {
+    const isSuperAdmin = isUserSuperAdmin(user)
+    const isInternal = isInternalUser(user)
+
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PORTFOLIO
+    )
+
+    const accessiblePropertyIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PROPERTY
+      )
+
+    const results = await Promise.all(
+      portfolioIds.map(async id => {
+        const portfolio = await this.portfolioRepository.findById(
+          id,
+          user.id,
+          isSuperAdmin,
+          accessiblePropertyIds
+        )
+
+        if (!portfolio) return null
+
+        // Respect access control
+        if (
+          accessibleIds !== 'all' &&
+          Array.isArray(accessibleIds) &&
+          !accessibleIds.includes(id)
+        ) {
+          return null
+        }
+
+        if (!isSuperAdmin && !isInternal && !portfolio.is_active) {
+          return null
+        }
+
+        return portfolio
+      })
+    )
+
+    return results.filter((p): p is NonNullable<typeof p> => p !== null)
+  }
+
   async findAllSecure(
     query: PortfolioQueryDto,
     user: IUserWithPermissions

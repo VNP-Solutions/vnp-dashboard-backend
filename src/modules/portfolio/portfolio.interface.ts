@@ -109,6 +109,10 @@ export interface IPortfolioService {
     id: string,
     user: IUserWithPermissions
   ): Promise<PortfolioWithFullDetails>
+  findManyByIdsSecure(
+    portfolioIds: string[],
+    user: IUserWithPermissions
+  ): Promise<PortfolioWithFullDetails[]>
   findAllSecure(
     query: PortfolioQueryDto,
     user: IUserWithPermissions

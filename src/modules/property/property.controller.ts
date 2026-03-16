@@ -45,6 +45,7 @@ import {
   CreatePropertyDto,
   DeactivatePropertyDto,
   DeletePropertyDto,
+  GetPropertiesByIdsSecureDto,
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
@@ -491,6 +492,36 @@ export class PropertyController {
     )
     if (!isPasswordValid) throw new BadRequestException('Invalid password')
     return this.propertyService.findAllSecure(query, user)
+  }
+
+  @Post('by-ids/secure')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Get specific properties by IDs with full bank details (password required)',
+    description:
+      'Returns full details including unmasked bank details for the specified property IDs. ' +
+      'IDs the user has no access to are silently excluded from the results. ' +
+      'Requires the current user to verify their password.'
+  })
+  @ApiBody({ type: GetPropertiesByIdsSecureDto })
+  @ApiResponse({
+    status: 200,
+    description: 'List of properties with full bank details'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  async findManyByIdsSecure(
+    @Body() body: GetPropertiesByIdsSecureDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+    if (!dbUser) throw new BadRequestException('User not found')
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      body.password,
+      dbUser.password
+    )
+    if (!isPasswordValid) throw new BadRequestException('Invalid password')
+    return this.propertyService.findManyByIdsSecure(body.property_ids, user)
   }
 
   @Post(':id/secure')

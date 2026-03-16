@@ -1117,6 +1117,48 @@ export class PropertyService implements IPropertyService {
     }
   }
 
+  async findManyByIdsSecure(
+    propertyIds: string[],
+    user: IUserWithPermissions
+  ) {
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    const results = await Promise.all(
+      propertyIds.map(async id => {
+        const property = await this.propertyRepository.findById(id)
+
+        if (!property) return null
+
+        if (
+          accessibleIds !== 'all' &&
+          Array.isArray(accessibleIds) &&
+          !accessibleIds.includes(id)
+        ) {
+          return null
+        }
+
+        if (
+          !property.is_active &&
+          !isUserSuperAdmin(user) &&
+          !isInternalUser(user)
+        ) {
+          return null
+        }
+
+        return {
+          ...property,
+          bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
+          access_type: 'owned' as const
+        }
+      })
+    )
+
+    return results.filter((p): p is NonNullable<typeof p> => p !== null)
+  }
+
   async findAllSecure(
     query: PropertyQueryDto,
     user: IUserWithPermissions
