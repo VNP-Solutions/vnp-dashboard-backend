@@ -324,6 +324,26 @@ export class DeletePortfolioDto {
   password: string
 }
 
+export class SecurePortfolioDto {
+  @ApiProperty({
+    example: 'MySecureP@ssw0rd',
+    description: 'User password for verification to access full bank details'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
+export class SecurePortfolioListDto extends PortfolioQueryDto {
+  @ApiProperty({
+    example: 'MySecureP@ssw0rd',
+    description: 'User password for verification to access full bank details'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
 export class BulkDeletePortfolioDto {
   @ApiProperty({
     example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],

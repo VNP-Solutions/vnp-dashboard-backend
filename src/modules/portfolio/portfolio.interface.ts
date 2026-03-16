@@ -34,6 +34,7 @@ type PortfolioWithRelations = Prisma.PortfolioGetPayload<{
     }
   }
 }> & {
+  bankDetails: any
   total_properties: number
   total_contract_urls: number
   total_notes: number
@@ -50,6 +51,7 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
     }
   }
 }> & {
+  bankDetails: any
   total_properties: number
   total_contract_urls: number
   total_notes: number
@@ -103,6 +105,14 @@ export interface IPortfolioService {
     id: string,
     user: IUserWithPermissions
   ): Promise<PortfolioWithFullDetails>
+  findOneSecure(
+    id: string,
+    user: IUserWithPermissions
+  ): Promise<PortfolioWithFullDetails>
+  findAllSecure(
+    query: PortfolioQueryDto,
+    user: IUserWithPermissions
+  ): Promise<PaginatedResult<PortfolioWithRelations>>
   update(
     id: string,
     data: UpdatePortfolioDto,

@@ -48,6 +48,8 @@ import {
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
+  SecurePropertyDto,
+  SecurePropertyListDto,
   SharePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
@@ -447,6 +449,63 @@ export class PropertyController {
       getPropertiesByPortfoliosDto,
       user
     )
+  }
+
+  @Post('secure')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Get all properties with full bank details (password required)',
+    description:
+      'Returns the same paginated list of properties but with unmasked bank details. ' +
+      'Requires the current user to verify their password.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated list of properties with full bank details'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  async findAllSecure(
+    @Query() query: PropertyQueryDto,
+    @Body() body: SecurePropertyListDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+    if (!dbUser) throw new BadRequestException('User not found')
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      body.password,
+      dbUser.password
+    )
+    if (!isPasswordValid) throw new BadRequestException('Invalid password')
+    return this.propertyService.findAllSecure(query, user)
+  }
+
+  @Post(':id/secure')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ, true)
+  @ApiOperation({
+    summary: 'Get a property by ID with full bank details (password required)',
+    description:
+      'Returns the property with unmasked bank details. ' +
+      'Requires the current user to verify their password.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Property with full bank details retrieved successfully'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 404, description: 'Property not found' })
+  async findOneSecure(
+    @Param('id') id: string,
+    @Body() body: SecurePropertyDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+    if (!dbUser) throw new BadRequestException('User not found')
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      body.password,
+      dbUser.password
+    )
+    if (!isPasswordValid) throw new BadRequestException('Invalid password')
+    return this.propertyService.findOneSecure(id, user)
   }
 
   @Get(':id')

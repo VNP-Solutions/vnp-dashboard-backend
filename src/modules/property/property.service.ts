@@ -24,6 +24,7 @@ import {
 } from '../../common/utils/spreadsheet.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { maskBankDetails } from '../../common/utils/bank-details.util'
 import {
   canCreateBankDetails,
   canReadBankDetails,
@@ -585,7 +586,7 @@ export class PropertyService implements IPropertyService {
       // Filter bank details based on user permission
       // If user doesn't have READ permission for bank_details, set bankDetails to null
       const filteredBankDetails = canReadBankDetails(user)
-        ? propertyWithoutPendingActions.bankDetails
+        ? maskBankDetails(propertyWithoutPendingActions.bankDetails)
         : null
 
       return {
@@ -921,7 +922,7 @@ export class PropertyService implements IPropertyService {
       // Filter bank details based on user permission
       // If user doesn't have READ permission for bank_details, set bankDetails to null
       const filteredBankDetails = canReadBankDetails(user)
-        ? propertyWithoutPendingActions.bankDetails
+        ? maskBankDetails(propertyWithoutPendingActions.bankDetails)
         : null
 
       return {
@@ -986,7 +987,9 @@ export class PropertyService implements IPropertyService {
       // Add access_type field to each property and filter bank details based on permission
       return properties.map((property: any) => ({
         ...property,
-        bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
+        bankDetails: canReadBankDetails(user)
+          ? maskBankDetails(property.bankDetails)
+          : null,
         access_type: 'owned' as const
       }))
     }
@@ -1028,7 +1031,9 @@ export class PropertyService implements IPropertyService {
         : 'shared'
       return {
         ...property,
-        bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
+        bankDetails: canReadBankDetails(user)
+          ? maskBankDetails(property.bankDetails)
+          : null,
         access_type: accessType
       }
     })
@@ -1070,10 +1075,191 @@ export class PropertyService implements IPropertyService {
     // Filter bank details based on user permission
     return {
       ...property,
+      bankDetails: canReadBankDetails(user)
+        ? maskBankDetails(property.bankDetails)
+        : null,
+      access_type: 'owned' as const
+    }
+  }
+
+  async findOneSecure(id: string, user: IUserWithPermissions) {
+    const property = await this.propertyRepository.findById(id)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    if (
+      accessibleIds !== 'all' &&
+      Array.isArray(accessibleIds) &&
+      !accessibleIds.includes(id)
+    ) {
+      throw new NotFoundException('Property not found')
+    }
+
+    if (
+      !property.is_active &&
+      !isUserSuperAdmin(user) &&
+      !isInternalUser(user)
+    ) {
+      throw new NotFoundException('Property not found')
+    }
+
+    return {
+      ...property,
       bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
       access_type: 'owned' as const
     }
   }
+
+  async findAllSecure(
+    query: PropertyQueryDto,
+    user: IUserWithPermissions
+  ) {
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
+      return QueryBuilder.buildPaginatedResult(
+        [],
+        0,
+        query.page || 1,
+        query.limit || 10
+      )
+    }
+
+    const auditPermission = user.role.audit_permission
+    const hasAuditAccess = auditPermission
+      ? auditPermission.access_level !== AccessLevel.none
+      : false
+
+    const additionalFilters: any = {}
+    if (query.is_active) {
+      const isActiveValue = query.is_active.toLowerCase().trim()
+      if (isActiveValue === 'all') {
+        // no filter
+      } else if (isActiveValue === 'true') {
+        additionalFilters.is_active = true
+      } else if (isActiveValue === 'false') {
+        additionalFilters.is_active = false
+      } else {
+        additionalFilters.is_active = true
+      }
+    } else {
+      if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
+        additionalFilters.is_active = true
+      }
+    }
+    if (query.bank_type) {
+      additionalFilters.bank_type = query.bank_type
+    }
+    if (query.bank_sub_type) {
+      const bankSubTypeValue = query.bank_sub_type.toLowerCase().trim()
+      if (bankSubTypeValue !== 'all') {
+        additionalFilters.bank_sub_type = bankSubTypeValue
+      }
+    }
+
+    let portfolioFilter: any = {}
+    if (query.portfolio_id) {
+      portfolioFilter = {
+        OR: [
+          { portfolio_id: query.portfolio_id },
+          { show_in_portfolio: { has: query.portfolio_id } }
+        ]
+      }
+    }
+
+    const mergedQuery = {
+      ...query,
+      filters: {
+        ...(typeof query.filters === 'object' ? query.filters : {}),
+        ...additionalFilters
+      }
+    }
+
+    const queryConfig = {
+      searchFields: [
+        'id',
+        'name',
+        'address',
+        'card_descriptor',
+        'portfolio.name',
+        'currency.code',
+        'currency.name'
+      ],
+      filterableFields: ['is_active', 'bank_type', 'bank_sub_type', 'currency_id'],
+      sortableFields: [
+        'name',
+        'address',
+        'card_descriptor',
+        'next_due_date',
+        'created_at',
+        'updated_at',
+        'is_active',
+        'portfolio.name',
+        'currency.code'
+      ],
+      defaultSortField: 'created_at',
+      defaultSortOrder: 'desc' as const,
+      nestedFieldMap: {
+        'portfolio.name': 'portfolio.name',
+        'currency.code': 'currency.code',
+        'currency.name': 'currency.name'
+      }
+    }
+
+    const baseWhere =
+      accessibleIds === 'all'
+        ? { ...portfolioFilter }
+        : {
+            AND: [
+              { id: { in: accessibleIds } },
+              ...(Object.keys(portfolioFilter).length > 0
+                ? [portfolioFilter]
+                : [])
+            ]
+          }
+
+    const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      baseWhere
+    )
+
+    const [properties, total] = await Promise.all([
+      this.propertyRepository.findAll({ where, skip, take, orderBy }, undefined, hasAuditAccess),
+      this.propertyRepository.count(where)
+    ])
+
+    const enrichedData = properties.map((property: any) => {
+      const pendingActions = property.pendingActions || []
+      const { pendingActions: _pendingActions, ...propertyWithoutPendingActions } = property
+
+      return {
+        ...propertyWithoutPendingActions,
+        bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
+        access_type: 'owned' as const,
+        has_pending_action: pendingActions.length > 0,
+        pending_actions: pendingActions
+      }
+    })
+
+    return QueryBuilder.buildPaginatedResult(
+      enrichedData,
+      total,
+      query.page || 1,
+      query.limit || 10
+    )
+  }
+
 
   async update(
     id: string,

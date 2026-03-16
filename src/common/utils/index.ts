@@ -1,6 +1,7 @@
 // Export all utility functions
 export * from './amount.util'
 export * from './audit.util'
+export * from './bank-details.util'
 export * from './email.util'
 export * from './encryption.util'
 export * from './ip.util'
