@@ -334,7 +334,7 @@ export class SecurePortfolioDto {
   password: string
 }
 
-export class SecurePortfolioListDto extends PortfolioQueryDto {
+export class SecurePortfolioListDto {
   @ApiProperty({
     example: 'MySecureP@ssw0rd',
     description: 'User password for verification to access full bank details'

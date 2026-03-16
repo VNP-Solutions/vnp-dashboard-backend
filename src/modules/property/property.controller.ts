@@ -456,14 +456,28 @@ export class PropertyController {
   @ApiOperation({
     summary: 'Get all properties with full bank details (password required)',
     description:
-      'Returns the same paginated list of properties but with unmasked bank details. ' +
-      'Requires the current user to verify their password.'
+      'Identical to GET /property (same query params, same pagination/filter/sort), ' +
+      'but returns unmasked bank details. Requires the current user to verify their password in the request body.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['password'],
+      properties: {
+        password: {
+          type: 'string',
+          example: 'MyPassword123!',
+          description: 'Current user password for verification'
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 200,
     description: 'Paginated list of properties with full bank details'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
   async findAllSecure(
     @Query() query: PropertyQueryDto,
     @Body() body: SecurePropertyListDto,
@@ -484,14 +498,28 @@ export class PropertyController {
   @ApiOperation({
     summary: 'Get a property by ID with full bank details (password required)',
     description:
-      'Returns the property with unmasked bank details. ' +
-      'Requires the current user to verify their password.'
+      'Identical to GET /property/:id but returns unmasked bank details. ' +
+      'Requires the current user to verify their password in the request body.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['password'],
+      properties: {
+        password: {
+          type: 'string',
+          example: 'MyPassword123!',
+          description: 'Current user password for verification'
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 200,
     description: 'Property with full bank details retrieved successfully'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - No access to this property' })
   @ApiResponse({ status: 404, description: 'Property not found' })
   async findOneSecure(
     @Param('id') id: string,

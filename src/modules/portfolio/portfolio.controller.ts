@@ -119,14 +119,28 @@ export class PortfolioController {
   @ApiOperation({
     summary: 'Get all portfolios with full bank details (password required)',
     description:
-      'Returns the same paginated list of portfolios but with unmasked bank details. ' +
-      'Requires the current user to verify their password.'
+      'Identical to GET /portfolio (same query params, same pagination/filter/sort), ' +
+      'but returns unmasked bank details. Requires the current user to verify their password in the request body.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['password'],
+      properties: {
+        password: {
+          type: 'string',
+          example: 'MySecureP@ssw0rd',
+          description: 'Current user password for verification'
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 200,
     description: 'Paginated list of portfolios with full bank details'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
   async findAllSecure(
     @Query() query: PortfolioQueryDto,
     @Body() body: SecurePortfolioListDto,
@@ -150,14 +164,28 @@ export class PortfolioController {
   @ApiOperation({
     summary: 'Get a portfolio by ID with full bank details (password required)',
     description:
-      'Returns the portfolio with unmasked bank details. ' +
-      'Requires the current user to verify their password.'
+      'Identical to GET /portfolio/:id but returns unmasked bank details. ' +
+      'Requires the current user to verify their password in the request body.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['password'],
+      properties: {
+        password: {
+          type: 'string',
+          example: 'MySecureP@ssw0rd',
+          description: 'Current user password for verification'
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 200,
     description: 'Portfolio with full bank details retrieved successfully'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 403, description: 'Forbidden - No access to this portfolio' })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   async findOneSecure(
     @Param('id') id: string,

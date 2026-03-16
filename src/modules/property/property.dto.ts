@@ -365,7 +365,7 @@ export class SecurePropertyDto {
   password: string
 }
 
-export class SecurePropertyListDto extends PropertyQueryDto {
+export class SecurePropertyListDto {
   @ApiProperty({
     example: 'MyPassword123!',
     description: 'User password for verification to access full bank details'
