@@ -198,10 +198,10 @@ export class SchedulerService {
   ): Promise<string[]> {
     const recipients: string[] = []
 
-    // Add portfolio contact email if exists
-    if (summary.portfolioContactEmail) {
-      recipients.push(summary.portfolioContactEmail)
-    }
+    // DISABLED: Stop sending alerts to portfolio contact emails automatically
+    // if (summary.portfolioContactEmail) {
+    //   recipients.push(summary.portfolioContactEmail)
+    // }
 
     // Find users with partial access to this property
     const userAccesses = await this.prisma.userAccessedProperty.findMany({
