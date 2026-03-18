@@ -64,11 +64,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = prismaError.message
       errors = [prismaError.message]
     }
-    // Handle Prisma Validation Errors
+    // Handle Prisma Validation Errors (includes unique constraint errors that come through as validation)
     else if (exception instanceof Prisma.PrismaClientValidationError) {
-      status = HttpStatus.BAD_REQUEST
-      message = 'Validation error in database query'
-      errors = [this.extractPrismaValidationError(exception.message)]
+      if (exception.message.includes('Unique constraint failed')) {
+        status = HttpStatus.CONFLICT
+        const friendlyMessage = this.formatUniqueConstraintError(exception.message)
+        message = friendlyMessage
+        errors = [friendlyMessage]
+      } else {
+        status = HttpStatus.BAD_REQUEST
+        message = 'Validation error in database query'
+        errors = [this.extractPrismaValidationError(exception.message)]
+      }
     }
     // Handle Prisma Initialization Errors
     else if (exception instanceof Prisma.PrismaClientInitializationError) {
@@ -88,10 +95,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       errors = [exception.message]
 
       // Handle specific error patterns
-      if (exception.message.includes('duplicate key')) {
+      if (
+        exception.message.includes('Unique constraint failed') ||
+        exception.message.includes('duplicate key')
+      ) {
         status = HttpStatus.CONFLICT
-        message = 'Duplicate entry detected'
-        errors = [this.extractDuplicateKeyError(exception.message)]
+        const friendlyMessage = this.formatUniqueConstraintError(
+          exception.message
+        )
+        message = friendlyMessage
+        errors = [friendlyMessage]
       } else if (exception.message.includes('foreign key constraint')) {
         status = HttpStatus.BAD_REQUEST
         message = 'Foreign key constraint violation'
@@ -132,12 +145,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     switch (code) {
       case 'P2002': {
-        // Unique constraint violation
+        // Unique constraint violation - parse user-friendly message from meta or error message
         const target = exception.meta?.target as string[] | undefined
-        const field = target ? target.join(', ') : 'field'
+        const fieldLabel = target
+          ? this.toReadableFieldName(target.join('_'))
+          : this.parseUniqueConstraintFromMessage(exception.message)
         return {
           status: HttpStatus.CONFLICT,
-          message: `A record with this ${field} already exists`
+          message: `A record with this ${fieldLabel} already exists. Please use a different value.`
         }
       }
 
@@ -220,12 +235,66 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return relevantLine?.trim() || 'Invalid data provided'
   }
 
-  private extractDuplicateKeyError(errorMessage: string): string {
-    const match = errorMessage.match(/duplicate key error.*?index: (\w+)/)
-    if (match) {
-      return `A record with this ${match[1]} already exists`
+  /**
+   * Formats unique constraint errors into short, user-friendly messages.
+   * Handles both Prisma "Unique constraint failed" and MongoDB "duplicate key" formats.
+   */
+  private formatUniqueConstraintError(errorMessage: string): string {
+    const fieldLabel = this.parseUniqueConstraintFromMessage(errorMessage)
+
+    if (fieldLabel) {
+      return `A record with this ${fieldLabel} already exists. Please use a different value.`
     }
-    return 'This record already exists in the database'
+
+    // Fallback for MongoDB duplicate key format
+    const duplicateMatch = errorMessage.match(/duplicate key error.*?index: (\w+)/)
+    if (duplicateMatch) {
+      return `A record with this ${this.toReadableFieldName(duplicateMatch[1])} already exists. Please use a different value.`
+    }
+
+    return 'This value is already in use. Please provide a different one.'
+  }
+
+  /**
+   * Parses Prisma constraint format: `ModelName_field_name_key` (e.g. PropertyCredentials_expedia_id_key)
+   */
+  private parseUniqueConstraintFromMessage(errorMessage: string): string {
+    const constraintMatch = errorMessage.match(
+      /Unique constraint failed on the constraint:\s*`?[\w]+_([a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)*)_key`?/
+    )
+    if (constraintMatch) {
+      const fieldName = constraintMatch[1]
+      return this.toReadableFieldName(fieldName)
+    }
+
+    return 'value'
+  }
+
+  /**
+   * Converts snake_case field names to readable labels (e.g., expedia_id -> "Expedia ID")
+   */
+  private toReadableFieldName(fieldName: string): string {
+    const knownLabels: Record<string, string> = {
+      expedia_id: 'Expedia ID',
+      agoda_id: 'Agoda ID',
+      booking_id: 'Booking ID',
+      property_id: 'Property',
+      email: 'email',
+      portfolio_id: 'Portfolio'
+    }
+
+    if (knownLabels[fieldName]) {
+      return knownLabels[fieldName]
+    }
+
+    return fieldName
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  }
+
+  private extractDuplicateKeyError(errorMessage: string): string {
+    return this.formatUniqueConstraintError(errorMessage)
   }
 
   private logError(exception: unknown, request: Request, status: number): void {
