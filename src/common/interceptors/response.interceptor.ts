@@ -6,6 +6,25 @@ import {
 } from '@nestjs/common'
 import { Observable } from 'rxjs'
 import { map } from 'rxjs/operators'
+import { formatErrorStringIfNeeded } from '../utils/error-formatter.util'
+
+/** Recursively transforms raw DB/Prisma error strings into user-friendly messages. */
+function sanitizeErrorStringsInResponse(obj: unknown): unknown {
+  if (typeof obj === 'string') {
+    return formatErrorStringIfNeeded(obj)
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeErrorStringsInResponse)
+  }
+  if (obj && typeof obj === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = sanitizeErrorStringsInResponse(value)
+    }
+    return result
+  }
+  return obj
+}
 
 export interface Response<T> {
   success: boolean
@@ -24,7 +43,7 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, Response<T>> {
     return next.handle().pipe(
       map((data: unknown) => {
         if (data && typeof data === 'object' && 'success' in data) {
-          return data as Response<T>
+          return sanitizeErrorStringsInResponse(data) as Response<T>
         }
 
         if (data && typeof data === 'object' && 'data' in data) {
@@ -33,10 +52,13 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, Response<T>> {
             data: T
             metadata?: unknown
           }
+          const sanitizedData = sanitizeErrorStringsInResponse(
+            responseData.data
+          ) as T
           return {
             success: true,
             message: responseData.message || 'Operation successful',
-            data: responseData.data,
+            data: sanitizedData,
             metadata: responseData.metadata
           }
         }
@@ -51,15 +73,17 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, Response<T>> {
           const messageData = data as { message: string; pending_action?: unknown }
           return {
             success: true,
-            message: messageData.message,
-            data: messageData.pending_action ? data as T : undefined
+            message: formatErrorStringIfNeeded(messageData.message),
+            data: messageData.pending_action
+              ? (sanitizeErrorStringsInResponse(data) as T)
+              : undefined
           }
         }
 
         return {
           success: true,
           message: 'Operation successful',
-          data: data as T
+          data: sanitizeErrorStringsInResponse(data) as T
         }
       })
     )

@@ -2703,7 +2703,7 @@ export class PropertyService implements IPropertyService {
           addError(
             rowNumber,
             propertyName,
-            error.message || 'Unknown error occurred'
+            error instanceof Error ? error.message : 'Unknown error occurred'
           )
         }
       }
@@ -3292,7 +3292,8 @@ export class PropertyService implements IPropertyService {
           result.errors.push({
             row: rowNumber,
             expediaId: expediaIdValue,
-            error: error.message || 'Unknown error occurred'
+            error:
+              error instanceof Error ? error.message : 'Unknown error occurred'
           })
           result.failureCount++
         }

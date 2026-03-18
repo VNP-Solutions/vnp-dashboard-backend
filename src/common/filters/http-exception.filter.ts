@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { Request, Response } from 'express'
+import { formatErrorForUser } from '../utils/error-formatter.util'
 
 interface ErrorResponse {
   success: boolean
@@ -68,7 +69,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     else if (exception instanceof Prisma.PrismaClientValidationError) {
       if (exception.message.includes('Unique constraint failed')) {
         status = HttpStatus.CONFLICT
-        const friendlyMessage = this.formatUniqueConstraintError(exception.message)
+        const friendlyMessage = formatErrorForUser(exception)
         message = friendlyMessage
         errors = [friendlyMessage]
       } else {
@@ -100,9 +101,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         exception.message.includes('duplicate key')
       ) {
         status = HttpStatus.CONFLICT
-        const friendlyMessage = this.formatUniqueConstraintError(
-          exception.message
-        )
+        const friendlyMessage = formatErrorForUser(exception)
         message = friendlyMessage
         errors = [friendlyMessage]
       } else if (exception.message.includes('foreign key constraint')) {
@@ -145,14 +144,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     switch (code) {
       case 'P2002': {
-        // Unique constraint violation - parse user-friendly message from meta or error message
-        const target = exception.meta?.target as string[] | undefined
-        const fieldLabel = target
-          ? this.toReadableFieldName(target.join('_'))
-          : this.parseUniqueConstraintFromMessage(exception.message)
+        // Unique constraint violation - use shared formatter for consistent user-friendly message
         return {
           status: HttpStatus.CONFLICT,
-          message: `A record with this ${fieldLabel} already exists. Please use a different value.`
+          message: formatErrorForUser(exception)
         }
       }
 
@@ -233,68 +228,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       line => line.includes('Argument') || line.includes('Unknown')
     )
     return relevantLine?.trim() || 'Invalid data provided'
-  }
-
-  /**
-   * Formats unique constraint errors into short, user-friendly messages.
-   * Handles both Prisma "Unique constraint failed" and MongoDB "duplicate key" formats.
-   */
-  private formatUniqueConstraintError(errorMessage: string): string {
-    const fieldLabel = this.parseUniqueConstraintFromMessage(errorMessage)
-
-    if (fieldLabel) {
-      return `A record with this ${fieldLabel} already exists. Please use a different value.`
-    }
-
-    // Fallback for MongoDB duplicate key format
-    const duplicateMatch = errorMessage.match(/duplicate key error.*?index: (\w+)/)
-    if (duplicateMatch) {
-      return `A record with this ${this.toReadableFieldName(duplicateMatch[1])} already exists. Please use a different value.`
-    }
-
-    return 'This value is already in use. Please provide a different one.'
-  }
-
-  /**
-   * Parses Prisma constraint format: `ModelName_field_name_key` (e.g. PropertyCredentials_expedia_id_key)
-   */
-  private parseUniqueConstraintFromMessage(errorMessage: string): string {
-    const constraintMatch = errorMessage.match(
-      /Unique constraint failed on the constraint:\s*`?[\w]+_([a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)*)_key`?/
-    )
-    if (constraintMatch) {
-      const fieldName = constraintMatch[1]
-      return this.toReadableFieldName(fieldName)
-    }
-
-    return 'value'
-  }
-
-  /**
-   * Converts snake_case field names to readable labels (e.g., expedia_id -> "Expedia ID")
-   */
-  private toReadableFieldName(fieldName: string): string {
-    const knownLabels: Record<string, string> = {
-      expedia_id: 'Expedia ID',
-      agoda_id: 'Agoda ID',
-      booking_id: 'Booking ID',
-      property_id: 'Property',
-      email: 'email',
-      portfolio_id: 'Portfolio'
-    }
-
-    if (knownLabels[fieldName]) {
-      return knownLabels[fieldName]
-    }
-
-    return fieldName
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ')
-  }
-
-  private extractDuplicateKeyError(errorMessage: string): string {
-    return this.formatUniqueConstraintError(errorMessage)
   }
 
   private logError(exception: unknown, request: Request, status: number): void {
