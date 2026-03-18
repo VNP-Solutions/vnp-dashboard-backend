@@ -1,10 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { BankType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
-import {
-  CreatePortfolioBankDetailsDto,
-  UpdatePortfolioBankDetailsDto
-} from './portfolio-bank-details.dto'
 import type { IPortfolioBankDetailsRepository } from './portfolio-bank-details.interface'
 
 @Injectable()

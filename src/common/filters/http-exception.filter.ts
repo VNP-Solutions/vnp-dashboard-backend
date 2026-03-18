@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { Request, Response } from 'express'
+import { formatErrorForUser } from '../utils/error-formatter.util'
 
 interface ErrorResponse {
   success: boolean
@@ -64,11 +65,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = prismaError.message
       errors = [prismaError.message]
     }
-    // Handle Prisma Validation Errors
+    // Handle Prisma Validation Errors (includes unique constraint errors that come through as validation)
     else if (exception instanceof Prisma.PrismaClientValidationError) {
-      status = HttpStatus.BAD_REQUEST
-      message = 'Validation error in database query'
-      errors = [this.extractPrismaValidationError(exception.message)]
+      if (exception.message.includes('Unique constraint failed')) {
+        status = HttpStatus.CONFLICT
+        const friendlyMessage = formatErrorForUser(exception)
+        message = friendlyMessage
+        errors = [friendlyMessage]
+      } else {
+        status = HttpStatus.BAD_REQUEST
+        message = 'Validation error in database query'
+        errors = [this.extractPrismaValidationError(exception.message)]
+      }
     }
     // Handle Prisma Initialization Errors
     else if (exception instanceof Prisma.PrismaClientInitializationError) {
@@ -88,10 +96,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       errors = [exception.message]
 
       // Handle specific error patterns
-      if (exception.message.includes('duplicate key')) {
+      if (
+        exception.message.includes('Unique constraint failed') ||
+        exception.message.includes('duplicate key')
+      ) {
         status = HttpStatus.CONFLICT
-        message = 'Duplicate entry detected'
-        errors = [this.extractDuplicateKeyError(exception.message)]
+        const friendlyMessage = formatErrorForUser(exception)
+        message = friendlyMessage
+        errors = [friendlyMessage]
       } else if (exception.message.includes('foreign key constraint')) {
         status = HttpStatus.BAD_REQUEST
         message = 'Foreign key constraint violation'
@@ -132,12 +144,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     switch (code) {
       case 'P2002': {
-        // Unique constraint violation
-        const target = exception.meta?.target as string[] | undefined
-        const field = target ? target.join(', ') : 'field'
+        // Unique constraint violation - use shared formatter for consistent user-friendly message
         return {
           status: HttpStatus.CONFLICT,
-          message: `A record with this ${field} already exists`
+          message: formatErrorForUser(exception)
         }
       }
 
@@ -218,14 +228,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       line => line.includes('Argument') || line.includes('Unknown')
     )
     return relevantLine?.trim() || 'Invalid data provided'
-  }
-
-  private extractDuplicateKeyError(errorMessage: string): string {
-    const match = errorMessage.match(/duplicate key error.*?index: (\w+)/)
-    if (match) {
-      return `A record with this ${match[1]} already exists`
-    }
-    return 'This record already exists in the database'
   }
 
   private logError(exception: unknown, request: Request, status: number): void {

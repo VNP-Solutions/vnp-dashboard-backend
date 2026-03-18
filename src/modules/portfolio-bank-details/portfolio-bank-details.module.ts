@@ -4,6 +4,7 @@ import { PortfolioBankDetailsService } from './portfolio-bank-details.service'
 import { PortfolioBankDetailsRepository } from './portfolio-bank-details.repository'
 import { PrismaService } from '../prisma/prisma.service'
 import { PermissionService } from '../../common/services/permission.service'
+import { EmailUtil } from '../../common/utils/email.util'
 import { PortfolioModule } from '../portfolio/portfolio.module'
 
 @Module({
@@ -19,7 +20,8 @@ import { PortfolioModule } from '../portfolio/portfolio.module'
       useClass: PortfolioBankDetailsRepository
     },
     PrismaService,
-    PermissionService
+    PermissionService,
+    EmailUtil
   ],
   exports: [
     {

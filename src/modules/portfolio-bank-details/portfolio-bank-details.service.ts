@@ -12,6 +12,7 @@ import {
   PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { EmailUtil } from '../../common/utils/email.util'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   CreatePortfolioBankDetailsDto,
@@ -30,7 +31,8 @@ export class PortfolioBankDetailsService
     @Inject('IPortfolioBankDetailsRepository')
     private portfolioBankDetailsRepository: IPortfolioBankDetailsRepository,
     @Inject(PrismaService) private prisma: PrismaService,
-    @Inject(PermissionService) private permissionService: PermissionService
+    @Inject(PermissionService) private permissionService: PermissionService,
+    @Inject(EmailUtil) private emailUtil: EmailUtil
   ) {}
 
   /**
@@ -239,6 +241,198 @@ export class PortfolioBankDetailsService
   }
 
   /**
+   * Get all super admin emails
+   */
+  private async getSuperAdminEmails(): Promise<string[]> {
+    const allUsers = await this.prisma.user.findMany({
+      where: {
+        is_verified: true
+      },
+      select: {
+        id: true,
+        email: true,
+        role: {
+          select: {
+            portfolio_permission: true,
+            property_permission: true,
+            audit_permission: true,
+            user_permission: true,
+            system_settings_permission: true
+          }
+        }
+      }
+    })
+
+    const superAdminEmails: string[] = []
+
+    for (const user of allUsers) {
+      const allPermissions = [
+        user.role.portfolio_permission,
+        user.role.property_permission,
+        user.role.audit_permission,
+        user.role.user_permission,
+        user.role.system_settings_permission
+      ]
+
+      const isSuperAdmin = allPermissions.every(
+        permission =>
+          permission &&
+          permission.permission_level === 'all' &&
+          permission.access_level === 'all'
+      )
+
+      if (isSuperAdmin) {
+        superAdminEmails.push(user.email)
+      }
+    }
+
+    return superAdminEmails
+  }
+
+  /**
+   * Get users with specific role attributes who have access to a portfolio
+   * Matches by permissions/attributes instead of role name
+   */
+  private async getUsersWithRolesAndPortfolioAccess(
+    portfolioId: string,
+    _roleNames: string[]
+  ): Promise<string[]> {
+    const userEmails: string[] = []
+
+    const allUsers = await this.prisma.user.findMany({
+      where: {
+        is_verified: true
+      },
+      select: {
+        id: true,
+        email: true,
+        role: {
+          select: {
+            name: true,
+            is_external: true,
+            can_access_mis: true,
+            bank_details_permission: true,
+            portfolio_permission: true,
+            property_permission: true,
+            audit_permission: true,
+            user_permission: true,
+            system_settings_permission: true
+          }
+        }
+      }
+    })
+
+    const matchingUsers: typeof allUsers = []
+
+    for (const user of allUsers) {
+      const role = user.role
+
+      const isVnpAdmin =
+        !role.is_external &&
+        role.can_access_mis === false &&
+        role.portfolio_permission?.access_level === 'partial' &&
+        role.property_permission?.access_level === 'partial' &&
+        role.bank_details_permission?.access_level === 'partial'
+
+      const isClientPortfolioManager =
+        role.is_external &&
+        role.can_access_mis === false &&
+        role.portfolio_permission?.permission_level === 'update' &&
+        role.portfolio_permission?.access_level === 'partial' &&
+        role.property_permission?.permission_level === 'update' &&
+        role.property_permission?.access_level === 'partial' &&
+        role.bank_details_permission?.permission_level === 'all' &&
+        role.bank_details_permission?.access_level === 'partial'
+
+      if (isVnpAdmin || isClientPortfolioManager) {
+        matchingUsers.push(user)
+      }
+    }
+
+    if (matchingUsers.length === 0) {
+      return userEmails
+    }
+
+    const userIds = matchingUsers.map(u => u.id)
+    const userAccesses = await this.prisma.userAccessedProperty.findMany({
+      where: {
+        user_id: {
+          in: userIds
+        }
+      },
+      select: {
+        user_id: true,
+        portfolio_id: true
+      }
+    })
+
+    for (const access of userAccesses) {
+      const portfolioIds = access.portfolio_id || []
+      if (portfolioIds.includes(portfolioId)) {
+        const user = matchingUsers.find(u => u.id === access.user_id)
+        if (user) {
+          userEmails.push(user.email)
+        }
+      }
+    }
+
+    return userEmails
+  }
+
+  /**
+   * Send email notification when bank details are created, updated, or deleted
+   * Sends to super admins and users with Client Portfolio Manager / VNP Admin roles
+   */
+  private async sendBankDetailsNotification(
+    portfolioId: string,
+    action: 'created' | 'updated' | 'deleted',
+    location?: string | null
+  ): Promise<void> {
+    try {
+      const portfolio = await this.prisma.portfolio.findUnique({
+        where: { id: portfolioId },
+        select: {
+          id: true,
+          name: true
+        }
+      })
+
+      if (!portfolio) {
+        return
+      }
+
+      const allRecipients: string[] = []
+
+      const superAdminEmails = await this.getSuperAdminEmails()
+      allRecipients.push(...superAdminEmails)
+
+      const roleUserEmails = await this.getUsersWithRolesAndPortfolioAccess(
+        portfolioId,
+        ['Client portfolio manager', 'VNP Admin']
+      )
+      allRecipients.push(...roleUserEmails)
+
+      const uniqueRecipients = [...new Set(allRecipients)]
+
+      if (uniqueRecipients.length === 0) {
+        return
+      }
+
+      await this.emailUtil.sendBankDetailsUpdateEmail(
+        uniqueRecipients,
+        [portfolio.name],
+        location ?? null,
+        new Date()
+      )
+    } catch (error) {
+      console.error(
+        'Error sending portfolio bank details notification:',
+        error
+      )
+    }
+  }
+
+  /**
    * Remove bank details from all child properties
    */
   private async removeFromChildProperties(portfolioId: string): Promise<void> {
@@ -322,10 +516,17 @@ export class PortfolioBankDetailsService
       user.id
     )
 
+    // Send email notification to super admins and role users
+    await this.sendBankDetailsNotification(
+      data.portfolio_id,
+      'created',
+      location
+    )
+
     return result
   }
 
-  async findByPortfolioId(portfolioId: string, user: IUserWithPermissions) {
+  async findByPortfolioId(portfolioId: string, _user: IUserWithPermissions) {
     const bankDetails =
       await this.portfolioBankDetailsRepository.findByPortfolioId(portfolioId)
 
@@ -367,6 +568,13 @@ export class PortfolioBankDetailsService
         // Remove bank details from all child properties
         await this.removeFromChildProperties(portfolioId)
 
+        // Send email notification about deletion
+        await this.sendBankDetailsNotification(
+          portfolioId,
+          'deleted',
+          location
+        )
+
         return deleted
       } else {
         // Bank details don't exist, return a success response
@@ -398,6 +606,13 @@ export class PortfolioBankDetailsService
 
     // Copy updated bank details to all child properties
     await this.copyToChildProperties(portfolioId, normalizedData, user.id)
+
+    // Send email notification to super admins and role users
+    await this.sendBankDetailsNotification(
+      portfolioId,
+      'updated',
+      location
+    )
 
     return result
   }

@@ -211,10 +211,12 @@ export class PermissionService {
         return userAccessedProperties.property_id || []
       }
 
-      // BANK_DETAILS partial access maps to PROPERTY access
-      // User can only access bank details for properties they have access to
+      // BANK_DETAILS partial access: user can access bank details for portfolios
+      // and properties they have access to (property and portfolio bank details)
       if (module === ModuleType.BANK_DETAILS) {
-        return userAccessedProperties.property_id || []
+        const portfolioIds = userAccessedProperties.portfolio_id || []
+        const propertyIds = userAccessedProperties.property_id || []
+        return [...portfolioIds, ...propertyIds]
       }
 
       // AUDIT module doesn't support partial access
@@ -428,11 +430,12 @@ export class PermissionService {
       return propertyIds.includes(resourceId)
     }
 
-    // BANK_DETAILS partial access maps to PROPERTY access
-    // resourceId here is the property_id that the bank details belong to
+    // BANK_DETAILS partial access: resourceId can be property_id (property bank details)
+    // or portfolio_id (portfolio bank details). Check both for correct access validation.
     if (module === ModuleType.BANK_DETAILS) {
+      const portfolioIds = userAccessedProperties.portfolio_id || []
       const propertyIds = userAccessedProperties.property_id || []
-      return propertyIds.includes(resourceId)
+      return portfolioIds.includes(resourceId) || propertyIds.includes(resourceId)
     }
 
     // AUDIT module doesn't support partial access

@@ -100,18 +100,18 @@ export class SalesAgentController {
   @Get(':id/report')
   @RequirePermission(ModuleType.SYSTEM_SETTINGS, PermissionAction.READ)
   @ApiOperation({
-    summary: 'Download commission report for a sales agent as Excel (Internal users only)',
+    summary: 'Download commission report for a sales agent (Internal users only)',
     description:
-      'Generates an Excel report for the given sales agent showing all audits ' +
+      'Generates a report for the given sales agent showing all audits ' +
       'across their assigned portfolios within the specified date range. ' +
-      'Audits are grouped by currency. Each sheet shows per-OTA confirmed amounts, ' +
-      'grand total, commission % and the calculated commission amount.'
+      'Use ?format=xlsx (default) or ?format=csv. Excel: multi-sheet by currency. CSV: flat table.'
   })
   @ApiResponse({
     status: 200,
-    description: 'Excel file download',
+    description: 'File download (Excel or CSV)',
     content: {
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {}
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {},
+      'text/csv': {}
     }
   })
   @ApiResponse({ status: 400, description: 'Bad request — invalid date range or no portfolios assigned' })
@@ -125,11 +125,18 @@ export class SalesAgentController {
     const buffer = await this.salesAgentService.downloadReport(id, query, user)
     const fromStr = query.from.replace(/-/g, '')
     const toStr = query.to.replace(/-/g, '')
-    const filename = `sales-agent-report-${fromStr}-${toStr}.xlsx`
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    const format = query.format ?? 'xlsx'
+    const ext = format === 'csv' ? 'csv' : 'xlsx'
+    const filename = `sales-agent-report-${fromStr}-${toStr}.${ext}`
+
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv')
+    } else {
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      )
+    }
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     res.send(buffer)
   }

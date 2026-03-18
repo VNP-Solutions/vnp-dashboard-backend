@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { BankType } from '@prisma/client'
-import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -19,8 +18,13 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount } from '../../common/utils/amount.util'
+import {
+  parseSpreadsheetToJson,
+  validateSpreadsheetFile
+} from '../../common/utils/spreadsheet.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { maskBankDetails } from '../../common/utils/bank-details.util'
 import {
   canCreateBankDetails,
   canReadBankDetails,
@@ -104,13 +108,18 @@ export class PropertyService implements IPropertyService {
 
     const property = await this.propertyRepository.create(data)
 
-    // If user has partial access, grant them access to the created property
+    // If user has partial access, grant them access to the created property and its portfolio
     const permission = user.role.property_permission
     if (permission?.access_level === AccessLevel.partial) {
       await this.permissionService.grantResourceAccess(
         user.id,
         ModuleType.PROPERTY,
         property.id
+      )
+      await this.permissionService.grantResourceAccess(
+        user.id,
+        ModuleType.PORTFOLIO,
+        data.portfolio_id
       )
     }
 
@@ -166,13 +175,18 @@ export class PropertyService implements IPropertyService {
       user.id
     )
 
-    // If user has partial access, grant them access to the created property
+    // If user has partial access, grant them access to the created property and its portfolio
     const permission = user.role.property_permission
     if (permission?.access_level === AccessLevel.partial) {
       await this.permissionService.grantResourceAccess(
         user.id,
         ModuleType.PROPERTY,
         property.id
+      )
+      await this.permissionService.grantResourceAccess(
+        user.id,
+        ModuleType.PORTFOLIO,
+        data.property.portfolio_id
       )
     }
 
@@ -582,7 +596,7 @@ export class PropertyService implements IPropertyService {
       // Filter bank details based on user permission
       // If user doesn't have READ permission for bank_details, set bankDetails to null
       const filteredBankDetails = canReadBankDetails(user)
-        ? propertyWithoutPendingActions.bankDetails
+        ? maskBankDetails(propertyWithoutPendingActions.bankDetails)
         : null
 
       return {
@@ -918,7 +932,7 @@ export class PropertyService implements IPropertyService {
       // Filter bank details based on user permission
       // If user doesn't have READ permission for bank_details, set bankDetails to null
       const filteredBankDetails = canReadBankDetails(user)
-        ? propertyWithoutPendingActions.bankDetails
+        ? maskBankDetails(propertyWithoutPendingActions.bankDetails)
         : null
 
       return {
@@ -983,7 +997,9 @@ export class PropertyService implements IPropertyService {
       // Add access_type field to each property and filter bank details based on permission
       return properties.map((property: any) => ({
         ...property,
-        bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
+        bankDetails: canReadBankDetails(user)
+          ? maskBankDetails(property.bankDetails)
+          : null,
         access_type: 'owned' as const
       }))
     }
@@ -1025,7 +1041,9 @@ export class PropertyService implements IPropertyService {
         : 'shared'
       return {
         ...property,
-        bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
+        bankDetails: canReadBankDetails(user)
+          ? maskBankDetails(property.bankDetails)
+          : null,
         access_type: accessType
       }
     })
@@ -1067,10 +1085,233 @@ export class PropertyService implements IPropertyService {
     // Filter bank details based on user permission
     return {
       ...property,
+      bankDetails: canReadBankDetails(user)
+        ? maskBankDetails(property.bankDetails)
+        : null,
+      access_type: 'owned' as const
+    }
+  }
+
+  async findOneSecure(id: string, user: IUserWithPermissions) {
+    const property = await this.propertyRepository.findById(id)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    if (
+      accessibleIds !== 'all' &&
+      Array.isArray(accessibleIds) &&
+      !accessibleIds.includes(id)
+    ) {
+      throw new NotFoundException('Property not found')
+    }
+
+    if (
+      !property.is_active &&
+      !isUserSuperAdmin(user) &&
+      !isInternalUser(user)
+    ) {
+      throw new NotFoundException('Property not found')
+    }
+
+    return {
+      ...property,
       bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
       access_type: 'owned' as const
     }
   }
+
+  async findManyByIdsSecure(
+    propertyIds: string[],
+    user: IUserWithPermissions
+  ) {
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    const results = await Promise.all(
+      propertyIds.map(async id => {
+        const property = await this.propertyRepository.findById(id)
+
+        if (!property) return null
+
+        if (
+          accessibleIds !== 'all' &&
+          Array.isArray(accessibleIds) &&
+          !accessibleIds.includes(id)
+        ) {
+          return null
+        }
+
+        if (
+          !property.is_active &&
+          !isUserSuperAdmin(user) &&
+          !isInternalUser(user)
+        ) {
+          return null
+        }
+
+        return {
+          ...property,
+          bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
+          access_type: 'owned' as const
+        }
+      })
+    )
+
+    return results.filter((p): p is NonNullable<typeof p> => p !== null)
+  }
+
+  async findAllSecure(
+    query: PropertyQueryDto,
+    user: IUserWithPermissions
+  ) {
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
+      return QueryBuilder.buildPaginatedResult(
+        [],
+        0,
+        query.page || 1,
+        query.limit || 10
+      )
+    }
+
+    const auditPermission = user.role.audit_permission
+    const hasAuditAccess = auditPermission
+      ? auditPermission.access_level !== AccessLevel.none
+      : false
+
+    const additionalFilters: any = {}
+    if (query.is_active) {
+      const isActiveValue = query.is_active.toLowerCase().trim()
+      if (isActiveValue === 'all') {
+        // no filter
+      } else if (isActiveValue === 'true') {
+        additionalFilters.is_active = true
+      } else if (isActiveValue === 'false') {
+        additionalFilters.is_active = false
+      } else {
+        additionalFilters.is_active = true
+      }
+    } else {
+      if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
+        additionalFilters.is_active = true
+      }
+    }
+    if (query.bank_type) {
+      additionalFilters.bank_type = query.bank_type
+    }
+    if (query.bank_sub_type) {
+      const bankSubTypeValue = query.bank_sub_type.toLowerCase().trim()
+      if (bankSubTypeValue !== 'all') {
+        additionalFilters.bank_sub_type = bankSubTypeValue
+      }
+    }
+
+    let portfolioFilter: any = {}
+    if (query.portfolio_id) {
+      portfolioFilter = {
+        OR: [
+          { portfolio_id: query.portfolio_id },
+          { show_in_portfolio: { has: query.portfolio_id } }
+        ]
+      }
+    }
+
+    const mergedQuery = {
+      ...query,
+      filters: {
+        ...(typeof query.filters === 'object' ? query.filters : {}),
+        ...additionalFilters
+      }
+    }
+
+    const queryConfig = {
+      searchFields: [
+        'id',
+        'name',
+        'address',
+        'card_descriptor',
+        'portfolio.name',
+        'currency.code',
+        'currency.name'
+      ],
+      filterableFields: ['is_active', 'bank_type', 'bank_sub_type', 'currency_id'],
+      sortableFields: [
+        'name',
+        'address',
+        'card_descriptor',
+        'next_due_date',
+        'created_at',
+        'updated_at',
+        'is_active',
+        'portfolio.name',
+        'currency.code'
+      ],
+      defaultSortField: 'created_at',
+      defaultSortOrder: 'desc' as const,
+      nestedFieldMap: {
+        'portfolio.name': 'portfolio.name',
+        'currency.code': 'currency.code',
+        'currency.name': 'currency.name'
+      }
+    }
+
+    const baseWhere =
+      accessibleIds === 'all'
+        ? { ...portfolioFilter }
+        : {
+            AND: [
+              { id: { in: accessibleIds } },
+              ...(Object.keys(portfolioFilter).length > 0
+                ? [portfolioFilter]
+                : [])
+            ]
+          }
+
+    const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
+      mergedQuery,
+      queryConfig,
+      baseWhere
+    )
+
+    const [properties, total] = await Promise.all([
+      this.propertyRepository.findAll({ where, skip, take, orderBy }, undefined, hasAuditAccess),
+      this.propertyRepository.count(where)
+    ])
+
+    const enrichedData = properties.map((property: any) => {
+      const pendingActions = property.pendingActions || []
+      const { pendingActions: _pendingActions, ...propertyWithoutPendingActions } = property
+
+      return {
+        ...propertyWithoutPendingActions,
+        bankDetails: canReadBankDetails(user) ? property.bankDetails : null,
+        access_type: 'owned' as const,
+        has_pending_action: pendingActions.length > 0,
+        pending_actions: pendingActions
+      }
+    })
+
+    return QueryBuilder.buildPaginatedResult(
+      enrichedData,
+      total,
+      query.page || 1,
+      query.limit || 10
+    )
+  }
+
 
   async update(
     id: string,
@@ -1653,14 +1894,7 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('No file provided')
     }
 
-    if (
-      !file.originalname.endsWith('.xlsx') &&
-      !file.originalname.endsWith('.xls')
-    ) {
-      throw new BadRequestException(
-        'File must be an Excel file (.xlsx or .xls)'
-      )
-    }
+    validateSpreadsheetFile(file)
 
     const result: BulkImportResultDto = {
       totalRows: 0,
@@ -1675,16 +1909,7 @@ export class PropertyService implements IPropertyService {
     const bankDetailsUpdatedPropertyIds: string[] = []
 
     try {
-      // Parse Excel file
-      const workbook = XLSX.read(file.buffer, { type: 'buffer' })
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const data = XLSX.utils.sheet_to_json(worksheet)
-
-      if (!data || data.length === 0) {
-        throw new BadRequestException('Excel file is empty')
-      }
-
+      const data = parseSpreadsheetToJson(file)
       result.totalRows = data.length
 
       console.log(
@@ -1846,7 +2071,7 @@ export class PropertyService implements IPropertyService {
 
       // Process each row
       for (let i = 0; i < data.length; i++) {
-        const row = data[i] as any
+        const row = data[i]
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
@@ -1862,9 +2087,18 @@ export class PropertyService implements IPropertyService {
             continue
           }
 
-          // Check if property already exists
+          // Reject duplicate: property with this name already exists
           const existingProperty =
             await this.propertyRepository.findByName(propertyName)
+
+          if (existingProperty) {
+            addError(
+              rowNumber,
+              propertyName,
+              `Property "${propertyName}" already exists. Use the bulk update endpoint to modify existing properties.`
+            )
+            continue
+          }
 
           // Extract property address (OPTIONAL, will use empty string if not provided)
           const address =
@@ -1959,27 +2193,10 @@ export class PropertyService implements IPropertyService {
             continue
           }
 
-          // Create or update property
+          // Create new property
           let propertyId: string
-          let isNewProperty = false
 
-          if (existingProperty) {
-            // Update existing property - use Prisma directly since bulk import
-            // needs to set is_active which is excluded from UpdatePropertyDto
-            await this.prisma.property.update({
-              where: { id: existingProperty.id },
-              data: {
-                address: address,
-                currency_id: currency.id,
-                card_descriptor: cardDescriptor || undefined,
-                is_active: true,
-                next_due_date: nextDueDate || undefined,
-                portfolio_id: portfolio.id
-              }
-            })
-            propertyId = existingProperty.id
-          } else {
-            // Create new property
+          {
             const propertyData: CreatePropertyDto = {
               name: propertyName,
               address: address,
@@ -1995,7 +2212,6 @@ export class PropertyService implements IPropertyService {
             const createdProperty =
               await this.propertyRepository.create(propertyData)
             propertyId = createdProperty.id
-            isNewProperty = true
           }
 
           // Extract remaining credentials fields
@@ -2126,25 +2342,24 @@ export class PropertyService implements IPropertyService {
           // Check if user has permission to create bank details
           // If not, silently skip bank details creation and mark as success
           if (!canCreateBankDetails(user)) {
-            // If this was a new property and user has partial access, grant them access
-            if (isNewProperty) {
-              const permission = user.role.property_permission
-              if (permission?.access_level === AccessLevel.partial) {
-                await this.permissionService.grantResourceAccess(
-                  user.id,
-                  ModuleType.PROPERTY,
-                  propertyId
-                )
-              }
+            // Grant partial-access user access to the newly created property and its portfolio
+            const permission = user.role.property_permission
+            if (permission?.access_level === AccessLevel.partial) {
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PROPERTY,
+                propertyId
+              )
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PORTFOLIO,
+                portfolio.id
+              )
             }
 
             result.successCount++
             result.successfulImports.push(propertyName)
-            logSuccess(
-              rowNumber,
-              propertyName,
-              existingProperty ? 'updated' : 'created'
-            )
+            logSuccess(rowNumber, propertyName, 'created')
             continue
           }
 
@@ -2170,26 +2385,25 @@ export class PropertyService implements IPropertyService {
 
           // If bank type is "None", skip bank details processing
           if (bankTypeNormalized === 'none') {
-            // If this was a new property and user has partial access, grant them access
-            if (isNewProperty) {
-              const permission = user.role.property_permission
-              if (permission?.access_level === AccessLevel.partial) {
-                await this.permissionService.grantResourceAccess(
-                  user.id,
-                  ModuleType.PROPERTY,
-                  propertyId
-                )
-              }
+            // Grant partial-access user access to the newly created property and its portfolio
+            const permission = user.role.property_permission
+            if (permission?.access_level === AccessLevel.partial) {
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PROPERTY,
+                propertyId
+              )
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PORTFOLIO,
+                portfolio.id
+              )
             }
 
             // Successfully created property without bank details
             result.successCount++
             result.successfulImports.push(propertyName)
-            logSuccess(
-              rowNumber,
-              propertyName,
-              existingProperty ? 'updated' : 'created'
-            )
+            logSuccess(rowNumber, propertyName, 'created')
             continue
           }
 
@@ -2422,15 +2636,11 @@ export class PropertyService implements IPropertyService {
               const normalizedAccountType = bankAccountType.toLowerCase()
               if (!['checking', 'savings'].includes(normalizedAccountType)) {
                 console.warn(
-                  `⚠️  Row ${rowNumber} - Property "${propertyName}": Invalid bank account type '${bankAccountType}'. Property was ${existingProperty ? 'updated' : 'created'} but bank account type was not saved.`
+                  `⚠️  Row ${rowNumber} - Property "${propertyName}": Invalid bank account type '${bankAccountType}'. Property was created but bank account type was not saved.`
                 )
                 result.successCount++
                 result.successfulImports.push(propertyName)
-                logSuccess(
-                  rowNumber,
-                  propertyName,
-                  existingProperty ? 'updated' : 'created'
-                )
+                logSuccess(rowNumber, propertyName, 'created')
                 continue
               }
               bankDetailsData.bank_account_type = normalizedAccountType
@@ -2460,8 +2670,8 @@ export class PropertyService implements IPropertyService {
             bankDetailsCreatedPropertyIds.push(propertyId)
           }
 
-          // If this was a new property and user has partial access, grant them access
-          if (isNewProperty) {
+          // Grant partial-access user access to the newly created property and its portfolio
+          {
             const permission = user.role.property_permission
             if (permission?.access_level === AccessLevel.partial) {
               await this.permissionService.grantResourceAccess(
@@ -2469,17 +2679,18 @@ export class PropertyService implements IPropertyService {
                 ModuleType.PROPERTY,
                 propertyId
               )
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PORTFOLIO,
+                portfolio.id
+              )
             }
           }
 
           result.successCount++
           result.successfulImports.push(propertyName)
 
-          logSuccess(
-            rowNumber,
-            propertyName,
-            existingProperty ? 'updated' : 'created'
-          )
+          logSuccess(rowNumber, propertyName, 'created')
         } catch (error) {
           const propertyName =
             findHeaderValue(row, ['Property Name', 'Property name', 'Name']) ||
@@ -2488,7 +2699,7 @@ export class PropertyService implements IPropertyService {
           addError(
             rowNumber,
             propertyName,
-            error.message || 'Unknown error occurred'
+            error instanceof Error ? error.message : 'Unknown error occurred'
           )
         }
       }
@@ -2529,14 +2740,7 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('No file provided')
     }
 
-    if (
-      !file.originalname.endsWith('.xlsx') &&
-      !file.originalname.endsWith('.xls')
-    ) {
-      throw new BadRequestException(
-        'File must be an Excel file (.xlsx or .xls)'
-      )
-    }
+    validateSpreadsheetFile(file)
 
     const result: BulkUpdateResultDto = {
       totalRows: 0,
@@ -2547,16 +2751,7 @@ export class PropertyService implements IPropertyService {
     }
 
     try {
-      // Parse Excel file
-      const workbook = XLSX.read(file.buffer, { type: 'buffer' })
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const data = XLSX.utils.sheet_to_json(worksheet)
-
-      if (!data || data.length === 0) {
-        throw new BadRequestException('Excel file is empty')
-      }
-
+      const data = parseSpreadsheetToJson(file)
       result.totalRows = data.length
 
       // Helper function to find header value with flexible naming
@@ -2698,7 +2893,7 @@ export class PropertyService implements IPropertyService {
 
       // Log column headers from first row for debugging
       if (data.length > 0) {
-        const firstRow = data[0] as any
+        const firstRow = data[0]
         const columnHeaders = Object.keys(firstRow)
         console.log('Excel column headers:', columnHeaders)
         console.log(
@@ -2712,7 +2907,7 @@ export class PropertyService implements IPropertyService {
 
       // Process each row
       for (let i = 0; i < data.length; i++) {
-        const row = data[i] as any
+        const row = data[i]
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
@@ -3093,7 +3288,8 @@ export class PropertyService implements IPropertyService {
           result.errors.push({
             row: rowNumber,
             expediaId: expediaIdValue,
-            error: error.message || 'Unknown error occurred'
+            error:
+              error instanceof Error ? error.message : 'Unknown error occurred'
           })
           result.failureCount++
         }

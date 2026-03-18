@@ -355,6 +355,46 @@ export class DeletePropertyDto {
   password: string
 }
 
+export class SecurePropertyDto {
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password for verification to access full bank details'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
+export class GetPropertiesByIdsSecureDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description: 'Array of Property IDs to retrieve with full bank details',
+    type: [String]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  property_ids: string[]
+
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'Current user password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
+export class SecurePropertyListDto {
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'User password for verification to access full bank details'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
 export class BulkDeletePropertyDto {
   @ApiProperty({
     example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],

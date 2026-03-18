@@ -1,5 +1,4 @@
 import { PropertyContractUrl, Prisma } from '@prisma/client'
-import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   CreatePropertyContractUrlDto,
@@ -78,7 +77,7 @@ export interface IPropertyContractUrlService {
   findAll(
     query: PropertyContractUrlQueryDto,
     user: IUserWithPermissions
-  ): Promise<PaginatedResult<PropertyContractUrlWithRelations>>
+  ): Promise<PropertyContractUrlWithRelations[]>
   findAllForExport(
     query: PropertyContractUrlQueryDto,
     user: IUserWithPermissions

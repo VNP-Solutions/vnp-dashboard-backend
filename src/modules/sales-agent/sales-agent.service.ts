@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import ExcelJS = require('exceljs')
+import * as ExcelJS from 'exceljs'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { isInternalUser, isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
@@ -221,6 +221,16 @@ export class SalesAgentService implements ISalesAgentService {
       auditsByCurrency.get(currency)!.push(audit)
     }
 
+    const format = query.format ?? 'xlsx'
+    if (format === 'csv') {
+      return this.generateCsvReport(
+        salesAgent,
+        query,
+        auditsByCurrency,
+        portfolioMap
+      )
+    }
+
     const workbook = new ExcelJS.Workbook()
     const commissionPct = salesAgent.commission
 
@@ -405,5 +415,80 @@ export class SalesAgentService implements ISalesAgentService {
 
     const buffer = await workbook.xlsx.writeBuffer()
     return Buffer.from(buffer)
+  }
+
+  /**
+   * Generate flat CSV report (same audit data as Excel, single table with Currency column)
+   */
+  private generateCsvReport(
+    _salesAgent: { full_name: string; email: string; phone: string },
+    _query: SalesAgentReportQueryDto,
+    auditsByCurrency: Map<string, any[]>,
+    portfolioMap: Map<string, { name: string }>
+  ): Buffer {
+    const escapeCsv = (val: unknown): string => {
+      const str =
+        val === null || val === undefined
+          ? ''
+          : typeof val === 'object'
+            ? JSON.stringify(val)
+            : String(val as string | number | boolean)
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
+
+    const headers = [
+      'Currency',
+      'Portfolio',
+      'Property',
+      'Audit Status',
+      'OTA Types',
+      'Start Date',
+      'End Date',
+      'Expedia Confirmed',
+      'Agoda Confirmed',
+      'Booking Confirmed',
+      'Total Confirmed'
+    ]
+    const lines: string[] = [headers.join(',')]
+
+    for (const [currency, currencyAudits] of auditsByCurrency.entries()) {
+      for (const audit of currencyAudits) {
+        const portfolio = portfolioMap.get(String(audit.property.portfolio_id))
+        const expediaConfirmed = audit.expedia_amount_confirmed ?? 0
+        const agodaConfirmed = audit.agoda_amount_confirmed ?? 0
+        const bookingConfirmed = audit.booking_amount_confirmed ?? 0
+        const rowTotal = expediaConfirmed + agodaConfirmed + bookingConfirmed
+
+        const startDateStr = audit.start_date
+          ? new Date(audit.start_date).toISOString().split('T')[0]
+          : ''
+        const endDateStr = audit.end_date
+          ? new Date(audit.end_date).toISOString().split('T')[0]
+          : ''
+        const otaTypes = Array.isArray(audit.type_of_ota)
+          ? audit.type_of_ota.join(', ')
+          : ''
+
+        const row = [
+          escapeCsv(currency),
+          escapeCsv(portfolio?.name ?? ''),
+          escapeCsv(audit.property?.name ?? ''),
+          escapeCsv(audit.auditStatus?.status ?? ''),
+          escapeCsv(otaTypes),
+          escapeCsv(startDateStr),
+          escapeCsv(endDateStr),
+          escapeCsv(expediaConfirmed),
+          escapeCsv(agodaConfirmed),
+          escapeCsv(bookingConfirmed),
+          escapeCsv(rowTotal)
+        ]
+        lines.push(row.join(','))
+      }
+    }
+
+    return Buffer.from(lines.join('\r\n'), 'utf-8')
   }
 }
