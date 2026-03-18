@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ExecutionContext,
   Get,
   Inject,
   Param,
@@ -17,6 +18,7 @@ import {
   ModuleType,
   PermissionAction
 } from '../../common/interfaces/permission.interface'
+import { getLocationFromRequest } from '../../common/utils/ip.util'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
   CreatePortfolioBankDetailsDto,
@@ -48,7 +50,8 @@ export class PortfolioBankDetailsController {
     @Body() createPortfolioBankDetailsDto: CreatePortfolioBankDetailsDto,
     @Req() req: any
   ) {
-    const location = req.headers['x-user-location'] || null
+    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const location = await getLocationFromRequest(context)
     return this.portfolioBankDetailsService.create(
       createPortfolioBankDetailsDto,
       req.user,
@@ -57,7 +60,7 @@ export class PortfolioBankDetailsController {
   }
 
   @Get(':portfolioId')
-  @RequirePermission(ModuleType.BANK_DETAILS, PermissionAction.READ)
+  @RequirePermission(ModuleType.BANK_DETAILS, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get bank details for a portfolio' })
   @ApiResponse({ status: 200, description: 'Bank details retrieved successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions' })
@@ -73,7 +76,7 @@ export class PortfolioBankDetailsController {
   }
 
   @Put(':portfolioId')
-  @RequirePermission(ModuleType.BANK_DETAILS, PermissionAction.UPDATE)
+  @RequirePermission(ModuleType.BANK_DETAILS, PermissionAction.UPDATE, true)
   @ApiOperation({
     summary: 'Update bank details for a portfolio',
     description: 'Update bank details or delete by setting bank_type to "none". Changes are automatically copied to all child properties.'
@@ -90,7 +93,8 @@ export class PortfolioBankDetailsController {
     @Body() updatePortfolioBankDetailsDto: UpdatePortfolioBankDetailsDto,
     @Req() req: any
   ) {
-    const location = req.headers['x-user-location'] || null
+    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const location = await getLocationFromRequest(context)
     return this.portfolioBankDetailsService.update(
       portfolioId,
       updatePortfolioBankDetailsDto,
