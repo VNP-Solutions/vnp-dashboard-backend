@@ -526,7 +526,7 @@ export class PortfolioBankDetailsService
     return result
   }
 
-  async findByPortfolioId(portfolioId: string, user: IUserWithPermissions) {
+  async findByPortfolioId(portfolioId: string, _user: IUserWithPermissions) {
     const bankDetails =
       await this.portfolioBankDetailsRepository.findByPortfolioId(portfolioId)
 

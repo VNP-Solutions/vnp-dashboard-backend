@@ -108,13 +108,18 @@ export class PropertyService implements IPropertyService {
 
     const property = await this.propertyRepository.create(data)
 
-    // If user has partial access, grant them access to the created property
+    // If user has partial access, grant them access to the created property and its portfolio
     const permission = user.role.property_permission
     if (permission?.access_level === AccessLevel.partial) {
       await this.permissionService.grantResourceAccess(
         user.id,
         ModuleType.PROPERTY,
         property.id
+      )
+      await this.permissionService.grantResourceAccess(
+        user.id,
+        ModuleType.PORTFOLIO,
+        data.portfolio_id
       )
     }
 
@@ -170,13 +175,18 @@ export class PropertyService implements IPropertyService {
       user.id
     )
 
-    // If user has partial access, grant them access to the created property
+    // If user has partial access, grant them access to the created property and its portfolio
     const permission = user.role.property_permission
     if (permission?.access_level === AccessLevel.partial) {
       await this.permissionService.grantResourceAccess(
         user.id,
         ModuleType.PROPERTY,
         property.id
+      )
+      await this.permissionService.grantResourceAccess(
+        user.id,
+        ModuleType.PORTFOLIO,
+        data.property.portfolio_id
       )
     }
 
@@ -2061,7 +2071,7 @@ export class PropertyService implements IPropertyService {
 
       // Process each row
       for (let i = 0; i < data.length; i++) {
-        const row = data[i] as any
+        const row = data[i]
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
@@ -2077,9 +2087,18 @@ export class PropertyService implements IPropertyService {
             continue
           }
 
-          // Check if property already exists
+          // Reject duplicate: property with this name already exists
           const existingProperty =
             await this.propertyRepository.findByName(propertyName)
+
+          if (existingProperty) {
+            addError(
+              rowNumber,
+              propertyName,
+              `Property "${propertyName}" already exists. Use the bulk update endpoint to modify existing properties.`
+            )
+            continue
+          }
 
           // Extract property address (OPTIONAL, will use empty string if not provided)
           const address =
@@ -2174,27 +2193,10 @@ export class PropertyService implements IPropertyService {
             continue
           }
 
-          // Create or update property
+          // Create new property
           let propertyId: string
-          let isNewProperty = false
 
-          if (existingProperty) {
-            // Update existing property - use Prisma directly since bulk import
-            // needs to set is_active which is excluded from UpdatePropertyDto
-            await this.prisma.property.update({
-              where: { id: existingProperty.id },
-              data: {
-                address: address,
-                currency_id: currency.id,
-                card_descriptor: cardDescriptor || undefined,
-                is_active: true,
-                next_due_date: nextDueDate || undefined,
-                portfolio_id: portfolio.id
-              }
-            })
-            propertyId = existingProperty.id
-          } else {
-            // Create new property
+          {
             const propertyData: CreatePropertyDto = {
               name: propertyName,
               address: address,
@@ -2210,7 +2212,6 @@ export class PropertyService implements IPropertyService {
             const createdProperty =
               await this.propertyRepository.create(propertyData)
             propertyId = createdProperty.id
-            isNewProperty = true
           }
 
           // Extract remaining credentials fields
@@ -2341,25 +2342,24 @@ export class PropertyService implements IPropertyService {
           // Check if user has permission to create bank details
           // If not, silently skip bank details creation and mark as success
           if (!canCreateBankDetails(user)) {
-            // If this was a new property and user has partial access, grant them access
-            if (isNewProperty) {
-              const permission = user.role.property_permission
-              if (permission?.access_level === AccessLevel.partial) {
-                await this.permissionService.grantResourceAccess(
-                  user.id,
-                  ModuleType.PROPERTY,
-                  propertyId
-                )
-              }
+            // Grant partial-access user access to the newly created property and its portfolio
+            const permission = user.role.property_permission
+            if (permission?.access_level === AccessLevel.partial) {
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PROPERTY,
+                propertyId
+              )
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PORTFOLIO,
+                portfolio.id
+              )
             }
 
             result.successCount++
             result.successfulImports.push(propertyName)
-            logSuccess(
-              rowNumber,
-              propertyName,
-              existingProperty ? 'updated' : 'created'
-            )
+            logSuccess(rowNumber, propertyName, 'created')
             continue
           }
 
@@ -2385,26 +2385,25 @@ export class PropertyService implements IPropertyService {
 
           // If bank type is "None", skip bank details processing
           if (bankTypeNormalized === 'none') {
-            // If this was a new property and user has partial access, grant them access
-            if (isNewProperty) {
-              const permission = user.role.property_permission
-              if (permission?.access_level === AccessLevel.partial) {
-                await this.permissionService.grantResourceAccess(
-                  user.id,
-                  ModuleType.PROPERTY,
-                  propertyId
-                )
-              }
+            // Grant partial-access user access to the newly created property and its portfolio
+            const permission = user.role.property_permission
+            if (permission?.access_level === AccessLevel.partial) {
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PROPERTY,
+                propertyId
+              )
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PORTFOLIO,
+                portfolio.id
+              )
             }
 
             // Successfully created property without bank details
             result.successCount++
             result.successfulImports.push(propertyName)
-            logSuccess(
-              rowNumber,
-              propertyName,
-              existingProperty ? 'updated' : 'created'
-            )
+            logSuccess(rowNumber, propertyName, 'created')
             continue
           }
 
@@ -2637,15 +2636,11 @@ export class PropertyService implements IPropertyService {
               const normalizedAccountType = bankAccountType.toLowerCase()
               if (!['checking', 'savings'].includes(normalizedAccountType)) {
                 console.warn(
-                  `⚠️  Row ${rowNumber} - Property "${propertyName}": Invalid bank account type '${bankAccountType}'. Property was ${existingProperty ? 'updated' : 'created'} but bank account type was not saved.`
+                  `⚠️  Row ${rowNumber} - Property "${propertyName}": Invalid bank account type '${bankAccountType}'. Property was created but bank account type was not saved.`
                 )
                 result.successCount++
                 result.successfulImports.push(propertyName)
-                logSuccess(
-                  rowNumber,
-                  propertyName,
-                  existingProperty ? 'updated' : 'created'
-                )
+                logSuccess(rowNumber, propertyName, 'created')
                 continue
               }
               bankDetailsData.bank_account_type = normalizedAccountType
@@ -2675,8 +2670,8 @@ export class PropertyService implements IPropertyService {
             bankDetailsCreatedPropertyIds.push(propertyId)
           }
 
-          // If this was a new property and user has partial access, grant them access
-          if (isNewProperty) {
+          // Grant partial-access user access to the newly created property and its portfolio
+          {
             const permission = user.role.property_permission
             if (permission?.access_level === AccessLevel.partial) {
               await this.permissionService.grantResourceAccess(
@@ -2684,17 +2679,18 @@ export class PropertyService implements IPropertyService {
                 ModuleType.PROPERTY,
                 propertyId
               )
+              await this.permissionService.grantResourceAccess(
+                user.id,
+                ModuleType.PORTFOLIO,
+                portfolio.id
+              )
             }
           }
 
           result.successCount++
           result.successfulImports.push(propertyName)
 
-          logSuccess(
-            rowNumber,
-            propertyName,
-            existingProperty ? 'updated' : 'created'
-          )
+          logSuccess(rowNumber, propertyName, 'created')
         } catch (error) {
           const propertyName =
             findHeaderValue(row, ['Property Name', 'Property name', 'Name']) ||
@@ -2897,7 +2893,7 @@ export class PropertyService implements IPropertyService {
 
       // Log column headers from first row for debugging
       if (data.length > 0) {
-        const firstRow = data[0] as any
+        const firstRow = data[0]
         const columnHeaders = Object.keys(firstRow)
         console.log('Excel column headers:', columnHeaders)
         console.log(
@@ -2911,7 +2907,7 @@ export class PropertyService implements IPropertyService {
 
       // Process each row
       for (let i = 0; i < data.length; i++) {
-        const row = data[i] as any
+        const row = data[i]
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {

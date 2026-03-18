@@ -19,7 +19,11 @@ export function formatErrorStringIfNeeded(str: string): string {
  */
 export function formatErrorForUser(error: unknown): string {
   const message =
-    error instanceof Error ? error.message : String(error ?? 'Unknown error')
+    error instanceof Error
+      ? error.message
+      : error != null && typeof error !== 'object'
+        ? String(error as string | number | boolean)
+        : 'Unknown error'
 
   if (
     message.includes('Unique constraint failed') ||
@@ -59,8 +63,9 @@ function formatUniqueConstraintError(errorMessage: string): string {
  */
 function parseUniqueConstraintFromMessage(errorMessage: string): string {
   // Format: Unique constraint failed on the constraint: `ModelName_field_key`
+  // Model names are PascalCase (no underscores); field names are snake_case
   const constraintMatch = errorMessage.match(
-    /Unique constraint failed on the constraint:\s*`?[\w]+_([a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)*)_key`?/
+    /Unique constraint failed on the constraint:\s*`?[A-Z][a-zA-Z0-9]*_([a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)*)_key`?/
   )
   if (constraintMatch) {
     return toReadableFieldName(constraintMatch[1])

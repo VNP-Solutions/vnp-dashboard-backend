@@ -13,7 +13,6 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { RequirePermission } from '../../common/decorators/require-permission.decorator'
 import { PermissionGuard } from '../../common/guards/permission.guard'
-import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   ModuleType,
   PermissionAction

@@ -1195,7 +1195,7 @@ export class AuditService implements IAuditService {
 
       // Process each row
       for (let i = 0; i < data.length; i++) {
-        const row = data[i] as any
+        const row = data[i]
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
@@ -1929,7 +1929,7 @@ export class AuditService implements IAuditService {
 
       // Log available columns for debugging
       if (data.length > 0) {
-        const firstRow = data[0] as any
+        const firstRow = data[0]
         const availableColumns = Object.keys(firstRow)
         console.log(
           'Available Excel columns:',
@@ -1943,7 +1943,7 @@ export class AuditService implements IAuditService {
 
       // Process each row
       for (let i = 0; i < data.length; i++) {
-        const row = data[i] as any
+        const row = data[i]
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {
@@ -2236,6 +2236,24 @@ export class AuditService implements IAuditService {
             booking_amount_confirmed: bookingAmountConfirmed,
             report_url: reportUrl,
             batch_id: batchId
+          }
+
+          // Check for duplicate: same property + start_date + end_date
+          const duplicateAudit = await this.prisma.audit.findFirst({
+            where: {
+              property_id: property.id,
+              start_date: startDate ?? null,
+              end_date: endDate ?? null
+            }
+          })
+          if (duplicateAudit) {
+            result.errors.push({
+              row: rowNumber,
+              audit: expediaId,
+              error: `An audit for Expedia ID "${expediaId}" with the same start and end date already exists.`
+            })
+            result.failureCount++
+            continue
           }
 
           // Create the audit

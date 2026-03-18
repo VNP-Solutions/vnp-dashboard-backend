@@ -470,7 +470,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
       // Log available columns for debugging
       if (data.length > 0) {
-        const firstRow = data[0] as any
+        const firstRow = data[0]
         const availableColumns = Object.keys(firstRow)
         console.log(
           'Available Excel columns:',
@@ -492,7 +492,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
       // Process each row
       for (let i = 0; i < data.length; i++) {
-        const row = data[i] as any
+        const row = data[i]
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {

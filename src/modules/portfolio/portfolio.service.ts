@@ -1272,7 +1272,7 @@ export class PortfolioService implements IPortfolioService {
 
       // Process each row
       for (let i = 0; i < data.length; i++) {
-        const row = data[i] as any
+        const row = data[i]
         const rowNumber = i + 2 // Spreadsheet row number (header is row 1)
 
         try {
@@ -1579,7 +1579,7 @@ export class PortfolioService implements IPortfolioService {
 
       // Log column headers from first row for debugging
       if (data.length > 0) {
-        const firstRow = data[0] as any
+        const firstRow = data[0]
         const columnHeaders = Object.keys(firstRow)
         console.log('Excel column headers:', columnHeaders)
         console.log(
@@ -1593,7 +1593,7 @@ export class PortfolioService implements IPortfolioService {
 
       // Process each row
       for (let i = 0; i < data.length; i++) {
-        const row = data[i] as any
+        const row = data[i]
         const rowNumber = i + 2 // Excel row number (header is row 1)
 
         try {

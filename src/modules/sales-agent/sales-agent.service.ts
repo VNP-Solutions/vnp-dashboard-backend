@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import ExcelJS = require('exceljs')
+import * as ExcelJS from 'exceljs'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { isInternalUser, isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
@@ -427,7 +427,12 @@ export class SalesAgentService implements ISalesAgentService {
     portfolioMap: Map<string, { name: string }>
   ): Buffer {
     const escapeCsv = (val: unknown): string => {
-      const str = val === null || val === undefined ? '' : String(val)
+      const str =
+        val === null || val === undefined
+          ? ''
+          : typeof val === 'object'
+            ? JSON.stringify(val)
+            : String(val as string | number | boolean)
       if (str.includes(',') || str.includes('"') || str.includes('\n')) {
         return `"${str.replace(/"/g, '""')}"`
       }

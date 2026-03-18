@@ -379,7 +379,7 @@ export class PendingActionService implements IPendingActionService {
         })
         break
 
-      case PendingActionType.AUDIT_UPDATE_AMOUNT_CONFIRMED:
+      case PendingActionType.AUDIT_UPDATE_AMOUNT_CONFIRMED: {
         // Update the audit's amount_confirmed fields for each OTA type
         if (!pendingAction.audit_id) {
           throw new BadRequestException(
@@ -427,6 +427,7 @@ export class PendingActionService implements IPendingActionService {
           data: updateData
         })
         break
+      }
 
       default:
         throw new BadRequestException(
