@@ -6,6 +6,7 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import { OtaType, PendingActionType } from '@prisma/client'
+import * as XLSX from 'xlsx'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -35,8 +36,11 @@ import type { IAuditStatusRepository } from '../audit-status/audit-status.interf
 import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IPropertyRepository } from '../property/property.interface'
+import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
+import type { IFileUploadService } from '../file-upload/file-upload.interface'
 import {
   AuditQueryDto,
+  AutoImportAuditResultDto,
   BulkArchiveAuditDto,
   BulkDeleteAuditDto,
   BulkImportResultDto,
@@ -61,6 +65,8 @@ export class AuditService implements IAuditService {
     private auditStatusRepository: IAuditStatusRepository,
     @Inject('IPropertyRepository')
     private propertyRepository: IPropertyRepository,
+    @Inject('IPortfolioRepository')
+    private portfolioRepository: IPortfolioRepository,
     @Inject('IAuditBatchRepository')
     private auditBatchRepository: IAuditBatchRepository,
     @Inject('IPendingActionRepository')
@@ -68,7 +74,9 @@ export class AuditService implements IAuditService {
     @Inject(PrismaService)
     private prisma: PrismaService,
     @Inject(EmailUtil)
-    private emailUtil: EmailUtil
+    private emailUtil: EmailUtil,
+    @Inject('IFileUploadService')
+    private fileUploadService: IFileUploadService
   ) {}
 
   /**
@@ -2824,5 +2832,373 @@ export class AuditService implements IAuditService {
       // Log the error but don't fail the update operation
       console.error('Failed to send report URL update notification:', error)
     }
+  }
+
+  async autoImport(
+    file: Express.Multer.File,
+    user: IUserWithPermissions
+  ): Promise<AutoImportAuditResultDto> {
+    if (!isInternalUser(user)) {
+      throw new BadRequestException('Only internal users can auto-import audits')
+    }
+
+    if (!file) {
+      throw new BadRequestException('No file provided')
+    }
+
+    validateSpreadsheetFile(file)
+
+    const data = parseSpreadsheetToJson(file)
+
+    // --- Column name resolution helpers ---
+    const OTA_COLS = ['OTA', 'ota', 'Ota']
+    const PORTFOLIO_COLS = ['Portfolio', 'portfolio', 'Portfolio Name', 'portfolio_name']
+    const HOTEL_NAME_COLS = [
+      'Hotel Name',
+      'hotel name',
+      'Hotel name',
+      'HotelName',
+      'Property Name',
+      'Property',
+      'property_name'
+    ]
+    const CHECK_IN_COLS = [
+      'Check In (MM/DD/YYYY)',
+      'Check In',
+      'check in',
+      'Check-In',
+      'CheckIn',
+      'check_in',
+      'Start Date',
+      'start_date'
+    ]
+    const CHECK_OUT_COLS = [
+      'Check Out (MM/DD/YYYY)',
+      'Check Out',
+      'check out',
+      'Check-Out',
+      'CheckOut',
+      'check_out',
+      'End Date',
+      'end_date'
+    ]
+    const AMOUNT_COLS = [
+      'Amount Collected',
+      'amount collected',
+      'Amount_Collected',
+      'amount_collected',
+      'AmountCollected'
+    ]
+
+    const findCol = (row: any, names: string[]): string | undefined => {
+      for (const name of names) {
+        const val = row[name]
+        if (val !== undefined && val !== null && val !== '') {
+          return String(val).trim()
+        }
+      }
+      // Try stripping asterisks / extra whitespace from actual keys
+      const rowKeys = Object.keys(row)
+      for (const name of names) {
+        for (const key of rowKeys) {
+          if (key.split('*')[0].trim().toLowerCase() === name.toLowerCase()) {
+            const val = row[key]
+            if (val !== undefined && val !== null && val !== '') {
+              return String(val).trim()
+            }
+          }
+        }
+      }
+      return undefined
+    }
+
+    const parseDate = (raw: any): Date | null => {
+      if (!raw) return null
+      if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw
+      if (typeof raw === 'number') {
+        const date = new Date(
+          new Date(1899, 11, 30).getTime() + raw * 24 * 60 * 60 * 1000
+        )
+        return !isNaN(date.getTime()) ? date : null
+      }
+      const s = String(raw).trim()
+      const parts = s.split('/')
+      if (parts.length === 3) {
+        const [m, d, y] = parts.map(Number)
+        if (!isNaN(m) && !isNaN(d) && !isNaN(y) && y >= 1900 && y <= 2100) {
+          return new Date(y, m - 1, d)
+        }
+      }
+      const dt = new Date(s)
+      return !isNaN(dt.getTime()) ? dt : null
+    }
+
+    const parseAmount = (raw: any): number => {
+      if (raw === undefined || raw === null || raw === '') return 0
+      if (typeof raw === 'number') return raw
+      // Strip any currency symbol, thousands separators, and whitespace,
+      // keeping only digits, decimal point, and leading minus sign
+      const cleaned = String(raw).replace(/[^\d.\-]/g, '')
+      const n = parseFloat(cleaned)
+      return isNaN(n) ? 0 : n
+    }
+
+    const parseOta = (raw: string | undefined): OtaType | null => {
+      if (!raw) return null
+      const n = raw.toLowerCase().trim()
+      if (n === 'expedia' || n === 'exp') return OtaType.expedia
+      if (n === 'agoda' || n === 'ago') return OtaType.agoda
+      if (n === 'booking' || n === 'booking.com' || n === 'book') return OtaType.booking
+      return null
+    }
+
+    // --- Preserve original header order from first row ---
+    const originalHeaders = data.length > 0 ? Object.keys(data[0]) : []
+
+    if (data.length === 0) {
+      throw new BadRequestException(
+        'No valid rows found. Ensure the file has a "Hotel Name" column with data.'
+      )
+    }
+
+    // --- Row-level validation with DB lookup caches ---
+    // Each row is validated individually so every error surfaces in the response.
+    const errors: Array<{ row: number; property: string; error: string }> = []
+
+    // Caches to avoid repeated DB calls for the same name
+    const portfolioCache = new Map<string, boolean>()          // name  → exists
+    const propertyIdCache = new Map<string, string | null>()   // name  → id | null
+    const accessCache    = new Map<string, boolean>()          // id    → hasAccess
+
+    const auditPermission = user.role.audit_permission
+
+    // validGroups is built in this same pass so that audit creation uses only
+    // rows that belong to groups that fully passed validation.
+    const validGroups = new Map<string, { rows: any[]; propertyId: string }>()
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i]
+      const rowNum = i + 2 // row 1 is the header in the sheet
+      const rowErrors: string[] = []
+
+      const hotelName    = findCol(row, HOTEL_NAME_COLS)
+      const portfolioName = findCol(row, PORTFOLIO_COLS)
+      const otaRaw       = findCol(row, OTA_COLS)
+      const checkInRaw   = findCol(row, CHECK_IN_COLS)
+      const checkOutRaw  = findCol(row, CHECK_OUT_COLS)
+      const amountRaw    = findCol(row, AMOUNT_COLS)
+
+      const label = hotelName ?? 'Unknown'
+
+      // --- Required field presence ---
+      if (!hotelName) {
+        errors.push({ row: rowNum, property: label, error: 'Hotel Name is missing' })
+        continue // can't validate further without a name
+      }
+
+      // --- OTA ---
+      if (!otaRaw) {
+        rowErrors.push('OTA is missing')
+      } else if (!parseOta(otaRaw)) {
+        rowErrors.push(
+          `OTA "${otaRaw}" is not recognised. Expected: expedia, agoda, or booking`
+        )
+      }
+
+      // --- Portfolio ---
+      if (!portfolioName) {
+        rowErrors.push('Portfolio name is missing')
+      } else {
+        if (!portfolioCache.has(portfolioName)) {
+          const p = await this.portfolioRepository.findByName(portfolioName)
+          portfolioCache.set(portfolioName, !!p)
+        }
+        if (!portfolioCache.get(portfolioName)) {
+          rowErrors.push(
+            `Portfolio "${portfolioName}" not found in the database`
+          )
+        }
+      }
+
+      // --- Property (Hotel Name) ---
+      if (!propertyIdCache.has(hotelName)) {
+        const p = await this.propertyRepository.findByName(hotelName)
+        propertyIdCache.set(hotelName, p?.id ?? null)
+      }
+      const propertyId = propertyIdCache.get(hotelName)
+      if (!propertyId) {
+        rowErrors.push(`Property "${hotelName}" not found in the database`)
+      } else if (auditPermission?.access_level === AccessLevel.partial) {
+        if (!accessCache.has(propertyId)) {
+          const ok = await this.permissionService.canAccessResource(
+            user,
+            ModuleType.PROPERTY,
+            propertyId
+          )
+          accessCache.set(propertyId, ok)
+        }
+        if (!accessCache.get(propertyId)) {
+          rowErrors.push(
+            `Access denied: You do not have access to property "${hotelName}"`
+          )
+        }
+      }
+
+      // --- Check-in date ---
+      const checkIn = parseDate(checkInRaw)
+      if (!checkInRaw) {
+        rowErrors.push('Check In date is missing')
+      } else if (!checkIn) {
+        rowErrors.push(
+          `Check In date "${checkInRaw}" could not be parsed. Expected format: MM/DD/YYYY`
+        )
+      }
+
+      // --- Check-out date ---
+      const checkOut = parseDate(checkOutRaw)
+      if (!checkOutRaw) {
+        rowErrors.push('Check Out date is missing')
+      } else if (!checkOut) {
+        rowErrors.push(
+          `Check Out date "${checkOutRaw}" could not be parsed. Expected format: MM/DD/YYYY`
+        )
+      }
+
+      // --- Date order ---
+      if (checkIn && checkOut && checkIn >= checkOut) {
+        rowErrors.push('Check In date must be before Check Out date')
+      }
+
+      // --- Amount Collected ---
+      if (!amountRaw) {
+        rowErrors.push('Amount Collected is missing')
+      } else {
+        const amount = parseAmount(amountRaw)
+        if (amount === 0 && String(amountRaw).replace(/[^\d]/g, '') !== '0') {
+          rowErrors.push(
+            `Amount Collected "${amountRaw}" could not be parsed as a number`
+          )
+        }
+      }
+
+      // Collect all errors for this row
+      for (const err of rowErrors) {
+        errors.push({ row: rowNum, property: label, error: err })
+      }
+
+      // Build valid group only if this row has zero errors so far
+      if (rowErrors.length === 0 && propertyId) {
+        if (!validGroups.has(hotelName)) {
+          validGroups.set(hotelName, { rows: [], propertyId })
+        }
+        validGroups.get(hotelName)!.rows.push(row)
+      }
+    }
+
+    if (errors.length > 0) {
+      return { success: false, errors }
+    }
+
+    // --- Look up "Reported to Property" audit status ---
+    const reportedStatus =
+      await this.auditStatusRepository.findByStatus('Reported to Property')
+    if (!reportedStatus) {
+      throw new BadRequestException(
+        'Audit status "Reported to Property" not found in the database'
+      )
+    }
+
+    // --- Create audits, generate per-property xlsx sheets, upload to S3 ---
+    const createdAudits: Array<{
+      property: string
+      audit_id: string
+      report_url: string
+    }> = []
+
+    for (const [hotelName, { rows, propertyId }] of validGroups) {
+      // Aggregate data from all rows for this property
+      const otaSet = new Set<OtaType>()
+      let expediaSum = 0
+      let agodaSum = 0
+      let bookingSum = 0
+      let minCheckIn: Date | null = null
+      let maxCheckOut: Date | null = null
+
+      for (const row of rows) {
+        const ota = parseOta(findCol(row, OTA_COLS))
+        const amount = parseAmount(findCol(row, AMOUNT_COLS))
+        const checkIn = parseDate(findCol(row, CHECK_IN_COLS))
+        const checkOut = parseDate(findCol(row, CHECK_OUT_COLS))
+
+        if (ota) {
+          otaSet.add(ota)
+          if (ota === OtaType.expedia) expediaSum += amount
+          if (ota === OtaType.agoda) agodaSum += amount
+          if (ota === OtaType.booking) bookingSum += amount
+        }
+
+        if (checkIn && (!minCheckIn || checkIn < minCheckIn)) minCheckIn = checkIn
+        if (checkOut && (!maxCheckOut || checkOut > maxCheckOut)) maxCheckOut = checkOut
+      }
+
+      const auditData: CreateAuditDto = {
+        property_id: propertyId,
+        audit_status_id: reportedStatus.id,
+        type_of_ota: [...otaSet],
+        start_date: minCheckIn?.toISOString(),
+        end_date: maxCheckOut?.toISOString(),
+        expedia_amount_collectable: otaSet.has(OtaType.expedia) ? roundAmount(expediaSum) : undefined,
+        expedia_amount_confirmed: otaSet.has(OtaType.expedia) ? roundAmount(expediaSum) : undefined,
+        agoda_amount_collectable: otaSet.has(OtaType.agoda) ? roundAmount(agodaSum) : undefined,
+        agoda_amount_confirmed: otaSet.has(OtaType.agoda) ? roundAmount(agodaSum) : undefined,
+        booking_amount_collectable: otaSet.has(OtaType.booking) ? roundAmount(bookingSum) : undefined,
+        booking_amount_confirmed: otaSet.has(OtaType.booking) ? roundAmount(bookingSum) : undefined
+      }
+
+      const audit = await this.auditRepository.create(auditData)
+
+      // Build per-property xlsx using original headers
+      const wsData = [
+        originalHeaders,
+        ...rows.map((row) => originalHeaders.map((h) => row[h] ?? ''))
+      ]
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.aoa_to_sheet(wsData)
+      XLSX.utils.book_append_sheet(wb, ws, 'Report')
+      const xlsxBuffer = Buffer.from(
+        XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+      )
+
+      // Upload to S3 via FileUploadService
+      const safeName = hotelName.replace(/[^a-zA-Z0-9]/g, '_')
+      const fakeFile = {
+        buffer: xlsxBuffer,
+        originalname: `auto-import_${safeName}_${Date.now()}.xlsx`,
+        mimetype:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        size: xlsxBuffer.length,
+        fieldname: 'file',
+        encoding: '7bit',
+        stream: null as any,
+        destination: '',
+        filename: '',
+        path: ''
+      } as Express.Multer.File
+
+      const uploadResult = await this.fileUploadService.uploadFile(fakeFile)
+
+      // Persist report_url on the created audit
+      await this.auditRepository.update(audit.id, {
+        report_url: uploadResult.url
+      })
+
+      createdAudits.push({
+        property: hotelName,
+        audit_id: audit.id,
+        report_url: uploadResult.url
+      })
+    }
+
+    return { success: true, created_audits: createdAudits }
   }
 }

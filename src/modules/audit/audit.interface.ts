@@ -3,6 +3,7 @@ import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AuditQueryDto,
+  AutoImportAuditResultDto,
   BulkArchiveAuditDto,
   BulkDeleteAuditDto,
   BulkImportResultDto,
@@ -208,4 +209,8 @@ export interface IAuditService {
     data: UpdateReportUrlDto,
     user: IUserWithPermissions
   ): Promise<AuditWithFullDetails>
+  autoImport(
+    file: Express.Multer.File,
+    user: IUserWithPermissions
+  ): Promise<AutoImportAuditResultDto>
 }
