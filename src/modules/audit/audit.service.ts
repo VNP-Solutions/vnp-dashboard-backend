@@ -2914,23 +2914,46 @@ export class AuditService implements IAuditService {
 
     const parseDate = (raw: any): Date | null => {
       if (!raw) return null
-      if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw
-      if (typeof raw === 'number') {
+
+      const isValidYear = (d: Date): boolean =>
+        !isNaN(d.getTime()) && d.getFullYear() >= 1900 && d.getFullYear() <= 2100
+
+      const fromExcelSerial = (serial: number): Date | null => {
         const date = new Date(
-          new Date(1899, 11, 30).getTime() + raw * 24 * 60 * 60 * 1000
+          new Date(1899, 11, 30).getTime() + serial * 24 * 60 * 60 * 1000
         )
-        return !isNaN(date.getTime()) ? date : null
+        return isValidYear(date) ? date : null
       }
+
+      // Date object returned by xlsx for date-formatted cells
+      if (raw instanceof Date) return isValidYear(raw) ? raw : null
+
+      // Numeric Excel serial (e.g. 46087 → somewhere in 2026)
+      if (typeof raw === 'number') return fromExcelSerial(raw)
+
       const s = String(raw).trim()
-      const parts = s.split('/')
-      if (parts.length === 3) {
-        const [m, d, y] = parts.map(Number)
+
+      // MM/DD/YYYY — canonical expected format
+      const slashParts = s.split('/')
+      if (slashParts.length === 3) {
+        const [m, d, y] = slashParts.map(Number)
         if (!isNaN(m) && !isNaN(d) && !isNaN(y) && y >= 1900 && y <= 2100) {
           return new Date(y, m - 1, d)
         }
       }
+
+      // Numeric string that is an Excel serial (e.g. "46087")
+      // Must be handled BEFORE new Date(s) because new Date("46087") = year 46087
+      const numericSerial = Number(s)
+      if (Number.isInteger(numericSerial) && numericSerial > 0) {
+        const result = fromExcelSerial(numericSerial)
+        if (result) return result
+      }
+
+      // Generic ISO or other parseable string — guard year range to prevent
+      // new Date("46087") silently producing year 46087
       const dt = new Date(s)
-      return !isNaN(dt.getTime()) ? dt : null
+      return isValidYear(dt) ? dt : null
     }
 
     const parseAmount = (raw: any): number => {
