@@ -327,4 +327,15 @@ export class UserRepository implements IUserRepository {
       }
     })
   }
+
+  async updatePassword(userId: string, hashedPassword: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+        temp_password: null,
+        is_verified: true
+      }
+    })
+  }
 }

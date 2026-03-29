@@ -34,18 +34,28 @@ export class AuthRepository implements IAuthRepository {
     })
   }
 
-  async createOtp(userId: string, otp: number, expiresAt: Date): Promise<void> {
+  async createOtp(
+    userId: string,
+    otp: number,
+    expiresAt: Date,
+    adminPasswordResetForUserId?: string | null
+  ): Promise<void> {
     await this.prisma.otp.create({
       data: {
         user_id: userId,
         otp,
         expires_at: expiresAt,
-        is_used: false
+        is_used: false,
+        admin_password_reset_for_user_id: adminPasswordResetForUserId ?? null
       }
     })
   }
 
-  async findValidOtp(userId: string, otp: number): Promise<Otp | null> {
+  async findValidOtp(
+    userId: string,
+    otp: number,
+    options?: { adminPasswordResetForUserId?: string }
+  ): Promise<Otp | null> {
     return this.prisma.otp.findFirst({
       where: {
         user_id: userId,
@@ -53,7 +63,11 @@ export class AuthRepository implements IAuthRepository {
         is_used: false,
         expires_at: {
           gte: new Date()
-        }
+        },
+        admin_password_reset_for_user_id:
+          options?.adminPasswordResetForUserId !== undefined
+            ? options.adminPasswordResetForUserId
+            : null
       }
     })
   }
