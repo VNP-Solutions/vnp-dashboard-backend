@@ -130,6 +130,9 @@ model Otp {
   is_used    Boolean
   expires_at DateTime
 
+  /// When set, this OTP verifies an admin resetting `user_id`'s password for this target user (user_id on row = admin).
+  admin_password_reset_for_user_id String? @db.ObjectId
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 

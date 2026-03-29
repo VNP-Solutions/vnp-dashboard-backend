@@ -1,11 +1,15 @@
 import { Module } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
 import { PermissionService } from '../../common/services/permission.service'
+import { EmailUtil } from '../../common/utils/email.util'
+import { AuthModule } from '../auth/auth.module'
 import { PrismaService } from '../prisma/prisma.service'
 import { UserController } from './user.controller'
 import { UserRepository } from './user.repository'
 import { UserService } from './user.service'
 
 @Module({
+  imports: [AuthModule, ConfigModule],
   controllers: [UserController],
   providers: [
     {
@@ -17,7 +21,8 @@ import { UserService } from './user.service'
       useClass: UserRepository
     },
     PermissionService,
-    PrismaService
+    PrismaService,
+    EmailUtil
   ],
   exports: [
     {

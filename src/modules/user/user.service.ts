@@ -5,21 +5,33 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import { Configuration } from '../../config/configuration'
+import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
-import { isUserSuperAdmin } from '../../common/utils/permission.util'
+import {
+  canInviteRole,
+  isUserSuperAdmin
+} from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import type { IAuthRepository } from '../auth/auth.interface'
 import { PrismaService } from '../prisma/prisma.service'
 import {
+  AdminResetUserPasswordDto,
   AssignUserRoleDto,
   DeleteUserDto,
   UpdateOwnProfileDto,
   UpdateUserDto,
   UserQueryDto
 } from './user.dto'
-import type { IUserRepository, IUserService } from './user.interface'
+import type {
+  IUserRepository,
+  IUserService,
+  UserWithDetails
+} from './user.interface'
 
 @Injectable()
 export class UserService implements IUserService {
@@ -28,7 +40,11 @@ export class UserService implements IUserService {
     private userRepository: IUserRepository,
     @Inject(PermissionService)
     private permissionService: PermissionService,
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    @Inject('IAuthRepository')
+    private authRepository: IAuthRepository,
+    private emailUtil: EmailUtil,
+    private configService: ConfigService<Configuration>
   ) {}
 
   async getProfile(userId: string) {
@@ -439,6 +455,102 @@ export class UserService implements IUserService {
     await this.userRepository.delete(id)
 
     return { message: 'User deleted successfully' }
+  }
+
+  async requestAdminPasswordResetOtp(
+    id: string,
+    currentUser: IUserWithPermissions
+  ): Promise<{ message: string }> {
+    const targetUser = await this.assertCanAdminResetTargetUser(id, currentUser)
+
+    const otp = EncryptionUtil.generateOtp()
+    const expiryMinutes = this.configService.get('auth.otpExpiryMinutes', {
+      infer: true
+    })!
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
+
+    await this.authRepository.createOtp(
+      currentUser.id,
+      otp,
+      expiresAt,
+      id
+    )
+
+    await this.emailUtil.sendAdminUserPasswordResetOtpEmail(
+      currentUser.email,
+      otp,
+      `${targetUser.first_name} ${targetUser.last_name}`.trim(),
+      targetUser.email
+    )
+
+    console.log(
+      `Admin user password reset OTP for ${currentUser.email} (target ${targetUser.email}): ${otp}`
+    )
+
+    return { message: 'An OTP has been sent to your email address' }
+  }
+
+  async resetPasswordByAdmin(
+    id: string,
+    data: AdminResetUserPasswordDto,
+    currentUser: IUserWithPermissions
+  ): Promise<{ message: string }> {
+    await this.assertCanAdminResetTargetUser(id, currentUser)
+
+    const validOtp = await this.authRepository.findValidOtp(
+      currentUser.id,
+      data.otp,
+      { adminPasswordResetForUserId: id }
+    )
+
+    if (!validOtp) {
+      throw new BadRequestException('Invalid or expired OTP')
+    }
+
+    await this.authRepository.markOtpAsUsed(validOtp.id)
+
+    const hashedNewPassword = await EncryptionUtil.hashPassword(
+      data.new_password
+    )
+    await this.userRepository.updatePassword(id, hashedNewPassword)
+
+    return { message: 'Password reset successfully' }
+  }
+
+  private async assertCanAdminResetTargetUser(
+    id: string,
+    currentUser: IUserWithPermissions
+  ): Promise<UserWithDetails> {
+    if (currentUser.id === id) {
+      throw new BadRequestException(
+        'Use the password reset flow or profile settings to change your own password'
+      )
+    }
+
+    const targetUser = await this.userRepository.findById(id)
+
+    if (!targetUser) {
+      throw new NotFoundException('User not found')
+    }
+
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      currentUser,
+      ModuleType.USER
+    )
+
+    if (accessibleIds !== 'all' && !accessibleIds.includes(id)) {
+      throw new ForbiddenException('You do not have access to this user')
+    }
+
+    if (!isUserSuperAdmin(currentUser)) {
+      if (!canInviteRole(currentUser, targetUser.role as any)) {
+        throw new ForbiddenException(
+          "You cannot reset this user's password. Their role is equal to or higher than yours in the permission hierarchy."
+        )
+      }
+    }
+
+    return targetUser
   }
 
   async findAll(query: UserQueryDto, user: IUserWithPermissions) {
