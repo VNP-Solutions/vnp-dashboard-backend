@@ -13,6 +13,7 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
+import { isBankDetailsNotificationRecipientRole } from '../../common/utils/permission.util'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   CreatePortfolioBankDetailsDto,
@@ -327,24 +328,7 @@ export class PortfolioBankDetailsService
     for (const user of allUsers) {
       const role = user.role
 
-      const isVnpAdmin =
-        !role.is_external &&
-        role.can_access_mis === false &&
-        role.portfolio_permission?.access_level === 'partial' &&
-        role.property_permission?.access_level === 'partial' &&
-        role.bank_details_permission?.access_level === 'partial'
-
-      const isClientPortfolioManager =
-        role.is_external &&
-        role.can_access_mis === false &&
-        role.portfolio_permission?.permission_level === 'update' &&
-        role.portfolio_permission?.access_level === 'partial' &&
-        role.property_permission?.permission_level === 'update' &&
-        role.property_permission?.access_level === 'partial' &&
-        role.bank_details_permission?.permission_level === 'all' &&
-        role.bank_details_permission?.access_level === 'partial'
-
-      if (isVnpAdmin || isClientPortfolioManager) {
+      if (isBankDetailsNotificationRecipientRole(role)) {
         matchingUsers.push(user)
       }
     }
