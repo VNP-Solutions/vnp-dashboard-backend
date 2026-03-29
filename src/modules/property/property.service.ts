@@ -125,6 +125,11 @@ export class PropertyService implements IPropertyService {
       )
     }
 
+    await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
+      data.portfolio_id,
+      property.id
+    )
+
     return property
   }
 
@@ -191,6 +196,11 @@ export class PropertyService implements IPropertyService {
         data.property.portfolio_id
       )
     }
+
+    await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
+      data.property.portfolio_id,
+      property.id
+    )
 
     // Send email notification to super admins and role users if bank details were created
     if (bankDetailsToCreate) {
@@ -1632,8 +1642,8 @@ export class PropertyService implements IPropertyService {
 
     // Super admin can directly delete
     if (isSuperAdmin) {
-      // Delete the property
       await this.propertyRepository.delete(id)
+      await this.permissionService.removePropertyFromAllUserAccessLists(id)
       return { message: 'Property deleted successfully' }
     }
 
@@ -1741,8 +1751,10 @@ export class PropertyService implements IPropertyService {
           continue
         }
 
-        // Delete the property
         await this.propertyRepository.delete(propertyId)
+        await this.permissionService.removePropertyFromAllUserAccessLists(
+          propertyId
+        )
 
         results.push({
           property_id: propertyId,
@@ -2214,6 +2226,11 @@ export class PropertyService implements IPropertyService {
             const createdProperty =
               await this.propertyRepository.create(propertyData)
             propertyId = createdProperty.id
+
+            await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
+              portfolio.id,
+              createdProperty.id
+            )
           }
 
           // Extract remaining credentials fields
