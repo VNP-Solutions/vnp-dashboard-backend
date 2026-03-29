@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import { OtaType, PendingActionType } from '@prisma/client'
 import * as XLSX from 'xlsx'
+import * as ExcelJS from 'exceljs'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -3180,16 +3181,34 @@ export class AuditService implements IAuditService {
 
       const audit = await this.auditRepository.create(auditData)
 
-      // Build per-property xlsx using original headers
-      const wsData = [
-        originalHeaders,
-        ...rows.map((row) => originalHeaders.map((h) => row[h] ?? ''))
-      ]
-      const wb = XLSX.utils.book_new()
-      const ws = XLSX.utils.aoa_to_sheet(wsData)
-      XLSX.utils.book_append_sheet(wb, ws, 'Report')
+      // Build per-property xlsx (always xlsx regardless of uploaded file type)
+      // Uses ExcelJS for bold headers and auto-fitted column widths
+      const excelWb = new ExcelJS.Workbook()
+      const excelWs = excelWb.addWorksheet('Report')
+
+      // Header row — bold text
+      const headerRow = excelWs.addRow(originalHeaders)
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true }
+      })
+
+      // Data rows
+      for (const dataRow of rows) {
+        excelWs.addRow(originalHeaders.map((h) => dataRow[h] ?? ''))
+      }
+
+      // Column widths: based on the longest value in each column (header + data)
+      originalHeaders.forEach((header, colIdx) => {
+        const maxContentLen = rows.reduce((max, dataRow) => {
+          const val = String(dataRow[header] ?? '')
+          return Math.max(max, val.length)
+        }, 0)
+        const width = Math.min(Math.max(header.length, maxContentLen) + 4, 60)
+        excelWs.getColumn(colIdx + 1).width = width
+      })
+
       const xlsxBuffer = Buffer.from(
-        XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+        await excelWb.xlsx.writeBuffer()
       )
 
       // Upload to S3 via FileUploadService
