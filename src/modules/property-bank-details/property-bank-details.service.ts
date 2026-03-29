@@ -18,6 +18,10 @@ import {
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
 import { EmailUtil } from '../../common/utils/email.util'
+import {
+  getBankDetailsNotificationRoleDisplayLabel,
+  isBankDetailsNotificationRecipientRole
+} from '../../common/utils/permission.util'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IPropertyRepository } from '../property/property.interface'
 import {
@@ -1222,29 +1226,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     for (const user of allUsers) {
       const role = user.role
 
-      // Check for VNP Admin: internal (is_external: false) + partial access
-      const isVnpAdmin =
-        !role.is_external && // internal user
-        role.can_access_mis === false &&
-        role.portfolio_permission?.access_level === 'partial' &&
-        role.property_permission?.access_level === 'partial' &&
-        role.bank_details_permission?.access_level === 'partial'
-
-      // Check for Client Portfolio Manager: external + partial access
-      const isClientPortfolioManager =
-        role.is_external && // external user
-        role.can_access_mis === false &&
-        role.portfolio_permission?.permission_level === 'update' &&
-        role.portfolio_permission?.access_level === 'partial' &&
-        role.property_permission?.permission_level === 'update' &&
-        role.property_permission?.access_level === 'partial' &&
-        role.bank_details_permission?.permission_level === 'all' &&
-        role.bank_details_permission?.access_level === 'partial'
-
-      if (isVnpAdmin || isClientPortfolioManager) {
+      if (isBankDetailsNotificationRecipientRole(role)) {
         matchingUsers.push(user)
-        const roleType = isVnpAdmin ? 'VNP Admin' : 'Client Portfolio Manager'
-        console.log(`   ✓ Match: ${user.email} (${role.name} - matches ${roleType} criteria)`)
+        console.log(
+          `   ✓ Match: ${user.email} (${role.name} - matches ${getBankDetailsNotificationRoleDisplayLabel(role)} criteria)`
+        )
       }
     }
 
