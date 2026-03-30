@@ -90,6 +90,15 @@ export class PropertyService implements IPropertyService {
     private emailUtil: EmailUtil
   ) {}
 
+  private async assertNoPendingPropertyAction(propertyId: string): Promise<void> {
+    const pending = await this.pendingActionRepository.findByPropertyId(propertyId)
+    if (pending.length > 0) {
+      throw new BadRequestException(
+        'A pending action request already exists for this property. Please wait for it to be approved or rejected.'
+      )
+    }
+  }
+
   async create(data: CreatePropertyDto, user: IUserWithPermissions) {
     // Only internal users can create properties
     if (!isInternalUser(user)) {
@@ -1479,6 +1488,8 @@ export class PropertyService implements IPropertyService {
         }
       : undefined
 
+    await this.assertNoPendingPropertyAction(id)
+
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'property',
       property_id: id,
@@ -1654,6 +1665,8 @@ export class PropertyService implements IPropertyService {
       )
     }
 
+    await this.assertNoPendingPropertyAction(id)
+
     // Internal users create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'property',
@@ -1819,6 +1832,8 @@ export class PropertyService implements IPropertyService {
       return { message: 'Property deactivated successfully' }
     }
 
+    await this.assertNoPendingPropertyAction(id)
+
     // All other users (internal and external) create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'property',
@@ -1875,6 +1890,8 @@ export class PropertyService implements IPropertyService {
       })
       return { message: 'Property activated successfully' }
     }
+
+    await this.assertNoPendingPropertyAction(id)
 
     // All other users (internal and external) create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({

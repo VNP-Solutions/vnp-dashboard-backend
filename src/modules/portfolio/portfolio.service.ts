@@ -954,18 +954,16 @@ export class PortfolioService implements IPortfolioService {
     }
 
     // Non-super admin users need to create a pending action
-    // Check if there's already a pending deactivation request
     const existingPendingAction = await this.prisma.pendingAction.findFirst({
       where: {
         portfolio_id: id,
-        action_type: 'PORTFOLIO_DEACTIVATE',
         status: 'PENDING'
       }
     })
 
     if (existingPendingAction) {
       throw new BadRequestException(
-        'A deactivation request for this portfolio is already pending approval'
+        'A pending action request already exists for this portfolio. Please wait for it to be approved or rejected.'
       )
     }
 
@@ -1082,18 +1080,16 @@ export class PortfolioService implements IPortfolioService {
     }
 
     // Non-super admin users need to create a pending action
-    // Check if there's already a pending activation request
     const existingPendingAction = await this.prisma.pendingAction.findFirst({
       where: {
         portfolio_id: id,
-        action_type: 'PORTFOLIO_ACTIVATE',
         status: 'PENDING'
       }
     })
 
     if (existingPendingAction) {
       throw new BadRequestException(
-        'An activation request for this portfolio is already pending approval'
+        'A pending action request already exists for this portfolio. Please wait for it to be approved or rejected.'
       )
     }
 

@@ -942,10 +942,9 @@ export class AuditService implements IAuditService {
       )
     }
 
-    // Check if there's already a pending action for this audit
-    const existingPendingActions =
+    const existingPendingForAudit =
       await this.pendingActionRepository.findByAuditId(id)
-    if (existingPendingActions.length > 0) {
+    if (existingPendingForAudit.length > 0) {
       throw new BadRequestException(
         'There is already a pending update request for this audit. Please wait for it to be approved or rejected.'
       )

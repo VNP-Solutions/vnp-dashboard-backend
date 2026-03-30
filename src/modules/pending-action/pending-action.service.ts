@@ -69,14 +69,41 @@ export class PendingActionService implements IPendingActionService {
       )
     }
 
+    if (data.property_id) {
+      const pending = await this.repository.findByPropertyId(data.property_id)
+      if (pending.length > 0) {
+        throw new BadRequestException(
+          'A pending action request already exists for this property. Please wait for it to be approved or rejected.'
+        )
+      }
+    }
+    if (data.portfolio_id) {
+      const pending = await this.repository.findByPortfolioId(data.portfolio_id)
+      if (pending.length > 0) {
+        throw new BadRequestException(
+          'A pending action request already exists for this portfolio. Please wait for it to be approved or rejected.'
+        )
+      }
+    }
+    if (data.audit_id) {
+      const pending = await this.repository.findByAuditId(data.audit_id)
+      if (pending.length > 0) {
+        throw new BadRequestException(
+          'A pending action request already exists for this audit. Please wait for it to be approved or rejected.'
+        )
+      }
+    }
+
     // Create the pending action with the new unified model
     return this.repository.create({
       resource_type: data.resource_type,
       property_id: data.property_id,
       portfolio_id: data.portfolio_id,
+      audit_id: data.audit_id,
       action_type: data.action_type,
       requested_user_id: user.id,
       transfer_data: data.transfer_data,
+      audit_update_data: data.audit_update_data,
       reason: data.reason
     })
   }
