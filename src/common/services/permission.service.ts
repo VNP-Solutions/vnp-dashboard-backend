@@ -9,6 +9,7 @@ import {
   PermissionCheckResult,
   PermissionLevel
 } from '../interfaces/permission.interface'
+import { isBankDetailsNotificationRecipientRole } from '../utils/permission.util'
 
 /**
  * Permission Service
@@ -525,6 +526,83 @@ export class PermissionService {
         }
         // If user has access to the new portfolio, keep the property access (no action needed)
       }
+    }
+  }
+
+  /**
+   * When a property is created under a portfolio, grant that property to every user who:
+   * - already has the parent portfolio in UserAccessedProperty.portfolio_id, and
+   * - has a role matching VNP Admin or Client Portfolio Manager (bank-details notification role predicates).
+   *
+   * Does not depend on who created the property. Idempotent per user.
+   */
+  async grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
+    portfolioId: string,
+    propertyId: string
+  ): Promise<void> {
+    const accessRows = await this.prisma.userAccessedProperty.findMany({
+      where: {
+        portfolio_id: { has: portfolioId }
+      },
+      select: { user_id: true }
+    })
+
+    const userIds = [...new Set(accessRows.map((r) => r.user_id))]
+    if (userIds.length === 0) {
+      return
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: {
+        id: true,
+        role: {
+          select: {
+            is_external: true,
+            can_access_mis: true,
+            portfolio_permission: true,
+            property_permission: true,
+            bank_details_permission: true
+          }
+        }
+      }
+    })
+
+    for (const u of users) {
+      if (!u.role) {
+        continue
+      }
+      if (isBankDetailsNotificationRecipientRole(u.role)) {
+        await this.grantResourceAccess(u.id, ModuleType.PROPERTY, propertyId)
+      }
+    }
+  }
+
+  /**
+   * Remove a property id from every UserAccessedProperty.property_id list.
+   * Call after the property row has been deleted (or in the same flow once deletion succeeded).
+   */
+  async removePropertyFromAllUserAccessLists(propertyId: string): Promise<void> {
+    const records = await this.prisma.userAccessedProperty.findMany({
+      where: {
+        property_id: { has: propertyId }
+      },
+      select: {
+        id: true,
+        property_id: true
+      }
+    })
+
+    for (const record of records) {
+      const current = record.property_id || []
+      const next = current.filter((id) => id !== propertyId)
+      if (next.length === current.length) {
+        continue
+      }
+      await this.prisma.userAccessedProperty.update({
+        where: { id: record.id },
+        data: { property_id: next }
+      })
     }
   }
 }

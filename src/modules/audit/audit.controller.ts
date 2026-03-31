@@ -33,6 +33,7 @@ import type { IAuthRepository } from '../auth/auth.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
+  AutoImportAuditResultDto,
   AuditQueryDto,
   BulkArchiveAuditDto,
   BulkDeleteAuditDto,
@@ -407,6 +408,67 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.bulkImport(file, user)
+  }
+
+  @Post('auto-import')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Auto-import audits from OTA reservation sheet (Internal users only)',
+    description: `
+    Upload an Excel (.xlsx, .xls) or CSV file containing OTA reservation rows.
+
+    Required columns:
+    - OTA: Platform name (Expedia, Agoda, Booking)
+    - Portfolio: Portfolio name (must already exist in the database)
+    - Hotel Name: Property name (must already exist in the database)
+    - Check In (MM/DD/YYYY): Check-in date in MM/DD/YYYY format
+    - Check Out (MM/DD/YYYY): Check-out date in MM/DD/YYYY format
+    - Amount Collected: Amount collected for this reservation
+
+    All other columns in the sheet are preserved in the generated per-property report files.
+
+    Behaviour:
+    - Rows are grouped by Hotel Name — one audit is created per unique property.
+    - OTA types are collected from all rows of that property.
+    - start_date = earliest check-in date across all rows.
+    - end_date = latest check-out date across all rows.
+    - Amounts are summed per OTA type; both collectable and confirmed are set to the same sum.
+    - Audit status is set to "Reported to Property".
+    - A per-property Excel sheet (all original columns, filtered to that property) is uploaded to S3 and its URL is stored as report_url on the audit.
+
+    Validation (pre-flight):
+    - If any Portfolio or Hotel Name cannot be found in the database, NO audits are created and the full error list is returned.
+    `
+  })
+  @ApiBody({
+    description: 'Excel (.xlsx/.xls) or CSV file containing OTA reservation rows',
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Auto-import result',
+    type: AutoImportAuditResultDto
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request – Invalid file, missing columns, or validation errors found'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden – Insufficient permissions or not an internal user'
+  })
+  autoImport(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.auditService.autoImport(file, user)
   }
 
   @Patch('bulk-upload-report')

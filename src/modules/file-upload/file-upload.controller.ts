@@ -71,12 +71,12 @@ export class FileUploadController {
 
   @Post('bulk')
   @UseInterceptors(
-    FilesInterceptor('files', 20, {
+    FilesInterceptor('files', 50, {
       limits: { fileSize: 50 * 1024 * 1024 } // 50 MB per file
     })
   )
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload multiple files to S3 (max 20 files)' })
+  @ApiOperation({ summary: 'Upload multiple files to S3 (max 50 files)' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -87,7 +87,7 @@ export class FileUploadController {
             type: 'string',
             format: 'binary'
           },
-          description: 'Files to upload (max 20)'
+          description: 'Files to upload (max 50)'
         }
       }
     }

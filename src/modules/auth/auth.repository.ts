@@ -20,8 +20,8 @@ export class AuthRepository implements IAuthRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async findUserByEmail(email: string): Promise<UserWithRelations | null> {
-    return this.prisma.user.findUnique({
-      where: { email },
+    return this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
       include: {
         role: true,
         userAccessedProperties: {
@@ -34,18 +34,28 @@ export class AuthRepository implements IAuthRepository {
     })
   }
 
-  async createOtp(userId: string, otp: number, expiresAt: Date): Promise<void> {
+  async createOtp(
+    userId: string,
+    otp: number,
+    expiresAt: Date,
+    adminPasswordResetForUserId?: string | null
+  ): Promise<void> {
     await this.prisma.otp.create({
       data: {
         user_id: userId,
         otp,
         expires_at: expiresAt,
-        is_used: false
+        is_used: false,
+        admin_password_reset_for_user_id: adminPasswordResetForUserId ?? null
       }
     })
   }
 
-  async findValidOtp(userId: string, otp: number): Promise<Otp | null> {
+  async findValidOtp(
+    userId: string,
+    otp: number,
+    options?: { adminPasswordResetForUserId?: string }
+  ): Promise<Otp | null> {
     return this.prisma.otp.findFirst({
       where: {
         user_id: userId,
@@ -53,7 +63,11 @@ export class AuthRepository implements IAuthRepository {
         is_used: false,
         expires_at: {
           gte: new Date()
-        }
+        },
+        admin_password_reset_for_user_id:
+          options?.adminPasswordResetForUserId !== undefined
+            ? options.adminPasswordResetForUserId
+            : null
       }
     })
   }
@@ -79,7 +93,7 @@ export class AuthRepository implements IAuthRepository {
     invitation_sent_at?: Date
   }): Promise<User> {
     return this.prisma.user.create({
-      data
+      data: { ...data, email: data.email.toLowerCase() }
     })
   }
 

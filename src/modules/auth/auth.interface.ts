@@ -21,8 +21,17 @@ type UserWithRelations = Prisma.UserGetPayload<{
 
 export interface IAuthRepository {
   findUserByEmail(email: string): Promise<UserWithRelations | null>
-  createOtp(userId: string, otp: number, expiresAt: Date): Promise<void>
-  findValidOtp(userId: string, otp: number): Promise<Otp | null>
+  createOtp(
+    userId: string,
+    otp: number,
+    expiresAt: Date,
+    adminPasswordResetForUserId?: string | null
+  ): Promise<void>
+  findValidOtp(
+    userId: string,
+    otp: number,
+    options?: { adminPasswordResetForUserId?: string }
+  ): Promise<Otp | null>
   markOtpAsUsed(otpId: string): Promise<void>
   createUser(data: {
     email: string

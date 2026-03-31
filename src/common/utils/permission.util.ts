@@ -685,3 +685,70 @@ export function canInviteRole(
 
   return true
 }
+
+// --- Bank details notification recipient roles (permission-based, not role name) ---
+
+/**
+ * Minimal role shape for bank-details email notification recipient matching.
+ */
+export interface BankDetailsNotificationRole {
+  is_external: boolean
+  can_access_mis: boolean
+  portfolio_permission: IPermission | null
+  property_permission: IPermission | null
+  bank_details_permission: IPermission | null
+}
+
+/**
+ * Internal VNP staff: partial access on portfolio, property, and bank details; no MIS.
+ */
+export function isVnpAdminBankDetailsNotificationRole(
+  role: BankDetailsNotificationRole
+): boolean {
+  return (
+    !role.is_external &&
+    role.can_access_mis === false &&
+    role.portfolio_permission?.access_level === AccessLevel.partial &&
+    role.property_permission?.access_level === AccessLevel.partial &&
+    role.bank_details_permission?.access_level === AccessLevel.partial
+  )
+}
+
+/**
+ * External client portfolio manager: update-level portfolio/property, full bank details CRUD scope on assigned resources.
+ */
+export function isClientPortfolioManagerBankDetailsNotificationRole(
+  role: BankDetailsNotificationRole
+): boolean {
+  return (
+    role.is_external &&
+    role.can_access_mis === false &&
+    role.portfolio_permission?.permission_level === PermissionLevel.update &&
+    role.portfolio_permission?.access_level === AccessLevel.partial &&
+    role.property_permission?.permission_level === PermissionLevel.update &&
+    role.property_permission?.access_level === AccessLevel.partial &&
+    role.bank_details_permission?.permission_level === PermissionLevel.all &&
+    role.bank_details_permission?.access_level === AccessLevel.partial
+  )
+}
+
+export function isBankDetailsNotificationRecipientRole(
+  role: BankDetailsNotificationRole
+): boolean {
+  return (
+    isVnpAdminBankDetailsNotificationRole(role) ||
+    isClientPortfolioManagerBankDetailsNotificationRole(role)
+  )
+}
+
+export function getBankDetailsNotificationRoleDisplayLabel(
+  role: BankDetailsNotificationRole
+): 'VNP Admin' | 'Client Portfolio Manager' | null {
+  if (isVnpAdminBankDetailsNotificationRole(role)) {
+    return 'VNP Admin'
+  }
+  if (isClientPortfolioManagerBankDetailsNotificationRole(role)) {
+    return 'Client Portfolio Manager'
+  }
+  return null
+}

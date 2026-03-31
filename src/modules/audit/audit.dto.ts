@@ -414,3 +414,44 @@ export class UpdateReportUrlDto {
   @IsNotEmpty()
   report_url: string
 }
+
+export class AutoImportAuditErrorDto {
+  @ApiProperty({ example: 2, description: 'Sheet row number (header = row 1)' })
+  row: number
+
+  @ApiProperty({ example: 'Hilton Garden Inn', description: 'Property / hotel name from sheet' })
+  property: string
+
+  @ApiProperty({ example: 'Portfolio "ARP Hospitality" not found in database', description: 'Error description' })
+  error: string
+}
+
+export class AutoImportAuditSuccessDto {
+  @ApiProperty({ example: 'Hilton Garden Inn', description: 'Property name' })
+  property: string
+
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Created audit ID' })
+  audit_id: string
+
+  @ApiProperty({ example: 'https://s3.amazonaws.com/bucket/auto-imports/Hilton_Garden_Inn_1234567890.xlsx', description: 'S3 URL of uploaded report sheet' })
+  report_url: string
+}
+
+export class AutoImportAuditResultDto {
+  @ApiProperty({ example: true, description: 'Whether import succeeded (false means validation errors were found)' })
+  success: boolean
+
+  @ApiProperty({
+    type: [AutoImportAuditErrorDto],
+    description: 'Validation errors found before any audit was created. Present when success=false.',
+    required: false
+  })
+  errors?: AutoImportAuditErrorDto[]
+
+  @ApiProperty({
+    type: [AutoImportAuditSuccessDto],
+    description: 'Successfully created audits with their report URLs. Present when success=true.',
+    required: false
+  })
+  created_audits?: AutoImportAuditSuccessDto[]
+}

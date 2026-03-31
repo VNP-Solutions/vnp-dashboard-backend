@@ -18,21 +18,23 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount } from '../../common/utils/amount.util'
-import {
-  parseSpreadsheetToJson,
-  validateSpreadsheetFile
-} from '../../common/utils/spreadsheet.util'
+import { maskBankDetails } from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
-import { maskBankDetails } from '../../common/utils/bank-details.util'
 import {
   canCreateBankDetails,
   canReadBankDetails,
   canUpdateBankDetails,
+  getBankDetailsNotificationRoleDisplayLabel,
+  isBankDetailsNotificationRecipientRole,
   isInternalUser,
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import {
+  parseSpreadsheetToJson,
+  validateSpreadsheetFile
+} from '../../common/utils/spreadsheet.util'
 import { Configuration } from '../../config/configuration'
 import type { ICurrencyRepository } from '../currency/currency.interface'
 import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
@@ -88,6 +90,51 @@ export class PropertyService implements IPropertyService {
     private emailUtil: EmailUtil
   ) {}
 
+  private async assertNoPendingPropertyAction(
+    propertyId: string
+  ): Promise<void> {
+    const pending =
+      await this.pendingActionRepository.findByPropertyId(propertyId)
+    if (pending.length > 0) {
+      throw new BadRequestException(
+        'A pending action request already exists for this property. Please wait for it to be approved or rejected.'
+      )
+    }
+  }
+
+  /**
+   * `total_audits`, `total_notes`, and `total_contract_urls` are computed after the query, so they are
+   * not valid Prisma field names. Sort by relation counts instead (QueryBuilder would otherwise fall
+   * back to `created_at`).
+   *
+   * Note: `total_audits` excludes archived audits in the response; ordering uses all related Audit
+   * rows so it may differ slightly when archived audits exist.
+   */
+  private resolvePropertyListOrderBy(
+    query: PropertyQueryDto,
+    defaultOrderBy: any,
+    hasAuditAccess: boolean
+  ): any {
+    const sortOrder: 'asc' | 'desc' = query.sortOrder === 'asc' ? 'asc' : 'desc'
+
+    switch (query.sortBy) {
+      case 'total_audits':
+        if (!hasAuditAccess) {
+          return defaultOrderBy
+        }
+        return [{ audits: { _count: sortOrder } }, { created_at: 'desc' }]
+      case 'total_notes':
+        return [{ notes: { _count: sortOrder } }, { created_at: 'desc' }]
+      case 'total_contract_urls':
+        return [
+          { propertyContractUrls: { _count: sortOrder } },
+          { created_at: 'desc' }
+        ]
+      default:
+        return defaultOrderBy
+    }
+  }
+
   async create(data: CreatePropertyDto, user: IUserWithPermissions) {
     // Only internal users can create properties
     if (!isInternalUser(user)) {
@@ -122,6 +169,11 @@ export class PropertyService implements IPropertyService {
         data.portfolio_id
       )
     }
+
+    await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
+      data.portfolio_id,
+      property.id
+    )
 
     return property
   }
@@ -190,9 +242,18 @@ export class PropertyService implements IPropertyService {
       )
     }
 
+    await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
+      data.property.portfolio_id,
+      property.id
+    )
+
     // Send email notification to super admins and role users if bank details were created
     if (bankDetailsToCreate) {
-      await this.sendBankDetailsNotificationToSuperAdmins(property.id, 'created', location)
+      await this.sendBankDetailsNotificationToSuperAdmins(
+        property.id,
+        'created',
+        location
+      )
     }
 
     return property
@@ -271,7 +332,8 @@ export class PropertyService implements IPropertyService {
 
     // Send email notification to super admins and role users if bank details were updated or deleted
     if (bankDetailsToUpdate) {
-      const action = bankDetailsToUpdate.bank_type === 'none' ? 'deleted' : 'updated'
+      const action =
+        bankDetailsToUpdate.bank_type === 'none' ? 'deleted' : 'updated'
       await this.sendBankDetailsNotificationToSuperAdmins(id, action, location)
     }
 
@@ -396,7 +458,9 @@ export class PropertyService implements IPropertyService {
       accessibleIds === 'all' ? {} : { id: { in: accessibleIds } }
     )
     let where = queryResult.where
-    const { skip, take, orderBy } = queryResult
+    let { orderBy } = queryResult
+    const { skip, take } = queryResult
+    orderBy = this.resolvePropertyListOrderBy(query, orderBy, hasAuditAccess)
 
     // Add credentials.expedia_id search if search term is provided
     // This uses proper Prisma 'is' syntax for one-to-one optional relations
@@ -735,7 +799,8 @@ export class PropertyService implements IPropertyService {
       accessibleIds === 'all' ? {} : { id: { in: accessibleIds } }
     )
     let where = queryResult.where
-    const { orderBy } = queryResult
+    let { orderBy } = queryResult
+    orderBy = this.resolvePropertyListOrderBy(query, orderBy, hasAuditAccess)
 
     // Add credentials.expedia_id search if search term is provided
     // This uses proper Prisma 'is' syntax for one-to-one optional relations
@@ -1127,10 +1192,7 @@ export class PropertyService implements IPropertyService {
     }
   }
 
-  async findManyByIdsSecure(
-    propertyIds: string[],
-    user: IUserWithPermissions
-  ) {
+  async findManyByIdsSecure(propertyIds: string[], user: IUserWithPermissions) {
     const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PROPERTY
@@ -1169,10 +1231,7 @@ export class PropertyService implements IPropertyService {
     return results.filter((p): p is NonNullable<typeof p> => p !== null)
   }
 
-  async findAllSecure(
-    query: PropertyQueryDto,
-    user: IUserWithPermissions
-  ) {
+  async findAllSecure(query: PropertyQueryDto, user: IUserWithPermissions) {
     const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PROPERTY
@@ -1247,7 +1306,12 @@ export class PropertyService implements IPropertyService {
         'currency.code',
         'currency.name'
       ],
-      filterableFields: ['is_active', 'bank_type', 'bank_sub_type', 'currency_id'],
+      filterableFields: [
+        'is_active',
+        'bank_type',
+        'bank_sub_type',
+        'currency_id'
+      ],
       sortableFields: [
         'name',
         'address',
@@ -1287,13 +1351,20 @@ export class PropertyService implements IPropertyService {
     )
 
     const [properties, total] = await Promise.all([
-      this.propertyRepository.findAll({ where, skip, take, orderBy }, undefined, hasAuditAccess),
+      this.propertyRepository.findAll(
+        { where, skip, take, orderBy },
+        undefined,
+        hasAuditAccess
+      ),
       this.propertyRepository.count(where)
     ])
 
     const enrichedData = properties.map((property: any) => {
       const pendingActions = property.pendingActions || []
-      const { pendingActions: _pendingActions, ...propertyWithoutPendingActions } = property
+      const {
+        pendingActions: _pendingActions,
+        ...propertyWithoutPendingActions
+      } = property
 
       return {
         ...propertyWithoutPendingActions,
@@ -1311,7 +1382,6 @@ export class PropertyService implements IPropertyService {
       query.limit || 10
     )
   }
-
 
   async update(
     id: string,
@@ -1466,6 +1536,8 @@ export class PropertyService implements IPropertyService {
           name: property.portfolio.name
         }
       : undefined
+
+    await this.assertNoPendingPropertyAction(id)
 
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'property',
@@ -1630,8 +1702,8 @@ export class PropertyService implements IPropertyService {
 
     // Super admin can directly delete
     if (isSuperAdmin) {
-      // Delete the property
       await this.propertyRepository.delete(id)
+      await this.permissionService.removePropertyFromAllUserAccessLists(id)
       return { message: 'Property deleted successfully' }
     }
 
@@ -1641,6 +1713,8 @@ export class PropertyService implements IPropertyService {
         'Only internal users can request property deletion'
       )
     }
+
+    await this.assertNoPendingPropertyAction(id)
 
     // Internal users create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
@@ -1739,8 +1813,10 @@ export class PropertyService implements IPropertyService {
           continue
         }
 
-        // Delete the property
         await this.propertyRepository.delete(propertyId)
+        await this.permissionService.removePropertyFromAllUserAccessLists(
+          propertyId
+        )
 
         results.push({
           property_id: propertyId,
@@ -1805,6 +1881,8 @@ export class PropertyService implements IPropertyService {
       return { message: 'Property deactivated successfully' }
     }
 
+    await this.assertNoPendingPropertyAction(id)
+
     // All other users (internal and external) create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
       resource_type: 'property',
@@ -1861,6 +1939,8 @@ export class PropertyService implements IPropertyService {
       })
       return { message: 'Property activated successfully' }
     }
+
+    await this.assertNoPendingPropertyAction(id)
 
     // All other users (internal and external) create pending action for approval
     const pendingAction = await this.pendingActionRepository.create({
@@ -2212,6 +2292,11 @@ export class PropertyService implements IPropertyService {
             const createdProperty =
               await this.propertyRepository.create(propertyData)
             propertyId = createdProperty.id
+
+            await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
+              portfolio.id,
+              createdProperty.id
+            )
           }
 
           // Extract remaining credentials fields
@@ -2710,10 +2795,18 @@ export class PropertyService implements IPropertyService {
 
       // Send email notifications to super admins and role users for bank details created/updated during bulk import
       if (bankDetailsCreatedPropertyIds.length > 0) {
-        await this.sendBulkBankDetailsNotificationToSuperAdmins(bankDetailsCreatedPropertyIds, 'created', location)
+        await this.sendBulkBankDetailsNotificationToSuperAdmins(
+          bankDetailsCreatedPropertyIds,
+          'created',
+          location
+        )
       }
       if (bankDetailsUpdatedPropertyIds.length > 0) {
-        await this.sendBulkBankDetailsNotificationToSuperAdmins(bankDetailsUpdatedPropertyIds, 'updated', location)
+        await this.sendBulkBankDetailsNotificationToSuperAdmins(
+          bankDetailsUpdatedPropertyIds,
+          'updated',
+          location
+        )
       }
 
       return result
@@ -2984,7 +3077,10 @@ export class PropertyService implements IPropertyService {
               const propertyWithSameName =
                 await this.propertyRepository.findByName(propertyName)
               // Only error if another property (different ID) already has this name
-              if (propertyWithSameName && propertyWithSameName.id !== existingProperty.id) {
+              if (
+                propertyWithSameName &&
+                propertyWithSameName.id !== existingProperty.id
+              ) {
                 result.errors.push({
                   row: rowNumber,
                   expediaId: expediaIdValue,
@@ -3513,7 +3609,9 @@ export class PropertyService implements IPropertyService {
   ): Promise<string[]> {
     const userEmails: string[] = []
 
-    console.log(`\n🔍 Looking for users matching notification role conditions (property service)...`)
+    console.log(
+      `\n🔍 Looking for users matching notification role conditions (property service)...`
+    )
     console.log(`🔍 Property ID to check access: ${propertyId}`)
 
     // Get all verified users with their role details
@@ -3548,33 +3646,17 @@ export class PropertyService implements IPropertyService {
     for (const user of allUsers) {
       const role = user.role
 
-      // Check for VNP Admin: internal (is_external: false) + partial access
-      const isVnpAdmin =
-        !role.is_external && // internal user
-        role.can_access_mis === false &&
-        role.portfolio_permission?.access_level === 'partial' &&
-        role.property_permission?.access_level === 'partial' &&
-        role.bank_details_permission?.access_level === 'partial'
-
-      // Check for Client Portfolio Manager: external + partial access
-      const isClientPortfolioManager =
-        role.is_external && // external user
-        role.can_access_mis === false &&
-        role.portfolio_permission?.permission_level === 'update' &&
-        role.portfolio_permission?.access_level === 'partial' &&
-        role.property_permission?.permission_level === 'update' &&
-        role.property_permission?.access_level === 'partial' &&
-        role.bank_details_permission?.permission_level === 'all' &&
-        role.bank_details_permission?.access_level === 'partial'
-
-      if (isVnpAdmin || isClientPortfolioManager) {
+      if (isBankDetailsNotificationRecipientRole(role)) {
         matchingUsers.push(user)
-        const roleType = isVnpAdmin ? 'VNP Admin' : 'Client Portfolio Manager'
-        console.log(`   ✓ Match: ${user.email} (${role.name} - matches ${roleType} criteria)`)
+        console.log(
+          `   ✓ Match: ${user.email} (${role.name} - matches ${getBankDetailsNotificationRoleDisplayLabel(role)} criteria)`
+        )
       }
     }
 
-    console.log(`✓ Found ${matchingUsers.length} user(s) matching notification role criteria`)
+    console.log(
+      `✓ Found ${matchingUsers.length} user(s) matching notification role criteria`
+    )
 
     if (matchingUsers.length === 0) {
       console.log(`ℹ️  No users matched the notification role criteria`)
@@ -3603,7 +3685,9 @@ export class PropertyService implements IPropertyService {
         const user = matchingUsers.find(u => u.id === access.user_id)
         if (user) {
           userEmails.push(user.email)
-          console.log(`   ✓ User ${user.email} has access to property ${propertyId}`)
+          console.log(
+            `   ✓ User ${user.email} has access to property ${propertyId}`
+          )
         }
       }
     }
@@ -3671,15 +3755,11 @@ export class PropertyService implements IPropertyService {
     location: string | null = null
   ): Promise<void> {
     try {
-      console.log(
-        `\n========================================`
-      )
+      console.log(`\n========================================`)
       console.log(
         `📧 PROPERTY BANK DETAILS ${action.toUpperCase()} NOTIFICATION`
       )
-      console.log(
-        `========================================`
-      )
+      console.log(`========================================`)
       console.log(`Property ID: ${propertyId}`)
 
       // Get property details
@@ -3726,9 +3806,7 @@ export class PropertyService implements IPropertyService {
         return
       }
 
-      console.log(
-        `✓ Total unique recipients: ${uniqueRecipients.length}`
-      )
+      console.log(`✓ Total unique recipients: ${uniqueRecipients.length}`)
 
       // Send email using the new method with location
       await this.emailUtil.sendBankDetailsUpdateEmail(
@@ -3741,17 +3819,13 @@ export class PropertyService implements IPropertyService {
       console.log(
         `\n✅ SUCCESS: Sent bank details ${action} notification to ${uniqueRecipients.length} recipient(s)`
       )
-      console.log(
-        `========================================\n`
-      )
+      console.log(`========================================\n`)
     } catch (error) {
       console.error(
         `\n❌ ERROR: Exception in sendBankDetailsNotificationToSuperAdmins`
       )
       console.error('Error details:', error)
-      console.log(
-        `========================================\n`
-      )
+      console.log(`========================================\n`)
       // Don't throw - email notifications are non-critical
     }
   }
@@ -3766,15 +3840,11 @@ export class PropertyService implements IPropertyService {
     location: string | null = null
   ): Promise<void> {
     try {
-      console.log(
-        `\n========================================`
-      )
+      console.log(`\n========================================`)
       console.log(
         `📧 PROPERTY BANK DETAILS BULK ${action.toUpperCase()} NOTIFICATION`
       )
-      console.log(
-        `========================================`
-      )
+      console.log(`========================================`)
       console.log(`Properties count: ${propertyIds.length}`)
 
       // Get all properties with their names
@@ -3829,9 +3899,7 @@ export class PropertyService implements IPropertyService {
         return
       }
 
-      console.log(
-        `✓ Total unique recipients: ${uniqueRecipients.length}`
-      )
+      console.log(`✓ Total unique recipients: ${uniqueRecipients.length}`)
 
       // Send email using the new method with location
       const propertyNames = properties.map(p => p.name)
@@ -3845,17 +3913,13 @@ export class PropertyService implements IPropertyService {
       console.log(
         `\n✅ SUCCESS: Sent bulk bank details ${action} notification to ${uniqueRecipients.length} recipient(s)`
       )
-      console.log(
-        `========================================\n`
-      )
+      console.log(`========================================\n`)
     } catch (error) {
       console.error(
         `\n❌ ERROR: Exception in sendBulkBankDetailsNotificationToSuperAdmins`
       )
       console.error('Error details:', error)
-      console.log(
-        `========================================\n`
-      )
+      console.log(`========================================\n`)
       // Don't throw - email notifications are non-critical
     }
   }

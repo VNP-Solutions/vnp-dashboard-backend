@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Inject,
   Param,
   Patch,
@@ -26,6 +28,7 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
+  AdminResetUserPasswordDto,
   AssignUserRoleDto,
   DeleteUserDto,
   ManageUserAccessDto,
@@ -103,6 +106,48 @@ export class UserController {
   })
   findOne(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.userService.findOne(id, user)
+  }
+
+  @Post(':id/password/otp')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary:
+      'Request an OTP (sent to your email) before resetting another user\'s password'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP sent successfully'
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  requestAdminPasswordResetOtp(
+    @Param('id') id: string,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.userService.requestAdminPasswordResetOtp(id, user)
+  }
+
+  @Patch(':id/password')
+  @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary:
+      'Reset another user password using the OTP from POST .../password/otp (same hierarchy rules as inviting)'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset successfully'
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  resetPasswordByAdmin(
+    @Param('id') id: string,
+    @Body() dto: AdminResetUserPasswordDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.userService.resetPasswordByAdmin(id, dto, user)
   }
 
   @Patch(':id')

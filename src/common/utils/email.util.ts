@@ -241,6 +241,65 @@ export class EmailUtil {
     }
   }
 
+  /**
+   * OTP sent to an admin authorizing reset of another user's password (user management).
+   */
+  async sendAdminUserPasswordResetOtpEmail(
+    adminEmail: string,
+    otp: number,
+    targetUserDisplayName: string,
+    targetUserEmail: string
+  ): Promise<void> {
+    const expiryMinutes =
+      this.configService.get('auth.otpExpiryMinutes', { infer: true }) ?? 10
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: adminEmail },
+      select: { first_name: true }
+    })
+
+    const firstName = user?.first_name?.split(' ')[0] || ''
+    const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+    const targetLabel =
+      targetUserDisplayName?.trim() || targetUserEmail || 'the user'
+
+    const mailOptions = {
+      from: this.configService.get('smtp.email', { infer: true }),
+      to: adminEmail,
+      subject: 'Verify password reset for another user (VNP Solutions)',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+          <p><strong>${greeting}</strong></p>
+          <p>You requested to set a new password for <strong>${targetLabel}</strong> (${targetUserEmail}).</p>
+          <p>Use the OTP below to confirm this action in the dashboard:</p>
+          <p><strong>Your OTP:</strong></p>
+          <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0;">
+            ${otp}
+          </div>
+          <p>This code will expire in <strong>${expiryMinutes} minutes</strong> for your security.</p>
+          <p style="color: #666;">If you did not request this, you can ignore this email.</p>
+          <div style="margin-top: 30px;">
+            <p>Stay secure,<br><strong>VNP Solutions Support Team</strong></p>
+          </div>
+        </div>
+      `,
+      text: `${greeting}\n\nYou requested to set a new password for ${targetLabel} (${targetUserEmail}).\n\nYour OTP: ${otp}\n\nThis code will expire in ${expiryMinutes} minutes for your security.\n\nIf you did not request this, you can ignore this email.\n\nStay secure,\nVNP Solutions Support Team`
+    }
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions)
+      console.log('✓ Admin user password reset OTP email sent:', {
+        to: adminEmail,
+        messageId: info.messageId
+      })
+    } catch (error) {
+      console.error('✗ Failed to send admin user password reset OTP email:', error)
+      throw new BadRequestException(
+        `Failed to send password reset OTP email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
+  }
+
   async sendEmail(
     to: string | string[],
     subject: string,
