@@ -20,8 +20,8 @@ export class AuthRepository implements IAuthRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async findUserByEmail(email: string): Promise<UserWithRelations | null> {
-    return this.prisma.user.findUnique({
-      where: { email },
+    return this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
       include: {
         role: true,
         userAccessedProperties: {
@@ -93,7 +93,7 @@ export class AuthRepository implements IAuthRepository {
     invitation_sent_at?: Date
   }): Promise<User> {
     return this.prisma.user.create({
-      data
+      data: { ...data, email: data.email.toLowerCase() }
     })
   }
 
