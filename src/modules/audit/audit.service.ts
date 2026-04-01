@@ -3067,23 +3067,21 @@ export class AuditService implements IAuditService {
         }
       }
 
-      // --- Check-in date (optional) ---
-      const checkIn = parseDate(checkInRaw)
+      // --- Check-in / Check-out (optional): validate only when a value is present ---
+      const checkIn = checkInRaw ? parseDate(checkInRaw) : null
       if (checkInRaw && !checkIn) {
         rowErrors.push(
           `Check In date "${checkInRaw}" could not be parsed. Expected format: MM/DD/YYYY`
         )
       }
 
-      // --- Check-out date (optional) ---
-      const checkOut = parseDate(checkOutRaw)
+      const checkOut = checkOutRaw ? parseDate(checkOutRaw) : null
       if (checkOutRaw && !checkOut) {
         rowErrors.push(
           `Check Out date "${checkOutRaw}" could not be parsed. Expected format: MM/DD/YYYY`
         )
       }
 
-      // --- Date order ---
       if (checkIn && checkOut && checkIn >= checkOut) {
         rowErrors.push('Check In date must be before Check Out date')
       }
