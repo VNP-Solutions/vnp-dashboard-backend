@@ -6,7 +6,6 @@ import {
   NotFoundException
 } from '@nestjs/common'
 import { OtaType, PendingActionType } from '@prisma/client'
-import * as XLSX from 'xlsx'
 import * as ExcelJS from 'exceljs'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
@@ -16,10 +15,6 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount, roundToDecimals } from '../../common/utils/amount.util'
-import {
-  parseSpreadsheetToJson,
-  validateSpreadsheetFile
-} from '../../common/utils/spreadsheet.util'
 import {
   COMPLETED_AUDIT_STATUSES,
   canArchiveAudit,
@@ -32,13 +27,17 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import {
+  parseSpreadsheetToJson,
+  validateSpreadsheetFile
+} from '../../common/utils/spreadsheet.util'
 import type { IAuditBatchRepository } from '../audit-batch/audit-batch.interface'
 import type { IAuditStatusRepository } from '../audit-status/audit-status.interface'
+import type { IFileUploadService } from '../file-upload/file-upload.interface'
 import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
+import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IPropertyRepository } from '../property/property.interface'
-import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
-import type { IFileUploadService } from '../file-upload/file-upload.interface'
 import {
   AuditQueryDto,
   AutoImportAuditResultDto,
@@ -250,54 +249,59 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // For MongoDB: Handle property name and expedia ID search separately since Prisma MongoDB doesn't support nested relation filters
-    let propertyIdFilter: string[] | undefined = undefined
+    // For MongoDB: pre-query all searchable relations since Prisma MongoDB
+    // does not support nested relation filters or contains on enum fields
+    const searchOrConditions: any[] = []
     if (query.search && query.search.trim()) {
       const searchTerm = query.search.trim()
-      // Find properties matching the search term (by name or expedia ID in credentials)
-      const matchingProperties = await this.prisma.property.findMany({
-        where: {
-          OR: [
-            {
-              name: {
-                contains: searchTerm,
-                mode: 'insensitive'
-              }
-            },
-            {
-              credentials: {
-                expedia_id: {
-                  contains: searchTerm,
-                  mode: 'insensitive'
+
+      const [matchingProperties, matchingBatches, matchingStatuses] =
+        await Promise.all([
+          this.prisma.property.findMany({
+            where: {
+              OR: [
+                { name: { contains: searchTerm, mode: 'insensitive' } },
+                {
+                  credentials: {
+                    expedia_id: { contains: searchTerm, mode: 'insensitive' }
+                  }
                 }
-              }
-            }
-          ]
-        },
-        select: {
-          id: true
-        }
-      })
+              ]
+            },
+            select: { id: true }
+          }),
+          this.prisma.auditBatch.findMany({
+            where: { batch_no: { contains: searchTerm, mode: 'insensitive' } },
+            select: { id: true }
+          }),
+          this.prisma.auditStatus.findMany({
+            where: { status: { contains: searchTerm, mode: 'insensitive' } },
+            select: { id: true }
+          })
+        ])
 
       if (matchingProperties.length > 0) {
-        propertyIdFilter = matchingProperties.map(p => p.id)
+        searchOrConditions.push({
+          property_id: { in: matchingProperties.map(p => p.id) }
+        })
+      }
+      if (matchingBatches.length > 0) {
+        searchOrConditions.push({
+          batch_id: { in: matchingBatches.map(b => b.id) }
+        })
+      }
+      if (matchingStatuses.length > 0) {
+        searchOrConditions.push({
+          audit_status_id: { in: matchingStatuses.map(s => s.id) }
+        })
       }
     }
 
-    // Configuration for query builder - remove nested fields for MongoDB compatibility
+    // Configuration for query builder
+    // searchFields is empty — search is handled via pre-queries above since
+    // MongoDB does not support contains on relation paths or enum array fields
     const queryConfig = {
-      searchFields: [
-        'id',
-        'property_id',
-        'batch.batch_no',
-        'batch_id',
-        'type_of_ota',
-        'audit_status_id',
-        'auditStatus.status',
-        'property.name',
-        'property.portfolio_id',
-        'property.portfolio.name'
-      ],
+      searchFields: [],
       filterableFields: [
         'batch_id',
         'type_of_ota',
@@ -332,7 +336,7 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Build base where clause
+    // Build base where clause (access scope only)
     const baseWhere: any =
       accessiblePropertyIds === 'all'
         ? {}
@@ -342,22 +346,7 @@ export class AuditService implements IAuditService {
             }
           }
 
-    // Add property ID filter if we found matching properties by name
-    if (propertyIdFilter && propertyIdFilter.length > 0) {
-      if (baseWhere.property_id && baseWhere.property_id.in) {
-        // Intersect with accessible property IDs
-        baseWhere.property_id.in = baseWhere.property_id.in.filter(
-          (id: string) => propertyIdFilter.includes(id)
-        )
-      } else {
-        // Set property ID filter directly
-        baseWhere.property_id = {
-          in: propertyIdFilter
-        }
-      }
-    }
-
-    // Build Prisma query options
+    // Build Prisma query options (handles explicit filters, sorting, pagination)
     const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
       mergedQuery,
       queryConfig,
@@ -426,6 +415,16 @@ export class AuditService implements IAuditService {
         finalWhere.property_id = {
           in: []
         }
+      }
+    }
+
+    // Apply search OR conditions — must happen after all other filter mutations
+    if (query.search && query.search.trim()) {
+      if (searchOrConditions.length > 0) {
+        finalWhere = { ...finalWhere, OR: searchOrConditions }
+      } else {
+        // Search term provided but nothing matched — force empty result set
+        finalWhere = { ...finalWhere, id: { in: [] } }
       }
     }
 
@@ -521,54 +520,59 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // For MongoDB: Handle property name and expedia ID search separately since Prisma MongoDB doesn't support nested relation filters
-    let propertyIdFilter: string[] | undefined = undefined
+    // For MongoDB: pre-query all searchable relations since Prisma MongoDB
+    // does not support nested relation filters or contains on enum fields
+    const searchOrConditions: any[] = []
     if (query.search && query.search.trim()) {
       const searchTerm = query.search.trim()
-      // Find properties matching the search term (by name or expedia ID in credentials)
-      const matchingProperties = await this.prisma.property.findMany({
-        where: {
-          OR: [
-            {
-              name: {
-                contains: searchTerm,
-                mode: 'insensitive'
-              }
-            },
-            {
-              credentials: {
-                expedia_id: {
-                  contains: searchTerm,
-                  mode: 'insensitive'
+
+      const [matchingProperties, matchingBatches, matchingStatuses] =
+        await Promise.all([
+          this.prisma.property.findMany({
+            where: {
+              OR: [
+                { name: { contains: searchTerm, mode: 'insensitive' } },
+                {
+                  credentials: {
+                    expedia_id: { contains: searchTerm, mode: 'insensitive' }
+                  }
                 }
-              }
-            }
-          ]
-        },
-        select: {
-          id: true
-        }
-      })
+              ]
+            },
+            select: { id: true }
+          }),
+          this.prisma.auditBatch.findMany({
+            where: { batch_no: { contains: searchTerm, mode: 'insensitive' } },
+            select: { id: true }
+          }),
+          this.prisma.auditStatus.findMany({
+            where: { status: { contains: searchTerm, mode: 'insensitive' } },
+            select: { id: true }
+          })
+        ])
 
       if (matchingProperties.length > 0) {
-        propertyIdFilter = matchingProperties.map(p => p.id)
+        searchOrConditions.push({
+          property_id: { in: matchingProperties.map(p => p.id) }
+        })
+      }
+      if (matchingBatches.length > 0) {
+        searchOrConditions.push({
+          batch_id: { in: matchingBatches.map(b => b.id) }
+        })
+      }
+      if (matchingStatuses.length > 0) {
+        searchOrConditions.push({
+          audit_status_id: { in: matchingStatuses.map(s => s.id) }
+        })
       }
     }
 
-    // Configuration for query builder - remove nested fields for MongoDB compatibility
+    // Configuration for query builder
+    // searchFields is empty — search is handled via pre-queries above since
+    // MongoDB does not support contains on relation paths or enum array fields
     const queryConfig = {
-      searchFields: [
-        'id',
-        'property_id',
-        'batch.batch_no',
-        'batch_id',
-        'type_of_ota',
-        'audit_status_id',
-        'auditStatus.status',
-        'property.name',
-        'property.portfolio_id',
-        'property.portfolio.name'
-      ],
+      searchFields: [],
       filterableFields: [
         'batch_id',
         'type_of_ota',
@@ -603,7 +607,7 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Build base where clause
+    // Build base where clause (access scope only)
     const baseWhere: any =
       accessiblePropertyIds === 'all'
         ? {}
@@ -612,21 +616,6 @@ export class AuditService implements IAuditService {
               in: accessiblePropertyIds
             }
           }
-
-    // Add property ID filter if we found matching properties by name
-    if (propertyIdFilter && propertyIdFilter.length > 0) {
-      if (baseWhere.property_id && baseWhere.property_id.in) {
-        // Intersect with accessible property IDs
-        baseWhere.property_id.in = baseWhere.property_id.in.filter(
-          (id: string) => propertyIdFilter.includes(id)
-        )
-      } else {
-        // Set property ID filter directly
-        baseWhere.property_id = {
-          in: propertyIdFilter
-        }
-      }
-    }
 
     // Build Prisma query options (without pagination)
     const { where, orderBy } = QueryBuilder.buildPrismaQuery(
@@ -700,6 +689,16 @@ export class AuditService implements IAuditService {
       }
     }
 
+    // Apply search OR conditions — must happen after all other filter mutations
+    if (query.search && query.search.trim()) {
+      if (searchOrConditions.length > 0) {
+        finalWhere = { ...finalWhere, OR: searchOrConditions }
+      } else {
+        // Search term provided but nothing matched — force empty result set
+        finalWhere = { ...finalWhere, id: { in: [] } }
+      }
+    }
+
     // Fetch all data without pagination
     const data = await this.auditRepository.findAll(
       { where: finalWhere, orderBy },
@@ -768,22 +767,40 @@ export class AuditService implements IAuditService {
     // Check amount_confirmed update restriction for non-super-admin internal users
     if (!isUserSuperAdmin(user)) {
       // For each OTA type, check if the amount_confirmed is already set
-      if (data.expedia_amount_confirmed !== undefined && data.expedia_amount_confirmed !== null) {
-        if (audit.expedia_amount_confirmed !== null && audit.expedia_amount_confirmed !== undefined) {
+      if (
+        data.expedia_amount_confirmed !== undefined &&
+        data.expedia_amount_confirmed !== null
+      ) {
+        if (
+          audit.expedia_amount_confirmed !== null &&
+          audit.expedia_amount_confirmed !== undefined
+        ) {
           throw new BadRequestException(
             'Expedia amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
           )
         }
       }
-      if (data.agoda_amount_confirmed !== undefined && data.agoda_amount_confirmed !== null) {
-        if (audit.agoda_amount_confirmed !== null && audit.agoda_amount_confirmed !== undefined) {
+      if (
+        data.agoda_amount_confirmed !== undefined &&
+        data.agoda_amount_confirmed !== null
+      ) {
+        if (
+          audit.agoda_amount_confirmed !== null &&
+          audit.agoda_amount_confirmed !== undefined
+        ) {
           throw new BadRequestException(
             'Agoda amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
           )
         }
       }
-      if (data.booking_amount_confirmed !== undefined && data.booking_amount_confirmed !== null) {
-        if (audit.booking_amount_confirmed !== null && audit.booking_amount_confirmed !== undefined) {
+      if (
+        data.booking_amount_confirmed !== undefined &&
+        data.booking_amount_confirmed !== null
+      ) {
+        if (
+          audit.booking_amount_confirmed !== null &&
+          audit.booking_amount_confirmed !== undefined
+        ) {
           throw new BadRequestException(
             'Booking amount confirmed is already set for this audit. Only super admins can update it once it has been set.'
           )
@@ -953,13 +970,19 @@ export class AuditService implements IAuditService {
     // Create the pending action with rounded amounts
     const auditUpdateData: any = {}
     if (data.expedia_amount_confirmed !== undefined) {
-      auditUpdateData.expedia_amount_confirmed = roundToDecimals(data.expedia_amount_confirmed) ?? data.expedia_amount_confirmed
+      auditUpdateData.expedia_amount_confirmed =
+        roundToDecimals(data.expedia_amount_confirmed) ??
+        data.expedia_amount_confirmed
     }
     if (data.agoda_amount_confirmed !== undefined) {
-      auditUpdateData.agoda_amount_confirmed = roundToDecimals(data.agoda_amount_confirmed) ?? data.agoda_amount_confirmed
+      auditUpdateData.agoda_amount_confirmed =
+        roundToDecimals(data.agoda_amount_confirmed) ??
+        data.agoda_amount_confirmed
     }
     if (data.booking_amount_confirmed !== undefined) {
-      auditUpdateData.booking_amount_confirmed = roundToDecimals(data.booking_amount_confirmed) ?? data.booking_amount_confirmed
+      auditUpdateData.booking_amount_confirmed =
+        roundToDecimals(data.booking_amount_confirmed) ??
+        data.booking_amount_confirmed
     }
 
     const pendingAction = await this.pendingActionRepository.create({
@@ -1378,9 +1401,13 @@ export class AuditService implements IAuditService {
             'expedia_amount_collectable'
           ])
           if (expediaAmountCollectableValue) {
-            const expediaAmountCollectable = parseFloat(expediaAmountCollectableValue)
+            const expediaAmountCollectable = parseFloat(
+              expediaAmountCollectableValue
+            )
             if (!isNaN(expediaAmountCollectable)) {
-              updateData.expedia_amount_collectable = roundToDecimals(expediaAmountCollectable)
+              updateData.expedia_amount_collectable = roundToDecimals(
+                expediaAmountCollectable
+              )
             }
           }
 
@@ -1391,7 +1418,9 @@ export class AuditService implements IAuditService {
             'expedia_amount_confirmed'
           ])
           if (expediaAmountConfirmedValue) {
-            const expediaAmountConfirmed = parseFloat(expediaAmountConfirmedValue)
+            const expediaAmountConfirmed = parseFloat(
+              expediaAmountConfirmedValue
+            )
             if (!isNaN(expediaAmountConfirmed)) {
               // Check expedia_amount_confirmed update restriction for non-super-admin internal users
               if (!isUserSuperAdmin(user)) {
@@ -1409,7 +1438,9 @@ export class AuditService implements IAuditService {
                   continue
                 }
               }
-              updateData.expedia_amount_confirmed = roundToDecimals(expediaAmountConfirmed)
+              updateData.expedia_amount_confirmed = roundToDecimals(
+                expediaAmountConfirmed
+              )
             }
           }
 
@@ -1420,9 +1451,13 @@ export class AuditService implements IAuditService {
             'agoda_amount_collectable'
           ])
           if (agodaAmountCollectableValue) {
-            const agodaAmountCollectable = parseFloat(agodaAmountCollectableValue)
+            const agodaAmountCollectable = parseFloat(
+              agodaAmountCollectableValue
+            )
             if (!isNaN(agodaAmountCollectable)) {
-              updateData.agoda_amount_collectable = roundToDecimals(agodaAmountCollectable)
+              updateData.agoda_amount_collectable = roundToDecimals(
+                agodaAmountCollectable
+              )
             }
           }
 
@@ -1451,7 +1486,8 @@ export class AuditService implements IAuditService {
                   continue
                 }
               }
-              updateData.agoda_amount_confirmed = roundToDecimals(agodaAmountConfirmed)
+              updateData.agoda_amount_confirmed =
+                roundToDecimals(agodaAmountConfirmed)
             }
           }
 
@@ -1462,9 +1498,13 @@ export class AuditService implements IAuditService {
             'booking_amount_collectable'
           ])
           if (bookingAmountCollectableValue) {
-            const bookingAmountCollectable = parseFloat(bookingAmountCollectableValue)
+            const bookingAmountCollectable = parseFloat(
+              bookingAmountCollectableValue
+            )
             if (!isNaN(bookingAmountCollectable)) {
-              updateData.booking_amount_collectable = roundToDecimals(bookingAmountCollectable)
+              updateData.booking_amount_collectable = roundToDecimals(
+                bookingAmountCollectable
+              )
             }
           }
 
@@ -1475,7 +1515,9 @@ export class AuditService implements IAuditService {
             'booking_amount_confirmed'
           ])
           if (bookingAmountConfirmedValue) {
-            const bookingAmountConfirmed = parseFloat(bookingAmountConfirmedValue)
+            const bookingAmountConfirmed = parseFloat(
+              bookingAmountConfirmedValue
+            )
             if (!isNaN(bookingAmountConfirmed)) {
               // Check booking_amount_confirmed update restriction for non-super-admin internal users
               if (!isUserSuperAdmin(user)) {
@@ -1493,7 +1535,9 @@ export class AuditService implements IAuditService {
                   continue
                 }
               }
-              updateData.booking_amount_confirmed = roundToDecimals(bookingAmountConfirmed)
+              updateData.booking_amount_confirmed = roundToDecimals(
+                bookingAmountConfirmed
+              )
             }
           }
 
@@ -2458,8 +2502,10 @@ export class AuditService implements IAuditService {
       amountConfirmed.booking += bookingConfirmed
 
       // Calculate total (sum of all OTA types)
-      amountCollectable.total += expediaCollectable + agodaCollectable + bookingCollectable
-      amountConfirmed.total += expediaConfirmed + agodaConfirmed + bookingConfirmed
+      amountCollectable.total +=
+        expediaCollectable + agodaCollectable + bookingCollectable
+      amountConfirmed.total +=
+        expediaConfirmed + agodaConfirmed + bookingConfirmed
     })
 
     // Round all amounts to 2 decimal places
@@ -2595,8 +2641,7 @@ export class AuditService implements IAuditService {
         audit.type_of_ota && audit.type_of_ota.length > 0
           ? audit.type_of_ota
               .map(
-                (ota: string) =>
-                  `${ota.charAt(0).toUpperCase() + ota.slice(1)}`
+                (ota: string) => `${ota.charAt(0).toUpperCase() + ota.slice(1)}`
               )
               .join(' + ') + ' Audit'
           : 'Audit'
@@ -2775,10 +2820,7 @@ export class AuditService implements IAuditService {
     }
 
     // Send email notification to external portfolio managers
-    await this.sendReportUrlUpdateNotification(
-      updatedAudit,
-      data.report_url
-    )
+    await this.sendReportUrlUpdateNotification(updatedAudit, data.report_url)
 
     return updatedAudit
   }
@@ -2787,10 +2829,7 @@ export class AuditService implements IAuditService {
    * Send email notification when report URL is updated
    * Sends email to portfolio contact emails (comma-separated values)
    */
-  private async sendReportUrlUpdateNotification(
-    audit: any,
-    reportUrl: string
-  ) {
+  private async sendReportUrlUpdateNotification(audit: any, reportUrl: string) {
     try {
       // Get portfolio details with contact_email
       const portfolio = await this.prisma.portfolio.findUnique({
@@ -2839,7 +2878,9 @@ export class AuditService implements IAuditService {
     user: IUserWithPermissions
   ): Promise<AutoImportAuditResultDto> {
     if (!isInternalUser(user)) {
-      throw new BadRequestException('Only internal users can auto-import audits')
+      throw new BadRequestException(
+        'Only internal users can auto-import audits'
+      )
     }
 
     if (!file) {
@@ -2852,7 +2893,12 @@ export class AuditService implements IAuditService {
 
     // --- Column name resolution helpers ---
     const OTA_COLS = ['OTA', 'ota', 'Ota']
-    const PORTFOLIO_COLS = ['Portfolio', 'portfolio', 'Portfolio Name', 'portfolio_name']
+    const PORTFOLIO_COLS = [
+      'Portfolio',
+      'portfolio',
+      'Portfolio Name',
+      'portfolio_name'
+    ]
     const HOTEL_NAME_COLS = [
       'Hotel Name',
       'hotel name',
@@ -2916,7 +2962,9 @@ export class AuditService implements IAuditService {
       if (!raw) return null
 
       const isValidYear = (d: Date): boolean =>
-        !isNaN(d.getTime()) && d.getFullYear() >= 1900 && d.getFullYear() <= 2100
+        !isNaN(d.getTime()) &&
+        d.getFullYear() >= 1900 &&
+        d.getFullYear() <= 2100
 
       const fromExcelSerial = (serial: number): Date | null => {
         const date = new Date(
@@ -2971,7 +3019,8 @@ export class AuditService implements IAuditService {
       const n = raw.toLowerCase().trim()
       if (n === 'expedia' || n === 'exp') return OtaType.expedia
       if (n === 'agoda' || n === 'ago') return OtaType.agoda
-      if (n === 'booking' || n === 'booking.com' || n === 'book') return OtaType.booking
+      if (n === 'booking' || n === 'booking.com' || n === 'book')
+        return OtaType.booking
       return null
     }
 
@@ -2989,9 +3038,9 @@ export class AuditService implements IAuditService {
     const errors: Array<{ row: number; property: string; error: string }> = []
 
     // Caches to avoid repeated DB calls for the same name
-    const portfolioCache = new Map<string, boolean>()          // name  → exists
-    const propertyIdCache = new Map<string, string | null>()   // name  → id | null
-    const accessCache    = new Map<string, boolean>()          // id    → hasAccess
+    const portfolioCache = new Map<string, boolean>() // name  → exists
+    const propertyIdCache = new Map<string, string | null>() // name  → id | null
+    const accessCache = new Map<string, boolean>() // id    → hasAccess
 
     const auditPermission = user.role.audit_permission
 
@@ -3004,18 +3053,22 @@ export class AuditService implements IAuditService {
       const rowNum = i + 2 // row 1 is the header in the sheet
       const rowErrors: string[] = []
 
-      const hotelName    = findCol(row, HOTEL_NAME_COLS)
+      const hotelName = findCol(row, HOTEL_NAME_COLS)
       const portfolioName = findCol(row, PORTFOLIO_COLS)
-      const otaRaw       = findCol(row, OTA_COLS)
-      const checkInRaw   = findCol(row, CHECK_IN_COLS)
-      const checkOutRaw  = findCol(row, CHECK_OUT_COLS)
-      const amountRaw    = findCol(row, AMOUNT_COLS)
+      const otaRaw = findCol(row, OTA_COLS)
+      const checkInRaw = findCol(row, CHECK_IN_COLS)
+      const checkOutRaw = findCol(row, CHECK_OUT_COLS)
+      const amountRaw = findCol(row, AMOUNT_COLS)
 
       const label = hotelName ?? 'Unknown'
 
       // --- Required field presence ---
       if (!hotelName) {
-        errors.push({ row: rowNum, property: label, error: 'Hotel Name is missing' })
+        errors.push({
+          row: rowNum,
+          property: label,
+          error: 'Hotel Name is missing'
+        })
         continue // can't validate further without a name
       }
 
@@ -3067,23 +3120,21 @@ export class AuditService implements IAuditService {
         }
       }
 
-      // --- Check-in date (optional) ---
-      const checkIn = parseDate(checkInRaw)
+      // --- Check-in / Check-out (optional): validate only when a value is present ---
+      const checkIn = checkInRaw ? parseDate(checkInRaw) : null
       if (checkInRaw && !checkIn) {
         rowErrors.push(
           `Check In date "${checkInRaw}" could not be parsed. Expected format: MM/DD/YYYY`
         )
       }
 
-      // --- Check-out date (optional) ---
-      const checkOut = parseDate(checkOutRaw)
+      const checkOut = checkOutRaw ? parseDate(checkOutRaw) : null
       if (checkOutRaw && !checkOut) {
         rowErrors.push(
           `Check Out date "${checkOutRaw}" could not be parsed. Expected format: MM/DD/YYYY`
         )
       }
 
-      // --- Date order ---
       if (checkIn && checkOut && checkIn >= checkOut) {
         rowErrors.push('Check In date must be before Check Out date')
       }
@@ -3119,8 +3170,9 @@ export class AuditService implements IAuditService {
     }
 
     // --- Look up "Reported to Property" audit status ---
-    const reportedStatus =
-      await this.auditStatusRepository.findByStatus('Reported to Property')
+    const reportedStatus = await this.auditStatusRepository.findByStatus(
+      'Reported to Property'
+    )
     if (!reportedStatus) {
       throw new BadRequestException(
         'Audit status "Reported to Property" not found in the database'
@@ -3156,8 +3208,10 @@ export class AuditService implements IAuditService {
           if (ota === OtaType.booking) bookingSum += amount
         }
 
-        if (checkIn && (!minCheckIn || checkIn < minCheckIn)) minCheckIn = checkIn
-        if (checkOut && (!maxCheckOut || checkOut > maxCheckOut)) maxCheckOut = checkOut
+        if (checkIn && (!minCheckIn || checkIn < minCheckIn))
+          minCheckIn = checkIn
+        if (checkOut && (!maxCheckOut || checkOut > maxCheckOut))
+          maxCheckOut = checkOut
       }
 
       const auditData: CreateAuditDto = {
@@ -3166,12 +3220,24 @@ export class AuditService implements IAuditService {
         type_of_ota: [...otaSet],
         start_date: minCheckIn?.toISOString(),
         end_date: maxCheckOut?.toISOString(),
-        expedia_amount_collectable: otaSet.has(OtaType.expedia) ? roundAmount(expediaSum) : undefined,
-        expedia_amount_confirmed: otaSet.has(OtaType.expedia) ? roundAmount(expediaSum) : undefined,
-        agoda_amount_collectable: otaSet.has(OtaType.agoda) ? roundAmount(agodaSum) : undefined,
-        agoda_amount_confirmed: otaSet.has(OtaType.agoda) ? roundAmount(agodaSum) : undefined,
-        booking_amount_collectable: otaSet.has(OtaType.booking) ? roundAmount(bookingSum) : undefined,
-        booking_amount_confirmed: otaSet.has(OtaType.booking) ? roundAmount(bookingSum) : undefined
+        expedia_amount_collectable: otaSet.has(OtaType.expedia)
+          ? roundAmount(expediaSum)
+          : undefined,
+        expedia_amount_confirmed: otaSet.has(OtaType.expedia)
+          ? roundAmount(expediaSum)
+          : undefined,
+        agoda_amount_collectable: otaSet.has(OtaType.agoda)
+          ? roundAmount(agodaSum)
+          : undefined,
+        agoda_amount_confirmed: otaSet.has(OtaType.agoda)
+          ? roundAmount(agodaSum)
+          : undefined,
+        booking_amount_collectable: otaSet.has(OtaType.booking)
+          ? roundAmount(bookingSum)
+          : undefined,
+        booking_amount_confirmed: otaSet.has(OtaType.booking)
+          ? roundAmount(bookingSum)
+          : undefined
       }
 
       const audit = await this.auditRepository.create(auditData)
@@ -3183,13 +3249,13 @@ export class AuditService implements IAuditService {
 
       // Header row — bold text
       const headerRow = excelWs.addRow(originalHeaders)
-      headerRow.eachCell((cell) => {
+      headerRow.eachCell(cell => {
         cell.font = { bold: true }
       })
 
       // Data rows
       for (const dataRow of rows) {
-        excelWs.addRow(originalHeaders.map((h) => dataRow[h] ?? ''))
+        excelWs.addRow(originalHeaders.map(h => dataRow[h] ?? ''))
       }
 
       // Column widths: based on the longest value in each column (header + data)
@@ -3202,9 +3268,7 @@ export class AuditService implements IAuditService {
         excelWs.getColumn(colIdx + 1).width = width
       })
 
-      const xlsxBuffer = Buffer.from(
-        await excelWb.xlsx.writeBuffer()
-      )
+      const xlsxBuffer = Buffer.from(await excelWb.xlsx.writeBuffer())
 
       // Upload to S3 via FileUploadService
       const safeName = hotelName.replace(/[^a-zA-Z0-9]/g, '_')

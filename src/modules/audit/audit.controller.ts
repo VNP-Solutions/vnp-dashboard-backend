@@ -423,17 +423,18 @@ export class AuditController {
     - OTA: Platform name (Expedia, Agoda, Booking)
     - Portfolio: Portfolio name (must already exist in the database)
     - Hotel Name: Property name (must already exist in the database)
-    - Check In (MM/DD/YYYY): Check-in date in MM/DD/YYYY format
-    - Check Out (MM/DD/YYYY): Check-out date in MM/DD/YYYY format
     - Amount Collected: Amount collected for this reservation
+
+    Optional columns (recognised header aliases include Check In / Start Date and Check Out / End Date):
+    - Check-in and check-out dates: if a cell is empty, it is skipped. If a cell has a value, it must parse as a date (MM/DD/YYYY or supported formats), and when both are present Check In must be before Check Out; otherwise the row is reported in the error list.
 
     All other columns in the sheet are preserved in the generated per-property report files.
 
     Behaviour:
     - Rows are grouped by Hotel Name — one audit is created per unique property.
     - OTA types are collected from all rows of that property.
-    - start_date = earliest check-in date across all rows.
-    - end_date = latest check-out date across all rows.
+    - start_date = earliest check-in date across all rows (omitted if none).
+    - end_date = latest check-out date across all rows (omitted if none).
     - Amounts are summed per OTA type; both collectable and confirmed are set to the same sum.
     - Audit status is set to "Reported to Property".
     - A per-property Excel sheet (all original columns, filtered to that property) is uploaded to S3 and its URL is stored as report_url on the audit.
