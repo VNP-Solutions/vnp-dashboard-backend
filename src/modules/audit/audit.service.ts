@@ -2935,6 +2935,7 @@ export class AuditService implements IAuditService {
       'amount_collected',
       'AmountCollected'
     ]
+    const BATCH_COLS = ['Batch', 'Batch No', 'Batch NO', 'Batch no']
 
     const findCol = (row: any, names: string[]): string | undefined => {
       for (const name of names) {
@@ -3046,7 +3047,10 @@ export class AuditService implements IAuditService {
 
     // validGroups is built in this same pass so that audit creation uses only
     // rows that belong to groups that fully passed validation.
-    const validGroups = new Map<string, { rows: any[]; propertyId: string }>()
+    const validGroups = new Map<
+      string,
+      { rows: any[]; propertyId: string; batch?: string }
+    >()
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i]
@@ -3059,6 +3063,7 @@ export class AuditService implements IAuditService {
       const checkInRaw = findCol(row, CHECK_IN_COLS)
       const checkOutRaw = findCol(row, CHECK_OUT_COLS)
       const amountRaw = findCol(row, AMOUNT_COLS)
+      const batchRaw = findCol(row, BATCH_COLS)
 
       const label = hotelName ?? 'Unknown'
 
@@ -3159,7 +3164,11 @@ export class AuditService implements IAuditService {
       // Build valid group only if this row has zero errors so far
       if (rowErrors.length === 0 && propertyId) {
         if (!validGroups.has(hotelName)) {
-          validGroups.set(hotelName, { rows: [], propertyId })
+          validGroups.set(hotelName, {
+            rows: [],
+            propertyId,
+            batch: batchRaw
+          })
         }
         validGroups.get(hotelName)!.rows.push(row)
       }
@@ -3186,7 +3195,7 @@ export class AuditService implements IAuditService {
       report_url: string
     }> = []
 
-    for (const [hotelName, { rows, propertyId }] of validGroups) {
+    for (const [hotelName, { rows, propertyId, batch }] of validGroups) {
       // Aggregate data from all rows for this property
       const otaSet = new Set<OtaType>()
       let expediaSum = 0
@@ -3214,10 +3223,26 @@ export class AuditService implements IAuditService {
           maxCheckOut = checkOut
       }
 
+      // --- Handle batch assignment ---
+      let batchId: string | undefined
+      if (batch) {
+        // Try to find existing batch by batch_no
+        let existingBatch =
+          await this.auditBatchRepository.findByBatchNo(batch)
+        if (!existingBatch) {
+          // Create new batch if not found
+          existingBatch = await this.auditBatchRepository.create({
+            batch_no: batch
+          })
+        }
+        batchId = existingBatch.id
+      }
+
       const auditData: CreateAuditDto = {
         property_id: propertyId,
         audit_status_id: reportedStatus.id,
         type_of_ota: [...otaSet],
+        batch_id: batchId,
         start_date: minCheckIn?.toISOString(),
         end_date: maxCheckOut?.toISOString(),
         expedia_amount_collectable: otaSet.has(OtaType.expedia)
