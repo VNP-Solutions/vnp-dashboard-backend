@@ -21,6 +21,7 @@ import {
   getArchiveErrorMessage,
   getStatusesByCategory
 } from '../../common/utils/audit.util'
+import { ColoredLogger } from '../../common/utils/colored-logger.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import {
   isInternalUser,
@@ -56,6 +57,8 @@ import type { IAuditRepository, IAuditService } from './audit.interface'
 
 @Injectable()
 export class AuditService implements IAuditService {
+  private readonly logger = new ColoredLogger(AuditService.name)
+
   constructor(
     @Inject('IAuditRepository')
     private auditRepository: IAuditRepository,
@@ -427,9 +430,6 @@ export class AuditService implements IAuditService {
         finalWhere = { ...finalWhere, id: { in: [] } }
       }
     }
-
-    console.log('Audit findAll - finalWhere:', JSON.stringify(finalWhere))
-    console.log('Audit findAll - accessiblePropertyIds:', accessiblePropertyIds)
 
     // Fetch data and count
     const [data, total] = await Promise.all([
@@ -2877,19 +2877,30 @@ export class AuditService implements IAuditService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<AutoImportAuditResultDto> {
+    this.logger.info(
+      `Starting auto-import for user: ${user.email} (${user.role.name})`
+    )
+
     if (!isInternalUser(user)) {
+      this.logger.error(
+        `Access denied: User ${user.email} is not an internal user`
+      )
       throw new BadRequestException(
         'Only internal users can auto-import audits'
       )
     }
 
     if (!file) {
+      this.logger.error('No file provided')
       throw new BadRequestException('No file provided')
     }
 
     validateSpreadsheetFile(file)
 
     const data = parseSpreadsheetToJson(file)
+    this.logger.info(
+      `File parsed successfully. Found ${data.length} data rows`
+    )
 
     // --- Column name resolution helpers ---
     const OTA_COLS = ['OTA', 'ota', 'Ota']
@@ -3010,7 +3021,7 @@ export class AuditService implements IAuditService {
       if (typeof raw === 'number') return raw
       // Strip any currency symbol, thousands separators, and whitespace,
       // keeping only digits, decimal point, and leading minus sign
-      const cleaned = String(raw).replace(/[^\d.\-]/g, '')
+      const cleaned = String(raw).replace(/[^\d.-]/g, '')
       const n = parseFloat(cleaned)
       return isNaN(n) ? 0 : n
     }
@@ -3036,6 +3047,8 @@ export class AuditService implements IAuditService {
 
     // --- Row-level validation with DB lookup caches ---
     // Each row is validated individually so every error surfaces in the response.
+    this.logger.info('Starting row validation and database lookups...')
+
     const errors: Array<{ row: number; property: string; error: string }> = []
 
     // Caches to avoid repeated DB calls for the same name
@@ -3066,6 +3079,17 @@ export class AuditService implements IAuditService {
       const batchRaw = findCol(row, BATCH_COLS)
 
       const label = hotelName ?? 'Unknown'
+
+      // Log row processing details
+      this.logger.info(
+        `Processing row ${rowNum}: Hotel="${hotelName || 'N/A'}", ` +
+          `Portfolio="${portfolioName || 'N/A'}", ` +
+          `OTA="${otaRaw || 'N/A'}", ` +
+          `CheckIn="${checkInRaw || 'N/A'}", ` +
+          `CheckOut="${checkOutRaw || 'N/A'}", ` +
+          `Amount="${amountRaw || 'N/A'}", ` +
+          `Batch="${batchRaw || 'N/A'}"`
+      )
 
       // --- Required field presence ---
       if (!hotelName) {
@@ -3175,18 +3199,37 @@ export class AuditService implements IAuditService {
     }
 
     if (errors.length > 0) {
+      this.logger.error(
+        `✗ Validation failed with ${errors.length} error(s). ` +
+          `Valid properties: ${validGroups.size}, Invalid rows: ${errors.length}`
+      )
+
+      // Log each error in detail
+      errors.forEach((err) => {
+        this.logger.error(
+          `  Row ${err.row} (${err.property}): ${err.error}`
+        )
+      })
+
       return { success: false, errors }
     }
+
+    this.logger.success(
+      `✓ Validation successful. ${validGroups.size} property group(s) ready for audit creation`
+    )
 
     // --- Look up "Reported to Property" audit status ---
     const reportedStatus = await this.auditStatusRepository.findByStatus(
       'Reported to Property'
     )
     if (!reportedStatus) {
+      this.logger.error('Audit status "Reported to Property" not found')
       throw new BadRequestException(
         'Audit status "Reported to Property" not found in the database'
       )
     }
+
+    this.logger.info('Starting audit creation process...')
 
     // --- Create audits, generate per-property xlsx sheets, upload to S3 ---
     const createdAudits: Array<{
@@ -3196,6 +3239,11 @@ export class AuditService implements IAuditService {
     }> = []
 
     for (const [hotelName, { rows, propertyId, batch }] of validGroups) {
+      this.logger.info(
+        `Processing property group: "${hotelName}" (${rows.length} rows)` +
+          `${batch ? `, Batch="${batch}"` : ''}`
+      )
+
       // Aggregate data from all rows for this property
       const otaSet = new Set<OtaType>()
       let expediaSum = 0
@@ -3227,13 +3275,22 @@ export class AuditService implements IAuditService {
       let batchId: string | undefined
       if (batch) {
         // Try to find existing batch by batch_no
-        let existingBatch =
-          await this.auditBatchRepository.findByBatchNo(batch)
+        let existingBatch = await this.auditBatchRepository.findByBatchNo(batch)
         if (!existingBatch) {
           // Create new batch if not found
+          this.logger.info(
+            `Creating new batch "${batch}" for property "${hotelName}"`
+          )
           existingBatch = await this.auditBatchRepository.create({
             batch_no: batch
           })
+          this.logger.success(
+            `✓ Batch created: ID=${existingBatch.id}, Batch No="${batch}"`
+          )
+        } else {
+          this.logger.info(
+            `Using existing batch: ID=${existingBatch.id}, Batch No="${batch}"`
+          )
         }
         batchId = existingBatch.id
       }
@@ -3265,9 +3322,24 @@ export class AuditService implements IAuditService {
           : undefined
       }
 
-      const audit = await this.auditRepository.create(auditData)
+      try {
+        this.logger.info(
+          `Creating audit for property "${hotelName}" with ${rows.length} rows`
+        )
 
-      // Build per-property xlsx (always xlsx regardless of uploaded file type)
+        const audit = await this.auditRepository.create(auditData)
+
+        this.logger.success(
+          `✓ Audit created successfully: ID=${audit.id}, ` +
+            `Property="${hotelName}", ` +
+            `Expedia=$${expediaSum.toFixed(2)}, ` +
+            `Agoda=$${agodaSum.toFixed(2)}, ` +
+            `Booking=$${bookingSum.toFixed(2)}, ` +
+            `Batch="${batch || 'None'}", ` +
+            `Date Range=${minCheckIn?.toISOString().split('T')[0]} to ${maxCheckOut?.toISOString().split('T')[0]}`
+        )
+
+        // Build per-property xlsx (always xlsx regardless of uploaded file type)
       // Uses ExcelJS for bold headers and auto-fitted column widths
       const excelWb = new ExcelJS.Workbook()
       const excelWs = excelWb.addWorksheet('Report')
@@ -3322,6 +3394,32 @@ export class AuditService implements IAuditService {
         property: hotelName,
         audit_id: audit.id,
         report_url: uploadResult.url
+      })
+
+        this.logger.success(
+          `✓ Report uploaded for property "${hotelName}": ${uploadResult.url}`
+        )
+      } catch (error) {
+        this.logger.error(
+          `✗ Failed to create audit for property "${hotelName}": ` +
+            `${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+        // Continue to next property even if this one fails
+      }
+    }
+
+    this.logger.success(
+      `✓ Auto-import completed successfully. ` +
+        `Total audits created: ${createdAudits.length}`
+    )
+
+    // Log summary of created audits
+    if (createdAudits.length > 0) {
+      this.logger.info('Summary of created audits:')
+      createdAudits.forEach((audit) => {
+        this.logger.info(
+          `  - Property: "${audit.property}", Audit ID: ${audit.audit_id}, Report: ${audit.report_url}`
+        )
       })
     }
 
