@@ -309,10 +309,10 @@ export class GlobalStatsResponseDto {
   amount_confirmed: GlobalStatsAmountDto
 
   @ApiProperty({
-    example: 25,
-    description: 'Count of completed audits across all accessible properties'
+    example: 50,
+    description: 'Total number of audits across all accessible properties'
   })
-  completed_audit_count: number
+  total_audit_count: number
 }
 
 export class BulkUploadReportDto {

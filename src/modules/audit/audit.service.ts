@@ -16,7 +16,6 @@ import {
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount, roundToDecimals } from '../../common/utils/amount.util'
 import {
-  COMPLETED_AUDIT_STATUSES,
   canArchiveAudit,
   getArchiveErrorMessage,
   getStatusesByCategory
@@ -2403,7 +2402,7 @@ export class AuditService implements IAuditService {
         booking: 0,
         agoda: 0
       },
-      completed_audit_count: 0
+      total_audit_count: 0
     }
 
     // If audit access level is 'none', return zeros
@@ -2457,16 +2456,9 @@ export class AuditService implements IAuditService {
       }
     })
 
-    // Get count of completed audits
-    const completedAuditCount = await this.prisma.audit.count({
-      where: {
-        ...whereClause,
-        auditStatus: {
-          status: {
-            in: COMPLETED_AUDIT_STATUSES
-          }
-        }
-      }
+    // Get total count of all audits
+    const totalAuditCount = await this.prisma.audit.count({
+      where: whereClause
     })
 
     // Initialize amounts
@@ -2522,7 +2514,7 @@ export class AuditService implements IAuditService {
         booking: roundAmount(amountConfirmed.booking),
         agoda: roundAmount(amountConfirmed.agoda)
       },
-      completed_audit_count: completedAuditCount
+      total_audit_count: totalAuditCount
     }
   }
 

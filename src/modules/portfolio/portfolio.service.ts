@@ -1972,7 +1972,7 @@ export class PortfolioService implements IPortfolioService {
           booking: 0,
           agoda: 0
         },
-        completed_audit_count: 0,
+        total_audit_count: 0,
         recent_audits: []
       }
     }
@@ -2001,22 +2001,13 @@ export class PortfolioService implements IPortfolioService {
       }
     })
 
-    // Get count of completed audits within the duration
-    const completedAuditCount = await this.prisma.audit.count({
+    // Get total count of all audits for the portfolio
+    const totalAuditCount = await this.prisma.audit.count({
       where: {
         property_id: {
           in: propertyIds
         },
-        is_archived: false,
-        created_at: {
-          gte: startDate,
-          lte: now
-        },
-        auditStatus: {
-          status: {
-            in: COMPLETED_AUDIT_STATUSES
-          }
-        }
+        is_archived: false
       }
     })
 
@@ -2110,7 +2101,7 @@ export class PortfolioService implements IPortfolioService {
         booking: roundAmount(amountConfirmed.booking),
         agoda: roundAmount(amountConfirmed.agoda)
       },
-      completed_audit_count: completedAuditCount,
+      total_audit_count: totalAuditCount,
       recent_audits: formattedRecentAudits.map(audit => ({
         ...audit,
         expedia_amount_collectable:
