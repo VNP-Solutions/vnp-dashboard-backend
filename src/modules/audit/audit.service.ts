@@ -2990,6 +2990,12 @@ export class AuditService implements IAuditService {
       'AmountCollected'
     ]
     const BATCH_COLS = ['Batch', 'Batch No', 'Batch NO', 'Batch no']
+    const REVIEW_COLLECTION_DATE_COLS = [
+      'Review Collection Date',
+      'Review collection date',
+      'Review collection Date',
+      'review_collection_date'
+    ]
 
     const findCol = (row: any, names: string[]): string | undefined => {
       for (const name of names) {
@@ -3105,7 +3111,12 @@ export class AuditService implements IAuditService {
     // rows that belong to groups that fully passed validation.
     const validGroups = new Map<
       string,
-      { rows: any[]; propertyId: string; batch?: string }
+      {
+        rows: any[]
+        propertyId: string
+        batch?: string
+        reviewCollectionDate?: string
+      }
     >()
 
     for (let i = 0; i < data.length; i++) {
@@ -3120,6 +3131,7 @@ export class AuditService implements IAuditService {
       const checkOutRaw = findCol(row, CHECK_OUT_COLS)
       const amountRaw = findCol(row, AMOUNT_COLS)
       const batchRaw = findCol(row, BATCH_COLS)
+      const reviewCollectionDateRaw = findCol(row, REVIEW_COLLECTION_DATE_COLS)
 
       const label = hotelName ?? 'Unknown'
 
@@ -3131,7 +3143,8 @@ export class AuditService implements IAuditService {
           `CheckIn="${checkInRaw || 'N/A'}", ` +
           `CheckOut="${checkOutRaw || 'N/A'}", ` +
           `Amount="${amountRaw || 'N/A'}", ` +
-          `Batch="${batchRaw || 'N/A'}"`
+          `Batch="${batchRaw || 'N/A'}", ` +
+          `ReviewCollectionDate="${reviewCollectionDateRaw || 'N/A'}"`
       )
 
       // --- Required field presence ---
@@ -3234,7 +3247,8 @@ export class AuditService implements IAuditService {
           validGroups.set(hotelName, {
             rows: [],
             propertyId,
-            batch: batchRaw
+            batch: batchRaw,
+            reviewCollectionDate: reviewCollectionDateRaw
           })
         }
         validGroups.get(hotelName)!.rows.push(row)
@@ -3281,10 +3295,17 @@ export class AuditService implements IAuditService {
       report_url: string
     }> = []
 
-    for (const [hotelName, { rows, propertyId, batch }] of validGroups) {
+    for (const [
+      hotelName,
+      { rows, propertyId, batch, reviewCollectionDate }
+    ] of validGroups) {
       this.logger.info(
         `Processing property group: "${hotelName}" (${rows.length} rows)` +
-          `${batch ? `, Batch="${batch}"` : ''}`
+          `${batch ? `, Batch="${batch}"` : ''}` +
+          `${reviewCollectionDate
+            ? `, ReviewCollectionDate="${reviewCollectionDate}"`
+            : ''
+          }`
       )
 
       // Aggregate data from all rows for this property
@@ -3338,6 +3359,11 @@ export class AuditService implements IAuditService {
         batchId = existingBatch.id
       }
 
+      // Parse review collection date if provided
+      const parsedReviewCollectionDate = reviewCollectionDate
+        ? parseDate(reviewCollectionDate)
+        : null
+
       const auditData: CreateAuditDto = {
         property_id: propertyId,
         audit_status_id: reportedStatus.id,
@@ -3345,6 +3371,9 @@ export class AuditService implements IAuditService {
         batch_id: batchId,
         start_date: minCheckIn?.toISOString(),
         end_date: maxCheckOut?.toISOString(),
+        review_collection_date: parsedReviewCollectionDate
+          ? parsedReviewCollectionDate.toISOString()
+          : undefined,
         expedia_amount_collectable: otaSet.has(OtaType.expedia)
           ? roundAmount(expediaSum)
           : undefined,
@@ -3379,7 +3408,11 @@ export class AuditService implements IAuditService {
             `Agoda=$${agodaSum.toFixed(2)}, ` +
             `Booking=$${bookingSum.toFixed(2)}, ` +
             `Batch="${batch || 'None'}", ` +
-            `Date Range=${minCheckIn?.toISOString().split('T')[0]} to ${maxCheckOut?.toISOString().split('T')[0]}`
+            `Date Range=${minCheckIn?.toISOString().split('T')[0]} to ${maxCheckOut?.toISOString().split('T')[0]}, ` +
+            `Review Collection Date=${parsedReviewCollectionDate
+              ? parsedReviewCollectionDate.toISOString().split('T')[0]
+              : 'Not set'
+            }`
         )
 
         // Build per-property xlsx (always xlsx regardless of uploaded file type)
