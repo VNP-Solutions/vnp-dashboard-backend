@@ -196,6 +196,7 @@ export class AuditController {
     - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
     - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)
     - Report URL/Report url/report_url/Report/URL: Report URL
+    - Review Collection Date/Review collection date/review_collection_date: Review collection date (mm/dd/yyyy)
     - Batch/Batch No: Batch number (will be created if doesn't exist)
 
     Note: Empty cells will keep existing values unchanged.
@@ -356,6 +357,7 @@ export class AuditController {
     - Booking Amount Collectable/Booking Collectable/booking_amount_collectable: Booking collectable amount
     - Booking Amount Confirmed/Booking Confirmed/booking_amount_confirmed: Booking confirmed amount
     - Report URL/Report url/report_url/Report/URL: Report URL
+    - Review Collection Date/Review collection date/review_collection_date: Review collection date (mm/dd/yyyy)
     - Batch/Batch No: Batch number (will be created if doesn't exist)
 
     Note: If both start and end dates are provided, start date must be before end date.

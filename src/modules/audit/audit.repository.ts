@@ -12,7 +12,10 @@ export class AuditRepository implements IAuditRepository {
       data: {
         ...data,
         start_date: data.start_date ? new Date(data.start_date) : undefined,
-        end_date: data.end_date ? new Date(data.end_date) : undefined
+        end_date: data.end_date ? new Date(data.end_date) : undefined,
+        review_collection_date: data.review_collection_date
+          ? new Date(data.review_collection_date)
+          : undefined
       },
       include: {
         auditStatus: {
@@ -339,6 +342,11 @@ export class AuditRepository implements IAuditRepository {
     if (data.end_date) {
       updateData.end_date = new Date(data.end_date)
     }
+    if (data.review_collection_date) {
+      updateData.review_collection_date = new Date(
+        data.review_collection_date
+      )
+    }
 
     return this.prisma.audit.update({
       where: { id },
@@ -453,6 +461,11 @@ export class AuditRepository implements IAuditRepository {
     }
     if (data.end_date) {
       updateData.end_date = new Date(data.end_date)
+    }
+    if (data.review_collection_date) {
+      updateData.review_collection_date = new Date(
+        data.review_collection_date
+      )
     }
 
     const result = await this.prisma.audit.updateMany({
