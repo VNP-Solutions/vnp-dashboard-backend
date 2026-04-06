@@ -132,6 +132,14 @@ export class CreateAuditDto {
   @IsString()
   @IsOptional()
   report_url?: string
+
+  @ApiPropertyOptional({
+    example: '2024-01-15T00:00:00Z',
+    description: 'Review collection date'
+  })
+  @IsDateString()
+  @IsOptional()
+  review_collection_date?: string
 }
 
 export class UpdateAuditDto extends PartialType(CreateAuditDto) {}

@@ -1611,6 +1611,28 @@ export class AuditService implements IAuditService {
             updateData.report_url = reportUrl
           }
 
+          // Extract review collection date (if provided) - use raw value to preserve Excel date format
+          const reviewCollectionDateValue = getRawValue(row, [
+            'Review Collection Date',
+            'Review collection date',
+            'Review collection Date',
+            'review_collection_date'
+          ])
+          if (reviewCollectionDateValue) {
+            const reviewCollectionDate = parseDate(reviewCollectionDateValue)
+            if (!reviewCollectionDate) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error: 'Invalid review collection date format (expected mm/dd/yyyy)'
+              })
+              result.failureCount++
+              continue
+            }
+            updateData.review_collection_date =
+              reviewCollectionDate.toISOString()
+          }
+
           // Extract batch (optional)
           const batchValue = findHeaderValue(row, ['Batch', 'Batch No'])
           if (batchValue) {
@@ -2253,6 +2275,32 @@ export class AuditService implements IAuditService {
             'URL'
           ])
 
+          // Extract review collection date (use raw value to preserve Excel date format) - optional
+          const reviewCollectionDateValue = getRawValue(row, [
+            'Review Collection Date',
+            'Review collection date',
+            'Review collection Date',
+            'review_collection_date'
+          ])
+
+          let reviewCollectionDate: Date | null = null
+          if (reviewCollectionDateValue) {
+            reviewCollectionDate = parseDate(reviewCollectionDateValue)
+            if (!reviewCollectionDate) {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ Row ${rowNumber} FAILED: Invalid review collection date format`
+              )
+              result.errors.push({
+                row: rowNumber,
+                audit: expediaId,
+                error: 'Invalid review collection date format (expected mm/dd/yyyy)'
+              })
+              result.failureCount++
+              continue
+            }
+          }
+
           // Extract batch (optional)
           const batchValue = findHeaderValue(row, ['Batch', 'Batch No'])
           let batchId: string | undefined = undefined
@@ -2286,6 +2334,9 @@ export class AuditService implements IAuditService {
             booking_amount_collectable: bookingAmountCollectable,
             booking_amount_confirmed: bookingAmountConfirmed,
             report_url: reportUrl,
+            review_collection_date: reviewCollectionDate
+              ? reviewCollectionDate.toISOString()
+              : undefined,
             batch_id: batchId
           }
 
