@@ -1,4 +1,8 @@
-import { ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+import {
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException
+} from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { AuthGuard } from '@nestjs/passport'
 
@@ -25,23 +29,47 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // Handle specific JWT authentication errors with 401 status
     if (err || !user) {
       if (info?.name === 'TokenExpiredError') {
-        throw new UnauthorizedException('Access token has expired. Please refresh your token.')
+        // throw new UnauthorizedException(
+        //   'Access token has expired. Please refresh your token.'
+        // )
+        throw new UnauthorizedException(
+          'Please logout and login again, the session is expired!'
+        )
       }
-      
+
       if (info?.name === 'JsonWebTokenError') {
-        throw new UnauthorizedException('Invalid access token. Please authenticate again.')
+        // throw new UnauthorizedException(
+        //   'Invalid access token. Please authenticate again.'
+        // )
+        throw new UnauthorizedException(
+          'Please logout and login again, the session is expired!'
+        )
       }
-      
+
       if (info?.name === 'NotBeforeError') {
-        throw new UnauthorizedException('Access token is not yet valid.')
+        // throw new UnauthorizedException('Access token is not yet valid.')
+        throw new UnauthorizedException(
+          'Please logout and login again, the session is expired!'
+        )
       }
-      
+
       if (info?.message === 'No auth token') {
-        throw new UnauthorizedException('No access token provided. Please authenticate.')
+        // throw new UnauthorizedException(
+        //   'No access token provided. Please authenticate.'
+        // )
+        throw new UnauthorizedException(
+          'Please logout and login again, the session is expired!'
+        )
       }
 
       // Generic authentication error
-      throw err || new UnauthorizedException('Authentication failed. Please provide a valid access token.')
+      throw (
+        err ||
+        new UnauthorizedException(
+          // 'Authentication failed. Please provide a valid access token.'
+          'Please logout and login again, the session is expired!'
+        )
+      )
     }
 
     return user
