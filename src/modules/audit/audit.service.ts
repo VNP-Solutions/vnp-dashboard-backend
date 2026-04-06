@@ -16,11 +16,11 @@ import {
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount, roundToDecimals } from '../../common/utils/amount.util'
 import {
-  COMPLETED_AUDIT_STATUSES,
   canArchiveAudit,
   getArchiveErrorMessage,
   getStatusesByCategory
 } from '../../common/utils/audit.util'
+import { ColoredLogger } from '../../common/utils/colored-logger.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import {
   isInternalUser,
@@ -56,6 +56,8 @@ import type { IAuditRepository, IAuditService } from './audit.interface'
 
 @Injectable()
 export class AuditService implements IAuditService {
+  private readonly logger = new ColoredLogger(AuditService.name)
+
   constructor(
     @Inject('IAuditRepository')
     private auditRepository: IAuditRepository,
@@ -427,9 +429,6 @@ export class AuditService implements IAuditService {
         finalWhere = { ...finalWhere, id: { in: [] } }
       }
     }
-
-    console.log('Audit findAll - finalWhere:', JSON.stringify(finalWhere))
-    console.log('Audit findAll - accessiblePropertyIds:', accessiblePropertyIds)
 
     // Fetch data and count
     const [data, total] = await Promise.all([
@@ -1612,6 +1611,28 @@ export class AuditService implements IAuditService {
             updateData.report_url = reportUrl
           }
 
+          // Extract review collection date (if provided) - use raw value to preserve Excel date format
+          const reviewCollectionDateValue = getRawValue(row, [
+            'Review Collection Date',
+            'Review collection date',
+            'Review collection Date',
+            'review_collection_date'
+          ])
+          if (reviewCollectionDateValue) {
+            const reviewCollectionDate = parseDate(reviewCollectionDateValue)
+            if (!reviewCollectionDate) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error: 'Invalid review collection date format (expected mm/dd/yyyy)'
+              })
+              result.failureCount++
+              continue
+            }
+            updateData.review_collection_date =
+              reviewCollectionDate.toISOString()
+          }
+
           // Extract batch (optional)
           const batchValue = findHeaderValue(row, ['Batch', 'Batch No'])
           if (batchValue) {
@@ -2254,6 +2275,32 @@ export class AuditService implements IAuditService {
             'URL'
           ])
 
+          // Extract review collection date (use raw value to preserve Excel date format) - optional
+          const reviewCollectionDateValue = getRawValue(row, [
+            'Review Collection Date',
+            'Review collection date',
+            'Review collection Date',
+            'review_collection_date'
+          ])
+
+          let reviewCollectionDate: Date | null = null
+          if (reviewCollectionDateValue) {
+            reviewCollectionDate = parseDate(reviewCollectionDateValue)
+            if (!reviewCollectionDate) {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ Row ${rowNumber} FAILED: Invalid review collection date format`
+              )
+              result.errors.push({
+                row: rowNumber,
+                audit: expediaId,
+                error: 'Invalid review collection date format (expected mm/dd/yyyy)'
+              })
+              result.failureCount++
+              continue
+            }
+          }
+
           // Extract batch (optional)
           const batchValue = findHeaderValue(row, ['Batch', 'Batch No'])
           let batchId: string | undefined = undefined
@@ -2287,6 +2334,9 @@ export class AuditService implements IAuditService {
             booking_amount_collectable: bookingAmountCollectable,
             booking_amount_confirmed: bookingAmountConfirmed,
             report_url: reportUrl,
+            review_collection_date: reviewCollectionDate
+              ? reviewCollectionDate.toISOString()
+              : undefined,
             batch_id: batchId
           }
 
@@ -2403,7 +2453,7 @@ export class AuditService implements IAuditService {
         booking: 0,
         agoda: 0
       },
-      completed_audit_count: 0
+      total_audit_count: 0
     }
 
     // If audit access level is 'none', return zeros
@@ -2457,16 +2507,9 @@ export class AuditService implements IAuditService {
       }
     })
 
-    // Get count of completed audits
-    const completedAuditCount = await this.prisma.audit.count({
-      where: {
-        ...whereClause,
-        auditStatus: {
-          status: {
-            in: COMPLETED_AUDIT_STATUSES
-          }
-        }
-      }
+    // Get total count of all audits
+    const totalAuditCount = await this.prisma.audit.count({
+      where: whereClause
     })
 
     // Initialize amounts
@@ -2522,7 +2565,7 @@ export class AuditService implements IAuditService {
         booking: roundAmount(amountConfirmed.booking),
         agoda: roundAmount(amountConfirmed.agoda)
       },
-      completed_audit_count: completedAuditCount
+      total_audit_count: totalAuditCount
     }
   }
 
@@ -2877,19 +2920,30 @@ export class AuditService implements IAuditService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<AutoImportAuditResultDto> {
+    this.logger.info(
+      `Starting auto-import for user: ${user.email} (${user.role.name})`
+    )
+
     if (!isInternalUser(user)) {
+      this.logger.error(
+        `Access denied: User ${user.email} is not an internal user`
+      )
       throw new BadRequestException(
         'Only internal users can auto-import audits'
       )
     }
 
     if (!file) {
+      this.logger.error('No file provided')
       throw new BadRequestException('No file provided')
     }
 
     validateSpreadsheetFile(file)
 
     const data = parseSpreadsheetToJson(file)
+    this.logger.info(
+      `File parsed successfully. Found ${data.length} data rows`
+    )
 
     // --- Column name resolution helpers ---
     const OTA_COLS = ['OTA', 'ota', 'Ota']
@@ -2934,6 +2988,13 @@ export class AuditService implements IAuditService {
       'Amount_Collected',
       'amount_collected',
       'AmountCollected'
+    ]
+    const BATCH_COLS = ['Batch', 'Batch No', 'Batch NO', 'Batch no']
+    const REVIEW_COLLECTION_DATE_COLS = [
+      'Review Collection Date',
+      'Review collection date',
+      'Review collection Date',
+      'review_collection_date'
     ]
 
     const findCol = (row: any, names: string[]): string | undefined => {
@@ -3009,7 +3070,7 @@ export class AuditService implements IAuditService {
       if (typeof raw === 'number') return raw
       // Strip any currency symbol, thousands separators, and whitespace,
       // keeping only digits, decimal point, and leading minus sign
-      const cleaned = String(raw).replace(/[^\d.\-]/g, '')
+      const cleaned = String(raw).replace(/[^\d.-]/g, '')
       const n = parseFloat(cleaned)
       return isNaN(n) ? 0 : n
     }
@@ -3035,7 +3096,9 @@ export class AuditService implements IAuditService {
 
     // --- Row-level validation with DB lookup caches ---
     // Each row is validated individually so every error surfaces in the response.
-    const errors: Array<{ row: number; property: string; error: string }> = []
+    this.logger.info('Starting row validation and database lookups...')
+
+    const errors: Array<{ row: number; property: string; property_id?: string; error: string }> = []
 
     // Caches to avoid repeated DB calls for the same name
     const portfolioCache = new Map<string, boolean>() // name  → exists
@@ -3046,7 +3109,15 @@ export class AuditService implements IAuditService {
 
     // validGroups is built in this same pass so that audit creation uses only
     // rows that belong to groups that fully passed validation.
-    const validGroups = new Map<string, { rows: any[]; propertyId: string }>()
+    const validGroups = new Map<
+      string,
+      {
+        rows: any[]
+        propertyId: string
+        batch?: string
+        reviewCollectionDate?: string
+      }
+    >()
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i]
@@ -3059,8 +3130,22 @@ export class AuditService implements IAuditService {
       const checkInRaw = findCol(row, CHECK_IN_COLS)
       const checkOutRaw = findCol(row, CHECK_OUT_COLS)
       const amountRaw = findCol(row, AMOUNT_COLS)
+      const batchRaw = findCol(row, BATCH_COLS)
+      const reviewCollectionDateRaw = findCol(row, REVIEW_COLLECTION_DATE_COLS)
 
       const label = hotelName ?? 'Unknown'
+
+      // Log row processing details
+      this.logger.info(
+        `Processing row ${rowNum}: Hotel="${hotelName || 'N/A'}", ` +
+          `Portfolio="${portfolioName || 'N/A'}", ` +
+          `OTA="${otaRaw || 'N/A'}", ` +
+          `CheckIn="${checkInRaw || 'N/A'}", ` +
+          `CheckOut="${checkOutRaw || 'N/A'}", ` +
+          `Amount="${amountRaw || 'N/A'}", ` +
+          `Batch="${batchRaw || 'N/A'}", ` +
+          `ReviewCollectionDate="${reviewCollectionDateRaw || 'N/A'}"`
+      )
 
       // --- Required field presence ---
       if (!hotelName) {
@@ -3153,31 +3238,55 @@ export class AuditService implements IAuditService {
 
       // Collect all errors for this row
       for (const err of rowErrors) {
-        errors.push({ row: rowNum, property: label, error: err })
+        errors.push({ row: rowNum, property: label, property_id: propertyId || undefined, error: err })
       }
 
       // Build valid group only if this row has zero errors so far
       if (rowErrors.length === 0 && propertyId) {
         if (!validGroups.has(hotelName)) {
-          validGroups.set(hotelName, { rows: [], propertyId })
+          validGroups.set(hotelName, {
+            rows: [],
+            propertyId,
+            batch: batchRaw,
+            reviewCollectionDate: reviewCollectionDateRaw
+          })
         }
         validGroups.get(hotelName)!.rows.push(row)
       }
     }
 
     if (errors.length > 0) {
+      this.logger.error(
+        `✗ Validation failed with ${errors.length} error(s). ` +
+          `Valid properties: ${validGroups.size}, Invalid rows: ${errors.length}`
+      )
+
+      // Log each error in detail
+      errors.forEach((err) => {
+        this.logger.error(
+          `  Row ${err.row} (${err.property}): ${err.error}`
+        )
+      })
+
       return { success: false, errors }
     }
+
+    this.logger.success(
+      `✓ Validation successful. ${validGroups.size} property group(s) ready for audit creation`
+    )
 
     // --- Look up "Reported to Property" audit status ---
     const reportedStatus = await this.auditStatusRepository.findByStatus(
       'Reported to Property'
     )
     if (!reportedStatus) {
+      this.logger.error('Audit status "Reported to Property" not found')
       throw new BadRequestException(
         'Audit status "Reported to Property" not found in the database'
       )
     }
+
+    this.logger.info('Starting audit creation process...')
 
     // --- Create audits, generate per-property xlsx sheets, upload to S3 ---
     const createdAudits: Array<{
@@ -3186,7 +3295,19 @@ export class AuditService implements IAuditService {
       report_url: string
     }> = []
 
-    for (const [hotelName, { rows, propertyId }] of validGroups) {
+    for (const [
+      hotelName,
+      { rows, propertyId, batch, reviewCollectionDate }
+    ] of validGroups) {
+      this.logger.info(
+        `Processing property group: "${hotelName}" (${rows.length} rows)` +
+          `${batch ? `, Batch="${batch}"` : ''}` +
+          `${reviewCollectionDate
+            ? `, ReviewCollectionDate="${reviewCollectionDate}"`
+            : ''
+          }`
+      )
+
       // Aggregate data from all rows for this property
       const otaSet = new Set<OtaType>()
       let expediaSum = 0
@@ -3214,12 +3335,45 @@ export class AuditService implements IAuditService {
           maxCheckOut = checkOut
       }
 
+      // --- Handle batch assignment ---
+      let batchId: string | undefined
+      if (batch) {
+        // Try to find existing batch by batch_no
+        let existingBatch = await this.auditBatchRepository.findByBatchNo(batch)
+        if (!existingBatch) {
+          // Create new batch if not found
+          this.logger.info(
+            `Creating new batch "${batch}" for property "${hotelName}"`
+          )
+          existingBatch = await this.auditBatchRepository.create({
+            batch_no: batch
+          })
+          this.logger.success(
+            `✓ Batch created: ID=${existingBatch.id}, Batch No="${batch}"`
+          )
+        } else {
+          this.logger.info(
+            `Using existing batch: ID=${existingBatch.id}, Batch No="${batch}"`
+          )
+        }
+        batchId = existingBatch.id
+      }
+
+      // Parse review collection date if provided
+      const parsedReviewCollectionDate = reviewCollectionDate
+        ? parseDate(reviewCollectionDate)
+        : null
+
       const auditData: CreateAuditDto = {
         property_id: propertyId,
         audit_status_id: reportedStatus.id,
         type_of_ota: [...otaSet],
+        batch_id: batchId,
         start_date: minCheckIn?.toISOString(),
         end_date: maxCheckOut?.toISOString(),
+        review_collection_date: parsedReviewCollectionDate
+          ? parsedReviewCollectionDate.toISOString()
+          : undefined,
         expedia_amount_collectable: otaSet.has(OtaType.expedia)
           ? roundAmount(expediaSum)
           : undefined,
@@ -3240,9 +3394,28 @@ export class AuditService implements IAuditService {
           : undefined
       }
 
-      const audit = await this.auditRepository.create(auditData)
+      try {
+        this.logger.info(
+          `Creating audit for property "${hotelName}" with ${rows.length} rows`
+        )
 
-      // Build per-property xlsx (always xlsx regardless of uploaded file type)
+        const audit = await this.auditRepository.create(auditData)
+
+        this.logger.success(
+          `✓ Audit created successfully: ID=${audit.id}, ` +
+            `Property="${hotelName}", ` +
+            `Expedia=$${expediaSum.toFixed(2)}, ` +
+            `Agoda=$${agodaSum.toFixed(2)}, ` +
+            `Booking=$${bookingSum.toFixed(2)}, ` +
+            `Batch="${batch || 'None'}", ` +
+            `Date Range=${minCheckIn?.toISOString().split('T')[0]} to ${maxCheckOut?.toISOString().split('T')[0]}, ` +
+            `Review Collection Date=${parsedReviewCollectionDate
+              ? parsedReviewCollectionDate.toISOString().split('T')[0]
+              : 'Not set'
+            }`
+        )
+
+        // Build per-property xlsx (always xlsx regardless of uploaded file type)
       // Uses ExcelJS for bold headers and auto-fitted column widths
       const excelWb = new ExcelJS.Workbook()
       const excelWs = excelWb.addWorksheet('Report')
@@ -3297,6 +3470,32 @@ export class AuditService implements IAuditService {
         property: hotelName,
         audit_id: audit.id,
         report_url: uploadResult.url
+      })
+
+        this.logger.success(
+          `✓ Report uploaded for property "${hotelName}": ${uploadResult.url}`
+        )
+      } catch (error) {
+        this.logger.error(
+          `✗ Failed to create audit for property "${hotelName}": ` +
+            `${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+        // Continue to next property even if this one fails
+      }
+    }
+
+    this.logger.success(
+      `✓ Auto-import completed successfully. ` +
+        `Total audits created: ${createdAudits.length}`
+    )
+
+    // Log summary of created audits
+    if (createdAudits.length > 0) {
+      this.logger.info('Summary of created audits:')
+      createdAudits.forEach((audit) => {
+        this.logger.info(
+          `  - Property: "${audit.property}", Audit ID: ${audit.audit_id}, Report: ${audit.report_url}`
+        )
       })
     }
 

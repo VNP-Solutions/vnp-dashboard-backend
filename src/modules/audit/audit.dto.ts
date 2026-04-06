@@ -132,6 +132,14 @@ export class CreateAuditDto {
   @IsString()
   @IsOptional()
   report_url?: string
+
+  @ApiPropertyOptional({
+    example: '2024-01-15T00:00:00Z',
+    description: 'Review collection date'
+  })
+  @IsDateString()
+  @IsOptional()
+  review_collection_date?: string
 }
 
 export class UpdateAuditDto extends PartialType(CreateAuditDto) {}
@@ -309,10 +317,10 @@ export class GlobalStatsResponseDto {
   amount_confirmed: GlobalStatsAmountDto
 
   @ApiProperty({
-    example: 25,
-    description: 'Count of completed audits across all accessible properties'
+    example: 50,
+    description: 'Total number of audits across all accessible properties'
   })
-  completed_audit_count: number
+  total_audit_count: number
 }
 
 export class BulkUploadReportDto {
@@ -421,6 +429,9 @@ export class AutoImportAuditErrorDto {
 
   @ApiProperty({ example: 'Hilton Garden Inn', description: 'Property / hotel name from sheet' })
   property: string
+
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Property MongoDB ID (if found)', required: false })
+  property_id?: string
 
   @ApiProperty({ example: 'Portfolio "ARP Hospitality" not found in database', description: 'Error description' })
   error: string

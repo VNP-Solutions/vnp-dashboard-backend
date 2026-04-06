@@ -361,6 +361,10 @@ export class PropertyService implements IPropertyService {
       ? auditPermission.access_level !== AccessLevel.none
       : false
 
+    // CRITICAL: Check if user has audit access before including audit amounts
+    // Users with audit_permission.access_level === 'none' should not see amount data
+    const shouldIncludeAmounts = hasAuditAccess
+
     // Build additional filters from query params
     const additionalFilters: any = {}
     if (query.is_active) {
@@ -594,6 +598,13 @@ export class PropertyService implements IPropertyService {
       this.propertyRepository.count(where, undefined)
     ])
 
+    // Get audit aggregates for all properties if user has audit access
+    let auditAggregatesMap: Map<string, any> = new Map()
+    if (shouldIncludeAmounts && data.length > 0) {
+      const propertyIds = data.map((p: any) => p.id)
+      auditAggregatesMap = await this.getAuditAggregatesForProperties(propertyIds)
+    }
+
     // Get encryption secret for decrypting passwords
     const encryptionSecret = this.configService.get('encryption.secret', {
       infer: true
@@ -663,6 +674,14 @@ export class PropertyService implements IPropertyService {
         ? maskBankDetails(propertyWithoutPendingActions.bankDetails)
         : null
 
+      // Add audit amounts if user has audit access
+      const auditAmounts = shouldIncludeAmounts
+        ? auditAggregatesMap.get(property.id) || {
+            total_amount_collectable: 0,
+            total_amount_confirmed: 0
+          }
+        : undefined
+
       return {
         ...propertyWithoutPendingActions,
         credentials: decryptedCredentials,
@@ -673,7 +692,11 @@ export class PropertyService implements IPropertyService {
           ? query.portfolio_id
           : property.portfolio_id,
         has_pending_action: pendingActions.length > 0,
-        pending_actions: pendingActions
+        pending_actions: pendingActions,
+        ...(auditAmounts && {
+          total_amount_collectable: auditAmounts.total_amount_collectable,
+          total_amount_confirmed: auditAmounts.total_amount_confirmed
+        })
       }
     })
 
@@ -700,6 +723,10 @@ export class PropertyService implements IPropertyService {
     const hasAuditAccess = auditPermission
       ? auditPermission.access_level !== AccessLevel.none
       : false
+
+    // CRITICAL: Check if user has audit access before including audit amounts
+    // Users with audit_permission.access_level === 'none' should not see amount data
+    const shouldIncludeAmounts = hasAuditAccess
 
     // Build additional filters from query params
     const additionalFilters: any = {}
@@ -931,6 +958,13 @@ export class PropertyService implements IPropertyService {
       hasAuditAccess
     )
 
+    // Get audit aggregates for all properties if user has audit access
+    let auditAggregatesMap: Map<string, any> = new Map()
+    if (shouldIncludeAmounts && data.length > 0) {
+      const propertyIds = data.map((p: any) => p.id)
+      auditAggregatesMap = await this.getAuditAggregatesForProperties(propertyIds)
+    }
+
     // Get encryption secret for decrypting passwords
     const encryptionSecret = this.configService.get('encryption.secret', {
       infer: true
@@ -1000,6 +1034,14 @@ export class PropertyService implements IPropertyService {
         ? maskBankDetails(propertyWithoutPendingActions.bankDetails)
         : null
 
+      // Add audit amounts if user has audit access
+      const auditAmounts = shouldIncludeAmounts
+        ? auditAggregatesMap.get(property.id) || {
+            total_amount_collectable: 0,
+            total_amount_confirmed: 0
+          }
+        : undefined
+
       return {
         ...propertyWithoutPendingActions,
         credentials: decryptedCredentials,
@@ -1010,7 +1052,11 @@ export class PropertyService implements IPropertyService {
           ? query.portfolio_id
           : property.portfolio_id,
         has_pending_action: pendingActions.length > 0,
-        pending_actions: pendingActions
+        pending_actions: pendingActions,
+        ...(auditAmounts && {
+          total_amount_collectable: auditAmounts.total_amount_collectable,
+          total_amount_confirmed: auditAmounts.total_amount_confirmed
+        })
       }
     })
 
@@ -3478,6 +3524,60 @@ export class PropertyService implements IPropertyService {
     return this.propertyRepository.update(id, {
       show_in_portfolio: updatedSharedPortfolios
     })
+  }
+
+  /**
+   * Get audit aggregates for multiple properties efficiently
+   * Returns a map of property_id -> { total_amount_collectable, total_amount_confirmed }
+   */
+  private async getAuditAggregatesForProperties(
+    propertyIds: string[]
+  ): Promise<Map<string, { total_amount_collectable: number; total_amount_confirmed: number }>> {
+    if (propertyIds.length === 0) {
+      return new Map()
+    }
+
+    // Aggregate audit amounts by property_id
+    const auditAggregates = await this.prisma.audit.groupBy({
+      by: ['property_id'],
+      where: {
+        property_id: { in: propertyIds },
+        is_archived: false
+      },
+      _sum: {
+        expedia_amount_collectable: true,
+        expedia_amount_confirmed: true,
+        agoda_amount_collectable: true,
+        agoda_amount_confirmed: true,
+        booking_amount_collectable: true,
+        booking_amount_confirmed: true
+      }
+    })
+
+    // Map the results to property_id
+    const result = new Map<
+      string,
+      { total_amount_collectable: number; total_amount_confirmed: number }
+    >()
+
+    for (const aggregate of auditAggregates) {
+      const totalAmountCollectable =
+        (aggregate._sum.expedia_amount_collectable || 0) +
+        (aggregate._sum.agoda_amount_collectable || 0) +
+        (aggregate._sum.booking_amount_collectable || 0)
+
+      const totalAmountConfirmed =
+        (aggregate._sum.expedia_amount_confirmed || 0) +
+        (aggregate._sum.agoda_amount_confirmed || 0) +
+        (aggregate._sum.booking_amount_confirmed || 0)
+
+      result.set(aggregate.property_id, {
+        total_amount_collectable: roundAmount(totalAmountCollectable),
+        total_amount_confirmed: roundAmount(totalAmountConfirmed)
+      })
+    }
+
+    return result
   }
 
   /**

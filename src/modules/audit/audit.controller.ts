@@ -196,6 +196,7 @@ export class AuditController {
     - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
     - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)
     - Report URL/Report url/report_url/Report/URL: Report URL
+    - Review Collection Date/Review collection date/review_collection_date: Review collection date (mm/dd/yyyy)
     - Batch/Batch No: Batch number (will be created if doesn't exist)
 
     Note: Empty cells will keep existing values unchanged.
@@ -356,6 +357,7 @@ export class AuditController {
     - Booking Amount Collectable/Booking Collectable/booking_amount_collectable: Booking collectable amount
     - Booking Amount Confirmed/Booking Confirmed/booking_amount_confirmed: Booking confirmed amount
     - Report URL/Report url/report_url/Report/URL: Report URL
+    - Review Collection Date/Review collection date/review_collection_date: Review collection date (mm/dd/yyyy)
     - Batch/Batch No: Batch number (will be created if doesn't exist)
 
     Note: If both start and end dates are provided, start date must be before end date.
@@ -427,6 +429,8 @@ export class AuditController {
 
     Optional columns (recognised header aliases include Check In / Start Date and Check Out / End Date):
     - Check-in and check-out dates: if a cell is empty, it is skipped. If a cell has a value, it must parse as a date (MM/DD/YYYY or supported formats), and when both are present Check In must be before Check Out; otherwise the row is reported in the error list.
+    - Batch: Batch number (will be created if doesn't exist). If present multiple times for same property, the first value is used.
+    - Review Collection Date/Review collection date/review_collection_date: Review collection date (MM/DD/YYYY or supported formats). If present multiple times for same property, the first value is used.
 
     All other columns in the sheet are preserved in the generated per-property report files.
 
@@ -438,6 +442,8 @@ export class AuditController {
     - Amounts are summed per OTA type; both collectable and confirmed are set to the same sum.
     - Audit status is set to "Reported to Property".
     - A per-property Excel sheet (all original columns, filtered to that property) is uploaded to S3 and its URL is stored as report_url on the audit.
+    - If Batch column is present, audits are assigned to the specified batch (created if doesn't exist).
+    - If Review Collection Date column is present, the date value is set on the audit (first value per property group is used).
 
     Validation (pre-flight):
     - If any Portfolio or Hotel Name cannot be found in the database, NO audits are created and the full error list is returned.
