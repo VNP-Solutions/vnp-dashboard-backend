@@ -21,8 +21,7 @@ export class AuthRepository implements IAuthRepository {
 
   async findUserByEmail(email: string): Promise<UserWithRelations | null> {
     return this.prisma.user.findFirst({
-      //where: { email: { equals: email, mode: 'insensitive' } },
-      where: { email },
+      where: { email: email.toLowerCase() },
       include: {
         role: true,
         userAccessedProperties: {

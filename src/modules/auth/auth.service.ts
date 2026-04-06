@@ -98,9 +98,9 @@ export class AuthService implements IAuthService {
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
 
     await this.authRepository.createOtp(user.id, otp, expiresAt)
-    await this.emailUtil.sendOtpEmail(email, otp)
+    await this.emailUtil.sendOtpEmail(user.email, otp)
 
-    console.log(`Login OTP for ${email}: ${otp}`)
+    console.log(`Login OTP for ${user.email}: ${otp}`)
 
     return { message: 'OTP sent to your email' }
   }
@@ -396,9 +396,9 @@ export class AuthService implements IAuthService {
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
 
     await this.authRepository.createOtp(user.id, otp, expiresAt)
-    await this.emailUtil.sendPasswordResetOtpEmail(email, otp)
+    await this.emailUtil.sendPasswordResetOtpEmail(user.email, otp)
 
-    console.log(`Password Reset OTP for ${email}: ${otp}`)
+    console.log(`Password Reset OTP for ${user.email}: ${otp}`)
 
     return { message: 'If the email exists, an OTP has been sent' }
   }
