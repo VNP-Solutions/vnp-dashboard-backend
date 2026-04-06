@@ -3092,7 +3092,7 @@ export class AuditService implements IAuditService {
     // Each row is validated individually so every error surfaces in the response.
     this.logger.info('Starting row validation and database lookups...')
 
-    const errors: Array<{ row: number; property: string; error: string }> = []
+    const errors: Array<{ row: number; property: string; property_id?: string; error: string }> = []
 
     // Caches to avoid repeated DB calls for the same name
     const portfolioCache = new Map<string, boolean>() // name  → exists
@@ -3225,7 +3225,7 @@ export class AuditService implements IAuditService {
 
       // Collect all errors for this row
       for (const err of rowErrors) {
-        errors.push({ row: rowNum, property: label, error: err })
+        errors.push({ row: rowNum, property: label, property_id: propertyId || undefined, error: err })
       }
 
       // Build valid group only if this row has zero errors so far
