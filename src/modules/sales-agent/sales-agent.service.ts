@@ -181,14 +181,13 @@ export class SalesAgentService implements ISalesAgentService {
     const portfolioMap = new Map(portfolios.map(p => [p.id, p]))
 
     // Fetch all matching audits across those portfolios
-    // Only audits that have both start_date and end_date, not archived,
-    // and whose start_date >= from AND end_date <= to,
+    // Only audits that have review_collection_date set, not archived,
+    // and whose review_collection_date is within the [from, to] range,
     // and whose status is one of the 4 report-eligible statuses (case-insensitive)
     const audits = await this.prisma.audit.findMany({
       where: {
         is_archived: false,
-        start_date: { not: null, gte: fromDate },
-        end_date: { not: null, lte: toDate },
+        review_collection_date: { not: null, gte: fromDate, lte: toDate },
         property: { portfolio_id: { in: portfolioIds } },
         auditStatus: {
           status: {
@@ -207,7 +206,7 @@ export class SalesAgentService implements ISalesAgentService {
         },
         auditStatus: { select: { status: true } }
       },
-      orderBy: [{ property: { portfolio_id: 'asc' } }, { start_date: 'asc' }]
+      orderBy: [{ property: { portfolio_id: 'asc' } }, { review_collection_date: 'asc' }]
     })
 
     // Group audits by currency (via their portfolio)
@@ -236,18 +235,17 @@ export class SalesAgentService implements ISalesAgentService {
 
     // Table column definitions: [header, width, alignment]
     const TABLE_COLS: Array<{ header: string; width: number; align: ExcelJS.Alignment['horizontal'] }> = [
-      { header: 'Portfolio',          width: 22, align: 'left'  },
-      { header: 'Property',           width: 22, align: 'left'  },
-      { header: 'Audit Status',       width: 22, align: 'left'  },
-      { header: 'OTA Types',          width: 22, align: 'left'  },
-      { header: 'Start Date',         width: 14, align: 'center' },
-      { header: 'End Date',           width: 14, align: 'center' },
-      { header: 'Expedia Confirmed',  width: 20, align: 'right' },
-      { header: 'Agoda Confirmed',    width: 20, align: 'right' },
-      { header: 'Booking Confirmed',  width: 20, align: 'right' },
-      { header: 'Total Confirmed',    width: 20, align: 'right' }
+      { header: 'Portfolio',               width: 22, align: 'left'  },
+      { header: 'Property',                width: 22, align: 'left'  },
+      { header: 'Audit Status',            width: 22, align: 'left'  },
+      { header: 'OTA Types',               width: 22, align: 'left'  },
+      { header: 'Review Collection Date',  width: 24, align: 'center' },
+      { header: 'Expedia Confirmed',       width: 20, align: 'right' },
+      { header: 'Agoda Confirmed',         width: 20, align: 'right' },
+      { header: 'Booking Confirmed',       width: 20, align: 'right' },
+      { header: 'Total Confirmed',         width: 20, align: 'right' }
     ]
-    const NUM_COLS = TABLE_COLS.length // 10
+    const NUM_COLS = TABLE_COLS.length // 9
 
     const buildSheet = (currency: string, currencyAudits: typeof audits) => {
       const sheet = workbook.addWorksheet(currency.substring(0, 31))
@@ -318,11 +316,8 @@ export class SalesAgentService implements ISalesAgentService {
         const rowTotal = expediaConfirmed + agodaConfirmed + bookingConfirmed
         grandTotalConfirmed += rowTotal
 
-        const startDateStr = audit.start_date
-          ? new Date(audit.start_date).toISOString().split('T')[0]
-          : ''
-        const endDateStr = audit.end_date
-          ? new Date(audit.end_date).toISOString().split('T')[0]
+        const reviewCollectionDateStr = audit.review_collection_date
+          ? new Date(audit.review_collection_date).toISOString().split('T')[0]
           : ''
 
         const dataRow = sheet.getRow(currentRow++)
@@ -331,8 +326,7 @@ export class SalesAgentService implements ISalesAgentService {
           audit.property.name,
           audit.auditStatus.status,
           audit.type_of_ota.join(', '),
-          startDateStr,
-          endDateStr,
+          reviewCollectionDateStr,
           expediaConfirmed,
           agodaConfirmed,
           bookingConfirmed,
@@ -445,8 +439,7 @@ export class SalesAgentService implements ISalesAgentService {
       'Property',
       'Audit Status',
       'OTA Types',
-      'Start Date',
-      'End Date',
+      'Review Collection Date',
       'Expedia Confirmed',
       'Agoda Confirmed',
       'Booking Confirmed',
@@ -462,11 +455,8 @@ export class SalesAgentService implements ISalesAgentService {
         const bookingConfirmed = audit.booking_amount_confirmed ?? 0
         const rowTotal = expediaConfirmed + agodaConfirmed + bookingConfirmed
 
-        const startDateStr = audit.start_date
-          ? new Date(audit.start_date).toISOString().split('T')[0]
-          : ''
-        const endDateStr = audit.end_date
-          ? new Date(audit.end_date).toISOString().split('T')[0]
+        const reviewCollectionDateStr = audit.review_collection_date
+          ? new Date(audit.review_collection_date).toISOString().split('T')[0]
           : ''
         const otaTypes = Array.isArray(audit.type_of_ota)
           ? audit.type_of_ota.join(', ')
@@ -478,8 +468,7 @@ export class SalesAgentService implements ISalesAgentService {
           escapeCsv(audit.property?.name ?? ''),
           escapeCsv(audit.auditStatus?.status ?? ''),
           escapeCsv(otaTypes),
-          escapeCsv(startDateStr),
-          escapeCsv(endDateStr),
+          escapeCsv(reviewCollectionDateStr),
           escapeCsv(expediaConfirmed),
           escapeCsv(agodaConfirmed),
           escapeCsv(bookingConfirmed),

@@ -93,22 +93,6 @@ export class CreateAuditDto {
   @IsOptional()
   booking_amount_confirmed?: number
 
-  @ApiPropertyOptional({
-    example: '2024-01-01T00:00:00Z',
-    description: 'Audit start date'
-  })
-  @IsDateString()
-  @IsOptional()
-  start_date?: string
-
-  @ApiPropertyOptional({
-    example: '2024-01-31T23:59:59Z',
-    description: 'Audit end date'
-  })
-  @IsDateString()
-  @IsOptional()
-  end_date?: string
-
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
     description: 'Property ID'

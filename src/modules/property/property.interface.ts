@@ -125,8 +125,6 @@ type PropertyWithFullDetails = Prisma.PropertyGetPayload<{
         agoda_amount_confirmed: true
         booking_amount_collectable: true
         booking_amount_confirmed: true
-        start_date: true
-        end_date: true
       }
     }
   }

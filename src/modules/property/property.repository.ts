@@ -216,9 +216,7 @@ export class PropertyRepository implements IPropertyRepository {
               agoda_amount_collectable: true,
               agoda_amount_confirmed: true,
               booking_amount_collectable: true,
-              booking_amount_confirmed: true,
-              start_date: true,
-              end_date: true
+              booking_amount_confirmed: true
             }
           }
         }
@@ -453,9 +451,7 @@ export class PropertyRepository implements IPropertyRepository {
                 agoda_amount_collectable: true,
                 agoda_amount_confirmed: true,
                 booking_amount_collectable: true,
-                booking_amount_confirmed: true,
-                start_date: true,
-                end_date: true
+                booking_amount_confirmed: true
               }
             }
           }
@@ -667,9 +663,7 @@ export class PropertyRepository implements IPropertyRepository {
             agoda_amount_collectable: true,
             agoda_amount_confirmed: true,
             booking_amount_collectable: true,
-            booking_amount_confirmed: true,
-            start_date: true,
-            end_date: true
+            booking_amount_confirmed: true
           }
         }
       }

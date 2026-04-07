@@ -155,8 +155,6 @@ model Audit {
   booking_amount_collectable Float?
   booking_amount_confirmed  Float?
   is_archived             Boolean      @default(false)
-  start_date              DateTime?
-  end_date                DateTime?
   property_id             String       @db.ObjectId
   property                Property     @relation(fields: [property_id], references: [id], onDelete: Cascade)
   batch_id                String?      @db.ObjectId
@@ -176,11 +174,8 @@ model Audit {
   @@index([type_of_ota])
   @@index([billing_type])
   @@index([is_archived])
-  @@index([start_date])
-  @@index([end_date])
   @@index([batch_id])
   @@index([property_id, is_archived])
-  @@index([property_id, start_date, end_date])
 }
 
 model PropertyCredentials {

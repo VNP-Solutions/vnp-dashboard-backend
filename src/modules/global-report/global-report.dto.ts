@@ -50,7 +50,7 @@ export class ColumnFilterDto {
 export class SortDto {
   @ApiProperty({
     description: 'Column key to sort by',
-    example: 'startDate'
+    example: 'nextDueDate'
   })
   @IsString()
   @IsNotEmpty()
@@ -113,7 +113,7 @@ export class GlobalReportQueryDto {
     description: 'Array of sort configurations (multi-column sort)',
     type: [SortDto],
     example: [
-      { column: 'startDate', order: 'desc' },
+      { column: 'nextDueDate', order: 'desc' },
       { column: 'portfolioName', order: 'asc' }
     ]
   })
@@ -248,12 +248,6 @@ export class ReportRowDto {
 
   @ApiPropertyOptional({ description: 'OTA Review Status' })
   auditStatus: string | null
-
-  @ApiPropertyOptional({ description: 'Start Date' })
-  startDate: Date | null
-
-  @ApiPropertyOptional({ description: 'End Date' })
-  endDate: Date | null
 
   @ApiPropertyOptional({ description: 'Next Due Date' })
   nextDueDate: Date | null

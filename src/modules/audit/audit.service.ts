@@ -125,16 +125,6 @@ export class AuditService implements IAuditService {
       throw new BadRequestException('Only internal users can create audits')
     }
 
-    // Validate date range only if both dates are provided
-    if (data.start_date && data.end_date) {
-      const startDate = new Date(data.start_date)
-      const endDate = new Date(data.end_date)
-
-      if (startDate >= endDate) {
-        throw new BadRequestException('Start date must be before end date')
-      }
-    }
-
     // Round amount fields to 2 decimal places
     const createData = {
       ...data,
@@ -316,8 +306,6 @@ export class AuditService implements IAuditService {
       sortableFields: [
         'created_at',
         'updated_at',
-        'start_date',
-        'end_date',
         'type_of_ota',
         'amount_collectable',
         'amount_confirmed',
@@ -584,8 +572,6 @@ export class AuditService implements IAuditService {
       sortableFields: [
         'created_at',
         'updated_at',
-        'start_date',
-        'end_date',
         'type_of_ota',
         'amount_collectable',
         'amount_confirmed',
@@ -815,23 +801,6 @@ export class AuditService implements IAuditService {
         throw new NotFoundException(
           `Audit batch with ID ${data.batch_id} not found`
         )
-      }
-    }
-
-    // Validate date range if dates are being updated
-    // Only validate if we'll have both dates after the update
-    if (data.start_date || data.end_date) {
-      const startDateStr = data.start_date || audit.start_date
-      const endDateStr = data.end_date || audit.end_date
-
-      // Only validate if both dates will be present after update
-      if (startDateStr && endDateStr) {
-        const startDate = new Date(startDateStr)
-        const endDate = new Date(endDateStr)
-
-        if (startDate >= endDate) {
-          throw new BadRequestException('Start date must be before end date')
-        }
       }
     }
 
@@ -1541,65 +1510,6 @@ export class AuditService implements IAuditService {
             }
           }
 
-          // Extract start date (if provided) - use raw value to preserve Excel date format
-          const startDateValue = getRawValue(row, [
-            'Start Date',
-            'Start date',
-            'start_date',
-            'From Date',
-            'From'
-          ])
-          if (startDateValue) {
-            const startDate = parseDate(startDateValue)
-            if (!startDate) {
-              result.errors.push({
-                row: rowNumber,
-                auditId: auditIdValue,
-                error: 'Invalid start date format (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
-              continue
-            }
-            updateData.start_date = startDate.toISOString()
-          }
-
-          // Extract end date (if provided) - use raw value to preserve Excel date format
-          const endDateValue = getRawValue(row, [
-            'End Date',
-            'End date',
-            'end_date',
-            'To Date',
-            'To'
-          ])
-          if (endDateValue) {
-            const endDate = parseDate(endDateValue)
-            if (!endDate) {
-              result.errors.push({
-                row: rowNumber,
-                auditId: auditIdValue,
-                error: 'Invalid end date format (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
-              continue
-            }
-            updateData.end_date = endDate.toISOString()
-          }
-
-          // Validate date range if both dates are provided
-          if (updateData.start_date && updateData.end_date) {
-            const startDate = new Date(updateData.start_date)
-            const endDate = new Date(updateData.end_date)
-            if (startDate >= endDate) {
-              result.errors.push({
-                row: rowNumber,
-                auditId: auditIdValue,
-                error: 'Start date must be before end date'
-              })
-              result.failureCount++
-              continue
-            }
-          }
-
           // Extract report URL (if provided)
           const reportUrl = findHeaderValue(row, [
             'Report URL',
@@ -2198,75 +2108,6 @@ export class AuditService implements IAuditService {
             ? (roundToDecimals(parsedBookingConfirmed) ?? undefined)
             : undefined
 
-          // Extract start date (use raw value to preserve Excel date format) - optional
-          const startDateValue = getRawValue(row, [
-            'Start Date',
-            'Start date',
-            'start_date',
-            'From Date',
-            'From'
-          ])
-
-          let startDate: Date | null = null
-          if (startDateValue) {
-            startDate = parseDate(startDateValue)
-            if (!startDate) {
-              console.log(
-                '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: Invalid start date format`
-              )
-              result.errors.push({
-                row: rowNumber,
-                audit: expediaId,
-                error: 'Invalid start date format (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
-              continue
-            }
-          }
-
-          // Extract end date (use raw value to preserve Excel date format) - optional
-          const endDateValue = getRawValue(row, [
-            'End Date',
-            'End date',
-            'end_date',
-            'To Date',
-            'To'
-          ])
-
-          let endDate: Date | null = null
-          if (endDateValue) {
-            endDate = parseDate(endDateValue)
-            if (!endDate) {
-              console.log(
-                '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: Invalid end date format`
-              )
-              result.errors.push({
-                row: rowNumber,
-                audit: expediaId,
-                error: 'Invalid end date format (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
-              continue
-            }
-          }
-
-          // Validate date range only if both dates are provided
-          if (startDate && endDate && startDate >= endDate) {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Start date must be before end date`
-            )
-            result.errors.push({
-              row: rowNumber,
-              audit: expediaId,
-              error: 'Start date must be before end date'
-            })
-            result.failureCount++
-            continue
-          }
-
           // Extract report URL
           const reportUrl = findHeaderValue(row, [
             'Report URL',
@@ -2325,8 +2166,6 @@ export class AuditService implements IAuditService {
           const auditData: CreateAuditDto = {
             property_id: property.id,
             audit_status_id: auditStatus.id,
-            start_date: startDate ? startDate.toISOString() : undefined,
-            end_date: endDate ? endDate.toISOString() : undefined,
             type_of_ota: typeOfOtaArray.length > 0 ? typeOfOtaArray : undefined,
             expedia_amount_collectable: expediaAmountCollectable,
             expedia_amount_confirmed: expediaAmountConfirmed,
@@ -2339,24 +2178,6 @@ export class AuditService implements IAuditService {
               ? reviewCollectionDate.toISOString()
               : undefined,
             batch_id: batchId
-          }
-
-          // Check for duplicate: same property + start_date + end_date
-          const duplicateAudit = await this.prisma.audit.findFirst({
-            where: {
-              property_id: property.id,
-              start_date: startDate ?? null,
-              end_date: endDate ?? null
-            }
-          })
-          if (duplicateAudit) {
-            result.errors.push({
-              row: rowNumber,
-              audit: expediaId,
-              error: `An audit for Expedia ID "${expediaId}" with the same start and end date already exists.`
-            })
-            result.failureCount++
-            continue
           }
 
           // Create the audit
@@ -2977,9 +2798,7 @@ export class AuditService implements IAuditService {
       'check in',
       'Check-In',
       'CheckIn',
-      'check_in',
-      'Start Date',
-      'start_date'
+      'check_in'
     ]
     const CHECK_OUT_COLS = [
       'Check Out (MM/DD/YYYY)',
@@ -2987,9 +2806,7 @@ export class AuditService implements IAuditService {
       'check out',
       'Check-Out',
       'CheckOut',
-      'check_out',
-      'End Date',
-      'end_date'
+      'check_out'
     ]
     const AMOUNT_COLS = [
       'Amount Collected',
@@ -3414,14 +3231,10 @@ export class AuditService implements IAuditService {
       let expediaSum = 0
       let agodaSum = 0
       let bookingSum = 0
-      let minCheckIn: Date | null = null
-      let maxCheckOut: Date | null = null
 
       for (const row of rows) {
         const ota = parseOta(findCol(row, OTA_COLS))
         const amount = parseAmount(findCol(row, AMOUNT_COLS))
-        const checkIn = parseDate(findCol(row, CHECK_IN_COLS))
-        const checkOut = parseDate(findCol(row, CHECK_OUT_COLS))
 
         if (ota) {
           otaSet.add(ota)
@@ -3429,11 +3242,6 @@ export class AuditService implements IAuditService {
           if (ota === OtaType.agoda) agodaSum += amount
           if (ota === OtaType.booking) bookingSum += amount
         }
-
-        if (checkIn && (!minCheckIn || checkIn < minCheckIn))
-          minCheckIn = checkIn
-        if (checkOut && (!maxCheckOut || checkOut > maxCheckOut))
-          maxCheckOut = checkOut
       }
 
       // --- Handle batch assignment ---
@@ -3470,8 +3278,6 @@ export class AuditService implements IAuditService {
         audit_status_id: auditStatusId,
         type_of_ota: [...otaSet],
         batch_id: batchId,
-        start_date: minCheckIn?.toISOString(),
-        end_date: maxCheckOut?.toISOString(),
         review_collection_date: parsedReviewCollectionDate
           ? parsedReviewCollectionDate.toISOString()
           : undefined,
@@ -3509,7 +3315,6 @@ export class AuditService implements IAuditService {
             `Agoda=$${agodaSum.toFixed(2)}, ` +
             `Booking=$${bookingSum.toFixed(2)}, ` +
             `Batch="${batch || 'None'}", ` +
-            `Date Range=${minCheckIn?.toISOString().split('T')[0]} to ${maxCheckOut?.toISOString().split('T')[0]}, ` +
             `Review Collection Date=${parsedReviewCollectionDate
               ? parsedReviewCollectionDate.toISOString().split('T')[0]
               : 'Not set'

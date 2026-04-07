@@ -366,7 +366,7 @@ Query audit data across all properties and portfolios with Excel-like filtering.
 
 **Example filters:**
 - Filter by portfolio: { column: "portfolioName", operator: "contains", value: "Marriott" }
-- Filter by date range: { column: "startDate", operator: "between", value: { from: "2024-01-01", to: "2024-12-31" } }
+- Filter by date range: { column: "nextDueDate", operator: "between", value: { from: "2024-01-01", to: "2024-12-31" } }
 - Filter by amount: { column: "amountCollectable", operator: "gte", value: 5000 }
 - Filter nulls: { column: "batchNo", operator: "isNull", value: true }
 - Filter by enum: { column: "otaType", operator: "in", value: ["expedia", "booking"] }

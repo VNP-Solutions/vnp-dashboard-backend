@@ -2082,8 +2082,6 @@ export class PortfolioService implements IPortfolioService {
       agoda_amount_confirmed: audit.agoda_amount_confirmed,
       booking_amount_collectable: audit.booking_amount_collectable,
       booking_amount_confirmed: audit.booking_amount_confirmed,
-      start_date: audit.start_date,
-      end_date: audit.end_date,
       property_name: audit.property.name,
       audit_status: audit.auditStatus.status
     }))

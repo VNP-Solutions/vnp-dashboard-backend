@@ -330,10 +330,6 @@ async function main() {
         billingTypes[Math.floor(Math.random() * billingTypes.length)]
       const status =
         statusOptions[Math.floor(Math.random() * statusOptions.length)]
-      const startDate = getRandomPastDate(365)
-      const endDate = new Date(startDate)
-      endDate.setDate(endDate.getDate() + 30 + Math.floor(Math.random() * 60))
-
       const amountCollectable = 1000 + Math.floor(Math.random() * 50000)
       const amountConfirmed =
         status.status === 'Completed'
@@ -360,9 +356,7 @@ async function main() {
           agoda_amount_confirmed: agodaAmountConfirmed,
           booking_amount_collectable: bookingAmountCollectable,
           booking_amount_confirmed: bookingAmountConfirmed,
-          is_archived: Math.random() < 0.1, // 10% archived
-          start_date: startDate,
-          end_date: endDate
+          is_archived: Math.random() < 0.1 // 10% archived
         }
       })
       auditCount++
