@@ -439,8 +439,18 @@ export class PermissionService {
       return portfolioIds.includes(resourceId) || propertyIds.includes(resourceId)
     }
 
-    // AUDIT module doesn't support partial access
-    // If someone tries to use PARTIAL for AUDIT, deny access
+    // AUDIT partial access: delegate to property access for the audit's property
+    if (module === ModuleType.AUDIT) {
+      const audit = await this.prisma.audit.findUnique({
+        where: { id: resourceId },
+        select: { property_id: true }
+      })
+      if (!audit) {
+        return false
+      }
+      return this.checkPartialAccess(user, ModuleType.PROPERTY, audit.property_id)
+    }
+
     return false
   }
 
