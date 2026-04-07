@@ -33,13 +33,16 @@ export class ContractUrlService implements IContractUrlService {
     private permissionService: PermissionService
   ) {}
 
+  private readonly contractUrlViewForbiddenMessage =
+    'Only Super Admin, or users with portfolio update/all permission and partial or all access, or internal users with portfolio view permission and partial or all access, can view contract URLs'
+
   /**
-   * Check if user can view contract URLs
+   * Check if user can view contract URLs (portfolio module permissions only).
    * - Super admin can always view
-   * - Users with portfolio permission level 'update' or 'all' and access level 'partial' or 'all' can view
+   * - Portfolio permission update/all + access partial/all can view
+   * - Internal users only: portfolio permission view + access partial/all can view (read-only; mutations enforced elsewhere)
    */
   private canViewContractUrls(user: IUserWithPermissions): boolean {
-    // Super admin can always view
     if (isUserSuperAdmin(user)) {
       return true
     }
@@ -50,17 +53,31 @@ export class ContractUrlService implements IContractUrlService {
       return false
     }
 
-    // Check permission level: must be 'update' or 'all'
-    const hasUpdatePermission =
-      portfolioPermission.permission_level === PermissionLevel.update ||
-      portfolioPermission.permission_level === PermissionLevel.all
-
-    // Check access level: must be 'partial' or 'all'
-    const hasPartialAccess =
+    const hasPartialOrAllAccess =
       portfolioPermission.access_level === AccessLevel.partial ||
       portfolioPermission.access_level === AccessLevel.all
 
-    return hasUpdatePermission && hasPartialAccess
+    if (!hasPartialOrAllAccess) {
+      return false
+    }
+
+    const level = portfolioPermission.permission_level
+
+    if (
+      level === PermissionLevel.update ||
+      level === PermissionLevel.all
+    ) {
+      return true
+    }
+
+    if (
+      level === PermissionLevel.view &&
+      user.role.is_external === false
+    ) {
+      return true
+    }
+
+    return false
   }
 
   async create(data: CreateContractUrlDto, user: IUserWithPermissions) {
@@ -126,9 +143,7 @@ export class ContractUrlService implements IContractUrlService {
   async findAll(query: ContractUrlQueryDto, user: IUserWithPermissions) {
     // Check if user can view contract URLs
     if (!this.canViewContractUrls(user)) {
-      throw new ForbiddenException(
-        'Only Super Admin or users with portfolio update permission and partial access can view contract URLs'
-      )
+      throw new ForbiddenException(this.contractUrlViewForbiddenMessage)
     }
 
     const accessiblePortfolioIds =
@@ -207,9 +222,7 @@ export class ContractUrlService implements IContractUrlService {
   ) {
     // Check if user can view contract URLs
     if (!this.canViewContractUrls(user)) {
-      throw new ForbiddenException(
-        'Only Super Admin or users with portfolio update permission and partial access can view contract URLs'
-      )
+      throw new ForbiddenException(this.contractUrlViewForbiddenMessage)
     }
 
     const accessiblePortfolioIds =
@@ -291,9 +304,7 @@ export class ContractUrlService implements IContractUrlService {
   async findOne(id: string, user: IUserWithPermissions) {
     // Check if user can view contract URLs
     if (!this.canViewContractUrls(user)) {
-      throw new ForbiddenException(
-        'Only Super Admin or users with portfolio update permission and partial access can view contract URLs'
-      )
+      throw new ForbiddenException(this.contractUrlViewForbiddenMessage)
     }
 
     const contractUrl = await this.contractUrlRepository.findById(id)
@@ -323,9 +334,7 @@ export class ContractUrlService implements IContractUrlService {
   async findByPortfolio(portfolioId: string, user: IUserWithPermissions) {
     // Check if user can view contract URLs
     if (!this.canViewContractUrls(user)) {
-      throw new ForbiddenException(
-        'Only Super Admin or users with portfolio update permission and partial access can view contract URLs'
-      )
+      throw new ForbiddenException(this.contractUrlViewForbiddenMessage)
     }
 
     // Verify user has access to the portfolio
