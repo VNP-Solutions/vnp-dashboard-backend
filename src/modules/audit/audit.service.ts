@@ -2329,18 +2329,20 @@ export class AuditService implements IAuditService {
       }
     })
 
-    // Get total count of consolidated reports scoped to accessible portfolios
+    // Get total count by summing total_audit_count across all accessible portfolios
     const accessiblePortfolioIds =
       await this.permissionService.getAccessibleResourceIds(
         user,
         ModuleType.PORTFOLIO
       )
-    const totalAuditCount = await this.prisma.consolidatedReport.count({
+    const portfolioAggregation = await this.prisma.portfolio.aggregate({
       where:
         accessiblePortfolioIds === 'all'
           ? {}
-          : { portfolio_id: { in: accessiblePortfolioIds } }
+          : { id: { in: accessiblePortfolioIds } },
+      _sum: { total_audit_count: true }
     })
+    const totalAuditCount = portfolioAggregation._sum.total_audit_count ?? 0
 
     // Initialize amounts
     const amountCollectable = {
