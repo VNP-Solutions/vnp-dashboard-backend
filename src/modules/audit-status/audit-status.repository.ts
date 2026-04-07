@@ -33,8 +33,6 @@ export class AuditStatusRepository implements IAuditStatusRepository {
           select: {
             id: true,
             property_id: true,
-            start_date: true,
-            end_date: true,
             is_archived: true
           }
         }

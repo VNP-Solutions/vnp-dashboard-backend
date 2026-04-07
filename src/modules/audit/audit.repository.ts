@@ -11,8 +11,6 @@ export class AuditRepository implements IAuditRepository {
     return this.prisma.audit.create({
       data: {
         ...data,
-        start_date: data.start_date ? new Date(data.start_date) : undefined,
-        end_date: data.end_date ? new Date(data.end_date) : undefined,
         review_collection_date: data.review_collection_date
           ? new Date(data.review_collection_date)
           : undefined
@@ -336,12 +334,6 @@ export class AuditRepository implements IAuditRepository {
   async update(id: string, data: UpdateAuditDto) {
     const updateData: any = { ...data }
 
-    if (data.start_date) {
-      updateData.start_date = new Date(data.start_date)
-    }
-    if (data.end_date) {
-      updateData.end_date = new Date(data.end_date)
-    }
     if (data.review_collection_date) {
       updateData.review_collection_date = new Date(
         data.review_collection_date
@@ -456,12 +448,6 @@ export class AuditRepository implements IAuditRepository {
   async bulkUpdate(auditIds: string[], data: UpdateAuditDto) {
     const updateData: any = { ...data }
 
-    if (data.start_date) {
-      updateData.start_date = new Date(data.start_date)
-    }
-    if (data.end_date) {
-      updateData.end_date = new Date(data.end_date)
-    }
     if (data.review_collection_date) {
       updateData.review_collection_date = new Date(
         data.review_collection_date

@@ -715,8 +715,6 @@ export class GlobalReportService implements IGlobalReportService {
       bookingUsername,
       bookingPassword,
       auditStatus: doc.auditStatus?.status || null,
-      startDate: this.extractDate(doc.start_date),
-      endDate: this.extractDate(doc.end_date),
       nextDueDate: this.extractDate(doc.property?.next_due_date),
       currency: doc.currency?.code || '',
       expediaAmountCollectable: roundToDecimals(doc.expedia_amount_collectable) ?? null,

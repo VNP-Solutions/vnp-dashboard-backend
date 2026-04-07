@@ -33,8 +33,6 @@ type NoteWithRelations = Prisma.NoteGetPayload<{
       select: {
         id: true
         type_of_ota: true
-        start_date: true
-        end_date: true
       }
     }
   }
