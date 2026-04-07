@@ -14,6 +14,7 @@ import {
   ApiResponse,
   ApiTags
 } from '@nestjs/swagger'
+import { DenyRestrictedPropertySensitiveDataProfile } from '../../common/decorators/deny-restricted-property-sensitive-data.decorator'
 import { RequirePermission } from '../../common/decorators/require-permission.decorator'
 import { PermissionGuard } from '../../common/guards/permission.guard'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -63,6 +64,7 @@ export class PropertyCredentialsController {
   }
 
   @Get('property/:propertyId')
+  @DenyRestrictedPropertySensitiveDataProfile()
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get credentials by property ID' })
   @ApiResponse({
@@ -73,6 +75,11 @@ export class PropertyCredentialsController {
   @ApiResponse({
     status: 403,
     description: 'Forbidden - No access to this property'
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - restricted external sales permission profile cannot access property credentials'
   })
   findByPropertyId(
     @Param('propertyId') propertyId: string,

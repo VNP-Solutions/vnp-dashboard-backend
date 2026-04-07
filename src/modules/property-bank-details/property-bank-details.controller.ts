@@ -21,6 +21,7 @@ import {
   ApiResponse,
   ApiTags
 } from '@nestjs/swagger'
+import { DenyRestrictedPropertySensitiveDataProfile } from '../../common/decorators/deny-restricted-property-sensitive-data.decorator'
 import { RequirePermission } from '../../common/decorators/require-permission.decorator'
 import { PermissionGuard } from '../../common/guards/permission.guard'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -189,6 +190,7 @@ export class PropertyBankDetailsController {
   }
 
   @Get('property/:propertyId')
+  @DenyRestrictedPropertySensitiveDataProfile()
   @RequirePermission(ModuleType.BANK_DETAILS, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get bank details by property ID' })
   @ApiResponse({
@@ -228,6 +230,11 @@ export class PropertyBankDetailsController {
   @ApiResponse({
     status: 403,
     description: 'Forbidden - No access to this property'
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - restricted external sales permission profile cannot access property bank details'
   })
   findByPropertyId(
     @Param('propertyId') propertyId: string,
