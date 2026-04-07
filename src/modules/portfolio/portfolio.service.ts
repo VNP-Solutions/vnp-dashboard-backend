@@ -2001,15 +2001,8 @@ export class PortfolioService implements IPortfolioService {
       }
     })
 
-    // Get total count of all audits for the portfolio
-    const totalAuditCount = await this.prisma.audit.count({
-      where: {
-        property_id: {
-          in: propertyIds
-        },
-        is_archived: false
-      }
-    })
+    // Get total count from portfolio's tracked import counter
+    const totalAuditCount = portfolio.total_audit_count ?? 0
 
     // Initialize amounts
     const amountCollectable = {

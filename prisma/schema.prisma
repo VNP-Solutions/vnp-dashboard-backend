@@ -57,6 +57,7 @@ model Portfolio {
   access_phone      String?
   sales_agent_id    String?                 @db.ObjectId
   salesAgent        SalesAgent?             @relation(fields: [sales_agent_id], references: [id])
+  total_audit_count Int                     @default(0)
 
   properties           Property[]
   notes                Note[]

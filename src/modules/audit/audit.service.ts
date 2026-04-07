@@ -2329,9 +2329,17 @@ export class AuditService implements IAuditService {
       }
     })
 
-    // Get total count of all audits
-    const totalAuditCount = await this.prisma.audit.count({
-      where: whereClause
+    // Get total count of consolidated reports scoped to accessible portfolios
+    const accessiblePortfolioIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PORTFOLIO
+      )
+    const totalAuditCount = await this.prisma.consolidatedReport.count({
+      where:
+        accessiblePortfolioIds === 'all'
+          ? {}
+          : { portfolio_id: { in: accessiblePortfolioIds } }
     })
 
     // Initialize amounts
@@ -3403,6 +3411,38 @@ export class AuditService implements IAuditService {
           `  - Property: "${audit.property}", Audit ID: ${audit.audit_id}, Report: ${audit.report_url}`
         )
       })
+
+      // Upload original sheet as a consolidated report and increment portfolio counter
+      try {
+        const portfolioName = portfolioCache.keys().next().value as string
+        const portfolio = await this.portfolioRepository.findByName(portfolioName)
+
+        if (portfolio) {
+          const originalUpload = await this.fileUploadService.uploadFile(file)
+
+          await this.prisma.consolidatedReport.create({
+            data: {
+              url: originalUpload.url,
+              portfolio_id: portfolio.id,
+              user_id: user.id
+            }
+          })
+
+          await this.prisma.portfolio.update({
+            where: { id: portfolio.id },
+            data: { total_audit_count: { increment: 1 } }
+          })
+
+          this.logger.success(
+            `✓ Consolidated report uploaded and portfolio audit count incremented for "${portfolioName}": ${originalUpload.url}`
+          )
+        }
+      } catch (error) {
+        this.logger.error(
+          `✗ Failed to upload consolidated report or update portfolio count: ` +
+            `${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+      }
     }
 
     return { success: true, created_audits: createdAudits }
