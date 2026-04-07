@@ -12,6 +12,14 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import {
+  assertAuditNotesTasksPolicy,
+  assertPortfolioNotesTasksPolicy,
+  assertPropertyNotesTasksPolicy,
+  canUseAuditNotesTasks,
+  canUsePortfolioNotesTasks,
+  canUsePropertyNotesTasks
+} from '../../common/utils/note-task-permission.util'
+import {
   CreateNoteDto,
   DeleteAllNotesDto,
   NoteEntityType,
@@ -30,21 +38,15 @@ export class NoteService implements INoteService {
   ) {}
 
   async create(data: CreateNoteDto, user: IUserWithPermissions) {
-    // Notes are only accessible by internal users
-    if (user.role.is_external) {
-      throw new ForbiddenException(
-        'Notes are only accessible by internal users'
-      )
-    }
-
     if (!data.portfolio_id && !data.property_id && !data.audit_id) {
       throw new BadRequestException(
         'Note must be associated with either a portfolio, property, or audit'
       )
     }
 
-    // Check permissions based on the entity type
+    // Check permissions based on the entity type (view + partial on that module; internal user)
     if (data.portfolio_id) {
+      assertPortfolioNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PORTFOLIO,
@@ -52,6 +54,7 @@ export class NoteService implements INoteService {
         data.portfolio_id
       )
     } else if (data.property_id) {
+      assertPropertyNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PROPERTY,
@@ -59,17 +62,16 @@ export class NoteService implements INoteService {
         data.property_id
       )
     } else if (data.audit_id) {
-      // For audit notes, check property permission
-      // We need to get the property_id from the audit
+      assertAuditNotesTasksPolicy(user)
       const audit = await this.noteRepository.findAuditById(data.audit_id)
       if (!audit) {
         throw new NotFoundException('Audit not found')
       }
       await this.permissionService.requirePermission(
         user,
-        ModuleType.PROPERTY,
+        ModuleType.AUDIT,
         PermissionAction.READ,
-        audit.property_id
+        data.audit_id
       )
     }
 
@@ -80,7 +82,6 @@ export class NoteService implements INoteService {
   }
 
   async findAll(query: NoteQueryDto, user: IUserWithPermissions) {
-    // Notes are only accessible by internal users
     if (user.role.is_external) {
       throw new ForbiddenException(
         'Notes are only accessible by internal users'
@@ -90,7 +91,6 @@ export class NoteService implements INoteService {
     // Build where clause based on accessible resources
     const where: any = {}
 
-    // Get accessible portfolios and properties
     const portfolioIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PORTFOLIO
@@ -100,25 +100,36 @@ export class NoteService implements INoteService {
       ModuleType.PROPERTY
     )
 
-    // Build permission-based filters
     const permissionFilters: any[] = []
 
-    // Portfolio notes - if user has partial access to specific portfolios
-    if (portfolioIds !== 'all' && portfolioIds && portfolioIds.length > 0) {
+    if (
+      canUsePortfolioNotesTasks(user) &&
+      portfolioIds !== 'all' &&
+      portfolioIds &&
+      portfolioIds.length > 0
+    ) {
       permissionFilters.push({
         portfolio_id: { in: portfolioIds }
       })
     }
 
-    // Property notes - if user has partial access to specific properties
-    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
+    if (
+      canUsePropertyNotesTasks(user) &&
+      propertyIds !== 'all' &&
+      propertyIds &&
+      propertyIds.length > 0
+    ) {
       permissionFilters.push({
         property_id: { in: propertyIds }
       })
     }
 
-    // Audit notes - if user has partial access to specific properties
-    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
+    if (
+      canUseAuditNotesTasks(user) &&
+      propertyIds !== 'all' &&
+      propertyIds &&
+      propertyIds.length > 0
+    ) {
       permissionFilters.push({
         audit: {
           property_id: { in: propertyIds }
@@ -126,15 +137,11 @@ export class NoteService implements INoteService {
       })
     }
 
-    // If user has "all" access (permissionFilters is empty), they can see all notes
-    // If user has partial access, apply permission filters
-    if (permissionFilters.length > 0) {
-      where.OR = permissionFilters
-    } else if (portfolioIds.length === 0 && propertyIds.length === 0) {
-      // User has no access to any resource
+    if (permissionFilters.length === 0) {
       return []
     }
-    // If permissionFilters is empty but user has "all" access, don't add OR filter
+
+    where.OR = permissionFilters
 
     // Add portfolio filter if provided
     if (query.portfolio_id) {
@@ -219,21 +226,14 @@ export class NoteService implements INoteService {
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
-    // Notes are only accessible by internal users
-    if (user.role.is_external) {
-      throw new ForbiddenException(
-        'Notes are only accessible by internal users'
-      )
-    }
-
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
       throw new NotFoundException('Note not found')
     }
 
-    // Check permissions based on the entity type
     if (note.portfolio_id) {
+      assertPortfolioNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PORTFOLIO,
@@ -241,23 +241,24 @@ export class NoteService implements INoteService {
         note.portfolio_id
       )
     } else if (note.property_id) {
+      assertPropertyNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PROPERTY,
         PermissionAction.READ,
         note.property_id
       )
-    } else if (note.audit_id && note.audit) {
-      // For audit notes, check property permission
+    } else if (note.audit_id) {
+      assertAuditNotesTasksPolicy(user)
       const audit = await this.noteRepository.findAuditById(note.audit_id)
       if (!audit) {
         throw new NotFoundException('Audit not found')
       }
       await this.permissionService.requirePermission(
         user,
-        ModuleType.PROPERTY,
+        ModuleType.AUDIT,
         PermissionAction.READ,
-        audit.property_id
+        note.audit_id
       )
     }
 
@@ -265,21 +266,14 @@ export class NoteService implements INoteService {
   }
 
   async update(id: string, data: UpdateNoteDto, user: IUserWithPermissions) {
-    // Notes are only accessible by internal users
-    if (user.role.is_external) {
-      throw new ForbiddenException(
-        'Notes are only accessible by internal users'
-      )
-    }
-
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
       throw new NotFoundException('Note not found')
     }
 
-    // Check permissions based on the entity type
     if (note.portfolio_id) {
+      assertPortfolioNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PORTFOLIO,
@@ -287,6 +281,7 @@ export class NoteService implements INoteService {
         note.portfolio_id
       )
     } else if (note.property_id) {
+      assertPropertyNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PROPERTY,
@@ -294,16 +289,16 @@ export class NoteService implements INoteService {
         note.property_id
       )
     } else if (note.audit_id) {
-      // For audit notes, check property permission
+      assertAuditNotesTasksPolicy(user)
       const audit = await this.noteRepository.findAuditById(note.audit_id)
       if (!audit) {
         throw new NotFoundException('Audit not found')
       }
       await this.permissionService.requirePermission(
         user,
-        ModuleType.PROPERTY,
+        ModuleType.AUDIT,
         PermissionAction.READ,
-        audit.property_id
+        note.audit_id
       )
     }
 
@@ -311,21 +306,14 @@ export class NoteService implements INoteService {
   }
 
   async remove(id: string, user: IUserWithPermissions) {
-    // Notes are only accessible by internal users
-    if (user.role.is_external) {
-      throw new ForbiddenException(
-        'Notes are only accessible by internal users'
-      )
-    }
-
     const note = await this.noteRepository.findById(id)
 
     if (!note) {
       throw new NotFoundException('Note not found')
     }
 
-    // Check permissions based on the entity type
     if (note.portfolio_id) {
+      assertPortfolioNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PORTFOLIO,
@@ -333,6 +321,7 @@ export class NoteService implements INoteService {
         note.portfolio_id
       )
     } else if (note.property_id) {
+      assertPropertyNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PROPERTY,
@@ -340,16 +329,16 @@ export class NoteService implements INoteService {
         note.property_id
       )
     } else if (note.audit_id) {
-      // For audit notes, check property permission
+      assertAuditNotesTasksPolicy(user)
       const audit = await this.noteRepository.findAuditById(note.audit_id)
       if (!audit) {
         throw new NotFoundException('Audit not found')
       }
       await this.permissionService.requirePermission(
         user,
-        ModuleType.PROPERTY,
+        ModuleType.AUDIT,
         PermissionAction.READ,
-        audit.property_id
+        note.audit_id
       )
     }
 
@@ -359,17 +348,14 @@ export class NoteService implements INoteService {
   }
 
   async removeAll(query: DeleteAllNotesDto, user: IUserWithPermissions) {
-    // Notes are only accessible by internal users
     if (user.role.is_external) {
       throw new ForbiddenException(
         'Notes are only accessible by internal users'
       )
     }
 
-    // Build where clause based on accessible resources
     const where: any = {}
 
-    // Ensure at least one filter is provided
     if (
       !query.portfolio_id &&
       !query.property_id &&
@@ -381,7 +367,6 @@ export class NoteService implements INoteService {
       )
     }
 
-    // Get accessible portfolios and properties
     const portfolioIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PORTFOLIO
@@ -391,25 +376,36 @@ export class NoteService implements INoteService {
       ModuleType.PROPERTY
     )
 
-    // Build permission-based filters
     const permissionFilters: any[] = []
 
-    // Portfolio notes - if user has partial access to specific portfolios
-    if (portfolioIds !== 'all' && portfolioIds && portfolioIds.length > 0) {
+    if (
+      canUsePortfolioNotesTasks(user) &&
+      portfolioIds !== 'all' &&
+      portfolioIds &&
+      portfolioIds.length > 0
+    ) {
       permissionFilters.push({
         portfolio_id: { in: portfolioIds }
       })
     }
 
-    // Property notes - if user has partial access to specific properties
-    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
+    if (
+      canUsePropertyNotesTasks(user) &&
+      propertyIds !== 'all' &&
+      propertyIds &&
+      propertyIds.length > 0
+    ) {
       permissionFilters.push({
         property_id: { in: propertyIds }
       })
     }
 
-    // Audit notes - if user has partial access to specific properties
-    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
+    if (
+      canUseAuditNotesTasks(user) &&
+      propertyIds !== 'all' &&
+      propertyIds &&
+      propertyIds.length > 0
+    ) {
       permissionFilters.push({
         audit: {
           property_id: { in: propertyIds }
@@ -417,18 +413,14 @@ export class NoteService implements INoteService {
       })
     }
 
-    // If user has "all" access (permissionFilters is empty), they can delete all matching notes
-    // If user has partial access, apply permission filters
-    if (permissionFilters.length > 0) {
-      where.OR = permissionFilters
-    } else if (portfolioIds.length === 0 && propertyIds.length === 0) {
-      // User has no access to any resource
+    if (permissionFilters.length === 0) {
       return {
         message: '0 note(s) deleted successfully',
         deletedCount: 0
       }
     }
-    // If permissionFilters is empty but user has "all" access, don't add OR filter
+
+    where.OR = permissionFilters
 
     // Build filter based on query
     if (query.portfolio_id) {
