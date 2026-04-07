@@ -80,7 +80,7 @@ export class PropertyContractUrlController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only Super Admin or users with property update permission and partial access can view contracts'
+      'Forbidden - Super Admin, property update/all with partial or all access, or internal users with property view and partial or all access'
   })
   findAll(
     @Query() query: PropertyContractUrlQueryDto,
@@ -102,7 +102,7 @@ export class PropertyContractUrlController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only Super Admin or users with property update permission and partial access can view contracts'
+      'Forbidden - Super Admin, property update/all with partial or all access, or internal users with property view and partial or all access'
   })
   findAllForExport(
     @Query() query: PropertyContractUrlQueryDto,
@@ -124,7 +124,7 @@ export class PropertyContractUrlController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only Super Admin or users with property update permission and partial access can view contracts'
+      'Forbidden - Super Admin, property update/all with partial or all access, or internal users with property view and partial or all access'
   })
   findByProperty(
     @Param('propertyId') propertyId: string,
@@ -144,7 +144,7 @@ export class PropertyContractUrlController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only Super Admin or users with property update permission and partial access can view contracts'
+      'Forbidden - Super Admin, property update/all with partial or all access, or internal users with property view and partial or all access'
   })
   findOne(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.propertyContractUrlService.findOne(id, user)

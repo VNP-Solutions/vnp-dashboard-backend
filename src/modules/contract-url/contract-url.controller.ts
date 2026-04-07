@@ -75,7 +75,7 @@ export class ContractUrlController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only Super Admin or users with portfolio update permission and partial access can view contracts'
+      'Forbidden - Super Admin, portfolio update/all with partial or all access, or internal users with portfolio view and partial or all access'
   })
   findAll(
     @Query() query: ContractUrlQueryDto,
@@ -97,7 +97,7 @@ export class ContractUrlController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only Super Admin or users with portfolio update permission and partial access can view contracts'
+      'Forbidden - Super Admin, portfolio update/all with partial or all access, or internal users with portfolio view and partial or all access'
   })
   findAllForExport(
     @Query() query: ContractUrlQueryDto,
@@ -119,7 +119,7 @@ export class ContractUrlController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only Super Admin or users with portfolio update permission and partial access can view contracts'
+      'Forbidden - Super Admin, portfolio update/all with partial or all access, or internal users with portfolio view and partial or all access'
   })
   findByPortfolio(
     @Param('portfolioId') portfolioId: string,
@@ -139,7 +139,7 @@ export class ContractUrlController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only Super Admin or users with portfolio update permission and partial access can view contracts'
+      'Forbidden - Super Admin, portfolio update/all with partial or all access, or internal users with portfolio view and partial or all access'
   })
   findOne(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.contractUrlService.findOne(id, user)
