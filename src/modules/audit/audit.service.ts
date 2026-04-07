@@ -3005,6 +3005,13 @@ export class AuditService implements IAuditService {
       'Review collection Date',
       'review_collection_date'
     ]
+    const STATUS_COLS = [
+      'Status',
+      'status',
+      'Audit Status',
+      'Audit status',
+      'audit_status_id'
+    ]
 
     const findCol = (row: any, names: string[]): string | undefined => {
       for (const name of names) {
@@ -3126,6 +3133,7 @@ export class AuditService implements IAuditService {
         displayName: string
         batch?: string
         reviewCollectionDate?: string
+        statusLabel: string
       }
     >()
 
@@ -3143,6 +3151,8 @@ export class AuditService implements IAuditService {
       const amountRaw = findCol(row, AMOUNT_COLS)
       const batchRaw = findCol(row, BATCH_COLS)
       const reviewCollectionDateRaw = findCol(row, REVIEW_COLLECTION_DATE_COLS)
+      const statusRaw = findCol(row, STATUS_COLS)
+      const statusTrimmed = statusRaw ? String(statusRaw).trim() : ''
 
       const hotelIdStr =
         hotelIdRaw !== undefined && hotelIdRaw !== null && hotelIdRaw !== ''
@@ -3165,7 +3175,8 @@ export class AuditService implements IAuditService {
           `CheckOut="${checkOutRaw || 'N/A'}", ` +
           `Amount="${amountRaw || 'N/A'}", ` +
           `Batch="${batchRaw || 'N/A'}", ` +
-          `ReviewCollectionDate="${reviewCollectionDateRaw || 'N/A'}"`
+          `ReviewCollectionDate="${reviewCollectionDateRaw || 'N/A'}", ` +
+          `Status="${statusTrimmed || 'N/A'}"`
       )
 
       // --- Required field presence ---
@@ -3178,6 +3189,11 @@ export class AuditService implements IAuditService {
           error: 'Hotel Name or Hotel ID is missing'
         })
         continue
+      }
+
+      // --- Status (audit status name) ---
+      if (!statusTrimmed) {
+        rowErrors.push('Status is missing')
       }
 
       // --- OTA ---
@@ -3299,20 +3315,23 @@ export class AuditService implements IAuditService {
       }
 
       // Build valid group only if this row has zero errors so far
+      // Groups are keyed by property + status (case-insensitive) so one property can yield multiple audits.
       if (rowErrors.length === 0 && propertyId) {
-        if (!validGroups.has(propertyId)) {
+        const groupKey = `${propertyId}::${statusTrimmed.toLowerCase()}`
+        if (!validGroups.has(groupKey)) {
           const displayName =
             hotelName ??
             (hotelIdStr && otaRaw ? `${otaRaw} ${hotelIdStr}` : hotelIdStr ?? 'Unknown')
-          validGroups.set(propertyId, {
+          validGroups.set(groupKey, {
             rows: [],
             propertyId,
             displayName,
             batch: batchRaw,
-            reviewCollectionDate: reviewCollectionDateRaw
+            reviewCollectionDate: reviewCollectionDateRaw,
+            statusLabel: statusTrimmed
           })
         }
-        validGroups.get(propertyId)!.rows.push(row)
+        validGroups.get(groupKey)!.rows.push(row)
       }
     }
 
@@ -3336,15 +3355,28 @@ export class AuditService implements IAuditService {
       `✓ Validation successful. ${validGroups.size} property group(s) ready for audit creation`
     )
 
-    // --- Look up "Reported to Property" audit status ---
-    const reportedStatus = await this.auditStatusRepository.findByStatus(
-      'Reported to Property'
-    )
-    if (!reportedStatus) {
-      this.logger.error('Audit status "Reported to Property" not found')
-      throw new BadRequestException(
-        'Audit status "Reported to Property" not found in the database'
+    // --- Resolve audit status IDs: find by name (case-insensitive), else create ---
+    const uniqueStatusLabels = Array.from(
+      new Set(
+        Array.from(validGroups.values()).map(g => g.statusLabel.trim())
       )
+    ).filter(Boolean)
+
+    const statusIdByNormalized = new Map<string, string>()
+    let allStatusesForImport = await this.auditStatusRepository.findAll()
+
+    for (const label of uniqueStatusLabels) {
+      const norm = label.toLowerCase()
+      if (statusIdByNormalized.has(norm)) continue
+
+      let matched =
+        allStatusesForImport.find(s => s.status.toLowerCase() === norm) ??
+        null
+      if (!matched) {
+        matched = await this.auditStatusRepository.create({ status: label })
+        allStatusesForImport = [...allStatusesForImport, matched]
+      }
+      statusIdByNormalized.set(norm, matched.id)
     }
 
     this.logger.info('Starting audit creation process...')
@@ -3357,16 +3389,24 @@ export class AuditService implements IAuditService {
     }> = []
 
     for (const [
-      _propertyIdKey,
-      { rows, propertyId, displayName, batch, reviewCollectionDate }
+      _groupKey,
+      { rows, propertyId, displayName, batch, reviewCollectionDate, statusLabel }
     ] of validGroups) {
+      const auditStatusId = statusIdByNormalized.get(statusLabel.toLowerCase())
+      if (!auditStatusId) {
+        throw new BadRequestException(
+          `Failed to resolve audit status for "${statusLabel}"`
+        )
+      }
+
       this.logger.info(
         `Processing property group: "${displayName}" (${rows.length} rows)` +
           `${batch ? `, Batch="${batch}"` : ''}` +
           `${reviewCollectionDate
             ? `, ReviewCollectionDate="${reviewCollectionDate}"`
             : ''
-          }`
+          }` +
+          `, Status="${statusLabel}"`
       )
 
       // Aggregate data from all rows for this property
@@ -3427,7 +3467,7 @@ export class AuditService implements IAuditService {
 
       const auditData: CreateAuditDto = {
         property_id: propertyId,
-        audit_status_id: reportedStatus.id,
+        audit_status_id: auditStatusId,
         type_of_ota: [...otaSet],
         batch_id: batchId,
         start_date: minCheckIn?.toISOString(),
