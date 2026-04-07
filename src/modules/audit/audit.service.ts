@@ -3454,15 +3454,15 @@ export class AuditService implements IAuditService {
           )
 
           this.logger.success(
-            `[POST-IMPORT] Incrementing total_audit_count for portfolio "${portfolioName}" (id=${portfolio.id})`
+            `[POST-IMPORT] Incrementing total_audit_count for portfolio "${portfolioName}" (id=${portfolio.id}, current=${portfolio.total_audit_count ?? 0})`
           )
-          const updated = await this.prisma.portfolio.update({
+          const newCount = (portfolio.total_audit_count ?? 0) + 1
+          await this.prisma.portfolio.update({
             where: { id: portfolio.id },
-            data: { total_audit_count: { increment: 1 } },
-            select: { id: true, total_audit_count: true }
+            data: { total_audit_count: newCount }
           })
           this.logger.success(
-            `[POST-IMPORT] Portfolio counter incremented successfully — new total_audit_count=${updated.total_audit_count}`
+            `[POST-IMPORT] Portfolio counter updated successfully — total_audit_count set to ${newCount}`
           )
         }
       } catch (error) {
