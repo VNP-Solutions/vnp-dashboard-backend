@@ -732,6 +732,26 @@ export class PropertyRepository implements IPropertyRepository {
     })
   }
 
+  async findByAgodaId(agodaId: string) {
+    return this.prisma.property.findFirst({
+      where: {
+        credentials: {
+          agoda_id: agodaId
+        }
+      }
+    })
+  }
+
+  async findByBookingId(bookingId: string) {
+    return this.prisma.property.findFirst({
+      where: {
+        credentials: {
+          booking_id: bookingId
+        }
+      }
+    })
+  }
+
   async update(id: string, data: UpdatePropertyDto) {
     const updateData: any = { ...data }
     if (data.next_due_date) {

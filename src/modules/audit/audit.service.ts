@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import { OtaType, PendingActionType } from '@prisma/client'
+import { OtaType, PendingActionType, Property } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
@@ -2962,6 +2962,14 @@ export class AuditService implements IAuditService {
       'Property',
       'property_name'
     ]
+    const HOTEL_ID_COLS = [
+      'Hotel ID',
+      'hotel id',
+      'Hotel Id',
+      'HotelID',
+      'hotel_id',
+      'Hotel_Id'
+    ]
     const CHECK_IN_COLS = [
       'Check In (MM/DD/YYYY)',
       'Check In',
@@ -3090,7 +3098,7 @@ export class AuditService implements IAuditService {
 
     if (data.length === 0) {
       throw new BadRequestException(
-        'No valid rows found. Ensure the file has a "Hotel Name" column with data.'
+        'No valid rows found. Ensure the file has a "Hotel Name" or "Hotel ID" column with data.'
       )
     }
 
@@ -3100,9 +3108,9 @@ export class AuditService implements IAuditService {
 
     const errors: Array<{ row: number; property: string; property_id?: string; error: string }> = []
 
-    // Caches to avoid repeated DB calls for the same name
+    // Caches to avoid repeated DB calls for the same lookup key
     const portfolioCache = new Map<string, boolean>() // name  → exists
-    const propertyIdCache = new Map<string, string | null>() // name  → id | null
+    const propertyIdCache = new Map<string, string | null>() // lookup key → id | null
     const accessCache = new Map<string, boolean>() // id    → hasAccess
 
     const auditPermission = user.role.audit_permission
@@ -3114,6 +3122,7 @@ export class AuditService implements IAuditService {
       {
         rows: any[]
         propertyId: string
+        displayName: string
         batch?: string
         reviewCollectionDate?: string
       }
@@ -3125,6 +3134,7 @@ export class AuditService implements IAuditService {
       const rowErrors: string[] = []
 
       const hotelName = findCol(row, HOTEL_NAME_COLS)
+      const hotelIdRaw = findCol(row, HOTEL_ID_COLS)
       const portfolioName = findCol(row, PORTFOLIO_COLS)
       const otaRaw = findCol(row, OTA_COLS)
       const checkInRaw = findCol(row, CHECK_IN_COLS)
@@ -3133,11 +3143,21 @@ export class AuditService implements IAuditService {
       const batchRaw = findCol(row, BATCH_COLS)
       const reviewCollectionDateRaw = findCol(row, REVIEW_COLLECTION_DATE_COLS)
 
-      const label = hotelName ?? 'Unknown'
+      const hotelIdStr =
+        hotelIdRaw !== undefined && hotelIdRaw !== null && hotelIdRaw !== ''
+          ? hotelIdRaw.trim()
+          : undefined
+
+      const otaParsed = parseOta(otaRaw)
+
+      const label =
+        hotelName ??
+        (hotelIdStr ? `${otaRaw ?? 'OTA'} ${hotelIdStr}` : 'Unknown')
 
       // Log row processing details
       this.logger.info(
         `Processing row ${rowNum}: Hotel="${hotelName || 'N/A'}", ` +
+          `HotelID="${hotelIdStr || 'N/A'}", ` +
           `Portfolio="${portfolioName || 'N/A'}", ` +
           `OTA="${otaRaw || 'N/A'}", ` +
           `CheckIn="${checkInRaw || 'N/A'}", ` +
@@ -3148,19 +3168,19 @@ export class AuditService implements IAuditService {
       )
 
       // --- Required field presence ---
-      if (!hotelName) {
+      if (!hotelName && !hotelIdStr) {
         errors.push({
           row: rowNum,
           property: label,
-          error: 'Hotel Name is missing'
+          error: 'Hotel Name or Hotel ID is missing'
         })
-        continue // can't validate further without a name
+        continue
       }
 
       // --- OTA ---
       if (!otaRaw) {
         rowErrors.push('OTA is missing')
-      } else if (!parseOta(otaRaw)) {
+      } else if (!otaParsed) {
         rowErrors.push(
           `OTA "${otaRaw}" is not recognised. Expected: expedia, agoda, or booking`
         )
@@ -3181,15 +3201,41 @@ export class AuditService implements IAuditService {
         }
       }
 
-      // --- Property (Hotel Name) ---
-      if (!propertyIdCache.has(hotelName)) {
-        const p = await this.propertyRepository.findByName(hotelName)
-        propertyIdCache.set(hotelName, p?.id ?? null)
+      // --- Property: OTA + Hotel ID (credentials) preferred; else Hotel Name ---
+      let propertyId: string | undefined
+
+      if (hotelIdStr && otaParsed) {
+        const cacheKey = `credentials:${otaParsed}:${hotelIdStr}`
+        if (!propertyIdCache.has(cacheKey)) {
+          let p: Property | null = null
+          if (otaParsed === OtaType.expedia) {
+            p = await this.propertyRepository.findByExpediaId(hotelIdStr)
+          } else if (otaParsed === OtaType.agoda) {
+            p = await this.propertyRepository.findByAgodaId(hotelIdStr)
+          } else if (otaParsed === OtaType.booking) {
+            p = await this.propertyRepository.findByBookingId(hotelIdStr)
+          }
+          propertyIdCache.set(cacheKey, p?.id ?? null)
+        }
+        propertyId = propertyIdCache.get(cacheKey) ?? undefined
+        if (!propertyId) {
+          rowErrors.push(
+            `Property not found for ${otaRaw} hotel ID "${hotelIdStr}"`
+          )
+        }
+      } else if (hotelName && !hotelIdStr) {
+        const cacheKey = `name:${hotelName}`
+        if (!propertyIdCache.has(cacheKey)) {
+          const p = await this.propertyRepository.findByName(hotelName)
+          propertyIdCache.set(cacheKey, p?.id ?? null)
+        }
+        propertyId = propertyIdCache.get(cacheKey) ?? undefined
+        if (!propertyId) {
+          rowErrors.push(`Property "${hotelName}" not found in the database`)
+        }
       }
-      const propertyId = propertyIdCache.get(hotelName)
-      if (!propertyId) {
-        rowErrors.push(`Property "${hotelName}" not found in the database`)
-      } else if (auditPermission?.access_level === AccessLevel.partial) {
+
+      if (propertyId && auditPermission?.access_level === AccessLevel.partial) {
         if (!accessCache.has(propertyId)) {
           const ok = await this.permissionService.canAccessResource(
             user,
@@ -3199,8 +3245,10 @@ export class AuditService implements IAuditService {
           accessCache.set(propertyId, ok)
         }
         if (!accessCache.get(propertyId)) {
+          const propertyLabel =
+            hotelName ?? `${otaRaw ?? 'OTA'} ${hotelIdStr ?? ''}`.trim()
           rowErrors.push(
-            `Access denied: You do not have access to property "${hotelName}"`
+            `Access denied: You do not have access to property "${propertyLabel}"`
           )
         }
       }
@@ -3243,15 +3291,19 @@ export class AuditService implements IAuditService {
 
       // Build valid group only if this row has zero errors so far
       if (rowErrors.length === 0 && propertyId) {
-        if (!validGroups.has(hotelName)) {
-          validGroups.set(hotelName, {
+        if (!validGroups.has(propertyId)) {
+          const displayName =
+            hotelName ??
+            (hotelIdStr && otaRaw ? `${otaRaw} ${hotelIdStr}` : hotelIdStr ?? 'Unknown')
+          validGroups.set(propertyId, {
             rows: [],
             propertyId,
+            displayName,
             batch: batchRaw,
             reviewCollectionDate: reviewCollectionDateRaw
           })
         }
-        validGroups.get(hotelName)!.rows.push(row)
+        validGroups.get(propertyId)!.rows.push(row)
       }
     }
 
@@ -3296,11 +3348,11 @@ export class AuditService implements IAuditService {
     }> = []
 
     for (const [
-      hotelName,
-      { rows, propertyId, batch, reviewCollectionDate }
+      _propertyIdKey,
+      { rows, propertyId, displayName, batch, reviewCollectionDate }
     ] of validGroups) {
       this.logger.info(
-        `Processing property group: "${hotelName}" (${rows.length} rows)` +
+        `Processing property group: "${displayName}" (${rows.length} rows)` +
           `${batch ? `, Batch="${batch}"` : ''}` +
           `${reviewCollectionDate
             ? `, ReviewCollectionDate="${reviewCollectionDate}"`
@@ -3343,7 +3395,7 @@ export class AuditService implements IAuditService {
         if (!existingBatch) {
           // Create new batch if not found
           this.logger.info(
-            `Creating new batch "${batch}" for property "${hotelName}"`
+            `Creating new batch "${batch}" for property "${displayName}"`
           )
           existingBatch = await this.auditBatchRepository.create({
             batch_no: batch
@@ -3396,14 +3448,14 @@ export class AuditService implements IAuditService {
 
       try {
         this.logger.info(
-          `Creating audit for property "${hotelName}" with ${rows.length} rows`
+          `Creating audit for property "${displayName}" with ${rows.length} rows`
         )
 
         const audit = await this.auditRepository.create(auditData)
 
         this.logger.success(
           `✓ Audit created successfully: ID=${audit.id}, ` +
-            `Property="${hotelName}", ` +
+            `Property="${displayName}", ` +
             `Expedia=$${expediaSum.toFixed(2)}, ` +
             `Agoda=$${agodaSum.toFixed(2)}, ` +
             `Booking=$${bookingSum.toFixed(2)}, ` +
@@ -3444,7 +3496,7 @@ export class AuditService implements IAuditService {
       const xlsxBuffer = Buffer.from(await excelWb.xlsx.writeBuffer())
 
       // Upload to S3 via FileUploadService
-      const safeName = hotelName.replace(/[^a-zA-Z0-9]/g, '_')
+      const safeName = displayName.replace(/[^a-zA-Z0-9]/g, '_')
       const fakeFile = {
         buffer: xlsxBuffer,
         originalname: `auto-import_${safeName}_${Date.now()}.xlsx`,
@@ -3467,17 +3519,17 @@ export class AuditService implements IAuditService {
       })
 
       createdAudits.push({
-        property: hotelName,
+        property: displayName,
         audit_id: audit.id,
         report_url: uploadResult.url
       })
 
         this.logger.success(
-          `✓ Report uploaded for property "${hotelName}": ${uploadResult.url}`
+          `✓ Report uploaded for property "${displayName}": ${uploadResult.url}`
         )
       } catch (error) {
         this.logger.error(
-          `✗ Failed to create audit for property "${hotelName}": ` +
+          `✗ Failed to create audit for property "${displayName}": ` +
             `${error instanceof Error ? error.message : 'Unknown error'}`
         )
         // Continue to next property even if this one fails
