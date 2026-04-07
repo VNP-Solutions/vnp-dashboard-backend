@@ -752,3 +752,61 @@ export function getBankDetailsNotificationRoleDisplayLabel(
   }
   return null
 }
+
+function isExactModulePermission(
+  p: IPermission | null | undefined,
+  permission_level: PermissionLevel,
+  access_level: AccessLevel
+): boolean {
+  return (
+    p != null &&
+    p.permission_level === permission_level &&
+    p.access_level === access_level
+  )
+}
+
+/**
+ * Roles with this exact matrix cannot use GET property credentials / GET property bank details
+ * (enforced on those routes). Matches external view-level sales-style access: partial portfolio
+ * property/audit scope, no user module access, system settings view-all, no bank-details access, no MIS.
+ */
+export function isRestrictedPropertyCredentialsAndBankDetailsProfile(
+  role: IUserWithPermissions['role']
+): boolean {
+  if (role.is_external !== true || role.can_access_mis !== false) {
+    return false
+  }
+
+  return (
+    isExactModulePermission(
+      role.portfolio_permission,
+      PermissionLevel.view,
+      AccessLevel.partial
+    ) &&
+    isExactModulePermission(
+      role.property_permission,
+      PermissionLevel.view,
+      AccessLevel.partial
+    ) &&
+    isExactModulePermission(
+      role.audit_permission,
+      PermissionLevel.view,
+      AccessLevel.partial
+    ) &&
+    isExactModulePermission(
+      role.user_permission,
+      PermissionLevel.view,
+      AccessLevel.none
+    ) &&
+    isExactModulePermission(
+      role.system_settings_permission,
+      PermissionLevel.view,
+      AccessLevel.all
+    ) &&
+    isExactModulePermission(
+      role.bank_details_permission,
+      PermissionLevel.view,
+      AccessLevel.none
+    )
+  )
+}

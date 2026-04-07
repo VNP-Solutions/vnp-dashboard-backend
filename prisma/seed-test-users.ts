@@ -14,6 +14,7 @@ interface RoleData {
   name: string
   description: string
   is_external: boolean
+  can_access_mis?: boolean
   is_active: boolean
   order: number
   portfolio_permission: {
@@ -492,6 +493,50 @@ async function createRoles(): Promise<UserRole[]> {
         set: {
           permission_level: 'view',
           access_level: 'none'
+        }
+      },
+      bank_details_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'none'
+        }
+      }
+    },
+    {
+      name: 'VNP Sales',
+      description: 'For sales associates of VNP Solutions',
+      is_external: true,
+      can_access_mis: false,
+      is_active: true,
+      order: 10,
+      portfolio_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'partial'
+        }
+      },
+      property_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'partial'
+        }
+      },
+      audit_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'partial'
+        }
+      },
+      user_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'none'
+        }
+      },
+      system_settings_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'all'
         }
       },
       bank_details_permission: {
