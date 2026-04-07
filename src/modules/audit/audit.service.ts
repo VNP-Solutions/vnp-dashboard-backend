@@ -40,6 +40,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import type { IPropertyRepository } from '../property/property.interface'
 import {
   AuditQueryDto,
+  AutoImportAuditErrorDto,
   AutoImportAuditResultDto,
   BulkArchiveAuditDto,
   BulkDeleteAuditDto,
@@ -3106,7 +3107,7 @@ export class AuditService implements IAuditService {
     // Each row is validated individually so every error surfaces in the response.
     this.logger.info('Starting row validation and database lookups...')
 
-    const errors: Array<{ row: number; property: string; property_id?: string; error: string }> = []
+    const errors: AutoImportAuditErrorDto[] = []
 
     // Caches to avoid repeated DB calls for the same lookup key
     const portfolioCache = new Map<string, boolean>() // name  → exists
@@ -3172,6 +3173,8 @@ export class AuditService implements IAuditService {
         errors.push({
           row: rowNum,
           property: label,
+          ota: otaRaw,
+          hotel_id: hotelIdStr,
           error: 'Hotel Name or Hotel ID is missing'
         })
         continue
@@ -3286,7 +3289,13 @@ export class AuditService implements IAuditService {
 
       // Collect all errors for this row
       for (const err of rowErrors) {
-        errors.push({ row: rowNum, property: label, property_id: propertyId || undefined, error: err })
+        errors.push({
+          row: rowNum,
+          property: label,
+          ota: otaRaw,
+          hotel_id: hotelIdStr,
+          error: err
+        })
       }
 
       // Build valid group only if this row has zero errors so far
