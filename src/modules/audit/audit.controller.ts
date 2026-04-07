@@ -424,7 +424,9 @@ export class AuditController {
     Required columns:
     - OTA: Platform name (Expedia, Agoda, Booking)
     - Portfolio: Portfolio name (must already exist in the database)
-    - Hotel Name: Property name (must already exist in the database)
+    - Property lookup (either):
+      - Hotel ID + OTA: Hotel ID must match the property's Expedia, Agoda, or Booking credential ID for that OTA, or
+      - Hotel Name: Property name (must already exist in the database) when Hotel ID is not used
     - Amount Collected: Amount collected for this reservation
 
     Optional columns (recognised header aliases include Check In / Start Date and Check Out / End Date):
@@ -435,7 +437,7 @@ export class AuditController {
     All other columns in the sheet are preserved in the generated per-property report files.
 
     Behaviour:
-    - Rows are grouped by Hotel Name — one audit is created per unique property.
+    - Rows are grouped by resolved property (Hotel ID + OTA or Hotel Name) — one audit is created per unique property.
     - OTA types are collected from all rows of that property.
     - start_date = earliest check-in date across all rows (omitted if none).
     - end_date = latest check-out date across all rows (omitted if none).
@@ -446,7 +448,7 @@ export class AuditController {
     - If Review Collection Date column is present, the date value is set on the audit (first value per property group is used).
 
     Validation (pre-flight):
-    - If any Portfolio or Hotel Name cannot be found in the database, NO audits are created and the full error list is returned.
+    - If any Portfolio or property (by Hotel ID + OTA or by Hotel Name) cannot be found in the database, NO audits are created and the full error list is returned.
     `
   })
   @ApiBody({

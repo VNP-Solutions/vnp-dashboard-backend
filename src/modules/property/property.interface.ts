@@ -160,6 +160,8 @@ export interface IPropertyRepository {
   findByIds(ids: string[]): Promise<Property[]>
   findByName(name: string): Promise<Property | null>
   findByExpediaId(expediaId: string): Promise<Property | null>
+  findByAgodaId(agodaId: string): Promise<Property | null>
+  findByBookingId(bookingId: string): Promise<Property | null>
   update(id: string, data: UpdatePropertyDto): Promise<PropertyWithRelations>
   delete(id: string): Promise<Property>
   countAudits(propertyId: string): Promise<number>
