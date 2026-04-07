@@ -3416,12 +3416,32 @@ export class AuditService implements IAuditService {
 
       // Upload original sheet as a consolidated report and increment portfolio counter
       try {
+        this.logger.success(
+          `[POST-IMPORT] Starting consolidated report upload and portfolio counter increment`
+        )
+
         const portfolioName = portfolioCache.keys().next().value as string
+        this.logger.success(
+          `[POST-IMPORT] Resolved portfolio name from cache: "${portfolioName}"`
+        )
+
         const portfolio = await this.portfolioRepository.findByName(portfolioName)
+        this.logger.success(
+          `[POST-IMPORT] Portfolio lookup result: ${portfolio ? `FOUND (id=${portfolio.id})` : 'NOT FOUND — skipping'}`
+        )
 
         if (portfolio) {
+          this.logger.success(
+            `[POST-IMPORT] Uploading original import file to S3 (size=${file?.size ?? 'unknown'} bytes, name="${file?.originalname ?? 'unknown'}")`
+          )
           const originalUpload = await this.fileUploadService.uploadFile(file)
+          this.logger.success(
+            `[POST-IMPORT] Original file uploaded successfully: ${originalUpload.url}`
+          )
 
+          this.logger.success(
+            `[POST-IMPORT] Creating consolidated report for portfolio "${portfolioName}" (id=${portfolio.id})`
+          )
           await this.prisma.consolidatedReport.create({
             data: {
               url: originalUpload.url,
@@ -3429,20 +3449,29 @@ export class AuditService implements IAuditService {
               user_id: user.id
             }
           })
-
-          await this.prisma.portfolio.update({
-            where: { id: portfolio.id },
-            data: { total_audit_count: { increment: 1 } }
-          })
+          this.logger.success(
+            `[POST-IMPORT] Consolidated report created successfully`
+          )
 
           this.logger.success(
-            `✓ Consolidated report uploaded and portfolio audit count incremented for "${portfolioName}": ${originalUpload.url}`
+            `[POST-IMPORT] Incrementing total_audit_count for portfolio "${portfolioName}" (id=${portfolio.id})`
+          )
+          const updated = await this.prisma.portfolio.update({
+            where: { id: portfolio.id },
+            data: { total_audit_count: { increment: 1 } },
+            select: { id: true, total_audit_count: true }
+          })
+          this.logger.success(
+            `[POST-IMPORT] Portfolio counter incremented successfully — new total_audit_count=${updated.total_audit_count}`
           )
         }
       } catch (error) {
         this.logger.error(
-          `✗ Failed to upload consolidated report or update portfolio count: ` +
+          `[POST-IMPORT] FAILED: ` +
             `${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+        this.logger.error(
+          `[POST-IMPORT] Stack: ${error instanceof Error ? error.stack : 'N/A'}`
         )
       }
     }
