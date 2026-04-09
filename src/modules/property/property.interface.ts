@@ -9,6 +9,7 @@ import {
   CompletePropertyCredentialsDto,
   CompleteUpdatePropertyDto,
   CreatePropertyDto,
+  GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
@@ -155,6 +156,17 @@ export interface IPropertyRepository {
   ): Promise<PropertyWithPendingActions[]>
   count(whereClause: any, propertyIds?: string[]): Promise<number>
   findById(id: string): Promise<PropertyWithFullDetails | null>
+  findManyForBankDetailsSecureList(
+    where: Prisma.PropertyWhereInput
+  ): Promise<
+    Array<{
+      id: string
+      name: string
+      portfolio_id: string
+      portfolio: { id: string; name: string }
+      bankDetails: NonNullable<PropertyWithPendingActions['bankDetails']>
+    }>
+  >
   findByIds(ids: string[]): Promise<Property[]>
   findByName(name: string): Promise<Property | null>
   findByExpediaId(expediaId: string): Promise<Property | null>
@@ -201,6 +213,17 @@ export interface IPropertyService {
     propertyIds: string[],
     user: IUserWithPermissions
   ): Promise<PropertyWithFullDetails[]>
+  findAllBankDetailsSecure(
+    data: GetPropertiesBankDetailsSecureDto,
+    user: IUserWithPermissions
+  ): Promise<
+    Array<{
+      property_id: string
+      property_name: string
+      portfolio: { id: string; name: string }
+      bank_details: NonNullable<PropertyWithFullDetails['bankDetails']>
+    }>
+  >
   getPropertiesByPortfolios(
     data: GetPropertiesByPortfoliosDto,
     user: IUserWithPermissions

@@ -8,7 +8,7 @@ import {
   forwardRef
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { BankType } from '@prisma/client'
+import { BankSubType, BankType, Prisma } from '@prisma/client'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -48,6 +48,7 @@ import {
   CompleteCreatePropertyDto,
   CompleteUpdatePropertyDto,
   CreatePropertyDto,
+  GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
@@ -602,7 +603,8 @@ export class PropertyService implements IPropertyService {
     let auditAggregatesMap: Map<string, any> = new Map()
     if (shouldIncludeAmounts && data.length > 0) {
       const propertyIds = data.map((p: any) => p.id)
-      auditAggregatesMap = await this.getAuditAggregatesForProperties(propertyIds)
+      auditAggregatesMap =
+        await this.getAuditAggregatesForProperties(propertyIds)
     }
 
     // Get encryption secret for decrypting passwords
@@ -962,7 +964,8 @@ export class PropertyService implements IPropertyService {
     let auditAggregatesMap: Map<string, any> = new Map()
     if (shouldIncludeAmounts && data.length > 0) {
       const propertyIds = data.map((p: any) => p.id)
-      auditAggregatesMap = await this.getAuditAggregatesForProperties(propertyIds)
+      auditAggregatesMap =
+        await this.getAuditAggregatesForProperties(propertyIds)
     }
 
     // Get encryption secret for decrypting passwords
@@ -1275,6 +1278,96 @@ export class PropertyService implements IPropertyService {
     )
 
     return results.filter((p): p is NonNullable<typeof p> => p !== null)
+  }
+
+  async findAllBankDetailsSecure(
+    data: GetPropertiesBankDetailsSecureDto,
+    user: IUserWithPermissions
+  ) {
+    if (!canReadBankDetails(user)) {
+      return []
+    }
+
+    const accessibleIds = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+
+    if (Array.isArray(accessibleIds) && accessibleIds.length === 0) {
+      return []
+    }
+
+    const bankSubTypeRaw = data.bank_sub_type?.toLowerCase().trim() ?? 'all'
+    let bankDetailsFilter: Prisma.PropertyBankDetailsNullableScalarRelationFilter
+
+    if (bankSubTypeRaw !== 'all') {
+      const subTypeEnum = bankSubTypeRaw as BankSubType
+      bankDetailsFilter = {
+        is: {
+          bank_sub_type: subTypeEnum
+        }
+      }
+    } else {
+      bankDetailsFilter = {
+        isNot: null
+      }
+    }
+
+    const andParts: Prisma.PropertyWhereInput[] = []
+
+    if (accessibleIds !== 'all') {
+      andParts.push({ id: { in: accessibleIds } })
+    }
+
+    if (!isUserSuperAdmin(user) && !isInternalUser(user)) {
+      andParts.push({ is_active: true })
+    }
+
+    if (data.portfolio_id) {
+      andParts.push({
+        OR: [
+          { portfolio_id: data.portfolio_id },
+          { show_in_portfolio: { has: data.portfolio_id } }
+        ]
+      })
+    }
+
+    if (
+      data.search &&
+      !QueryBuilder.shouldIgnoreValue(data.search) &&
+      data.search.trim() !== ''
+    ) {
+      const term = data.search.trim()
+      andParts.push({
+        OR: [
+          { name: { contains: term, mode: 'insensitive' } },
+          {
+            portfolio: {
+              name: { contains: term, mode: 'insensitive' }
+            }
+          }
+        ]
+      })
+    }
+
+    andParts.push({
+      bankDetails: bankDetailsFilter
+    })
+
+    const where: Prisma.PropertyWhereInput =
+      andParts.length === 1 ? andParts[0] : { AND: andParts }
+
+    const rows =
+      await this.propertyRepository.findManyForBankDetailsSecureList(where)
+
+    return rows
+      .filter(row => row.bankDetails != null)
+      .map(row => ({
+        property_id: row.id,
+        property_name: row.name,
+        portfolio: row.portfolio,
+        bank_details: row.bankDetails
+      }))
   }
 
   async findAllSecure(query: PropertyQueryDto, user: IUserWithPermissions) {
@@ -3532,7 +3625,12 @@ export class PropertyService implements IPropertyService {
    */
   private async getAuditAggregatesForProperties(
     propertyIds: string[]
-  ): Promise<Map<string, { total_amount_collectable: number; total_amount_confirmed: number }>> {
+  ): Promise<
+    Map<
+      string,
+      { total_amount_collectable: number; total_amount_confirmed: number }
+    >
+  > {
     if (propertyIds.length === 0) {
       return new Map()
     }

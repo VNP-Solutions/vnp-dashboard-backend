@@ -9,6 +9,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -383,6 +384,43 @@ export class GetPropertiesByIdsSecureDto {
   @IsString()
   @IsNotEmpty()
   password: string
+}
+
+export class GetPropertiesBankDetailsSecureDto {
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'Current user password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439011',
+    description:
+      'Filter by portfolio (includes properties owned by or shared into this portfolio)'
+  })
+  @IsOptional()
+  @IsString()
+  portfolio_id?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Search by property name or portfolio name (case-insensitive partial match)'
+  })
+  @IsOptional()
+  @IsString()
+  search?: string
+
+  @ApiPropertyOptional({
+    enum: ['all', 'ach', 'domestic_wire', 'international_wire'],
+    default: 'all',
+    description:
+      'Filter by bank sub-type. Use "all" or omit for no filter (only properties with bank details are returned).'
+  })
+  @IsOptional()
+  @IsIn(['all', 'ach', 'domestic_wire', 'international_wire'])
+  bank_sub_type?: string
 }
 
 export class SecurePropertyListDto {
