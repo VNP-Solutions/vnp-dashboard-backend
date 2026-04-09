@@ -1,5 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { BankAccountType, BankSubType, BankType } from '@prisma/client'
+import {
+  BankAccountType,
+  BankSubType,
+  BankType,
+  Prisma,
+  PropertyBankDetails
+} from '@prisma/client'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { PrismaService } from '../prisma/prisma.service'
 import {
@@ -620,6 +626,43 @@ export class PropertyRepository implements IPropertyRepository {
     return this.prisma.property.count({
       where: whereClause
     })
+  }
+
+  async findManyForBankDetailsSecureList(
+    where: Prisma.PropertyWhereInput
+  ): Promise<
+    Array<{
+      id: string
+      name: string
+      portfolio_id: string
+      portfolio: { id: string; name: string }
+      bankDetails: PropertyBankDetails
+    }>
+  > {
+    return this.prisma.property.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        portfolio_id: true,
+        portfolio: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        bankDetails: true
+      }
+    }) as Promise<
+      Array<{
+        id: string
+        name: string
+        portfolio_id: string
+        portfolio: { id: string; name: string }
+        bankDetails: PropertyBankDetails
+      }>
+    >
   }
 
   async findById(id: string) {
