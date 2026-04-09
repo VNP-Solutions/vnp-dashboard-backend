@@ -218,7 +218,7 @@ export class UpdatePropertyBankDetailsDto extends PartialType(
 }
 
 export class BulkUpdateBankDetailsResultDto {
-  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  @ApiProperty({ example: 10, description: 'Total number of rows processed across all sheets' })
   totalRows: number
 
   @ApiProperty({
@@ -232,13 +232,14 @@ export class BulkUpdateBankDetailsResultDto {
 
   @ApiProperty({
     example: [
-      { row: 3, property: 'EXP123456', error: 'Property not found for this Expedia ID' },
-      { row: 5, property: 'EXP789012', error: 'Missing required fields for ach: Bank Account Type' }
+      { row: 3, sheet: 'ACH', property: 'EXP123456', error: 'Property not found for this Expedia ID' },
+      { row: 5, sheet: 'Domestic Wire', property: 'EXP789012', error: 'Missing required fields for domestic_wire: Routing Number' }
     ],
-    description: 'List of errors encountered during bulk update. Property field contains Expedia ID.'
+    description: 'List of errors encountered during bulk update. Property field contains Expedia ID. Sheet field indicates which tab the error came from (for multi-tab files).'
   })
   errors: Array<{
     row: number
+    sheet?: string
     property: string
     error: string
   }>
@@ -248,4 +249,19 @@ export class BulkUpdateBankDetailsResultDto {
     description: 'List of successfully updated Expedia IDs'
   })
   successfulUpdates: string[]
+
+  @ApiPropertyOptional({
+    example: [
+      { sheet: 'ACH', subType: 'ach', totalRows: 5, successCount: 4, failureCount: 1 },
+      { sheet: 'Domestic Wire', subType: 'domestic_wire', totalRows: 3, successCount: 3, failureCount: 0 }
+    ],
+    description: 'Per-sheet breakdown of results (present when file has multiple tabs)'
+  })
+  sheetResults?: Array<{
+    sheet: string
+    subType: string
+    totalRows: number
+    successCount: number
+    failureCount: number
+  }>
 }

@@ -14,7 +14,7 @@ import {
 import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
-  parseSpreadsheetToJson,
+  parseSpreadsheetAllSheetsToJson,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
 import { EmailUtil } from '../../common/utils/email.util'
@@ -215,8 +215,20 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   }
 
   /**
-   * Detect bank sub-type from Excel sheet headers
-   * Uses unique column presence to determine the type
+   * Detect bank sub-type from sheet name (tab name).
+   * Returns null if the name does not match a known sub-type.
+   */
+  private getSubTypeFromSheetName(sheetName: string): BankSubType | null {
+    const name = sheetName.toLowerCase().trim()
+    if (name === 'ach') return BankSubType.ach
+    if (name.includes('domestic')) return BankSubType.domestic_wire
+    if (name.includes('international')) return BankSubType.international_wire
+    return null
+  }
+
+  /**
+   * Detect bank sub-type from Excel sheet headers.
+   * Used as a fallback when the sheet name does not match a known sub-type.
    */
   private detectBankSubType(headers: string[]): BankSubType {
     const normalizedHeaders = headers.map(h => h.toLowerCase().trim())
@@ -429,7 +441,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       successCount: 0,
       failureCount: 0,
       errors: [],
-      successfulUpdates: []
+      successfulUpdates: [],
+      sheetResults: []
     }
 
     // Track properties that were successfully created or updated for alert notifications
@@ -437,16 +450,13 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     const updatedPropertyIds: string[] = []
 
     try {
-      const data = parseSpreadsheetToJson(file)
-      result.totalRows = data.length
+      const allSheets = parseSpreadsheetAllSheetsToJson(file)
 
       // Helper function to find header value with flexible naming
-      // Handles column names with asterisks (e.g., "Bank Type*")
       const findHeaderValue = (
         row: any,
         possibleNames: string[]
       ): string | undefined => {
-        // First, try to find exact matches
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
@@ -454,11 +464,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           }
         }
 
-        // If no exact match, try matching by removing asterisks from Excel column names
         const rowKeys = Object.keys(row)
         for (const name of possibleNames) {
           for (const key of rowKeys) {
-            // Remove asterisk and trim from the Excel column name
             const cleanKey = key.split('*')[0].trim()
             if (cleanKey.toLowerCase() === name.toLowerCase()) {
               const value = row[key]
@@ -472,582 +480,445 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         return undefined
       }
 
-      // Log available columns for debugging
-      if (data.length > 0) {
-        const firstRow = data[0]
-        const availableColumns = Object.keys(firstRow)
+      for (const { sheetName, data } of allSheets) {
         console.log(
-          'Available Excel columns:',
-          JSON.stringify(availableColumns)
+          '\x1b[36m%s\x1b[0m',
+          `\n📋 Processing sheet: "${sheetName}" (${data.length} rows)`
         )
+
+        // Determine sub-type: sheet name takes priority, fallback to header detection
+        const headers = data.length > 0 ? Object.keys(data[0] as Record<string, any>) : []
+        const subTypeFromName = this.getSubTypeFromSheetName(sheetName)
+        const bankSubType = subTypeFromName ?? this.detectBankSubType(headers)
+
         console.log(
-          'Sample first row values:',
-          JSON.stringify(firstRow, null, 2)
+          '\x1b[36m%s\x1b[0m',
+          `🔍 Sheet "${sheetName}" → sub-type: ${bankSubType}${subTypeFromName ? ' (from tab name)' : ' (from headers)'}`
         )
-      }
 
-      // Detect bank sub-type from sheet headers
-      const headers = data.length > 0 ? Object.keys(data[0] as Record<string, any>) : []
-      const detectedBankSubType = this.detectBankSubType(headers)
-      console.log(
-        '\x1b[36m%s\x1b[0m',
-        `🔍 Detected bank sub-type: ${detectedBankSubType}`
-      )
+        if (data.length > 0) {
+          console.log('Available Excel columns:', JSON.stringify(headers))
+        }
 
-      // Process each row
-      for (let i = 0; i < data.length; i++) {
-        const row = data[i]
-        const rowNumber = i + 2 // Excel row number (header is row 1)
+        result.totalRows += data.length
 
-        try {
-          // Extract Expedia ID (required)
-          const expediaId = findHeaderValue(row, [
-            'Expedia ID',
-            'Expedia id',
-            'expedia_id',
-            'ExpediaID',
-            'Expedia Id'
-          ])
+        const sheetResult = {
+          sheet: sheetName,
+          subType: bankSubType,
+          totalRows: data.length,
+          successCount: 0,
+          failureCount: 0
+        }
 
-          // Log row data for debugging
-          console.table([
-            {
-              'Row #': rowNumber,
-              'Expedia ID': expediaId || 'N/A',
-              'Detected Sub-Type': detectedBankSubType
-            }
-          ])
+        for (let i = 0; i < data.length; i++) {
+          const row = data[i]
+          const rowNumber = i + 2 // Excel row number (header is row 1)
 
-          if (!expediaId) {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Expedia ID is required. Available columns: ${Object.keys(row).join(', ')}`
-            )
-            result.errors.push({
-              row: rowNumber,
-              property: 'Unknown',
-              error: 'Expedia ID is required'
-            })
-            result.failureCount++
-            continue
-          }
-
-          // Find property by Expedia ID
-          const property = await this.propertyRepository.findByExpediaId(
-            expediaId
-          )
-
-          if (!property) {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Property with Expedia ID '${expediaId}' not found in database`
-            )
-            result.errors.push({
-              row: rowNumber,
-              property: expediaId,
-              error: 'Property not found for this Expedia ID'
-            })
-            result.failureCount++
-            continue
-          }
-
-          // Check permission for this property - need UPDATE permission for bulk update
           try {
-            await this.checkBankDetailsPermission(
-              user,
-              property.id,
-              PermissionAction.UPDATE
-            )
-          } catch {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: No permission to edit Expedia ID '${expediaId}'`
-            )
-            result.errors.push({
-              row: rowNumber,
-              property: expediaId,
-              error:
-                'You do not have permission to edit bank details for this property'
-            })
-            result.failureCount++
-            continue
-          }
+            // Extract Expedia ID (required)
+            const expediaId = findHeaderValue(row, [
+              'Expedia ID',
+              'Expedia id',
+              'expedia_id',
+              'ExpediaID',
+              'Expedia Id'
+            ])
 
-          // Extract bank details fields with comprehensive name matching
-          const hotelPortfolioName = findHeaderValue(row, [
-            'Hotel Or Portfolio Name',
-            'Hotel or Portfolio Name',
-            'Hotel Portfolio Name',
-            'Hotel portfolio name',
-            'hotel_portfolio_name',
-            'Hotel Name',
-            'Hotel name',
-            'Portfolio Name',
-            'Portfolio name'
-          ])
-          const beneficiaryName = findHeaderValue(row, [
-            'Pay To The Order Of',
-            'Pay to the Order Of',
-            'Pay to the order of',
-            'Beneficiary Name',
-            'Beneficiary name',
-            'beneficiary_name',
-            'Beneficiary',
-            'Beneficiary Name (ACH)'
-          ])
-          const beneficiaryAddress = findHeaderValue(row, [
-            'Beneficiary Address',
-            'Beneficiary address',
-            'beneficiary_address',
-            'Address',
-            'Beneficiary addr'
-          ])
-          const accountNumber = findHeaderValue(row, [
-            'IBAN or Account Number',
-            'IBAN or account number',
-            'Iban or Account Number',
-            'Bank Account Number',
-            'Bank account number',
-            'Account Number',
-            'Account number',
-            'account_number',
-            'Bank Account',
-            'Account No',
-            'Account #'
-          ])
-          const accountName = findHeaderValue(row, [
-            'Account Name',
-            'Account name',
-            'account_name',
-            'Account Holder',
-            'Account holder',
-            'Account Holder Name'
-          ])
-          const bankName = findHeaderValue(row, [
-            'Bank Name',
-            'Bank name',
-            'bank_name',
-            'Bank'
-          ])
-          const bankBranch = findHeaderValue(row, [
-            'Bank Branch',
-            'Bank branch',
-            'bank_branch',
-            'Branch',
-            'Branch Name'
-          ])
-          const ibanNumber = findHeaderValue(row, [
-            'IBAN or Account Number',
-            'IBAN or account number',
-            'Iban or Account Number',
-            'IBAN/Account Number',
-            'IBAN',
-            'Iban',
-            'iban_number'
-          ])
-          const swiftBicNumber = findHeaderValue(row, [
-            'SWIFT/BIC Code',
-            'Swift/BIC Code',
-            'Swift/Bic Code',
-            'SWIFT/BIC',
-            'Swift Code',
-            'Swift code',
-            'SWIFT',
-            'Swift',
-            'SWIFT Code',
-            'BIC',
-            'BIC Code',
-            'swift_bic_number'
-          ])
-          const routingNumber = findHeaderValue(row, [
-            'Bank Routing Number',
-            'Bank routing number',
-            'Routing Number',
-            'Routing number',
-            'routing_number',
-            'Routing',
-            'Routing No',
-            'ABA Number',
-            'ABA'
-          ])
-          const bankWiringRoutingNumber = findHeaderValue(row, [
-            'Bank Wiring Routing Number',
-            'Bank wiring routing number',
-            'Wiring Routing Number',
-            'Wiring routing number'
-          ])
-          const bankAccountType = findHeaderValue(row, [
-            'Bank Account Type',
-            'Bank account type',
-            'bank_account_type',
-            'Account Type',
-            'Account type',
-            'Type'
-          ])
-          const currency = findHeaderValue(row, [
-            'Currency',
-            'currency',
-            'Currency Code',
-            'Currency code'
-          ])
-          const contactName = findHeaderValue(row, [
-            'Contact Name',
-            'Contact name',
-            'contact_name'
-          ])
-          const emailAddress = findHeaderValue(row, [
-            'Email Address',
-            'Email address',
-            'email_address',
-            'Email'
-          ])
-          const bankAddress = findHeaderValue(row, [
-            'Bank Address',
-            'Bank address',
-            'bank_address'
-          ])
-          const comments = findHeaderValue(row, [
-            'Comments',
-            'comments',
-            'Comment',
-            'comment',
-            'Notes',
-            'notes'
-          ])
-
-          // Check if bank details already exist
-          const existingBankDetails =
-            await this.propertyBankDetailsRepository.findByPropertyId(
-              property.id
-            )
-
-          // Prepare update data
-          const updateData: any = {}
-
-          // All sheets are for Bank type (not Stripe), set bank_type and detected sub_type
-          updateData.bank_type = BankType.bank
-          updateData.bank_sub_type = detectedBankSubType
-          updateData.stripe_account_email = null
-
-          // Only add fields that are provided
-          if (hotelPortfolioName !== undefined) {
-            updateData.hotel_portfolio_name = hotelPortfolioName
-          }
-          if (beneficiaryName !== undefined) {
-            updateData.beneficiary_name = beneficiaryName
-          }
-          if (beneficiaryAddress !== undefined) {
-            updateData.beneficiary_address = beneficiaryAddress
-          }
-          if (accountNumber !== undefined) {
-            updateData.account_number = accountNumber
-          }
-          if (accountName !== undefined) {
-            updateData.account_name = accountName
-          }
-          if (bankName !== undefined) {
-            updateData.bank_name = bankName
-          }
-          if (bankBranch !== undefined) {
-            updateData.bank_branch = bankBranch
-          }
-          if (ibanNumber !== undefined) {
-            updateData.iban_number = ibanNumber
-          }
-          if (swiftBicNumber !== undefined) {
-            updateData.swift_bic_number = swiftBicNumber
-          }
-          if (routingNumber !== undefined) {
-            // Validate routing number has at least 9 digits
-            if (routingNumber.trim().length < 9) {
-              console.log(
-                '\x1b[33m%s\x1b[0m',
-                `⚠️  Row ${rowNumber} WARNING: Routing number '${routingNumber}' has less than 9 digits for Expedia ID '${expediaId}'. Skipping routing number update.`
-              )
-              result.errors.push({
-                row: rowNumber,
-                property: expediaId,
-                error:
-                  'Routing number must be at least 9 digits. Routing number was not updated.'
-              })
-              // Don't update routing number, but continue processing other fields
-            } else {
-              updateData.routing_number = routingNumber
-            }
-          }
-          if (bankWiringRoutingNumber !== undefined) {
-            updateData.bank_wiring_routing_number = bankWiringRoutingNumber
-          }
-          if (bankAccountType !== undefined) {
-            const normalizedAccountType = bankAccountType.toLowerCase().trim()
-            // Handle both "Checking/Saving" and "checking/savings"
-            if (
-              normalizedAccountType === 'checking' ||
-              normalizedAccountType === 'check'
-            ) {
-              updateData.bank_account_type = 'checking'
-            } else if (
-              normalizedAccountType === 'savings' ||
-              normalizedAccountType === 'saving'
-            ) {
-              updateData.bank_account_type = 'savings'
-            } else {
+            if (!expediaId) {
               console.log(
                 '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: Invalid bank account type '${bankAccountType}' for Expedia ID '${expediaId}'`
+                `❌ [${sheetName}] Row ${rowNumber} FAILED: Expedia ID is required`
               )
               result.errors.push({
                 row: rowNumber,
-                property: expediaId,
-                error: `Invalid bank account type: ${bankAccountType}. Must be one of: checking, savings, Checking, Saving`
+                sheet: sheetName,
+                property: 'Unknown',
+                error: 'Expedia ID is required'
               })
               result.failureCount++
+              sheetResult.failureCount++
               continue
             }
-          }
-          if (currency !== undefined) {
-            updateData.currency = currency
-          }
-          // Add new fields
-          if (contactName !== undefined) {
-            updateData.contact_name = contactName
-          }
-          if (emailAddress !== undefined) {
-            updateData.email_address = emailAddress
-          }
-          if (bankAddress !== undefined) {
-            updateData.bank_address = bankAddress
-          }
-          if (comments !== undefined) {
-            updateData.comments = comments
-          }
 
-          // Validate required fields based on detected sub-type
-          const finalSubType = updateData.bank_sub_type
+            // Find property by Expedia ID
+            const property = await this.propertyRepository.findByExpediaId(expediaId)
 
-          const missingFields: string[] = []
+            if (!property) {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ [${sheetName}] Row ${rowNumber} FAILED: Property '${expediaId}' not found`
+              )
+              result.errors.push({
+                row: rowNumber,
+                sheet: sheetName,
+                property: expediaId,
+                error: 'Property not found for this Expedia ID'
+              })
+              result.failureCount++
+              sheetResult.failureCount++
+              continue
+            }
 
-          // Merge with existing data for validation
-          const mergedData = {
-            hotel_portfolio_name:
-              updateData.hotel_portfolio_name !== undefined
-                ? updateData.hotel_portfolio_name
-                : existingBankDetails?.hotel_portfolio_name,
-            beneficiary_name:
-              updateData.beneficiary_name !== undefined
-                ? updateData.beneficiary_name
-                : existingBankDetails?.beneficiary_name,
-            beneficiary_address:
-              updateData.beneficiary_address !== undefined
-                ? updateData.beneficiary_address
-                : existingBankDetails?.beneficiary_address,
-            account_number:
-              updateData.account_number !== undefined
-                ? updateData.account_number
-                : existingBankDetails?.account_number,
-            bank_name:
-              updateData.bank_name !== undefined
-                ? updateData.bank_name
-                : existingBankDetails?.bank_name,
-            routing_number:
-              updateData.routing_number !== undefined
-                ? updateData.routing_number
-                : existingBankDetails?.routing_number,
-            bank_wiring_routing_number:
-              updateData.bank_wiring_routing_number !== undefined
-                ? updateData.bank_wiring_routing_number
-                : existingBankDetails?.bank_wiring_routing_number,
-            iban_number:
-              updateData.iban_number !== undefined
-                ? updateData.iban_number
-                : existingBankDetails?.iban_number,
-            swift_bic_number:
-              updateData.swift_bic_number !== undefined
-                ? updateData.swift_bic_number
-                : existingBankDetails?.swift_bic_number,
-            bank_account_type:
-              updateData.bank_account_type !== undefined
-                ? updateData.bank_account_type
-                : existingBankDetails?.bank_account_type,
-            currency:
-              updateData.currency !== undefined
-                ? updateData.currency
-                : existingBankDetails?.currency
-          }
+            // Check permission for this property
+            try {
+              await this.checkBankDetailsPermission(
+                user,
+                property.id,
+                PermissionAction.UPDATE
+              )
+            } catch {
+              console.log(
+                '\x1b[31m%s\x1b[0m',
+                `❌ [${sheetName}] Row ${rowNumber} FAILED: No permission for '${expediaId}'`
+              )
+              result.errors.push({
+                row: rowNumber,
+                sheet: sheetName,
+                property: expediaId,
+                error: 'You do not have permission to edit bank details for this property'
+              })
+              result.failureCount++
+              sheetResult.failureCount++
+              continue
+            }
 
-          // Common required fields (note: account_number is not common - ACH/domestic wire use it, international wire uses IBAN)
-          if (
-            !mergedData.hotel_portfolio_name ||
-            !mergedData.hotel_portfolio_name.trim()
-          ) {
-            missingFields.push('Hotel Portfolio Name')
-          }
-          if (!mergedData.bank_name || !mergedData.bank_name.trim()) {
-            missingFields.push('Bank Name')
-          }
+            // Extract bank details fields
+            const hotelPortfolioName = findHeaderValue(row, [
+              'Hotel Or Portfolio Name',
+              'Hotel or Portfolio Name',
+              'Hotel Portfolio Name',
+              'Hotel portfolio name',
+              'hotel_portfolio_name',
+              'Hotel Name',
+              'Hotel name',
+              'Portfolio Name',
+              'Portfolio name'
+            ])
+            const beneficiaryName = findHeaderValue(row, [
+              'Pay To The Order Of',
+              'Pay to the Order Of',
+              'Pay to the order of',
+              'Beneficiary Name',
+              'Beneficiary name',
+              'beneficiary_name',
+              'Beneficiary',
+              'Beneficiary Name (ACH)'
+            ])
+            const beneficiaryAddress = findHeaderValue(row, [
+              'Beneficiary Address',
+              'Beneficiary address',
+              'beneficiary_address',
+              'Address',
+              'Beneficiary addr'
+            ])
+            const accountNumber = findHeaderValue(row, [
+              'IBAN or Account Number',
+              'IBAN or account number',
+              'Iban or Account Number',
+              'Bank Account Number',
+              'Bank account number',
+              'Account Number',
+              'Account number',
+              'account_number',
+              'Bank Account',
+              'Account No',
+              'Account #'
+            ])
+            const accountName = findHeaderValue(row, [
+              'Account Name',
+              'Account name',
+              'account_name',
+              'Account Holder',
+              'Account holder',
+              'Account Holder Name'
+            ])
+            const bankName = findHeaderValue(row, [
+              'Bank Name',
+              'Bank name',
+              'bank_name',
+              'Bank'
+            ])
+            const bankBranch = findHeaderValue(row, [
+              'Bank Branch',
+              'Bank branch',
+              'bank_branch',
+              'Branch',
+              'Branch Name'
+            ])
+            const ibanNumber = findHeaderValue(row, [
+              'IBAN or Account Number',
+              'IBAN or account number',
+              'Iban or Account Number',
+              'IBAN/Account Number',
+              'IBAN',
+              'Iban',
+              'iban_number'
+            ])
+            const swiftBicNumber = findHeaderValue(row, [
+              'SWIFT/BIC Code',
+              'Swift/BIC Code',
+              'Swift/Bic Code',
+              'SWIFT/BIC',
+              'Swift Code',
+              'Swift code',
+              'SWIFT',
+              'Swift',
+              'SWIFT Code',
+              'BIC',
+              'BIC Code',
+              'swift_bic_number'
+            ])
+            const routingNumber = findHeaderValue(row, [
+              'Bank Routing Number',
+              'Bank routing number',
+              'Routing Number',
+              'Routing number',
+              'routing_number',
+              'Routing',
+              'Routing No',
+              'ABA Number',
+              'ABA'
+            ])
+            const bankWiringRoutingNumber = findHeaderValue(row, [
+              'Bank Wiring Routing Number',
+              'Bank wiring routing number',
+              'Wiring Routing Number',
+              'Wiring routing number'
+            ])
+            const bankAccountType = findHeaderValue(row, [
+              'Bank Account Type',
+              'Bank account type',
+              'bank_account_type',
+              'Account Type',
+              'Account type',
+              'Type'
+            ])
+            const currency = findHeaderValue(row, [
+              'Currency',
+              'currency',
+              'Currency Code',
+              'Currency code'
+            ])
+            const contactName = findHeaderValue(row, [
+              'Contact Name',
+              'Contact name',
+              'contact_name'
+            ])
+            const emailAddress = findHeaderValue(row, [
+              'Email Address',
+              'Email address',
+              'email_address',
+              'Email'
+            ])
+            const bankAddress = findHeaderValue(row, [
+              'Bank Address',
+              'Bank address',
+              'bank_address'
+            ])
+            const comments = findHeaderValue(row, [
+              'Comments',
+              'comments',
+              'Comment',
+              'comment',
+              'Notes',
+              'notes'
+            ])
 
-          // Sub-type specific validation
-          switch (finalSubType) {
-              case BankSubType.ach:
-                  if (
-                    !mergedData.beneficiary_name ||
-                    !mergedData.beneficiary_name.trim()
-                  ) {
-                    missingFields.push('Beneficiary Name')
-                  }
-                  if (
-                    !mergedData.account_number ||
-                    !mergedData.account_number.trim()
-                  ) {
-                    missingFields.push('Account Number')
-                  }
-                  if (
-                    !mergedData.routing_number ||
-                    !mergedData.routing_number.trim()
-                  ) {
-                    missingFields.push('Routing Number')
-                  } else if (mergedData.routing_number.trim().length < 9) {
-                    missingFields.push(
-                      'Routing Number (must be at least 9 digits)'
-                    )
-                  }
-                  if (!mergedData.bank_account_type) {
-                    missingFields.push('Bank Account Type')
-                  }
-                  break
+            // Check if bank details already exist
+            const existingBankDetails =
+              await this.propertyBankDetailsRepository.findByPropertyId(property.id)
 
-                case BankSubType.domestic_wire:
-                  if (
-                    !mergedData.beneficiary_name ||
-                    !mergedData.beneficiary_name.trim()
-                  ) {
-                    missingFields.push('Beneficiary Name')
-                  }
-                  if (
-                    !mergedData.account_number ||
-                    !mergedData.account_number.trim()
-                  ) {
-                    missingFields.push('Account Number')
-                  }
-                  // beneficiary_address is now OPTIONAL for Domestic Wire
-                  if (
-                    !mergedData.routing_number ||
-                    !mergedData.routing_number.trim()
-                  ) {
-                    missingFields.push('Routing Number')
-                  } else if (mergedData.routing_number.trim().length < 9) {
-                    missingFields.push(
-                      'Routing Number (must be at least 9 digits)'
-                    )
-                  }
-                  break
+            // Prepare update data
+            const updateData: any = {
+              bank_type: BankType.bank,
+              bank_sub_type: bankSubType,
+              stripe_account_email: null
+            }
 
-                case BankSubType.international_wire:
-                  if (
-                    !mergedData.beneficiary_name ||
-                    !mergedData.beneficiary_name.trim()
-                  ) {
-                    missingFields.push('Beneficiary Name')
-                  }
-                  // beneficiary_address is now OPTIONAL for International Wire
-                  // currency is now OPTIONAL for International Wire
-                  // Note: International wire uses IBAN, not account_number
-                  if (
-                    !mergedData.iban_number ||
-                    !mergedData.iban_number.trim()
-                  ) {
-                    missingFields.push('IBAN or Account Number')
-                  }
-                  if (
-                    !mergedData.swift_bic_number ||
-                    !mergedData.swift_bic_number.trim()
-                  ) {
-                    missingFields.push('SWIFT/BIC Code')
-                  }
-                  break
+            if (hotelPortfolioName !== undefined) updateData.hotel_portfolio_name = hotelPortfolioName
+            if (beneficiaryName !== undefined) updateData.beneficiary_name = beneficiaryName
+            if (beneficiaryAddress !== undefined) updateData.beneficiary_address = beneficiaryAddress
+            if (accountNumber !== undefined) updateData.account_number = accountNumber
+            if (accountName !== undefined) updateData.account_name = accountName
+            if (bankName !== undefined) updateData.bank_name = bankName
+            if (bankBranch !== undefined) updateData.bank_branch = bankBranch
+            if (ibanNumber !== undefined) updateData.iban_number = ibanNumber
+            if (swiftBicNumber !== undefined) updateData.swift_bic_number = swiftBicNumber
+            if (bankWiringRoutingNumber !== undefined) updateData.bank_wiring_routing_number = bankWiringRoutingNumber
+            if (currency !== undefined) updateData.currency = currency
+            if (contactName !== undefined) updateData.contact_name = contactName
+            if (emailAddress !== undefined) updateData.email_address = emailAddress
+            if (bankAddress !== undefined) updateData.bank_address = bankAddress
+            if (comments !== undefined) updateData.comments = comments
+
+            if (routingNumber !== undefined) {
+              if (routingNumber.trim().length < 9) {
+                console.log(
+                  '\x1b[33m%s\x1b[0m',
+                  `⚠️  [${sheetName}] Row ${rowNumber} WARNING: Routing number '${routingNumber}' < 9 digits for '${expediaId}'`
+                )
+                result.errors.push({
+                  row: rowNumber,
+                  sheet: sheetName,
+                  property: expediaId,
+                  error: 'Routing number must be at least 9 digits. Routing number was not updated.'
+                })
+              } else {
+                updateData.routing_number = routingNumber
               }
+            }
+
+            if (bankAccountType !== undefined) {
+              const normalizedAccountType = bankAccountType.toLowerCase().trim()
+              if (normalizedAccountType === 'checking' || normalizedAccountType === 'check') {
+                updateData.bank_account_type = 'checking'
+              } else if (normalizedAccountType === 'savings' || normalizedAccountType === 'saving') {
+                updateData.bank_account_type = 'savings'
+              } else {
+                console.log(
+                  '\x1b[31m%s\x1b[0m',
+                  `❌ [${sheetName}] Row ${rowNumber} FAILED: Invalid bank account type '${bankAccountType}' for '${expediaId}'`
+                )
+                result.errors.push({
+                  row: rowNumber,
+                  sheet: sheetName,
+                  property: expediaId,
+                  error: `Invalid bank account type: ${bankAccountType}. Must be one of: checking, savings`
+                })
+                result.failureCount++
+                sheetResult.failureCount++
+                continue
+              }
+            }
+
+            // Validate required fields based on sub-type
+            const missingFields: string[] = []
+            const mergedData = {
+              hotel_portfolio_name: updateData.hotel_portfolio_name ?? existingBankDetails?.hotel_portfolio_name,
+              beneficiary_name: updateData.beneficiary_name ?? existingBankDetails?.beneficiary_name,
+              account_number: updateData.account_number ?? existingBankDetails?.account_number,
+              bank_name: updateData.bank_name ?? existingBankDetails?.bank_name,
+              routing_number: updateData.routing_number ?? existingBankDetails?.routing_number,
+              bank_wiring_routing_number: updateData.bank_wiring_routing_number ?? existingBankDetails?.bank_wiring_routing_number,
+              iban_number: updateData.iban_number ?? existingBankDetails?.iban_number,
+              swift_bic_number: updateData.swift_bic_number ?? existingBankDetails?.swift_bic_number,
+              bank_account_type: updateData.bank_account_type ?? existingBankDetails?.bank_account_type,
+              currency: updateData.currency ?? existingBankDetails?.currency
+            }
+
+            if (!mergedData.hotel_portfolio_name?.trim()) missingFields.push('Hotel Portfolio Name')
+            if (!mergedData.bank_name?.trim()) missingFields.push('Bank Name')
+
+            switch (bankSubType) {
+              case BankSubType.ach:
+                if (!mergedData.beneficiary_name?.trim()) missingFields.push('Beneficiary Name')
+                if (!mergedData.account_number?.trim()) missingFields.push('Account Number')
+                if (!mergedData.routing_number?.trim()) {
+                  missingFields.push('Routing Number')
+                } else if (mergedData.routing_number.trim().length < 9) {
+                  missingFields.push('Routing Number (must be at least 9 digits)')
+                }
+                if (!mergedData.bank_account_type) missingFields.push('Bank Account Type')
+                break
+
+              case BankSubType.domestic_wire:
+                if (!mergedData.beneficiary_name?.trim()) missingFields.push('Beneficiary Name')
+                if (!mergedData.account_number?.trim()) missingFields.push('Account Number')
+                if (!mergedData.routing_number?.trim()) {
+                  missingFields.push('Routing Number')
+                } else if (mergedData.routing_number.trim().length < 9) {
+                  missingFields.push('Routing Number (must be at least 9 digits)')
+                }
+                break
+
+              case BankSubType.international_wire:
+                if (!mergedData.beneficiary_name?.trim()) missingFields.push('Beneficiary Name')
+                if (!mergedData.iban_number?.trim()) missingFields.push('IBAN or Account Number')
+                if (!mergedData.swift_bic_number?.trim()) missingFields.push('SWIFT/BIC Code')
+                break
+            }
 
             if (missingFields.length > 0) {
               console.log(
                 '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: Missing required fields for ${finalSubType}: ${missingFields.join(', ')} for Expedia ID '${expediaId}'`
+                `❌ [${sheetName}] Row ${rowNumber} FAILED: Missing required fields for ${bankSubType}: ${missingFields.join(', ')}`
               )
               result.errors.push({
                 row: rowNumber,
+                sheet: sheetName,
                 property: expediaId,
-                error: `Missing required fields for ${finalSubType}: ${missingFields.join(', ')}`
+                error: `Missing required fields for ${bankSubType}: ${missingFields.join(', ')}`
               })
               result.failureCount++
+              sheetResult.failureCount++
               continue
             }
 
-          // Set associated user
-          updateData.associated_user_id = user.id
+            updateData.associated_user_id = user.id
 
-          if (existingBankDetails) {
-            // Update existing bank details
-            await this.propertyBankDetailsRepository.update(
-              property.id,
-              updateData
-            )
+            if (existingBankDetails) {
+              await this.propertyBankDetailsRepository.update(property.id, updateData)
+              console.log(
+                '\x1b[32m%s\x1b[0m',
+                `✅ [${sheetName}] Row ${rowNumber} SUCCESS: Updated bank details for '${expediaId}'`
+              )
+              updatedPropertyIds.push(property.id)
+            } else {
+              updateData.property_id = property.id
+              await this.propertyBankDetailsRepository.create(updateData)
+              console.log(
+                '\x1b[32m%s\x1b[0m',
+                `✅ [${sheetName}] Row ${rowNumber} SUCCESS: Created bank details for '${expediaId}'`
+              )
+              createdPropertyIds.push(property.id)
+            }
+
+            result.successCount++
+            sheetResult.successCount++
+            result.successfulUpdates.push(expediaId)
+          } catch (error) {
+            const expediaIdFromRow =
+              findHeaderValue(row, [
+                'Expedia ID',
+                'Expedia id',
+                'expedia_id',
+                'ExpediaID'
+              ]) || 'Unknown'
+
             console.log(
-              '\x1b[32m%s\x1b[0m',
-              `✅ Row ${rowNumber} SUCCESS: Updated bank details for Expedia ID '${expediaId}'`
+              '\x1b[31m%s\x1b[0m',
+              `❌ [${sheetName}] Row ${rowNumber} FAILED: ${error.message || 'Unknown error'} for '${expediaIdFromRow}'`
             )
-            updatedPropertyIds.push(property.id)
-          } else {
-            // Create new bank details
-            updateData.property_id = property.id
-            await this.propertyBankDetailsRepository.create(updateData)
-            console.log(
-              '\x1b[32m%s\x1b[0m',
-              `✅ Row ${rowNumber} SUCCESS: Created bank details for Expedia ID '${expediaId}'`
-            )
-            createdPropertyIds.push(property.id)
+            result.errors.push({
+              row: rowNumber,
+              sheet: sheetName,
+              property: expediaIdFromRow,
+              error: error.message || 'Unknown error occurred'
+            })
+            result.failureCount++
+            sheetResult.failureCount++
           }
-
-          result.successCount++
-          result.successfulUpdates.push(expediaId)
-        } catch (error) {
-          const expediaIdFromRow =
-            findHeaderValue(row, [
-              'Expedia ID',
-              'Expedia id',
-              'expedia_id',
-              'ExpediaID'
-            ]) || 'Unknown'
-
-          console.log(
-            '\x1b[31m%s\x1b[0m',
-            `❌ Row ${rowNumber} FAILED: ${error.message || 'Unknown error occurred'} for Expedia ID '${expediaIdFromRow}'`
-          )
-          result.errors.push({
-            row: rowNumber,
-            property: expediaIdFromRow,
-            error: error.message || 'Unknown error occurred'
-          })
-          result.failureCount++
         }
+
+        result.sheetResults!.push(sheetResult)
+
+        console.log(
+          '\x1b[36m%s\x1b[0m',
+          `📋 Sheet "${sheetName}" done — success: ${sheetResult.successCount}, failed: ${sheetResult.failureCount}`
+        )
+      }
+
+      // If only one sheet processed, omit sheetResults to keep response lean
+      if (result.sheetResults!.length <= 1) {
+        delete result.sheetResults
       }
 
       // Final summary report
-      console.log(
-        '\n\x1b[36m%s\x1b[0m',
-        '========================================'
-      )
+      console.log('\n\x1b[36m%s\x1b[0m', '========================================')
       console.log('\x1b[36m%s\x1b[0m', '📊 BULK UPDATE SUMMARY REPORT')
-      console.log(
-        '\x1b[36m%s\x1b[0m',
-        '========================================'
-      )
-      console.log(
-        '\x1b[33m%s\x1b[0m',
-        `📝 Total Rows Processed: ${result.totalRows}`
-      )
-      console.log(
-        '\x1b[32m%s\x1b[0m',
-        `✅ Successfully Updated/Created: ${result.successCount}`
-      )
+      console.log('\x1b[36m%s\x1b[0m', '========================================')
+      console.log('\x1b[33m%s\x1b[0m', `📝 Total Rows Processed: ${result.totalRows}`)
+      console.log('\x1b[32m%s\x1b[0m', `✅ Successfully Updated/Created: ${result.successCount}`)
       console.log('\x1b[31m%s\x1b[0m', `❌ Failed: ${result.failureCount}`)
 
       if (result.successCount > 0) {
@@ -1062,23 +933,18 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         console.table(result.errors)
       }
 
-      console.log(
-        '\x1b[36m%s\x1b[0m',
-        '========================================\n'
-      )
+      console.log('\x1b[36m%s\x1b[0m', '========================================\n')
 
-      // Send alert notifications to all users with access to updated properties
+      // Send alert notifications
       const allUpdatedPropertyIds = [...createdPropertyIds, ...updatedPropertyIds]
       if (allUpdatedPropertyIds.length > 0) {
         await this.sendBulkUpdateAlerts(allUpdatedPropertyIds)
       }
 
-      // Send notification to super admins and role users for created properties
       if (createdPropertyIds.length > 0) {
         await this.sendBulkNotification(createdPropertyIds, 'created', location)
       }
 
-      // Send notification to super admins and role users for updated properties
       if (updatedPropertyIds.length > 0) {
         await this.sendBulkNotification(updatedPropertyIds, 'updated', location)
       }
