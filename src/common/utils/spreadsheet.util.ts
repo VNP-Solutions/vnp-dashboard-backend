@@ -20,6 +20,7 @@ export function validateSpreadsheetFile(file: Express.Multer.File): void {
 /**
  * Parses a spreadsheet file (Excel or CSV) and returns rows as array of objects.
  * Uses first row as headers. Works with .xlsx, .xls, and .csv.
+ * Only reads the first sheet — use parseSpreadsheetAllSheetsToJson for multi-tab files.
  */
 export function parseSpreadsheetToJson(file: Express.Multer.File): any[] {
   const isCsv = file.originalname.toLowerCase().endsWith('.csv')
@@ -44,4 +45,48 @@ export function parseSpreadsheetToJson(file: Express.Multer.File): any[] {
   }
 
   return data
+}
+
+export interface SheetData {
+  sheetName: string
+  data: any[]
+}
+
+/**
+ * Parses all sheets from an Excel file and returns each sheet's data with its name.
+ * For CSV files (single-sheet only), returns a single entry.
+ * Skips sheets that are empty (no data rows).
+ */
+export function parseSpreadsheetAllSheetsToJson(
+  file: Express.Multer.File
+): SheetData[] {
+  const isCsv = file.originalname.toLowerCase().endsWith('.csv')
+  let workbook: XLSX.WorkBook
+
+  if (isCsv) {
+    workbook = XLSX.read(file.buffer.toString('utf-8'), { type: 'string' })
+  } else {
+    workbook = XLSX.read(file.buffer, { type: 'buffer' })
+  }
+
+  if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+    throw new BadRequestException('File contains no worksheets')
+  }
+
+  const result: SheetData[] = []
+
+  for (const sheetName of workbook.SheetNames) {
+    const worksheet = workbook.Sheets[sheetName]
+    const data = XLSX.utils.sheet_to_json(worksheet)
+
+    if (data && data.length > 0) {
+      result.push({ sheetName, data })
+    }
+  }
+
+  if (result.length === 0) {
+    throw new BadRequestException('File is empty or contains no data rows')
+  }
+
+  return result
 }

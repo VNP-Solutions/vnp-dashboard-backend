@@ -667,8 +667,6 @@ export class AggregationBuilder {
       _id: 1,
       type_of_ota: 1,
       billing_type: 1,
-      start_date: 1,
-      end_date: 1,
 
       // OTA-specific amount fields
       expedia_amount_collectable: 1,

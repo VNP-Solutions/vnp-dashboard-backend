@@ -1,5 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { BankAccountType, BankSubType, BankType } from '@prisma/client'
+import {
+  BankAccountType,
+  BankSubType,
+  BankType,
+  Prisma,
+  PropertyBankDetails
+} from '@prisma/client'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { PrismaService } from '../prisma/prisma.service'
 import {
@@ -216,9 +222,7 @@ export class PropertyRepository implements IPropertyRepository {
               agoda_amount_collectable: true,
               agoda_amount_confirmed: true,
               booking_amount_collectable: true,
-              booking_amount_confirmed: true,
-              start_date: true,
-              end_date: true
+              booking_amount_confirmed: true
             }
           }
         }
@@ -453,9 +457,7 @@ export class PropertyRepository implements IPropertyRepository {
                 agoda_amount_collectable: true,
                 agoda_amount_confirmed: true,
                 booking_amount_collectable: true,
-                booking_amount_confirmed: true,
-                start_date: true,
-                end_date: true
+                booking_amount_confirmed: true
               }
             }
           }
@@ -626,6 +628,43 @@ export class PropertyRepository implements IPropertyRepository {
     })
   }
 
+  async findManyForBankDetailsSecureList(
+    where: Prisma.PropertyWhereInput
+  ): Promise<
+    Array<{
+      id: string
+      name: string
+      portfolio_id: string
+      portfolio: { id: string; name: string }
+      bankDetails: PropertyBankDetails
+    }>
+  > {
+    return this.prisma.property.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        portfolio_id: true,
+        portfolio: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        bankDetails: true
+      }
+    }) as Promise<
+      Array<{
+        id: string
+        name: string
+        portfolio_id: string
+        portfolio: { id: string; name: string }
+        bankDetails: PropertyBankDetails
+      }>
+    >
+  }
+
   async findById(id: string) {
     const property = await this.prisma.property.findUnique({
       where: { id },
@@ -667,9 +706,7 @@ export class PropertyRepository implements IPropertyRepository {
             agoda_amount_collectable: true,
             agoda_amount_confirmed: true,
             booking_amount_collectable: true,
-            booking_amount_confirmed: true,
-            start_date: true,
-            end_date: true
+            booking_amount_confirmed: true
           }
         }
       }
@@ -727,6 +764,26 @@ export class PropertyRepository implements IPropertyRepository {
       where: {
         credentials: {
           expedia_id: expediaId
+        }
+      }
+    })
+  }
+
+  async findByAgodaId(agodaId: string) {
+    return this.prisma.property.findFirst({
+      where: {
+        credentials: {
+          agoda_id: agodaId
+        }
+      }
+    })
+  }
+
+  async findByBookingId(bookingId: string) {
+    return this.prisma.property.findFirst({
+      where: {
+        credentials: {
+          booking_id: bookingId
         }
       }
     })

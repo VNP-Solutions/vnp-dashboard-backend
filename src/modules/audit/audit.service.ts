@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import { OtaType, PendingActionType } from '@prisma/client'
+import { OtaType, PendingActionType, Property } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
@@ -40,6 +40,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import type { IPropertyRepository } from '../property/property.interface'
 import {
   AuditQueryDto,
+  AutoImportAuditErrorDto,
   AutoImportAuditResultDto,
   BulkArchiveAuditDto,
   BulkDeleteAuditDto,
@@ -122,16 +123,6 @@ export class AuditService implements IAuditService {
     // Only internal users can create audits
     if (!isInternalUser(user)) {
       throw new BadRequestException('Only internal users can create audits')
-    }
-
-    // Validate date range only if both dates are provided
-    if (data.start_date && data.end_date) {
-      const startDate = new Date(data.start_date)
-      const endDate = new Date(data.end_date)
-
-      if (startDate >= endDate) {
-        throw new BadRequestException('Start date must be before end date')
-      }
     }
 
     // Round amount fields to 2 decimal places
@@ -315,8 +306,6 @@ export class AuditService implements IAuditService {
       sortableFields: [
         'created_at',
         'updated_at',
-        'start_date',
-        'end_date',
         'type_of_ota',
         'amount_collectable',
         'amount_confirmed',
@@ -583,8 +572,6 @@ export class AuditService implements IAuditService {
       sortableFields: [
         'created_at',
         'updated_at',
-        'start_date',
-        'end_date',
         'type_of_ota',
         'amount_collectable',
         'amount_confirmed',
@@ -814,23 +801,6 @@ export class AuditService implements IAuditService {
         throw new NotFoundException(
           `Audit batch with ID ${data.batch_id} not found`
         )
-      }
-    }
-
-    // Validate date range if dates are being updated
-    // Only validate if we'll have both dates after the update
-    if (data.start_date || data.end_date) {
-      const startDateStr = data.start_date || audit.start_date
-      const endDateStr = data.end_date || audit.end_date
-
-      // Only validate if both dates will be present after update
-      if (startDateStr && endDateStr) {
-        const startDate = new Date(startDateStr)
-        const endDate = new Date(endDateStr)
-
-        if (startDate >= endDate) {
-          throw new BadRequestException('Start date must be before end date')
-        }
       }
     }
 
@@ -1540,65 +1510,6 @@ export class AuditService implements IAuditService {
             }
           }
 
-          // Extract start date (if provided) - use raw value to preserve Excel date format
-          const startDateValue = getRawValue(row, [
-            'Start Date',
-            'Start date',
-            'start_date',
-            'From Date',
-            'From'
-          ])
-          if (startDateValue) {
-            const startDate = parseDate(startDateValue)
-            if (!startDate) {
-              result.errors.push({
-                row: rowNumber,
-                auditId: auditIdValue,
-                error: 'Invalid start date format (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
-              continue
-            }
-            updateData.start_date = startDate.toISOString()
-          }
-
-          // Extract end date (if provided) - use raw value to preserve Excel date format
-          const endDateValue = getRawValue(row, [
-            'End Date',
-            'End date',
-            'end_date',
-            'To Date',
-            'To'
-          ])
-          if (endDateValue) {
-            const endDate = parseDate(endDateValue)
-            if (!endDate) {
-              result.errors.push({
-                row: rowNumber,
-                auditId: auditIdValue,
-                error: 'Invalid end date format (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
-              continue
-            }
-            updateData.end_date = endDate.toISOString()
-          }
-
-          // Validate date range if both dates are provided
-          if (updateData.start_date && updateData.end_date) {
-            const startDate = new Date(updateData.start_date)
-            const endDate = new Date(updateData.end_date)
-            if (startDate >= endDate) {
-              result.errors.push({
-                row: rowNumber,
-                auditId: auditIdValue,
-                error: 'Start date must be before end date'
-              })
-              result.failureCount++
-              continue
-            }
-          }
-
           // Extract report URL (if provided)
           const reportUrl = findHeaderValue(row, [
             'Report URL',
@@ -2197,75 +2108,6 @@ export class AuditService implements IAuditService {
             ? (roundToDecimals(parsedBookingConfirmed) ?? undefined)
             : undefined
 
-          // Extract start date (use raw value to preserve Excel date format) - optional
-          const startDateValue = getRawValue(row, [
-            'Start Date',
-            'Start date',
-            'start_date',
-            'From Date',
-            'From'
-          ])
-
-          let startDate: Date | null = null
-          if (startDateValue) {
-            startDate = parseDate(startDateValue)
-            if (!startDate) {
-              console.log(
-                '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: Invalid start date format`
-              )
-              result.errors.push({
-                row: rowNumber,
-                audit: expediaId,
-                error: 'Invalid start date format (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
-              continue
-            }
-          }
-
-          // Extract end date (use raw value to preserve Excel date format) - optional
-          const endDateValue = getRawValue(row, [
-            'End Date',
-            'End date',
-            'end_date',
-            'To Date',
-            'To'
-          ])
-
-          let endDate: Date | null = null
-          if (endDateValue) {
-            endDate = parseDate(endDateValue)
-            if (!endDate) {
-              console.log(
-                '\x1b[31m%s\x1b[0m',
-                `❌ Row ${rowNumber} FAILED: Invalid end date format`
-              )
-              result.errors.push({
-                row: rowNumber,
-                audit: expediaId,
-                error: 'Invalid end date format (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
-              continue
-            }
-          }
-
-          // Validate date range only if both dates are provided
-          if (startDate && endDate && startDate >= endDate) {
-            console.log(
-              '\x1b[31m%s\x1b[0m',
-              `❌ Row ${rowNumber} FAILED: Start date must be before end date`
-            )
-            result.errors.push({
-              row: rowNumber,
-              audit: expediaId,
-              error: 'Start date must be before end date'
-            })
-            result.failureCount++
-            continue
-          }
-
           // Extract report URL
           const reportUrl = findHeaderValue(row, [
             'Report URL',
@@ -2324,8 +2166,6 @@ export class AuditService implements IAuditService {
           const auditData: CreateAuditDto = {
             property_id: property.id,
             audit_status_id: auditStatus.id,
-            start_date: startDate ? startDate.toISOString() : undefined,
-            end_date: endDate ? endDate.toISOString() : undefined,
             type_of_ota: typeOfOtaArray.length > 0 ? typeOfOtaArray : undefined,
             expedia_amount_collectable: expediaAmountCollectable,
             expedia_amount_confirmed: expediaAmountConfirmed,
@@ -2338,24 +2178,6 @@ export class AuditService implements IAuditService {
               ? reviewCollectionDate.toISOString()
               : undefined,
             batch_id: batchId
-          }
-
-          // Check for duplicate: same property + start_date + end_date
-          const duplicateAudit = await this.prisma.audit.findFirst({
-            where: {
-              property_id: property.id,
-              start_date: startDate ?? null,
-              end_date: endDate ?? null
-            }
-          })
-          if (duplicateAudit) {
-            result.errors.push({
-              row: rowNumber,
-              audit: expediaId,
-              error: `An audit for Expedia ID "${expediaId}" with the same start and end date already exists.`
-            })
-            result.failureCount++
-            continue
           }
 
           // Create the audit
@@ -2507,10 +2329,20 @@ export class AuditService implements IAuditService {
       }
     })
 
-    // Get total count of all audits
-    const totalAuditCount = await this.prisma.audit.count({
-      where: whereClause
+    // Get total count by summing total_audit_count across all accessible portfolios
+    const accessiblePortfolioIds =
+      await this.permissionService.getAccessibleResourceIds(
+        user,
+        ModuleType.PORTFOLIO
+      )
+    const portfolioAggregation = await this.prisma.portfolio.aggregate({
+      where:
+        accessiblePortfolioIds === 'all'
+          ? {}
+          : { id: { in: accessiblePortfolioIds } },
+      _sum: { total_audit_count: true }
     })
+    const totalAuditCount = portfolioAggregation._sum.total_audit_count ?? 0
 
     // Initialize amounts
     const amountCollectable = {
@@ -2962,15 +2794,21 @@ export class AuditService implements IAuditService {
       'Property',
       'property_name'
     ]
+    const HOTEL_ID_COLS = [
+      'Hotel ID',
+      'hotel id',
+      'Hotel Id',
+      'HotelID',
+      'hotel_id',
+      'Hotel_Id'
+    ]
     const CHECK_IN_COLS = [
       'Check In (MM/DD/YYYY)',
       'Check In',
       'check in',
       'Check-In',
       'CheckIn',
-      'check_in',
-      'Start Date',
-      'start_date'
+      'check_in'
     ]
     const CHECK_OUT_COLS = [
       'Check Out (MM/DD/YYYY)',
@@ -2978,9 +2816,7 @@ export class AuditService implements IAuditService {
       'check out',
       'Check-Out',
       'CheckOut',
-      'check_out',
-      'End Date',
-      'end_date'
+      'check_out'
     ]
     const AMOUNT_COLS = [
       'Amount Collected',
@@ -2995,6 +2831,13 @@ export class AuditService implements IAuditService {
       'Review collection date',
       'Review collection Date',
       'review_collection_date'
+    ]
+    const STATUS_COLS = [
+      'Status',
+      'status',
+      'Audit Status',
+      'Audit status',
+      'audit_status_id'
     ]
 
     const findCol = (row: any, names: string[]): string | undefined => {
@@ -3090,7 +2933,7 @@ export class AuditService implements IAuditService {
 
     if (data.length === 0) {
       throw new BadRequestException(
-        'No valid rows found. Ensure the file has a "Hotel Name" column with data.'
+        'No valid rows found. Ensure the file has a "Hotel Name" or "Hotel ID" column with data.'
       )
     }
 
@@ -3098,11 +2941,11 @@ export class AuditService implements IAuditService {
     // Each row is validated individually so every error surfaces in the response.
     this.logger.info('Starting row validation and database lookups...')
 
-    const errors: Array<{ row: number; property: string; property_id?: string; error: string }> = []
+    const errors: AutoImportAuditErrorDto[] = []
 
-    // Caches to avoid repeated DB calls for the same name
+    // Caches to avoid repeated DB calls for the same lookup key
     const portfolioCache = new Map<string, boolean>() // name  → exists
-    const propertyIdCache = new Map<string, string | null>() // name  → id | null
+    const propertyIdCache = new Map<string, string | null>() // lookup key → id | null
     const accessCache = new Map<string, boolean>() // id    → hasAccess
 
     const auditPermission = user.role.audit_permission
@@ -3114,8 +2957,10 @@ export class AuditService implements IAuditService {
       {
         rows: any[]
         propertyId: string
+        displayName: string
         batch?: string
         reviewCollectionDate?: string
+        statusLabel: string
       }
     >()
 
@@ -3125,6 +2970,7 @@ export class AuditService implements IAuditService {
       const rowErrors: string[] = []
 
       const hotelName = findCol(row, HOTEL_NAME_COLS)
+      const hotelIdRaw = findCol(row, HOTEL_ID_COLS)
       const portfolioName = findCol(row, PORTFOLIO_COLS)
       const otaRaw = findCol(row, OTA_COLS)
       const checkInRaw = findCol(row, CHECK_IN_COLS)
@@ -3132,35 +2978,55 @@ export class AuditService implements IAuditService {
       const amountRaw = findCol(row, AMOUNT_COLS)
       const batchRaw = findCol(row, BATCH_COLS)
       const reviewCollectionDateRaw = findCol(row, REVIEW_COLLECTION_DATE_COLS)
+      const statusRaw = findCol(row, STATUS_COLS)
+      const statusTrimmed = statusRaw ? String(statusRaw).trim() : ''
 
-      const label = hotelName ?? 'Unknown'
+      const hotelIdStr =
+        hotelIdRaw !== undefined && hotelIdRaw !== null && hotelIdRaw !== ''
+          ? hotelIdRaw.trim()
+          : undefined
+
+      const otaParsed = parseOta(otaRaw)
+
+      const label =
+        hotelName ??
+        (hotelIdStr ? `${otaRaw ?? 'OTA'} ${hotelIdStr}` : 'Unknown')
 
       // Log row processing details
       this.logger.info(
         `Processing row ${rowNum}: Hotel="${hotelName || 'N/A'}", ` +
+          `HotelID="${hotelIdStr || 'N/A'}", ` +
           `Portfolio="${portfolioName || 'N/A'}", ` +
           `OTA="${otaRaw || 'N/A'}", ` +
           `CheckIn="${checkInRaw || 'N/A'}", ` +
           `CheckOut="${checkOutRaw || 'N/A'}", ` +
           `Amount="${amountRaw || 'N/A'}", ` +
           `Batch="${batchRaw || 'N/A'}", ` +
-          `ReviewCollectionDate="${reviewCollectionDateRaw || 'N/A'}"`
+          `ReviewCollectionDate="${reviewCollectionDateRaw || 'N/A'}", ` +
+          `Status="${statusTrimmed || 'N/A'}"`
       )
 
       // --- Required field presence ---
-      if (!hotelName) {
+      if (!hotelName && !hotelIdStr) {
         errors.push({
           row: rowNum,
           property: label,
-          error: 'Hotel Name is missing'
+          ota: otaRaw,
+          hotel_id: hotelIdStr,
+          error: 'Hotel Name or Hotel ID is missing'
         })
-        continue // can't validate further without a name
+        continue
+      }
+
+      // --- Status (audit status name) ---
+      if (!statusTrimmed) {
+        rowErrors.push('Status is missing')
       }
 
       // --- OTA ---
       if (!otaRaw) {
         rowErrors.push('OTA is missing')
-      } else if (!parseOta(otaRaw)) {
+      } else if (!otaParsed) {
         rowErrors.push(
           `OTA "${otaRaw}" is not recognised. Expected: expedia, agoda, or booking`
         )
@@ -3181,15 +3047,41 @@ export class AuditService implements IAuditService {
         }
       }
 
-      // --- Property (Hotel Name) ---
-      if (!propertyIdCache.has(hotelName)) {
-        const p = await this.propertyRepository.findByName(hotelName)
-        propertyIdCache.set(hotelName, p?.id ?? null)
+      // --- Property: OTA + Hotel ID (credentials) preferred; else Hotel Name ---
+      let propertyId: string | undefined
+
+      if (hotelIdStr && otaParsed) {
+        const cacheKey = `credentials:${otaParsed}:${hotelIdStr}`
+        if (!propertyIdCache.has(cacheKey)) {
+          let p: Property | null = null
+          if (otaParsed === OtaType.expedia) {
+            p = await this.propertyRepository.findByExpediaId(hotelIdStr)
+          } else if (otaParsed === OtaType.agoda) {
+            p = await this.propertyRepository.findByAgodaId(hotelIdStr)
+          } else if (otaParsed === OtaType.booking) {
+            p = await this.propertyRepository.findByBookingId(hotelIdStr)
+          }
+          propertyIdCache.set(cacheKey, p?.id ?? null)
+        }
+        propertyId = propertyIdCache.get(cacheKey) ?? undefined
+        if (!propertyId) {
+          rowErrors.push(
+            `Property not found for ${otaRaw} hotel ID "${hotelIdStr}"`
+          )
+        }
+      } else if (hotelName && !hotelIdStr) {
+        const cacheKey = `name:${hotelName}`
+        if (!propertyIdCache.has(cacheKey)) {
+          const p = await this.propertyRepository.findByName(hotelName)
+          propertyIdCache.set(cacheKey, p?.id ?? null)
+        }
+        propertyId = propertyIdCache.get(cacheKey) ?? undefined
+        if (!propertyId) {
+          rowErrors.push(`Property "${hotelName}" not found in the database`)
+        }
       }
-      const propertyId = propertyIdCache.get(hotelName)
-      if (!propertyId) {
-        rowErrors.push(`Property "${hotelName}" not found in the database`)
-      } else if (auditPermission?.access_level === AccessLevel.partial) {
+
+      if (propertyId && auditPermission?.access_level === AccessLevel.partial) {
         if (!accessCache.has(propertyId)) {
           const ok = await this.permissionService.canAccessResource(
             user,
@@ -3199,8 +3091,10 @@ export class AuditService implements IAuditService {
           accessCache.set(propertyId, ok)
         }
         if (!accessCache.get(propertyId)) {
+          const propertyLabel =
+            hotelName ?? `${otaRaw ?? 'OTA'} ${hotelIdStr ?? ''}`.trim()
           rowErrors.push(
-            `Access denied: You do not have access to property "${hotelName}"`
+            `Access denied: You do not have access to property "${propertyLabel}"`
           )
         }
       }
@@ -3238,20 +3132,33 @@ export class AuditService implements IAuditService {
 
       // Collect all errors for this row
       for (const err of rowErrors) {
-        errors.push({ row: rowNum, property: label, property_id: propertyId || undefined, error: err })
+        errors.push({
+          row: rowNum,
+          property: label,
+          ota: otaRaw,
+          hotel_id: hotelIdStr,
+          error: err
+        })
       }
 
       // Build valid group only if this row has zero errors so far
+      // Groups are keyed by property + status (case-insensitive) so one property can yield multiple audits.
       if (rowErrors.length === 0 && propertyId) {
-        if (!validGroups.has(hotelName)) {
-          validGroups.set(hotelName, {
+        const groupKey = `${propertyId}::${statusTrimmed.toLowerCase()}`
+        if (!validGroups.has(groupKey)) {
+          const displayName =
+            hotelName ??
+            (hotelIdStr && otaRaw ? `${otaRaw} ${hotelIdStr}` : hotelIdStr ?? 'Unknown')
+          validGroups.set(groupKey, {
             rows: [],
             propertyId,
+            displayName,
             batch: batchRaw,
-            reviewCollectionDate: reviewCollectionDateRaw
+            reviewCollectionDate: reviewCollectionDateRaw,
+            statusLabel: statusTrimmed
           })
         }
-        validGroups.get(hotelName)!.rows.push(row)
+        validGroups.get(groupKey)!.rows.push(row)
       }
     }
 
@@ -3275,15 +3182,28 @@ export class AuditService implements IAuditService {
       `✓ Validation successful. ${validGroups.size} property group(s) ready for audit creation`
     )
 
-    // --- Look up "Reported to Property" audit status ---
-    const reportedStatus = await this.auditStatusRepository.findByStatus(
-      'Reported to Property'
-    )
-    if (!reportedStatus) {
-      this.logger.error('Audit status "Reported to Property" not found')
-      throw new BadRequestException(
-        'Audit status "Reported to Property" not found in the database'
+    // --- Resolve audit status IDs: find by name (case-insensitive), else create ---
+    const uniqueStatusLabels = Array.from(
+      new Set(
+        Array.from(validGroups.values()).map(g => g.statusLabel.trim())
       )
+    ).filter(Boolean)
+
+    const statusIdByNormalized = new Map<string, string>()
+    let allStatusesForImport = await this.auditStatusRepository.findAll()
+
+    for (const label of uniqueStatusLabels) {
+      const norm = label.toLowerCase()
+      if (statusIdByNormalized.has(norm)) continue
+
+      let matched =
+        allStatusesForImport.find(s => s.status.toLowerCase() === norm) ??
+        null
+      if (!matched) {
+        matched = await this.auditStatusRepository.create({ status: label })
+        allStatusesForImport = [...allStatusesForImport, matched]
+      }
+      statusIdByNormalized.set(norm, matched.id)
     }
 
     this.logger.info('Starting audit creation process...')
@@ -3296,16 +3216,24 @@ export class AuditService implements IAuditService {
     }> = []
 
     for (const [
-      hotelName,
-      { rows, propertyId, batch, reviewCollectionDate }
+      _groupKey,
+      { rows, propertyId, displayName, batch, reviewCollectionDate, statusLabel }
     ] of validGroups) {
+      const auditStatusId = statusIdByNormalized.get(statusLabel.toLowerCase())
+      if (!auditStatusId) {
+        throw new BadRequestException(
+          `Failed to resolve audit status for "${statusLabel}"`
+        )
+      }
+
       this.logger.info(
-        `Processing property group: "${hotelName}" (${rows.length} rows)` +
+        `Processing property group: "${displayName}" (${rows.length} rows)` +
           `${batch ? `, Batch="${batch}"` : ''}` +
           `${reviewCollectionDate
             ? `, ReviewCollectionDate="${reviewCollectionDate}"`
             : ''
-          }`
+          }` +
+          `, Status="${statusLabel}"`
       )
 
       // Aggregate data from all rows for this property
@@ -3313,14 +3241,10 @@ export class AuditService implements IAuditService {
       let expediaSum = 0
       let agodaSum = 0
       let bookingSum = 0
-      let minCheckIn: Date | null = null
-      let maxCheckOut: Date | null = null
 
       for (const row of rows) {
         const ota = parseOta(findCol(row, OTA_COLS))
         const amount = parseAmount(findCol(row, AMOUNT_COLS))
-        const checkIn = parseDate(findCol(row, CHECK_IN_COLS))
-        const checkOut = parseDate(findCol(row, CHECK_OUT_COLS))
 
         if (ota) {
           otaSet.add(ota)
@@ -3328,11 +3252,6 @@ export class AuditService implements IAuditService {
           if (ota === OtaType.agoda) agodaSum += amount
           if (ota === OtaType.booking) bookingSum += amount
         }
-
-        if (checkIn && (!minCheckIn || checkIn < minCheckIn))
-          minCheckIn = checkIn
-        if (checkOut && (!maxCheckOut || checkOut > maxCheckOut))
-          maxCheckOut = checkOut
       }
 
       // --- Handle batch assignment ---
@@ -3343,7 +3262,7 @@ export class AuditService implements IAuditService {
         if (!existingBatch) {
           // Create new batch if not found
           this.logger.info(
-            `Creating new batch "${batch}" for property "${hotelName}"`
+            `Creating new batch "${batch}" for property "${displayName}"`
           )
           existingBatch = await this.auditBatchRepository.create({
             batch_no: batch
@@ -3366,11 +3285,9 @@ export class AuditService implements IAuditService {
 
       const auditData: CreateAuditDto = {
         property_id: propertyId,
-        audit_status_id: reportedStatus.id,
+        audit_status_id: auditStatusId,
         type_of_ota: [...otaSet],
         batch_id: batchId,
-        start_date: minCheckIn?.toISOString(),
-        end_date: maxCheckOut?.toISOString(),
         review_collection_date: parsedReviewCollectionDate
           ? parsedReviewCollectionDate.toISOString()
           : undefined,
@@ -3396,19 +3313,18 @@ export class AuditService implements IAuditService {
 
       try {
         this.logger.info(
-          `Creating audit for property "${hotelName}" with ${rows.length} rows`
+          `Creating audit for property "${displayName}" with ${rows.length} rows`
         )
 
         const audit = await this.auditRepository.create(auditData)
 
         this.logger.success(
           `✓ Audit created successfully: ID=${audit.id}, ` +
-            `Property="${hotelName}", ` +
+            `Property="${displayName}", ` +
             `Expedia=$${expediaSum.toFixed(2)}, ` +
             `Agoda=$${agodaSum.toFixed(2)}, ` +
             `Booking=$${bookingSum.toFixed(2)}, ` +
             `Batch="${batch || 'None'}", ` +
-            `Date Range=${minCheckIn?.toISOString().split('T')[0]} to ${maxCheckOut?.toISOString().split('T')[0]}, ` +
             `Review Collection Date=${parsedReviewCollectionDate
               ? parsedReviewCollectionDate.toISOString().split('T')[0]
               : 'Not set'
@@ -3444,7 +3360,7 @@ export class AuditService implements IAuditService {
       const xlsxBuffer = Buffer.from(await excelWb.xlsx.writeBuffer())
 
       // Upload to S3 via FileUploadService
-      const safeName = hotelName.replace(/[^a-zA-Z0-9]/g, '_')
+      const safeName = displayName.replace(/[^a-zA-Z0-9]/g, '_')
       const fakeFile = {
         buffer: xlsxBuffer,
         originalname: `auto-import_${safeName}_${Date.now()}.xlsx`,
@@ -3467,17 +3383,17 @@ export class AuditService implements IAuditService {
       })
 
       createdAudits.push({
-        property: hotelName,
+        property: displayName,
         audit_id: audit.id,
         report_url: uploadResult.url
       })
 
         this.logger.success(
-          `✓ Report uploaded for property "${hotelName}": ${uploadResult.url}`
+          `✓ Report uploaded for property "${displayName}": ${uploadResult.url}`
         )
       } catch (error) {
         this.logger.error(
-          `✗ Failed to create audit for property "${hotelName}": ` +
+          `✗ Failed to create audit for property "${displayName}": ` +
             `${error instanceof Error ? error.message : 'Unknown error'}`
         )
         // Continue to next property even if this one fails
@@ -3497,6 +3413,67 @@ export class AuditService implements IAuditService {
           `  - Property: "${audit.property}", Audit ID: ${audit.audit_id}, Report: ${audit.report_url}`
         )
       })
+
+      // Upload original sheet as a consolidated report and increment portfolio counter
+      try {
+        this.logger.success(
+          `[POST-IMPORT] Starting consolidated report upload and portfolio counter increment`
+        )
+
+        const portfolioName = portfolioCache.keys().next().value as string
+        this.logger.success(
+          `[POST-IMPORT] Resolved portfolio name from cache: "${portfolioName}"`
+        )
+
+        const portfolio = await this.portfolioRepository.findByName(portfolioName)
+        this.logger.success(
+          `[POST-IMPORT] Portfolio lookup result: ${portfolio ? `FOUND (id=${portfolio.id})` : 'NOT FOUND — skipping'}`
+        )
+
+        if (portfolio) {
+          this.logger.success(
+            `[POST-IMPORT] Uploading original import file to S3 (size=${file?.size ?? 'unknown'} bytes, name="${file?.originalname ?? 'unknown'}")`
+          )
+          const originalUpload = await this.fileUploadService.uploadFile(file)
+          this.logger.success(
+            `[POST-IMPORT] Original file uploaded successfully: ${originalUpload.url}`
+          )
+
+          this.logger.success(
+            `[POST-IMPORT] Creating consolidated report for portfolio "${portfolioName}" (id=${portfolio.id})`
+          )
+          await this.prisma.consolidatedReport.create({
+            data: {
+              url: originalUpload.url,
+              portfolio_id: portfolio.id,
+              user_id: user.id
+            }
+          })
+          this.logger.success(
+            `[POST-IMPORT] Consolidated report created successfully`
+          )
+
+          this.logger.success(
+            `[POST-IMPORT] Incrementing total_audit_count for portfolio "${portfolioName}" (id=${portfolio.id}, current=${portfolio.total_audit_count ?? 0})`
+          )
+          const newCount = (portfolio.total_audit_count ?? 0) + 1
+          await this.prisma.portfolio.update({
+            where: { id: portfolio.id },
+            data: { total_audit_count: newCount }
+          })
+          this.logger.success(
+            `[POST-IMPORT] Portfolio counter updated successfully — total_audit_count set to ${newCount}`
+          )
+        }
+      } catch (error) {
+        this.logger.error(
+          `[POST-IMPORT] FAILED: ` +
+            `${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+        this.logger.error(
+          `[POST-IMPORT] Stack: ${error instanceof Error ? error.stack : 'N/A'}`
+        )
+      }
     }
 
     return { success: true, created_audits: createdAudits }

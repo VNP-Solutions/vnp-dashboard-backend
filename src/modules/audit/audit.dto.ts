@@ -93,22 +93,6 @@ export class CreateAuditDto {
   @IsOptional()
   booking_amount_confirmed?: number
 
-  @ApiPropertyOptional({
-    example: '2024-01-01T00:00:00Z',
-    description: 'Audit start date'
-  })
-  @IsDateString()
-  @IsOptional()
-  start_date?: string
-
-  @ApiPropertyOptional({
-    example: '2024-01-31T23:59:59Z',
-    description: 'Audit end date'
-  })
-  @IsDateString()
-  @IsOptional()
-  end_date?: string
-
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
     description: 'Property ID'
@@ -430,8 +414,19 @@ export class AutoImportAuditErrorDto {
   @ApiProperty({ example: 'Hilton Garden Inn', description: 'Property / hotel name from sheet' })
   property: string
 
-  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Property MongoDB ID (if found)', required: false })
-  property_id?: string
+  @ApiProperty({
+    example: 'expedia',
+    description: 'OTA column value from the sheet row',
+    required: false
+  })
+  ota?: string
+
+  @ApiProperty({
+    example: '12345',
+    description: 'Hotel ID column value from the sheet row',
+    required: false
+  })
+  hotel_id?: string
 
   @ApiProperty({ example: 'Portfolio "ARP Hospitality" not found in database', description: 'Error description' })
   error: string

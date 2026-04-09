@@ -12,6 +12,14 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import {
+  assertAuditNotesTasksPolicy,
+  assertPortfolioNotesTasksPolicy,
+  assertPropertyNotesTasksPolicy,
+  canUseAuditNotesTasks,
+  canUsePortfolioNotesTasks,
+  canUsePropertyNotesTasks
+} from '../../common/utils/note-task-permission.util'
+import {
   CreateTaskDto,
   DeleteAllTasksDto,
   TaskEntityType,
@@ -30,21 +38,14 @@ export class TaskService implements ITaskService {
   ) {}
 
   async create(data: CreateTaskDto, user: IUserWithPermissions) {
-    // Tasks are only accessible by internal users
-    if (user.role.is_external) {
-      throw new ForbiddenException(
-        'Tasks are only accessible by internal users'
-      )
-    }
-
     if (!data.portfolio_id && !data.property_id && !data.audit_id) {
       throw new BadRequestException(
         'Task must be associated with either a portfolio, property, or audit'
       )
     }
 
-    // Check permissions based on the entity type
     if (data.portfolio_id) {
+      assertPortfolioNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PORTFOLIO,
@@ -52,6 +53,7 @@ export class TaskService implements ITaskService {
         data.portfolio_id
       )
     } else if (data.property_id) {
+      assertPropertyNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PROPERTY,
@@ -59,17 +61,16 @@ export class TaskService implements ITaskService {
         data.property_id
       )
     } else if (data.audit_id) {
-      // For audit tasks, check property permission
-      // We need to get the property_id from the audit
+      assertAuditNotesTasksPolicy(user)
       const audit = await this.taskRepository.findAuditById(data.audit_id)
       if (!audit) {
         throw new NotFoundException('Audit not found')
       }
       await this.permissionService.requirePermission(
         user,
-        ModuleType.PROPERTY,
+        ModuleType.AUDIT,
         PermissionAction.READ,
-        audit.property_id
+        data.audit_id
       )
     }
 
@@ -80,17 +81,14 @@ export class TaskService implements ITaskService {
   }
 
   async findAll(query: TaskQueryDto, user: IUserWithPermissions) {
-    // Tasks are only accessible by internal users
     if (user.role.is_external) {
       throw new ForbiddenException(
         'Tasks are only accessible by internal users'
       )
     }
 
-    // Build where clause based on accessible resources
     const where: any = {}
 
-    // Get accessible portfolios and properties
     const portfolioIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PORTFOLIO
@@ -100,25 +98,36 @@ export class TaskService implements ITaskService {
       ModuleType.PROPERTY
     )
 
-    // Build permission-based filters
     const permissionFilters: any[] = []
 
-    // Portfolio tasks - if user has partial access to specific portfolios
-    if (portfolioIds !== 'all' && portfolioIds && portfolioIds.length > 0) {
+    if (
+      canUsePortfolioNotesTasks(user) &&
+      portfolioIds !== 'all' &&
+      portfolioIds &&
+      portfolioIds.length > 0
+    ) {
       permissionFilters.push({
         portfolio_id: { in: portfolioIds }
       })
     }
 
-    // Property tasks - if user has partial access to specific properties
-    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
+    if (
+      canUsePropertyNotesTasks(user) &&
+      propertyIds !== 'all' &&
+      propertyIds &&
+      propertyIds.length > 0
+    ) {
       permissionFilters.push({
         property_id: { in: propertyIds }
       })
     }
 
-    // Audit tasks - if user has partial access to specific properties
-    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
+    if (
+      canUseAuditNotesTasks(user) &&
+      propertyIds !== 'all' &&
+      propertyIds &&
+      propertyIds.length > 0
+    ) {
       permissionFilters.push({
         audit: {
           property_id: { in: propertyIds }
@@ -126,15 +135,11 @@ export class TaskService implements ITaskService {
       })
     }
 
-    // If user has "all" access (permissionFilters is empty), they can see all tasks
-    // If user has partial access, apply permission filters
-    if (permissionFilters.length > 0) {
-      where.OR = permissionFilters
-    } else if (portfolioIds.length === 0 && propertyIds.length === 0) {
-      // User has no access to any resource
+    if (permissionFilters.length === 0) {
       return []
     }
-    // If permissionFilters is empty but user has "all" access, don't add OR filter
+
+    where.OR = permissionFilters
 
     // Add portfolio filter if provided
     if (query.portfolio_id) {
@@ -231,21 +236,14 @@ export class TaskService implements ITaskService {
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
-    // Tasks are only accessible by internal users
-    if (user.role.is_external) {
-      throw new ForbiddenException(
-        'Tasks are only accessible by internal users'
-      )
-    }
-
     const task = await this.taskRepository.findById(id)
 
     if (!task) {
       throw new NotFoundException('Task not found')
     }
 
-    // Check permissions based on the entity type
     if (task.portfolio_id) {
+      assertPortfolioNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PORTFOLIO,
@@ -253,23 +251,24 @@ export class TaskService implements ITaskService {
         task.portfolio_id
       )
     } else if (task.property_id) {
+      assertPropertyNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PROPERTY,
         PermissionAction.READ,
         task.property_id
       )
-    } else if (task.audit_id && task.audit) {
-      // For audit tasks, check property permission
+    } else if (task.audit_id) {
+      assertAuditNotesTasksPolicy(user)
       const audit = await this.taskRepository.findAuditById(task.audit_id)
       if (!audit) {
         throw new NotFoundException('Audit not found')
       }
       await this.permissionService.requirePermission(
         user,
-        ModuleType.PROPERTY,
+        ModuleType.AUDIT,
         PermissionAction.READ,
-        audit.property_id
+        task.audit_id
       )
     }
 
@@ -277,21 +276,14 @@ export class TaskService implements ITaskService {
   }
 
   async update(id: string, data: UpdateTaskDto, user: IUserWithPermissions) {
-    // Tasks are only accessible by internal users
-    if (user.role.is_external) {
-      throw new ForbiddenException(
-        'Tasks are only accessible by internal users'
-      )
-    }
-
     const task = await this.taskRepository.findById(id)
 
     if (!task) {
       throw new NotFoundException('Task not found')
     }
 
-    // Check permissions based on the entity type
     if (task.portfolio_id) {
+      assertPortfolioNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PORTFOLIO,
@@ -299,6 +291,7 @@ export class TaskService implements ITaskService {
         task.portfolio_id
       )
     } else if (task.property_id) {
+      assertPropertyNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PROPERTY,
@@ -306,16 +299,16 @@ export class TaskService implements ITaskService {
         task.property_id
       )
     } else if (task.audit_id) {
-      // For audit tasks, check property permission
+      assertAuditNotesTasksPolicy(user)
       const audit = await this.taskRepository.findAuditById(task.audit_id)
       if (!audit) {
         throw new NotFoundException('Audit not found')
       }
       await this.permissionService.requirePermission(
         user,
-        ModuleType.PROPERTY,
+        ModuleType.AUDIT,
         PermissionAction.READ,
-        audit.property_id
+        task.audit_id
       )
     }
 
@@ -323,21 +316,14 @@ export class TaskService implements ITaskService {
   }
 
   async remove(id: string, user: IUserWithPermissions) {
-    // Tasks are only accessible by internal users
-    if (user.role.is_external) {
-      throw new ForbiddenException(
-        'Tasks are only accessible by internal users'
-      )
-    }
-
     const task = await this.taskRepository.findById(id)
 
     if (!task) {
       throw new NotFoundException('Task not found')
     }
 
-    // Check permissions based on the entity type
     if (task.portfolio_id) {
+      assertPortfolioNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PORTFOLIO,
@@ -345,6 +331,7 @@ export class TaskService implements ITaskService {
         task.portfolio_id
       )
     } else if (task.property_id) {
+      assertPropertyNotesTasksPolicy(user)
       await this.permissionService.requirePermission(
         user,
         ModuleType.PROPERTY,
@@ -352,16 +339,16 @@ export class TaskService implements ITaskService {
         task.property_id
       )
     } else if (task.audit_id) {
-      // For audit tasks, check property permission
+      assertAuditNotesTasksPolicy(user)
       const audit = await this.taskRepository.findAuditById(task.audit_id)
       if (!audit) {
         throw new NotFoundException('Audit not found')
       }
       await this.permissionService.requirePermission(
         user,
-        ModuleType.PROPERTY,
+        ModuleType.AUDIT,
         PermissionAction.READ,
-        audit.property_id
+        task.audit_id
       )
     }
 
@@ -371,17 +358,14 @@ export class TaskService implements ITaskService {
   }
 
   async removeAll(query: DeleteAllTasksDto, user: IUserWithPermissions) {
-    // Tasks are only accessible by internal users
     if (user.role.is_external) {
       throw new ForbiddenException(
         'Tasks are only accessible by internal users'
       )
     }
 
-    // Build where clause based on accessible resources
     const where: any = {}
 
-    // Ensure at least one filter is provided
     if (
       !query.portfolio_id &&
       !query.property_id &&
@@ -393,7 +377,6 @@ export class TaskService implements ITaskService {
       )
     }
 
-    // Get accessible portfolios and properties
     const portfolioIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PORTFOLIO
@@ -403,25 +386,36 @@ export class TaskService implements ITaskService {
       ModuleType.PROPERTY
     )
 
-    // Build permission-based filters
     const permissionFilters: any[] = []
 
-    // Portfolio tasks - if user has partial access to specific portfolios
-    if (portfolioIds !== 'all' && portfolioIds && portfolioIds.length > 0) {
+    if (
+      canUsePortfolioNotesTasks(user) &&
+      portfolioIds !== 'all' &&
+      portfolioIds &&
+      portfolioIds.length > 0
+    ) {
       permissionFilters.push({
         portfolio_id: { in: portfolioIds }
       })
     }
 
-    // Property tasks - if user has partial access to specific properties
-    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
+    if (
+      canUsePropertyNotesTasks(user) &&
+      propertyIds !== 'all' &&
+      propertyIds &&
+      propertyIds.length > 0
+    ) {
       permissionFilters.push({
         property_id: { in: propertyIds }
       })
     }
 
-    // Audit tasks - if user has partial access to specific properties
-    if (propertyIds !== 'all' && propertyIds && propertyIds.length > 0) {
+    if (
+      canUseAuditNotesTasks(user) &&
+      propertyIds !== 'all' &&
+      propertyIds &&
+      propertyIds.length > 0
+    ) {
       permissionFilters.push({
         audit: {
           property_id: { in: propertyIds }
@@ -429,18 +423,14 @@ export class TaskService implements ITaskService {
       })
     }
 
-    // If user has "all" access (permissionFilters is empty), they can delete all matching tasks
-    // If user has partial access, apply permission filters
-    if (permissionFilters.length > 0) {
-      where.OR = permissionFilters
-    } else if (portfolioIds.length === 0 && propertyIds.length === 0) {
-      // User has no access to any resource
+    if (permissionFilters.length === 0) {
       return {
         message: '0 task(s) deleted successfully',
         deletedCount: 0
       }
     }
-    // If permissionFilters is empty but user has "all" access, don't add OR filter
+
+    where.OR = permissionFilters
 
     // Build filter based on query
     if (query.portfolio_id) {

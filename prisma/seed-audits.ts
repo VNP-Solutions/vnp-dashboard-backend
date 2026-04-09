@@ -31,24 +31,6 @@ function getRandomFutureDate(maxDaysAhead: number): Date {
   return date
 }
 
-function generateDateRange(): { start_date: Date; end_date: Date } {
-  // Generate audits for various time periods (past and future)
-  const isPast = Math.random() > 0.3 // 70% past audits, 30% future/ongoing
-
-  if (isPast) {
-    // Past audits
-    const endDate = getRandomPastDate(365) // Up to 1 year ago
-    const startDate = new Date(endDate)
-    startDate.setDate(startDate.getDate() - getRandomNumber(28, 92)) // 1-3 months duration
-    return { start_date: startDate, end_date: endDate }
-  } else {
-    // Ongoing or future audits
-    const startDate = getRandomPastDate(60) // Started up to 2 months ago
-    const endDate = getRandomFutureDate(90) // Ends up to 3 months from now
-    return { start_date: startDate, end_date: endDate }
-  }
-}
-
 function generateAuditAmounts(status: string): {
   amount_collectable: number
   amount_confirmed: number
@@ -179,7 +161,6 @@ async function main() {
 
         const billingType = getRandomElement(billingTypes)
         const status = getRandomElement(auditStatuses)
-        const { start_date, end_date } = generateDateRange()
         const { amount_collectable, amount_confirmed } = generateAuditAmounts(
           status.status
         )
@@ -207,8 +188,6 @@ async function main() {
             booking_amount_collectable: bookingAmountCollectable,
             booking_amount_confirmed: bookingAmountConfirmed,
             is_archived: isArchived,
-            start_date,
-            end_date,
             report_url: reportUrl,
             batch_id: null // Can be assigned later if needed
           }

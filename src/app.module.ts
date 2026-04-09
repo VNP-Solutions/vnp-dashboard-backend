@@ -5,6 +5,7 @@ import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { PermissionGuard } from './common/guards/permission.guard'
+import { RestrictedPropertySensitiveDataGuard } from './common/guards/restricted-property-sensitive-data.guard'
 import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { LoggerMiddleware } from './common/middlewares/logger.middleware'
 import { PermissionService } from './common/services/permission.service'
@@ -80,6 +81,10 @@ import { UserModule } from './modules/user/user.module'
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RestrictedPropertySensitiveDataGuard
     },
     {
       provide: APP_GUARD,

@@ -2001,15 +2001,8 @@ export class PortfolioService implements IPortfolioService {
       }
     })
 
-    // Get total count of all audits for the portfolio
-    const totalAuditCount = await this.prisma.audit.count({
-      where: {
-        property_id: {
-          in: propertyIds
-        },
-        is_archived: false
-      }
-    })
+    // Get total count from portfolio's tracked import counter
+    const totalAuditCount = portfolio.total_audit_count ?? 0
 
     // Initialize amounts
     const amountCollectable = {
@@ -2082,8 +2075,6 @@ export class PortfolioService implements IPortfolioService {
       agoda_amount_confirmed: audit.agoda_amount_confirmed,
       booking_amount_collectable: audit.booking_amount_collectable,
       booking_amount_confirmed: audit.booking_amount_confirmed,
-      start_date: audit.start_date,
-      end_date: audit.end_date,
       property_name: audit.property.name,
       audit_status: audit.auditStatus.status
     }))

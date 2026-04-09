@@ -4,19 +4,17 @@ import {
   Post,
   UploadedFile,
   UploadedFiles,
-  UseGuards,
   UseInterceptors
 } from '@nestjs/common'
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express'
 import {
-  ApiBearerAuth,
   ApiBody,
   ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiTags
 } from '@nestjs/swagger'
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { Public } from '../auth/decorators/public.decorator'
 import {
   BulkFileUploadResponseDto,
   FileUploadResponseDto
@@ -24,9 +22,8 @@ import {
 import type { IFileUploadService } from './file-upload.interface'
 
 @ApiTags('File Upload')
-@ApiBearerAuth('JWT-auth')
+@Public()
 @Controller('file-upload')
-@UseGuards(JwtAuthGuard)
 export class FileUploadController {
   constructor(
     @Inject('IFileUploadService')

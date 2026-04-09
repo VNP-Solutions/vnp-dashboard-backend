@@ -462,30 +462,6 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     requiresLookup: [AUDIT_STATUS_LOOKUP]
   },
 
-  // Start Date
-  startDate: {
-    key: 'startDate',
-    label: 'Start Date',
-    dataType: ColumnDataType.DATE,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'start_date',
-    allowedOperators: DATE_OPERATORS
-  },
-
-  // End Date
-  endDate: {
-    key: 'endDate',
-    label: 'End Date',
-    dataType: ColumnDataType.DATE,
-    filterable: true,
-    sortable: true,
-    source: 'audit',
-    fieldPath: 'end_date',
-    allowedOperators: DATE_OPERATORS
-  },
-
   // Next Due Date
   nextDueDate: {
     key: 'nextDueDate',

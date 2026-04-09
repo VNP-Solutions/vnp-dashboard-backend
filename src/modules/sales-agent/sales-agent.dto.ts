@@ -92,7 +92,7 @@ export class SalesAgentQueryDto extends QueryDto {
 export class SalesAgentReportQueryDto {
   @ApiProperty({
     example: '2024-01-01',
-    description: 'Start of date range (ISO date string) — filters audits whose start_date >= from'
+    description: 'Start of date range (ISO date string) — filters audits whose review_collection_date >= from'
   })
   @IsDateString()
   @IsNotEmpty()
@@ -100,7 +100,7 @@ export class SalesAgentReportQueryDto {
 
   @ApiProperty({
     example: '2024-12-31',
-    description: 'End of date range (ISO date string) — filters audits whose end_date <= to'
+    description: 'End of date range (ISO date string) — filters audits whose review_collection_date <= to'
   })
   @IsDateString()
   @IsNotEmpty()

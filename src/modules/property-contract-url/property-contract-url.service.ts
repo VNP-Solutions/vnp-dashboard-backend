@@ -33,13 +33,16 @@ export class PropertyContractUrlService implements IPropertyContractUrlService {
     private permissionService: PermissionService
   ) {}
 
+  private readonly propertyContractUrlViewForbiddenMessage =
+    'Only Super Admin, or users with property update/all permission and partial or all access, or internal users with property view permission and partial or all access, can view property contract URLs'
+
   /**
-   * Check if user can view property contract URLs
+   * Check if user can view property contract URLs (property module permissions only).
    * - Super admin can always view
-   * - Users with property permission level 'update' or 'all' and access level 'partial' or 'all' can view
+   * - Property permission update/all + access partial/all can view
+   * - Internal users only: property permission view + access partial/all can view (read-only; mutations enforced elsewhere)
    */
   private canViewPropertyContractUrls(user: IUserWithPermissions): boolean {
-    // Super admin can always view
     if (isUserSuperAdmin(user)) {
       return true
     }
@@ -50,17 +53,31 @@ export class PropertyContractUrlService implements IPropertyContractUrlService {
       return false
     }
 
-    // Check permission level: must be 'update' or 'all'
-    const hasUpdatePermission =
-      propertyPermission.permission_level === PermissionLevel.update ||
-      propertyPermission.permission_level === PermissionLevel.all
-
-    // Check access level: must be 'partial' or 'all'
-    const hasPartialAccess =
+    const hasPartialOrAllAccess =
       propertyPermission.access_level === AccessLevel.partial ||
       propertyPermission.access_level === AccessLevel.all
 
-    return hasUpdatePermission && hasPartialAccess
+    if (!hasPartialOrAllAccess) {
+      return false
+    }
+
+    const level = propertyPermission.permission_level
+
+    if (
+      level === PermissionLevel.update ||
+      level === PermissionLevel.all
+    ) {
+      return true
+    }
+
+    if (
+      level === PermissionLevel.view &&
+      user.role.is_external === false
+    ) {
+      return true
+    }
+
+    return false
   }
 
   async create(
@@ -139,9 +156,7 @@ export class PropertyContractUrlService implements IPropertyContractUrlService {
   ) {
     // Check if user can view property contract URLs
     if (!this.canViewPropertyContractUrls(user)) {
-      throw new ForbiddenException(
-        'Only Super Admin or users with property update permission and partial access can view property contract URLs'
-      )
+      throw new ForbiddenException(this.propertyContractUrlViewForbiddenMessage)
     }
 
     const accessiblePropertyIds =
@@ -223,9 +238,7 @@ export class PropertyContractUrlService implements IPropertyContractUrlService {
   ) {
     // Check if user can view property contract URLs
     if (!this.canViewPropertyContractUrls(user)) {
-      throw new ForbiddenException(
-        'Only Super Admin or users with property update permission and partial access can view property contract URLs'
-      )
+      throw new ForbiddenException(this.propertyContractUrlViewForbiddenMessage)
     }
 
     const accessiblePropertyIds =
@@ -307,9 +320,7 @@ export class PropertyContractUrlService implements IPropertyContractUrlService {
   async findOne(id: string, user: IUserWithPermissions) {
     // Check if user can view property contract URLs
     if (!this.canViewPropertyContractUrls(user)) {
-      throw new ForbiddenException(
-        'Only Super Admin or users with property update permission and partial access can view property contract URLs'
-      )
+      throw new ForbiddenException(this.propertyContractUrlViewForbiddenMessage)
     }
 
     const propertyContractUrl =
@@ -340,9 +351,7 @@ export class PropertyContractUrlService implements IPropertyContractUrlService {
   async findByProperty(propertyId: string, user: IUserWithPermissions) {
     // Check if user can view property contract URLs
     if (!this.canViewPropertyContractUrls(user)) {
-      throw new ForbiddenException(
-        'Only Super Admin or users with property update permission and partial access can view property contract URLs'
-      )
+      throw new ForbiddenException(this.propertyContractUrlViewForbiddenMessage)
     }
 
     // Verify user has access to the property

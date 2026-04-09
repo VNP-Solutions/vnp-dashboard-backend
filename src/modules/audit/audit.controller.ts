@@ -193,8 +193,6 @@ export class AuditController {
     - Agoda Amount Confirmed/Agoda Confirmed/agoda_amount_confirmed: Agoda confirmed amount (Note: Non-super-admin internal users can only set this once. Once it has been set, only super admins can update it.)
     - Booking Amount Collectable/Booking Collectable/booking_amount_collectable: Booking collectable amount
     - Booking Amount Confirmed/Booking Confirmed/booking_amount_confirmed: Booking confirmed amount (Note: Non-super-admin internal users can only set this once. Once it has been set, only super admins can update it.)
-    - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
-    - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)
     - Report URL/Report url/report_url/Report/URL: Report URL
     - Review Collection Date/Review collection date/review_collection_date: Review collection date (mm/dd/yyyy)
     - Batch/Batch No: Batch number (will be created if doesn't exist)
@@ -347,8 +345,6 @@ export class AuditController {
     - Audit Status/Audit status/Status: Status name (will be created if doesn't exist)
 
     Optional columns:
-    - Start Date/Start date/start_date/From Date/From: Audit start date (mm/dd/yyyy)
-    - End Date/End date/end_date/To Date/To: Audit end date (mm/dd/yyyy)
     - OTA/OTA Type/Ota Type/Ota type: OTA type (expedia, agoda, booking)
     - Expedia Amount Collectable/Expedia Collectable/expedia_amount_collectable: Expedia collectable amount
     - Expedia Amount Confirmed/Expedia Confirmed/expedia_amount_confirmed: Expedia confirmed amount
@@ -359,8 +355,6 @@ export class AuditController {
     - Report URL/Report url/report_url/Report/URL: Report URL
     - Review Collection Date/Review collection date/review_collection_date: Review collection date (mm/dd/yyyy)
     - Batch/Batch No: Batch number (will be created if doesn't exist)
-
-    Note: If both start and end dates are provided, start date must be before end date.
     `
   })
   @ApiBody({
@@ -424,29 +418,30 @@ export class AuditController {
     Required columns:
     - OTA: Platform name (Expedia, Agoda, Booking)
     - Portfolio: Portfolio name (must already exist in the database)
-    - Hotel Name: Property name (must already exist in the database)
+    - Status / Audit Status: Audit status name (matched case-insensitively to an existing status, or created if it does not exist)
+    - Property lookup (either):
+      - Hotel ID + OTA: Hotel ID must match the property's Expedia, Agoda, or Booking credential ID for that OTA, or
+      - Hotel Name: Property name (must already exist in the database) when Hotel ID is not used
     - Amount Collected: Amount collected for this reservation
 
     Optional columns (recognised header aliases include Check In / Start Date and Check Out / End Date):
     - Check-in and check-out dates: if a cell is empty, it is skipped. If a cell has a value, it must parse as a date (MM/DD/YYYY or supported formats), and when both are present Check In must be before Check Out; otherwise the row is reported in the error list.
-    - Batch: Batch number (will be created if doesn't exist). If present multiple times for same property, the first value is used.
-    - Review Collection Date/Review collection date/review_collection_date: Review collection date (MM/DD/YYYY or supported formats). If present multiple times for same property, the first value is used.
+    - Batch: Batch number (will be created if doesn't exist). If present multiple times for the same property+status group, the first value is used.
+    - Review Collection Date/Review collection date/review_collection_date: Review collection date (MM/DD/YYYY or supported formats). If present multiple times for the same property+status group, the first value is used.
 
     All other columns in the sheet are preserved in the generated per-property report files.
 
     Behaviour:
-    - Rows are grouped by Hotel Name — one audit is created per unique property.
-    - OTA types are collected from all rows of that property.
-    - start_date = earliest check-in date across all rows (omitted if none).
-    - end_date = latest check-out date across all rows (omitted if none).
+    - Rows are grouped by resolved property (Hotel ID + OTA or Hotel Name) and Status — one audit is created per unique property + status combination.
+    - OTA types are collected from all rows of that group.
     - Amounts are summed per OTA type; both collectable and confirmed are set to the same sum.
-    - Audit status is set to "Reported to Property".
+    - Audit status is taken from the Status column (find existing by name, case-insensitive, or create a new status record).
     - A per-property Excel sheet (all original columns, filtered to that property) is uploaded to S3 and its URL is stored as report_url on the audit.
     - If Batch column is present, audits are assigned to the specified batch (created if doesn't exist).
-    - If Review Collection Date column is present, the date value is set on the audit (first value per property group is used).
+    - If Review Collection Date column is present, the date value is set on the audit (first value per property+status group is used).
 
     Validation (pre-flight):
-    - If any Portfolio or Hotel Name cannot be found in the database, NO audits are created and the full error list is returned.
+    - If any Portfolio or property (by Hotel ID + OTA or by Hotel Name) cannot be found in the database, NO audits are created and the full error list is returned.
     `
   })
   @ApiBody({

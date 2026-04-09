@@ -34,9 +34,7 @@ export class NoteRepository implements INoteRepository {
         audit: {
           select: {
             id: true,
-            type_of_ota: true,
-            start_date: true,
-            end_date: true
+            type_of_ota: true
           }
         }
       }
@@ -73,9 +71,7 @@ export class NoteRepository implements INoteRepository {
         audit: {
           select: {
             id: true,
-            type_of_ota: true,
-            start_date: true,
-            end_date: true
+            type_of_ota: true
           }
         }
       }
@@ -109,9 +105,7 @@ export class NoteRepository implements INoteRepository {
         audit: {
           select: {
             id: true,
-            type_of_ota: true,
-            start_date: true,
-            end_date: true
+            type_of_ota: true
           }
         }
       }
@@ -155,9 +149,7 @@ export class NoteRepository implements INoteRepository {
         audit: {
           select: {
             id: true,
-            type_of_ota: true,
-            start_date: true,
-            end_date: true
+            type_of_ota: true
           }
         }
       }
