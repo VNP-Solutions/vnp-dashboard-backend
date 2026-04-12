@@ -5,6 +5,7 @@ import * as https from 'https'
 import * as nodemailer from 'nodemailer'
 import { URL } from 'url'
 import { Configuration } from '../../config/configuration'
+import { DeploymentEnvironment } from '../../config/configuration.schema'
 import type {
   AttachmentUrlDto,
   EmailAttachment
@@ -55,6 +56,21 @@ export class EmailUtil {
         }
       })
     }
+  }
+
+  /**
+   * Returns true only when notification (non-critical) emails are allowed.
+   * In staging, only transactional emails (OTP, invitation, password reset) are
+   * sent. All informational/notification emails are suppressed.
+   */
+  private isNotificationEmailAllowed(): boolean {
+    const deploymentEnv = this.configService.get('deploymentEnv', {
+      infer: true
+    })
+    if (deploymentEnv === DeploymentEnvironment.STAGING) {
+      return false
+    }
+    return true
   }
 
   async sendOtpEmail(email: string, otp: number): Promise<void> {
@@ -316,6 +332,13 @@ export class EmailUtil {
       return
     }
 
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping generic email to ${recipients.join(', ')} – subject: "${subject}"`
+      )
+      return
+    }
+
     const mailOptions: nodemailer.SendMailOptions = {
       from: this.configService.get('smtp.email', { infer: true }),
       to: recipients,
@@ -560,6 +583,13 @@ export class EmailUtil {
       return
     }
 
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping property transfer email for "${propertyName}" to ${uniqueEmails.join(', ')}`
+      )
+      return
+    }
+
     // Format the effective date
     const formattedDate = effectiveDate.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -627,6 +657,13 @@ export class EmailUtil {
     if (uniqueEmails.length === 0) {
       console.warn(
         'No valid recipient emails provided for audit status change notification'
+      )
+      return
+    }
+
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping audit status change email for "${auditName}" to ${uniqueEmails.join(', ')}`
       )
       return
     }
@@ -715,6 +752,13 @@ export class EmailUtil {
       return
     }
 
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping property transfer rejection email for "${propertyName}" to ${uniqueEmails.join(', ')}`
+      )
+      return
+    }
+
     // Format the requested date
     const formattedDate = requestedDate.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -791,6 +835,13 @@ export class EmailUtil {
       return
     }
 
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping property deactivation rejection email for "${propertyName}" to ${uniqueEmails.join(', ')}`
+      )
+      return
+    }
+
     // Format the requested date
     const formattedDate = requestedDate.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -862,6 +913,13 @@ export class EmailUtil {
     if (uniqueEmails.length === 0) {
       console.warn(
         'No valid recipient emails provided for portfolio deactivation rejection notification'
+      )
+      return
+    }
+
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping portfolio deactivation rejection email for "${portfolioName}" to ${uniqueEmails.join(', ')}`
       )
       return
     }
@@ -942,6 +1000,13 @@ export class EmailUtil {
       return
     }
 
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping property activation rejection email for "${propertyName}" to ${uniqueEmails.join(', ')}`
+      )
+      return
+    }
+
     // Format the requested date
     const formattedDate = requestedDate.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -1015,6 +1080,13 @@ export class EmailUtil {
     if (uniqueEmails.length === 0) {
       console.warn(
         'No valid recipient emails provided for audit report URL update notification'
+      )
+      return
+    }
+
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping audit report upload email for "${auditName}" to ${uniqueEmails.join(', ')}`
       )
       return
     }
@@ -1100,6 +1172,13 @@ export class EmailUtil {
     if (uniqueEmails.length === 0) {
       console.warn(
         'No valid recipient emails provided for consolidated report upload notification'
+      )
+      return
+    }
+
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping consolidated report upload email for portfolio "${portfolioName}" to ${uniqueEmails.join(', ')}`
       )
       return
     }
@@ -1212,6 +1291,13 @@ export class EmailUtil {
       return
     }
 
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping portfolio deactivation email for "${portfolioName}" to ${uniqueEmails.join(', ')}`
+      )
+      return
+    }
+
     // Format the effective date
     const formattedDate = effectiveDate.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -1277,6 +1363,13 @@ export class EmailUtil {
     if (uniqueEmails.length === 0) {
       console.warn(
         'No valid recipient emails provided for portfolio activation notification'
+      )
+      return
+    }
+
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping portfolio activation email for "${portfolioName}" to ${uniqueEmails.join(', ')}`
       )
       return
     }
@@ -1347,6 +1440,13 @@ export class EmailUtil {
     if (uniqueEmails.length === 0) {
       console.warn(
         'No valid recipient emails provided for portfolio activation rejection notification'
+      )
+      return
+    }
+
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping portfolio activation rejection email for "${portfolioName}" to ${uniqueEmails.join(', ')}`
       )
       return
     }
@@ -1422,6 +1522,13 @@ export class EmailUtil {
     if (uniqueEmails.length === 0) {
       console.warn(
         'No valid recipient emails provided for bank details update notification'
+      )
+      return
+    }
+
+    if (!this.isNotificationEmailAllowed()) {
+      console.log(
+        `[staging] Skipping bank details update email for properties [${propertyNames.join(', ')}] to ${uniqueEmails.join(', ')}`
       )
       return
     }

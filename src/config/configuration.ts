@@ -1,4 +1,4 @@
-import { NodeEnvironment } from './configuration.schema'
+import { DeploymentEnvironment, NodeEnvironment } from './configuration.schema'
 
 export interface Configuration {
   port: number
@@ -7,6 +7,7 @@ export interface Configuration {
   }
   appName?: string
   nodeEnv: NodeEnvironment
+  deploymentEnv: DeploymentEnvironment
   database: {
     url: string
   }
@@ -50,6 +51,9 @@ export default (): Configuration => ({
   appName: process.env.APP_NAME,
   nodeEnv:
     (process.env.NODE_ENV as NodeEnvironment) || NodeEnvironment.DEVELOPMENT,
+  deploymentEnv:
+    (process.env.DEPLOYMENT_ENV as DeploymentEnvironment) ||
+    DeploymentEnvironment.DEVELOPMENT,
   database: {
     url: process.env.DATABASE_URL!
   },
