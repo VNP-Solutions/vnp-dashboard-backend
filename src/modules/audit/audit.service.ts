@@ -48,6 +48,7 @@ import {
   BulkUpdateResultDto,
   BulkUploadReportDto,
   CreateAuditDto,
+  DeleteAuditsByPortfolioDto,
   GlobalStatsResponseDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
@@ -3477,5 +3478,34 @@ export class AuditService implements IAuditService {
     }
 
     return { success: true, created_audits: createdAudits }
+  }
+
+  async deleteAllByPortfolio(
+    portfolioId: string,
+    _data: DeleteAuditsByPortfolioDto,
+    user: IUserWithPermissions
+  ): Promise<{ message: string; deleted_count: number }> {
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admins can delete all audits for a portfolio'
+      )
+    }
+
+    const portfolio = await this.portfolioRepository.findById(
+      portfolioId,
+      user.id,
+      true
+    )
+
+    if (!portfolio) {
+      throw new NotFoundException('Portfolio not found')
+    }
+
+    const result = await this.auditRepository.deleteByPortfolioId(portfolioId)
+
+    return {
+      message: `Successfully deleted ${result.count} audit(s) for portfolio "${portfolio.name}"`,
+      deleted_count: result.count
+    }
   }
 }
