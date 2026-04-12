@@ -397,6 +397,16 @@ export class RequestUpdateAmountConfirmedDto {
   reason?: string
 }
 
+export class DeleteAuditsByPortfolioDto {
+  @ApiProperty({
+    example: 'MyPassword123!',
+    description: 'Super admin password for verification'
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string
+}
+
 export class UpdateReportUrlDto {
   @ApiProperty({
     example: 'https://example.com/report.pdf',
