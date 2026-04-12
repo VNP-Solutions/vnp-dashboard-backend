@@ -16,6 +16,12 @@ export enum NodeEnvironment {
   TEST = 'test'
 }
 
+export enum DeploymentEnvironment {
+  STAGING = 'staging',
+  PRODUCTION = 'production',
+  DEVELOPMENT = 'development'
+}
+
 export class ConfigurationSchema {
   @Transform(({ value }: { value: string }) => parseInt(value, 10))
   @IsNumber()
@@ -30,6 +36,10 @@ export class ConfigurationSchema {
 
   @IsEnum(NodeEnvironment)
   NODE_ENV: NodeEnvironment = NodeEnvironment.DEVELOPMENT
+
+  @IsOptional()
+  @IsEnum(DeploymentEnvironment)
+  DEPLOYMENT_ENV?: DeploymentEnvironment = DeploymentEnvironment.DEVELOPMENT
 
   @IsString()
   @IsNotEmpty()
