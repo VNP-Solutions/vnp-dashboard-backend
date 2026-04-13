@@ -218,6 +218,16 @@ export class PortfolioService implements IPortfolioService {
       }
     }
 
+    if (query.bank_type) {
+      additionalFilters.bank_type = query.bank_type
+    }
+    if (query.bank_sub_type) {
+      const bankSubTypeValue = query.bank_sub_type.toLowerCase().trim()
+      if (bankSubTypeValue !== 'all') {
+        additionalFilters.bank_sub_type = bankSubTypeValue
+      }
+    }
+
     // Merge with existing filters
     const mergedQuery = {
       ...query,
@@ -230,7 +240,12 @@ export class PortfolioService implements IPortfolioService {
     // Configuration for query builder
     const queryConfig = {
       searchFields: ['name'], // Search only by portfolio name
-      filterableFields: ['service_type_id', 'is_active'],
+      filterableFields: [
+        'service_type_id',
+        'is_active',
+        'bank_type',
+        'bank_sub_type'
+      ],
       sortableFields: [
         'name',
         'created_at',
@@ -241,7 +256,9 @@ export class PortfolioService implements IPortfolioService {
       defaultSortField: 'created_at',
       defaultSortOrder: 'desc' as const,
       nestedFieldMap: {
-        service_type_name: 'serviceType.type'
+        service_type_name: 'serviceType.type',
+        bank_type: 'bankDetails.bank_type',
+        bank_sub_type: 'bankDetails.bank_sub_type'
       }
     }
 
@@ -356,6 +373,16 @@ export class PortfolioService implements IPortfolioService {
       }
     }
 
+    if (query.bank_type) {
+      additionalFilters.bank_type = query.bank_type
+    }
+    if (query.bank_sub_type) {
+      const bankSubTypeValue = query.bank_sub_type.toLowerCase().trim()
+      if (bankSubTypeValue !== 'all') {
+        additionalFilters.bank_sub_type = bankSubTypeValue
+      }
+    }
+
     // Merge with existing filters
     const mergedQuery = {
       ...query,
@@ -368,7 +395,12 @@ export class PortfolioService implements IPortfolioService {
     // Configuration for query builder
     const queryConfig = {
       searchFields: ['name'], // Search only by portfolio name
-      filterableFields: ['service_type_id', 'is_active'],
+      filterableFields: [
+        'service_type_id',
+        'is_active',
+        'bank_type',
+        'bank_sub_type'
+      ],
       sortableFields: [
         'name',
         'created_at',
@@ -379,7 +411,9 @@ export class PortfolioService implements IPortfolioService {
       defaultSortField: 'created_at',
       defaultSortOrder: 'desc' as const,
       nestedFieldMap: {
-        service_type_name: 'serviceType.type'
+        service_type_name: 'serviceType.type',
+        bank_type: 'bankDetails.bank_type',
+        bank_sub_type: 'bankDetails.bank_sub_type'
       }
     }
 
@@ -591,6 +625,16 @@ export class PortfolioService implements IPortfolioService {
       }
     }
 
+    if (query.bank_type) {
+      additionalFilters.bank_type = query.bank_type
+    }
+    if (query.bank_sub_type) {
+      const bankSubTypeValue = query.bank_sub_type.toLowerCase().trim()
+      if (bankSubTypeValue !== 'all') {
+        additionalFilters.bank_sub_type = bankSubTypeValue
+      }
+    }
+
     const mergedQuery = {
       ...query,
       filters: {
@@ -601,7 +645,12 @@ export class PortfolioService implements IPortfolioService {
 
     const queryConfig = {
       searchFields: ['name'],
-      filterableFields: ['service_type_id', 'is_active'],
+      filterableFields: [
+        'service_type_id',
+        'is_active',
+        'bank_type',
+        'bank_sub_type'
+      ],
       sortableFields: [
         'name',
         'created_at',
@@ -612,7 +661,9 @@ export class PortfolioService implements IPortfolioService {
       defaultSortField: 'created_at',
       defaultSortOrder: 'desc' as const,
       nestedFieldMap: {
-        service_type_name: 'serviceType.type'
+        service_type_name: 'serviceType.type',
+        bank_type: 'bankDetails.bank_type',
+        bank_sub_type: 'bankDetails.bank_sub_type'
       }
     }
 
