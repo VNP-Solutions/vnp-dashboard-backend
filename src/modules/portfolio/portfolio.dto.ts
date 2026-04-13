@@ -114,6 +114,23 @@ export class PortfolioQueryDto extends QueryDto {
   service_type_id?: string
 
   @ApiPropertyOptional({
+    description: 'Filter by bank type (bank/stripe/All)',
+    example: 'bank'
+  })
+  @IsOptional()
+  @IsString()
+  bank_type?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by bank sub type (ach/domestic_wire/international_wire/all)',
+    example: 'ach'
+  })
+  @IsOptional()
+  @IsString()
+  bank_sub_type?: string
+
+  @ApiPropertyOptional({
     description: 'Filter by active status (true/false/All)',
     example: 'true'
   })

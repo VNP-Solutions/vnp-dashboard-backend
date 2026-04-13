@@ -37,6 +37,7 @@ import {
   AuditQueryDto,
   BulkArchiveAuditDto,
   BulkDeleteAuditDto,
+  DeleteAuditsByPortfolioDto,
   BulkUploadReportDto,
   CreateAuditDto,
   DeleteAuditDto,
@@ -544,6 +545,58 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.auditService.bulkUploadReport(bulkUploadReportDto, user)
+  }
+
+  @Post('delete-by-portfolio/:portfolioId')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE)
+  @ApiOperation({
+    summary: 'Delete all audits for a portfolio (Super admin only, requires password verification)',
+    description:
+      'Only super admins can use this endpoint. All audits belonging to any property in the given portfolio will be permanently deleted. Password verification is required. This action cannot be undone.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All audits for the portfolio deleted successfully',
+    schema: {
+      example: {
+        message: 'Successfully deleted 42 audit(s) for portfolio "ARP Hospitality"',
+        deleted_count: 42
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid password'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only super admins can delete audits'
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Portfolio not found'
+  })
+  async deleteByPortfolio(
+    @Param('portfolioId') portfolioId: string,
+    @Body() deleteDto: DeleteAuditsByPortfolioDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    const dbUser = await this.authRepository.findUserByEmail(user.email)
+
+    if (!dbUser) {
+      throw new BadRequestException('User not found')
+    }
+
+    const isPasswordValid = await EncryptionUtil.comparePassword(
+      deleteDto.password,
+      dbUser.password
+    )
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid password')
+    }
+
+    return this.auditService.deleteAllByPortfolio(portfolioId, deleteDto, user)
   }
 
   @Post('bulk-delete')

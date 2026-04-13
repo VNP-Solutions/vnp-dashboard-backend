@@ -10,6 +10,7 @@ import {
   BulkUpdateResultDto,
   BulkUploadReportDto,
   CreateAuditDto,
+  DeleteAuditsByPortfolioDto,
   GlobalStatsResponseDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
@@ -137,6 +138,7 @@ export interface IAuditRepository {
   bulkArchive(auditIds: string[]): Promise<{ count: number }>
   bulkDelete(auditIds: string[]): Promise<{ count: number }>
   delete(id: string): Promise<void>
+  deleteByPortfolioId(portfolioId: string): Promise<{ count: number }>
 }
 
 export interface IAuditService {
@@ -213,4 +215,9 @@ export interface IAuditService {
     file: Express.Multer.File,
     user: IUserWithPermissions
   ): Promise<AutoImportAuditResultDto>
+  deleteAllByPortfolio(
+    portfolioId: string,
+    data: DeleteAuditsByPortfolioDto,
+    user: IUserWithPermissions
+  ): Promise<{ message: string; deleted_count: number }>
 }

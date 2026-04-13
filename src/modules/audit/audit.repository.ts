@@ -625,4 +625,16 @@ export class AuditRepository implements IAuditRepository {
 
     return { count: result.count }
   }
+
+  async deleteByPortfolioId(portfolioId: string) {
+    const result = await this.prisma.audit.deleteMany({
+      where: {
+        property: {
+          portfolio_id: portfolioId
+        }
+      }
+    })
+
+    return { count: result.count }
+  }
 }

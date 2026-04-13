@@ -12,12 +12,10 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import {
+  addNotesTasksScopeOrFilters,
   assertAuditNotesTasksPolicy,
   assertPortfolioNotesTasksPolicy,
-  assertPropertyNotesTasksPolicy,
-  canUseAuditNotesTasks,
-  canUsePortfolioNotesTasks,
-  canUsePropertyNotesTasks
+  assertPropertyNotesTasksPolicy
 } from '../../common/utils/note-task-permission.util'
 import {
   CreateTaskDto,
@@ -99,41 +97,12 @@ export class TaskService implements ITaskService {
     )
 
     const permissionFilters: any[] = []
-
-    if (
-      canUsePortfolioNotesTasks(user) &&
-      portfolioIds !== 'all' &&
-      portfolioIds &&
-      portfolioIds.length > 0
-    ) {
-      permissionFilters.push({
-        portfolio_id: { in: portfolioIds }
-      })
-    }
-
-    if (
-      canUsePropertyNotesTasks(user) &&
-      propertyIds !== 'all' &&
-      propertyIds &&
-      propertyIds.length > 0
-    ) {
-      permissionFilters.push({
-        property_id: { in: propertyIds }
-      })
-    }
-
-    if (
-      canUseAuditNotesTasks(user) &&
-      propertyIds !== 'all' &&
-      propertyIds &&
-      propertyIds.length > 0
-    ) {
-      permissionFilters.push({
-        audit: {
-          property_id: { in: propertyIds }
-        }
-      })
-    }
+    addNotesTasksScopeOrFilters(
+      permissionFilters,
+      user,
+      portfolioIds,
+      propertyIds
+    )
 
     if (permissionFilters.length === 0) {
       return []
@@ -387,41 +356,12 @@ export class TaskService implements ITaskService {
     )
 
     const permissionFilters: any[] = []
-
-    if (
-      canUsePortfolioNotesTasks(user) &&
-      portfolioIds !== 'all' &&
-      portfolioIds &&
-      portfolioIds.length > 0
-    ) {
-      permissionFilters.push({
-        portfolio_id: { in: portfolioIds }
-      })
-    }
-
-    if (
-      canUsePropertyNotesTasks(user) &&
-      propertyIds !== 'all' &&
-      propertyIds &&
-      propertyIds.length > 0
-    ) {
-      permissionFilters.push({
-        property_id: { in: propertyIds }
-      })
-    }
-
-    if (
-      canUseAuditNotesTasks(user) &&
-      propertyIds !== 'all' &&
-      propertyIds &&
-      propertyIds.length > 0
-    ) {
-      permissionFilters.push({
-        audit: {
-          property_id: { in: propertyIds }
-        }
-      })
-    }
+    addNotesTasksScopeOrFilters(
+      permissionFilters,
+      user,
+      portfolioIds,
+      propertyIds
+    )
 
     if (permissionFilters.length === 0) {
       return {
