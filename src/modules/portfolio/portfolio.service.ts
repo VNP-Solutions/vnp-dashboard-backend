@@ -1019,7 +1019,7 @@ export class PortfolioService implements IPortfolioService {
     }
 
     // Create pending action
-    await this.prisma.pendingAction.create({
+    const pendingActionRecord = await this.prisma.pendingAction.create({
       data: {
         resource_type: 'portfolio',
         portfolio_id: id,
@@ -1029,6 +1029,9 @@ export class PortfolioService implements IPortfolioService {
         reason: reason
       }
     })
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingActionRecord.id
+    )
 
     return {
       message:
@@ -1145,7 +1148,7 @@ export class PortfolioService implements IPortfolioService {
     }
 
     // Create pending action
-    await this.prisma.pendingAction.create({
+    const pendingActionRecord = await this.prisma.pendingAction.create({
       data: {
         resource_type: 'portfolio',
         portfolio_id: id,
@@ -1155,6 +1158,9 @@ export class PortfolioService implements IPortfolioService {
         reason: reason
       }
     })
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingActionRecord.id
+    )
 
     return {
       message:

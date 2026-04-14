@@ -1596,4 +1596,272 @@ export class EmailUtil {
       }
     }
   }
+
+  /**
+   * Email all super admins when a pending action is submitted.
+   * Uses the same staging suppression as other notification emails (see isNotificationEmailAllowed).
+   */
+  async notifySuperAdminsOfPendingActionRequest(
+    pendingActionId: string
+  ): Promise<void> {
+    try {
+      if (!this.isNotificationEmailAllowed()) {
+        console.log(
+          `[staging] Skipping pending action request notification for ${pendingActionId}`
+        )
+        return
+      }
+
+      const superAdminEmails = await this.getSuperAdminEmailsForNotifications()
+      if (superAdminEmails.length === 0) {
+        console.warn(
+          'No super admin recipients for pending action request notification'
+        )
+        return
+      }
+
+      const pa = await this.prisma.pendingAction.findUnique({
+        where: { id: pendingActionId },
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              portfolio_id: true,
+              portfolio: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          },
+          portfolio: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          audit: {
+            select: {
+              id: true,
+              type_of_ota: true,
+              property: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          },
+          requestedBy: {
+            select: {
+              id: true,
+              email: true,
+              first_name: true,
+              last_name: true
+            }
+          }
+        }
+      })
+
+      if (!pa) {
+        console.warn(
+          `Pending action not found for notification: ${pendingActionId}`
+        )
+        return
+      }
+
+      const dashboardUrl =
+        this.configService.get('dashboardUrl', { infer: true }) ||
+        'https://new.dashboardvnps.com/'
+      const dashboardLink = dashboardUrl.replace(/\/$/, '')
+
+      const escapeHtml = (s: string) =>
+        s
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+
+      const reqName = [pa.requestedBy.first_name, pa.requestedBy.last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim()
+
+      const rows: string[] = []
+      rows.push(
+        `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Request ID</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(pa.id)}</td></tr>`
+      )
+      rows.push(
+        `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Resource type</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(pa.resource_type)}</td></tr>`
+      )
+      rows.push(
+        `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Action type</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(pa.action_type)}</td></tr>`
+      )
+      rows.push(
+        `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Status</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(pa.status)}</td></tr>`
+      )
+      rows.push(
+        `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Requested at</strong></td><td style="padding:8px;border:1px solid #ddd;">${pa.created_at.toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZoneName: 'short'
+        })}</td></tr>`
+      )
+      rows.push(
+        `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Requested by</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(reqName || '(no name)')} (${escapeHtml(pa.requestedBy.email)})</td></tr>`
+      )
+      if (pa.reason) {
+        rows.push(
+          `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Reason</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(pa.reason)}</td></tr>`
+        )
+      }
+      if (pa.property) {
+        const p = pa.property
+        const portfolioLabel = p.portfolio
+          ? ` — Portfolio: ${escapeHtml(p.portfolio.name)} (${escapeHtml(p.portfolio.id)})`
+          : ''
+        rows.push(
+          `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Property</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(p.name)} (${escapeHtml(p.id)})${portfolioLabel}</td></tr>`
+        )
+      } else if (pa.portfolio) {
+        rows.push(
+          `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Portfolio</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(pa.portfolio.name)} (${escapeHtml(pa.portfolio.id)})</td></tr>`
+        )
+      }
+      if (pa.audit) {
+        const a = pa.audit
+        const propName = a.property?.name
+        rows.push(
+          `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Audit</strong></td><td style="padding:8px;border:1px solid #ddd;">ID ${escapeHtml(a.id)}${a.type_of_ota ? ` — OTA: ${escapeHtml(String(a.type_of_ota))}` : ''}${propName ? ` — Property: ${escapeHtml(propName)}` : ''}</td></tr>`
+        )
+      }
+      if (pa.transfer_data) {
+        const td = pa.transfer_data
+        let transferHtml = `New portfolio ID: ${escapeHtml(td.new_portfolio_id)}`
+        if (td.portfolio_from) {
+          transferHtml += `<br/>From: ${escapeHtml(td.portfolio_from.name)} (${escapeHtml(td.portfolio_from.id)})`
+        }
+        if (td.portfolio_to) {
+          transferHtml += `<br/>To: ${escapeHtml(td.portfolio_to.name)} (${escapeHtml(td.portfolio_to.id)})`
+        }
+        rows.push(
+          `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Transfer</strong></td><td style="padding:8px;border:1px solid #ddd;">${transferHtml}</td></tr>`
+        )
+      }
+      if (pa.audit_update_data) {
+        const aud = pa.audit_update_data
+        const parts: string[] = []
+        if (aud.expedia_amount_confirmed !== undefined) {
+          parts.push(`Expedia amount confirmed: ${aud.expedia_amount_confirmed}`)
+        }
+        if (aud.agoda_amount_confirmed !== undefined) {
+          parts.push(`Agoda amount confirmed: ${aud.agoda_amount_confirmed}`)
+        }
+        if (aud.booking_amount_confirmed !== undefined) {
+          parts.push(`Booking amount confirmed: ${aud.booking_amount_confirmed}`)
+        }
+        rows.push(
+          `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Requested amount updates</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(parts.join('; '))}</td></tr>`
+        )
+      }
+
+      const tableHtml = `<table style="border-collapse:collapse;width:100%;max-width:640px;">${rows.join('')}</table>`
+
+      for (const userEmail of superAdminEmails) {
+        try {
+          const user = await this.prisma.user.findUnique({
+            where: { email: userEmail },
+            select: { first_name: true }
+          })
+          const firstName = user?.first_name?.split(' ')[0] || ''
+          const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+
+          const mailOptions = {
+            from: this.configService.get('smtp.email', { infer: true }),
+            to: userEmail,
+            subject: `New pending action: ${pa.action_type}`,
+            html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 640px; margin: 0 auto;">
+              <p><strong>${greeting}</strong></p>
+              <p>A new action request has been submitted and is awaiting super admin review.</p>
+              ${tableHtml}
+              <p style="margin-top:20px;"><a href="${escapeHtml(dashboardLink)}">Open the VNP Dashboard</a> to review pending actions.</p>
+              <div style="margin-top: 30px; color: #666;">
+                <p>VNP Solutions Support Team</p>
+              </div>
+            </div>
+          `,
+            text: `${greeting}\n\nA new pending action request (${pa.action_type}) requires review.\n\nRequest ID: ${pa.id}\nResource: ${pa.resource_type}\nRequested by: ${pa.requestedBy.email}\n\n${dashboardLink}`
+          }
+
+          const info = await this.transporter.sendMail(mailOptions)
+          console.log('✓ Pending action request notification sent:', {
+            to: userEmail,
+            messageId: info.messageId
+          })
+        } catch (error) {
+          console.error(
+            `✗ Failed to send pending action notification to ${userEmail}:`,
+            error
+          )
+        }
+      }
+    } catch (error) {
+      console.error(
+        '✗ Failed pending action super-admin notification:',
+        error
+      )
+    }
+  }
+
+  private async getSuperAdminEmailsForNotifications(): Promise<string[]> {
+    const allUsers = await this.prisma.user.findMany({
+      where: {
+        is_verified: true
+      },
+      select: {
+        id: true,
+        email: true,
+        role: {
+          select: {
+            portfolio_permission: true,
+            property_permission: true,
+            audit_permission: true,
+            user_permission: true,
+            system_settings_permission: true
+          }
+        }
+      }
+    })
+
+    const superAdminEmails: string[] = []
+
+    for (const user of allUsers) {
+      const allPermissions = [
+        user.role.portfolio_permission,
+        user.role.property_permission,
+        user.role.audit_permission,
+        user.role.user_permission,
+        user.role.system_settings_permission
+      ]
+
+      const isSuperAdmin = allPermissions.every(
+        permission =>
+          permission &&
+          permission.permission_level === 'all' &&
+          permission.access_level === 'all'
+      )
+
+      if (isSuperAdmin) {
+        superAdminEmails.push(user.email)
+      }
+    }
+
+    return superAdminEmails
+  }
 }

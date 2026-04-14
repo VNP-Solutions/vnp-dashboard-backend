@@ -963,6 +963,7 @@ export class AuditService implements IAuditService {
       audit_update_data: auditUpdateData,
       reason: data.reason
     })
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
 
     return {
       message:
