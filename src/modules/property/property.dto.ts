@@ -338,7 +338,7 @@ export class GetPropertiesByPortfoliosDto {
   @ApiProperty({
     example: ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439013'],
     description:
-      'Array of Portfolio IDs to get properties from. If empty array is provided, returns all properties accessible to the user.',
+      'Array of Portfolio IDs to get properties from (owned by those portfolios only; not show-in). If empty array is provided, returns all properties accessible to the user.',
     type: [String]
   })
   @IsArray()
@@ -398,7 +398,7 @@ export class GetPropertiesBankDetailsSecureDto {
   @ApiPropertyOptional({
     example: '507f1f77bcf86cd799439011',
     description:
-      'Filter by portfolio (includes properties owned by or shared into this portfolio)'
+      'Filter by portfolio: only properties owned by this portfolio (excludes properties shown in via show_in_portfolio)'
   })
   @IsOptional()
   @IsString()

@@ -845,6 +845,7 @@ export class PortfolioService implements IPortfolioService {
 
     const results: Array<{
       portfolio_id: string
+      portfolio_name: string
       success: boolean
       message?: string
     }> = []
@@ -864,6 +865,7 @@ export class PortfolioService implements IPortfolioService {
         if (!portfolio) {
           results.push({
             portfolio_id: portfolioId,
+            portfolio_name: 'N/A',
             success: false,
             message: 'Portfolio not found'
           })
@@ -878,6 +880,7 @@ export class PortfolioService implements IPortfolioService {
         if (propertyCount > 0) {
           results.push({
             portfolio_id: portfolioId,
+            portfolio_name: portfolio.name,
             success: false,
             message: `Cannot delete portfolio with ${propertyCount} associated properties. Please delete or reassign the properties first.`
           })
@@ -890,12 +893,14 @@ export class PortfolioService implements IPortfolioService {
 
         results.push({
           portfolio_id: portfolioId,
+          portfolio_name: portfolio.name,
           success: true
         })
         successCount++
       } catch (error) {
         results.push({
           portfolio_id: portfolioId,
+          portfolio_name: 'N/A',
           success: false,
           message: error.message || 'Unknown error occurred'
         })
@@ -1019,7 +1024,7 @@ export class PortfolioService implements IPortfolioService {
     }
 
     // Create pending action
-    await this.prisma.pendingAction.create({
+    const pendingActionRecord = await this.prisma.pendingAction.create({
       data: {
         resource_type: 'portfolio',
         portfolio_id: id,
@@ -1029,6 +1034,9 @@ export class PortfolioService implements IPortfolioService {
         reason: reason
       }
     })
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingActionRecord.id
+    )
 
     return {
       message:
@@ -1145,7 +1153,7 @@ export class PortfolioService implements IPortfolioService {
     }
 
     // Create pending action
-    await this.prisma.pendingAction.create({
+    const pendingActionRecord = await this.prisma.pendingAction.create({
       data: {
         resource_type: 'portfolio',
         portfolio_id: id,
@@ -1155,6 +1163,9 @@ export class PortfolioService implements IPortfolioService {
         reason: reason
       }
     })
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingActionRecord.id
+    )
 
     return {
       message:

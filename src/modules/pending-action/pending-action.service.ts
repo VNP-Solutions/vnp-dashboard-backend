@@ -95,7 +95,7 @@ export class PendingActionService implements IPendingActionService {
     }
 
     // Create the pending action with the new unified model
-    return this.repository.create({
+    const created = await this.repository.create({
       resource_type: data.resource_type,
       property_id: data.property_id,
       portfolio_id: data.portfolio_id,
@@ -106,6 +106,8 @@ export class PendingActionService implements IPendingActionService {
       audit_update_data: data.audit_update_data,
       reason: data.reason
     })
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(created.id)
+    return created
   }
 
   async findAll(

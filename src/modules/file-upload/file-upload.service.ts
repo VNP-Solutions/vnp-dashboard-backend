@@ -1,4 +1,4 @@
-import { S3Client } from '@aws-sdk/client-s3'
+import { HeadObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import {
   BadRequestException,
@@ -33,13 +33,85 @@ export class FileUploadService implements IFileUploadService {
     this.bucketUrl = s3Config.bucketUrl
   }
 
+  /** Inserts `-{timestamp}` before the extension (or at end if no extension). */
+  private withTimestampSuffix(sanitizedFileName: string): string {
+    const ts = Date.now()
+    const lastDot = sanitizedFileName.lastIndexOf('.')
+    if (lastDot > 0) {
+      const base = sanitizedFileName.slice(0, lastDot)
+      const ext = sanitizedFileName.slice(lastDot)
+      return `${base}-${ts}${ext}`
+    }
+    return `${sanitizedFileName}-${ts}`
+  }
+
+  private async objectExists(key: string): Promise<boolean> {
+    try {
+      await this.s3Client.send(
+        new HeadObjectCommand({ Bucket: this.bucketName, Key: key })
+      )
+      return true
+    } catch (error: unknown) {
+      const err = error as {
+        name?: string
+        $metadata?: { httpStatusCode?: number }
+      }
+      if (
+        err.name === 'NotFound' ||
+        err.name === 'NoSuchKey' ||
+        err.$metadata?.httpStatusCode === 404
+      ) {
+        return false
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Uses `uploads/{sanitized}` when that key is free; otherwise
+   * `uploads/{base}-{timestamp}{ext}`. `reservedKeys` covers in-flight bulk uploads.
+   */
+  private async resolveUploadKey(
+    sanitizedFileName: string,
+    reservedKeys?: Set<string>
+  ): Promise<string> {
+    const prefix = 'uploads/'
+    const isTaken = async (s3Key: string): Promise<boolean> => {
+      if (reservedKeys?.has(s3Key)) return true
+      return this.objectExists(s3Key)
+    }
+
+    let candidateName = sanitizedFileName
+    let key = `${prefix}${candidateName}`
+
+    if (!(await isTaken(key))) {
+      reservedKeys?.add(key)
+      return key
+    }
+
+    let attempts = 0
+    while (attempts < 10) {
+      candidateName = this.withTimestampSuffix(sanitizedFileName)
+      key = `${prefix}${candidateName}`
+      if (!(await isTaken(key))) {
+        reservedKeys?.add(key)
+        return key
+      }
+      attempts++
+    }
+
+    throw new InternalServerErrorException(
+      'Could not resolve a unique upload key for this filename'
+    )
+  }
+
   async uploadFile(file: Express.Multer.File): Promise<FileUploadResponse> {
     if (!file) {
       throw new BadRequestException('No file provided')
     }
 
     const sanitizedFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const key = `uploads/${sanitizedFileName}`
+    const key = await this.resolveUploadKey(sanitizedFileName)
 
     try {
       const upload = new Upload({
@@ -81,14 +153,18 @@ export class FileUploadService implements IFileUploadService {
     const uploadedFiles: FileUploadResponse[] = []
     const errors: string[] = []
 
-    // Upload files in parallel using Promise.allSettled
-    const uploadPromises = files.map(async (file) => {
+    const reservedKeys = new Set<string>()
+    const planned: { file: Express.Multer.File; key: string }[] = []
+    for (const file of files) {
       const sanitizedFileName = file.originalname.replace(
         /[^a-zA-Z0-9.-]/g,
         '_'
       )
-      const key = `uploads/${sanitizedFileName}`
+      const key = await this.resolveUploadKey(sanitizedFileName, reservedKeys)
+      planned.push({ file, key })
+    }
 
+    const uploadPromises = planned.map(async ({ file, key }) => {
       try {
         const upload = new Upload({
           client: this.s3Client,
