@@ -13,6 +13,7 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import { EmailUtil } from '../../common/utils/email.util'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   BulkCreateConsolidatedReportDto,
@@ -36,7 +37,9 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
     @Inject(PermissionService)
     private permissionService: PermissionService,
     @Inject(PrismaService)
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    @Inject(EmailUtil)
+    private emailUtil: EmailUtil
   ) {}
 
   async create(data: CreateConsolidatedReportDto, user: IUserWithPermissions) {
@@ -66,6 +69,8 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
       ...data,
       user_id: user.id
     })
+
+    void this.sendConsolidatedReportEmail(data.portfolio_id, [consolidatedReport.url])
 
     return consolidatedReport
   }
@@ -128,9 +133,45 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
       }
     }
 
-    // Email notification removed - no longer sending emails for consolidated report uploads
+    // Send email notification for all successfully uploaded reports
+    if (result.successCount > 0) {
+      const successfulUrls = data.reports
+        .filter((_, i) => !result.errors.some(e => e.index === i))
+        .map(r => r.url)
+      void this.sendConsolidatedReportEmail(data.portfolio_id, successfulUrls)
+    }
 
     return result
+  }
+
+  private async sendConsolidatedReportEmail(
+    portfolioId: string,
+    reportUrls: string[]
+  ): Promise<void> {
+    try {
+      const portfolio = await this.prisma.portfolio.findUnique({
+        where: { id: portfolioId },
+        select: { name: true, contact_email: true }
+      })
+
+      if (!portfolio?.contact_email) return
+
+      const recipientEmails = portfolio.contact_email
+        .split(',')
+        .map(e => e.trim())
+        .filter(e => e.length > 0)
+
+      if (recipientEmails.length === 0) return
+
+      await this.emailUtil.sendConsolidatedReportUploadedEmail(
+        recipientEmails,
+        portfolio.name,
+        reportUrls,
+        new Date()
+      )
+    } catch (error) {
+      console.error('Failed to send consolidated report email:', error)
+    }
   }
 
   async findAll(query: ConsolidatedReportQueryDto, user: IUserWithPermissions) {
