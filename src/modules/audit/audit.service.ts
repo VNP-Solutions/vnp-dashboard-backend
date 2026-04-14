@@ -2696,58 +2696,7 @@ export class AuditService implements IAuditService {
       throw new NotFoundException('Audit not found after update')
     }
 
-    // Send email notification to external portfolio managers
-    await this.sendReportUrlUpdateNotification(updatedAudit, data.report_url)
-
     return updatedAudit
-  }
-
-  /**
-   * Send email notification when report URL is updated
-   * Sends email to portfolio contact emails (comma-separated values)
-   */
-  private async sendReportUrlUpdateNotification(audit: any, reportUrl: string) {
-    try {
-      // Get portfolio details with contact_email
-      const portfolio = await this.prisma.portfolio.findUnique({
-        where: { id: audit.property.portfolio_id },
-        select: { contact_email: true, name: true }
-      })
-
-      if (!portfolio?.contact_email) {
-        console.log(
-          'No contact email found for portfolio in report URL update notification'
-        )
-        return
-      }
-
-      // Parse comma-separated email addresses
-      const recipientEmails = portfolio.contact_email
-        .split(',')
-        .map(email => email.trim())
-        .filter(email => email.length > 0)
-
-      if (recipientEmails.length === 0) {
-        console.log('No valid email addresses found in portfolio contact_email')
-        return
-      }
-      const auditName = audit.type_of_ota
-        ? `${audit.type_of_ota.charAt(0).toUpperCase() + audit.type_of_ota.slice(1)} Audit`
-        : 'Audit'
-
-      // Send the email
-      await this.emailUtil.sendAuditReportUrlUpdatedEmail(
-        recipientEmails,
-        auditName,
-        audit.property.name,
-        portfolio.name,
-        reportUrl,
-        new Date()
-      )
-    } catch (error) {
-      // Log the error but don't fail the update operation
-      console.error('Failed to send report URL update notification:', error)
-    }
   }
 
   async autoImport(
@@ -3454,6 +3403,26 @@ export class AuditService implements IAuditService {
           this.logger.success(
             `[POST-IMPORT] Consolidated report created successfully`
           )
+
+          // Send email notification to portfolio contact email(s)
+          if (portfolio.contact_email) {
+            const recipientEmails = portfolio.contact_email
+              .split(',')
+              .map(e => e.trim())
+              .filter(e => e.length > 0)
+
+            if (recipientEmails.length > 0) {
+              void this.emailUtil.sendConsolidatedReportUploadedEmail(
+                recipientEmails,
+                portfolioName,
+                [originalUpload.url],
+                new Date()
+              )
+              this.logger.success(
+                `[POST-IMPORT] Consolidated report email queued for: ${recipientEmails.join(', ')}`
+              )
+            }
+          }
 
           this.logger.success(
             `[POST-IMPORT] Incrementing total_audit_count for portfolio "${portfolioName}" (id=${portfolio.id}, current=${portfolio.total_audit_count ?? 0})`
