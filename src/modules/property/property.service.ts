@@ -1693,6 +1693,7 @@ export class PropertyService implements IPropertyService {
       },
       reason: data.reason
     })
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
 
     return {
       message:
@@ -1863,6 +1864,7 @@ export class PropertyService implements IPropertyService {
       requested_user_id: user.id,
       reason: 'Property deletion requested'
     })
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
 
     return {
       message:
@@ -2030,6 +2032,7 @@ export class PropertyService implements IPropertyService {
       requested_user_id: user.id,
       reason: reason
     })
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
 
     return {
       message:
@@ -2089,6 +2092,7 @@ export class PropertyService implements IPropertyService {
       requested_user_id: user.id,
       reason: reason
     })
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
 
     return {
       message:
