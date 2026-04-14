@@ -428,12 +428,12 @@ export class PropertyController {
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get properties from specific portfolios (used for user invitation flows). If empty array is provided, returns all accessible properties.'
+      'Get properties owned by specific portfolios (excludes show-in; used for user invitation flows). If empty array is provided, returns all accessible properties.'
   })
   @ApiResponse({
     status: 200,
     description:
-      'Properties from specified portfolios retrieved successfully. Returns all properties if empty array provided.'
+      'Properties owned by the specified portfolios retrieved successfully. Returns all accessible properties if empty array provided.'
   })
   @ApiResponse({
     status: 400,
@@ -532,7 +532,7 @@ export class PropertyController {
       'List property bank details with full values (password required, no pagination)',
     description:
       'Returns unmasked bank details for all matching properties the user can access. ' +
-      'Optional filters: portfolio_id, search (property or portfolio name), bank_sub_type ' +
+      'Optional filters: portfolio_id (owned properties only — not show-in), search (property or portfolio name), bank_sub_type ' +
       '(all | ach | domestic_wire | international_wire). Only properties that have bank details are included.'
   })
   @ApiBody({ type: GetPropertiesBankDetailsSecureDto })

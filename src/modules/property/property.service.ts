@@ -1118,23 +1118,10 @@ export class PropertyService implements IPropertyService {
       }))
     }
 
-    // Filter by specific portfolio IDs (include both owned and shared properties)
-    const portfolioFilter = {
-      OR: [
-        // Properties owned by the specified portfolios
-        { portfolio_id: { in: data.portfolio_ids } },
-        // Properties shared with the specified portfolios
-        {
-          show_in_portfolio: {
-            hasSome: data.portfolio_ids
-          }
-        }
-      ]
-    }
-
+    // Owned by one of the portfolios only — exclude properties only shown in via show_in_portfolio
     const whereClause = {
       ...baseWhere,
-      ...portfolioFilter
+      portfolio_id: { in: data.portfolio_ids }
     }
 
     const queryOptions = {
@@ -1149,18 +1136,13 @@ export class PropertyService implements IPropertyService {
     )
 
     // Add access_type field to each property and filter bank details based on permission
-    return properties.map((property: any) => {
-      const accessType = data.portfolio_ids.includes(property.portfolio_id)
-        ? 'owned'
-        : 'shared'
-      return {
-        ...property,
-        bankDetails: canReadBankDetails(user)
-          ? maskBankDetails(property.bankDetails)
-          : null,
-        access_type: accessType
-      }
-    })
+    return properties.map((property: any) => ({
+      ...property,
+      bankDetails: canReadBankDetails(user)
+        ? maskBankDetails(property.bankDetails)
+        : null,
+      access_type: 'owned' as const
+    }))
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
@@ -1324,12 +1306,8 @@ export class PropertyService implements IPropertyService {
     }
 
     if (data.portfolio_id) {
-      andParts.push({
-        OR: [
-          { portfolio_id: data.portfolio_id },
-          { show_in_portfolio: { has: data.portfolio_id } }
-        ]
-      })
+      // Only properties owned by this portfolio — exclude "show in portfolio" (shared) rows
+      andParts.push({ portfolio_id: data.portfolio_id })
     }
 
     if (
