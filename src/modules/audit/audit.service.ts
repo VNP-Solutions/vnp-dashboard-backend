@@ -1526,6 +1526,8 @@ export class AuditService implements IAuditService {
 
           // Extract review collection date (if provided) - use raw value to preserve Excel date format
           const reviewCollectionDateValue = getRawValue(row, [
+            'Review/Collection Date',
+            'Review/collection date',
             'Review Collection Date',
             'Review collection date',
             'Review collection Date',
@@ -2121,6 +2123,8 @@ export class AuditService implements IAuditService {
 
           // Extract review collection date (use raw value to preserve Excel date format) - optional
           const reviewCollectionDateValue = getRawValue(row, [
+            'Review/Collection Date',
+            'Review/collection date',
             'Review Collection Date',
             'Review collection date',
             'Review collection Date',
@@ -2778,6 +2782,8 @@ export class AuditService implements IAuditService {
     ]
     const BATCH_COLS = ['Batch', 'Batch No', 'Batch NO', 'Batch no']
     const REVIEW_COLLECTION_DATE_COLS = [
+      'Review/Collection Date',
+      'Review/collection date',
       'Review Collection Date',
       'Review collection date',
       'Review collection Date',
@@ -3276,7 +3282,7 @@ export class AuditService implements IAuditService {
             `Agoda=$${agodaSum.toFixed(2)}, ` +
             `Booking=$${bookingSum.toFixed(2)}, ` +
             `Batch="${batch || 'None'}", ` +
-            `Review Collection Date=${parsedReviewCollectionDate
+            `Review/Collection Date=${parsedReviewCollectionDate
               ? parsedReviewCollectionDate.toISOString().split('T')[0]
               : 'Not set'
             }`
