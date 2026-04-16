@@ -441,6 +441,8 @@ export class AuditController {
     - If Batch column is present, audits are assigned to the specified batch (created if doesn't exist).
     - If Review/Collection Date column is present, the date value is set on the audit (first value per property+status group is used).
 
+    Consolidated reports and portfolio total audit count are not updated by this endpoint — upload consolidated reports via the consolidated-report API to increment the portfolio total.
+
     Validation (pre-flight):
     - If any Portfolio or property (by Hotel ID + OTA or by Hotel Name) cannot be found in the database, NO audits are created and the full error list is returned.
     `
