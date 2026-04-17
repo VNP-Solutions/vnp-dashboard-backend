@@ -1969,6 +1969,10 @@ export class PortfolioService implements IPortfolioService {
       throw new NotFoundException('Portfolio not found')
     }
 
+    const totalAuditCount = await this.prisma.consolidatedReport.count({
+      where: { portfolio_id: portfolioId }
+    })
+
     // Calculate date range based on duration
     const now = new Date()
     let startDate: Date
@@ -2034,7 +2038,7 @@ export class PortfolioService implements IPortfolioService {
           booking: 0,
           agoda: 0
         },
-        total_audit_count: 0,
+        total_audit_count: totalAuditCount,
         recent_audits: []
       }
     }
@@ -2062,9 +2066,6 @@ export class PortfolioService implements IPortfolioService {
         booking_amount_confirmed: true
       }
     })
-
-    // Get total count from portfolio's tracked import counter
-    const totalAuditCount = portfolio.total_audit_count ?? 0
 
     // Initialize amounts
     const amountCollectable = {

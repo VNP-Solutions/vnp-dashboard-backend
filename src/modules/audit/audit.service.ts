@@ -1526,6 +1526,8 @@ export class AuditService implements IAuditService {
 
           // Extract review collection date (if provided) - use raw value to preserve Excel date format
           const reviewCollectionDateValue = getRawValue(row, [
+            'Review/Collection Date',
+            'Review/collection date',
             'Review Collection Date',
             'Review collection date',
             'Review collection Date',
@@ -2121,6 +2123,8 @@ export class AuditService implements IAuditService {
 
           // Extract review collection date (use raw value to preserve Excel date format) - optional
           const reviewCollectionDateValue = getRawValue(row, [
+            'Review/Collection Date',
+            'Review/collection date',
             'Review Collection Date',
             'Review collection date',
             'Review collection Date',
@@ -2331,20 +2335,18 @@ export class AuditService implements IAuditService {
       }
     })
 
-    // Get total count by summing total_audit_count across all accessible portfolios
     const accessiblePortfolioIds =
       await this.permissionService.getAccessibleResourceIds(
         user,
         ModuleType.PORTFOLIO
       )
-    const portfolioAggregation = await this.prisma.portfolio.aggregate({
-      where:
-        accessiblePortfolioIds === 'all'
-          ? {}
-          : { id: { in: accessiblePortfolioIds } },
-      _sum: { total_audit_count: true }
+    const consolidatedReportWhere =
+      accessiblePortfolioIds === 'all'
+        ? {}
+        : { portfolio_id: { in: accessiblePortfolioIds } }
+    const totalAuditCount = await this.prisma.consolidatedReport.count({
+      where: consolidatedReportWhere
     })
-    const totalAuditCount = portfolioAggregation._sum.total_audit_count ?? 0
 
     // Initialize amounts
     const amountCollectable = {
@@ -2778,6 +2780,8 @@ export class AuditService implements IAuditService {
     ]
     const BATCH_COLS = ['Batch', 'Batch No', 'Batch NO', 'Batch no']
     const REVIEW_COLLECTION_DATE_COLS = [
+      'Review/Collection Date',
+      'Review/collection date',
       'Review Collection Date',
       'Review collection date',
       'Review collection Date',
@@ -2836,12 +2840,18 @@ export class AuditService implements IAuditService {
 
       const s = String(raw).trim()
 
-      // MM/DD/YYYY — canonical expected format
+      // Slash dates: MM/DD/YYYY when unambiguous; DD/MM/YYYY when day is first (>12)
       const slashParts = s.split('/')
       if (slashParts.length === 3) {
-        const [m, d, y] = slashParts.map(Number)
-        if (!isNaN(m) && !isNaN(d) && !isNaN(y) && y >= 1900 && y <= 2100) {
-          return new Date(y, m - 1, d)
+        const [a, b, y] = slashParts.map(Number)
+        if (!isNaN(a) && !isNaN(b) && !isNaN(y) && y >= 1900 && y <= 2100) {
+          if (a > 12) {
+            return new Date(y, b - 1, a)
+          }
+          if (b > 12) {
+            return new Date(y, a - 1, b)
+          }
+          return new Date(y, a - 1, b)
         }
       }
 
@@ -3276,7 +3286,7 @@ export class AuditService implements IAuditService {
             `Agoda=$${agodaSum.toFixed(2)}, ` +
             `Booking=$${bookingSum.toFixed(2)}, ` +
             `Batch="${batch || 'None'}", ` +
-            `Review Collection Date=${parsedReviewCollectionDate
+            `Review/Collection Date=${parsedReviewCollectionDate
               ? parsedReviewCollectionDate.toISOString().split('T')[0]
               : 'Not set'
             }`
@@ -3284,6 +3294,35 @@ export class AuditService implements IAuditService {
 
         // Build per-property xlsx (always xlsx regardless of uploaded file type)
       // Uses ExcelJS for bold headers and auto-fitted column widths
+      // SheetJS leaves Excel date cells as serial numbers; write real Date + numFmt so
+      // opened files show dates instead of raw numbers (e.g. 46125).
+      const isDateLikeColumnHeader = (header: string): boolean => {
+        const h = header.split('*')[0].trim().toLowerCase()
+        const markers = [
+          'date',
+          'check in',
+          'check-in',
+          'checkin',
+          'check out',
+          'checkout',
+          'review',
+          'collection',
+          'arrival',
+          'departure'
+        ]
+        return markers.some(m => h.includes(m))
+      }
+
+      const cellValueForExport = (header: string, raw: unknown): ExcelJS.CellValue => {
+        if (raw === undefined || raw === null || raw === '') return ''
+        if (!isDateLikeColumnHeader(header)) {
+          return raw as ExcelJS.CellValue
+        }
+        if (raw instanceof Date) return raw
+        const parsed = parseDate(raw)
+        return parsed ?? (raw as ExcelJS.CellValue)
+      }
+
       const excelWb = new ExcelJS.Workbook()
       const excelWs = excelWb.addWorksheet('Report')
 
@@ -3295,14 +3334,30 @@ export class AuditService implements IAuditService {
 
       // Data rows
       for (const dataRow of rows) {
-        excelWs.addRow(originalHeaders.map(h => dataRow[h] ?? ''))
+        const row = excelWs.addRow(
+          originalHeaders.map(h => cellValueForExport(h, dataRow[h]))
+        )
+        row.eachCell(cell => {
+          if (cell.value instanceof Date) {
+            // Match typical auto-import sheet display: month/day/year (US-style)
+            cell.numFmt = 'mm/dd/yyyy'
+          }
+        })
       }
 
       // Column widths: based on the longest value in each column (header + data)
       originalHeaders.forEach((header, colIdx) => {
         const maxContentLen = rows.reduce((max, dataRow) => {
-          const val = String(dataRow[header] ?? '')
-          return Math.max(max, val.length)
+          const exported = cellValueForExport(header, dataRow[header])
+          const len =
+            exported instanceof Date
+              ? 10
+              : typeof exported === 'number' ||
+                  typeof exported === 'string' ||
+                  typeof exported === 'boolean'
+                ? String(exported).length
+                : 12
+          return Math.max(max, len)
         }, 0)
         const width = Math.min(Math.max(header.length, maxContentLen) + 4, 60)
         excelWs.getColumn(colIdx + 1).width = width
@@ -3364,87 +3419,6 @@ export class AuditService implements IAuditService {
           `  - Property: "${audit.property}", Audit ID: ${audit.audit_id}, Report: ${audit.report_url}`
         )
       })
-
-      // Upload original sheet as a consolidated report and increment portfolio counter
-      try {
-        this.logger.success(
-          `[POST-IMPORT] Starting consolidated report upload and portfolio counter increment`
-        )
-
-        const portfolioName = portfolioCache.keys().next().value as string
-        this.logger.success(
-          `[POST-IMPORT] Resolved portfolio name from cache: "${portfolioName}"`
-        )
-
-        const portfolio = await this.portfolioRepository.findByName(portfolioName)
-        this.logger.success(
-          `[POST-IMPORT] Portfolio lookup result: ${portfolio ? `FOUND (id=${portfolio.id})` : 'NOT FOUND — skipping'}`
-        )
-
-        if (portfolio) {
-          this.logger.success(
-            `[POST-IMPORT] Uploading original import file to S3 (size=${file?.size ?? 'unknown'} bytes, name="${file?.originalname ?? 'unknown'}")`
-          )
-          const originalUpload = await this.fileUploadService.uploadFile(file)
-          this.logger.success(
-            `[POST-IMPORT] Original file uploaded successfully: ${originalUpload.url}`
-          )
-
-          this.logger.success(
-            `[POST-IMPORT] Creating consolidated report for portfolio "${portfolioName}" (id=${portfolio.id})`
-          )
-          await this.prisma.consolidatedReport.create({
-            data: {
-              url: originalUpload.url,
-              portfolio_id: portfolio.id,
-              user_id: user.id
-            }
-          })
-          this.logger.success(
-            `[POST-IMPORT] Consolidated report created successfully`
-          )
-
-          // Send email notification to portfolio contact email(s)
-          if (portfolio.contact_email) {
-            const recipientEmails = portfolio.contact_email
-              .split(',')
-              .map(e => e.trim())
-              .filter(e => e.length > 0)
-
-            if (recipientEmails.length > 0) {
-              void this.emailUtil.sendConsolidatedReportUploadedEmail(
-                recipientEmails,
-                portfolioName,
-                [originalUpload.url],
-                new Date()
-              )
-              this.logger.success(
-                `[POST-IMPORT] Consolidated report email queued for: ${recipientEmails.join(', ')}`
-              )
-            }
-          }
-
-          this.logger.success(
-            `[POST-IMPORT] Incrementing total_audit_count for portfolio "${portfolioName}" (id=${portfolio.id}, current=${portfolio.total_audit_count ?? 0})`
-          )
-          const newCount = (portfolio.total_audit_count ?? 0) + 1
-          await this.prisma.portfolio.update({
-            where: { id: portfolio.id },
-            data: { total_audit_count: newCount }
-          })
-          this.logger.success(
-            `[POST-IMPORT] Portfolio counter updated successfully — total_audit_count set to ${newCount}`
-          )
-        }
-      } catch (error) {
-        this.logger.error(
-          `[POST-IMPORT] FAILED: ` +
-            `${error instanceof Error ? error.message : 'Unknown error'}`
-        )
-        this.logger.error(
-          `[POST-IMPORT] Stack: ${error instanceof Error ? error.stack : 'N/A'}`
-        )
-      }
     }
 
     return { success: true, created_audits: createdAudits }
