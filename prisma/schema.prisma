@@ -576,8 +576,8 @@ model PendingAction {
   audit             Audit?              @relation(fields: [audit_id], references: [id], onDelete: Cascade)
   action_type       PendingActionType
   status            PendingActionStatus @default(PENDING)
-  requested_user_id String              @db.ObjectId
-  requestedBy       User                @relation("PendingActionRequestedBy", fields: [requested_user_id], references: [id], onDelete: Cascade)
+  requested_user_id String?             @db.ObjectId
+  requestedBy       User?               @relation("PendingActionRequestedBy", fields: [requested_user_id], references: [id], onDelete: SetNull)
   transfer_data     TransferData? // Stores new_portfolio_id for transfer actions
   audit_update_data AuditUpdateData? // Stores amount_confirmed for audit update actions
   reason            String? // Reason provided by requester for the action
