@@ -126,17 +126,18 @@ export class EncryptionUtil {
   }
 
   static generateTempPassword(): string {
-    const chars =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+    const digits = '0123456789'
+    const all = uppercase + lowercase + digits
+
     let password = ''
+    password += uppercase.charAt(Math.floor(Math.random() * uppercase.length))
+    password += lowercase.charAt(Math.floor(Math.random() * lowercase.length))
+    password += digits.charAt(Math.floor(Math.random() * digits.length))
 
-    password += chars.charAt(Math.floor(Math.random() * 26))
-    password += chars.charAt(26 + Math.floor(Math.random() * 26))
-    password += chars.charAt(52 + Math.floor(Math.random() * 10))
-    password += chars.charAt(62 + Math.floor(Math.random() * 8))
-
-    for (let i = 0; i < 8; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length))
+    for (let i = 0; i < 9; i++) {
+      password += all.charAt(Math.floor(Math.random() * all.length))
     }
 
     return password
