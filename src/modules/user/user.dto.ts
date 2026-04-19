@@ -271,6 +271,36 @@ export class AdminResetUserPasswordDto {
   new_password: string
 }
 
+export class AdminActivateUserDto {
+  @ApiProperty({
+    example: 123456,
+    description: '6-digit OTP sent to your email to authorize this action',
+    minimum: 100000,
+    maximum: 999999
+  })
+  @IsNumber()
+  @IsNotEmpty()
+  @Min(100000)
+  @Max(999999)
+  otp: number
+
+  @ApiProperty({
+    example: 'NewPass123!',
+    description:
+      'Initial password to set for the user (8-32 chars, letter, number, special character)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(
+    /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,32}$/,
+    {
+      message:
+        'Password must be 8-32 characters long and contain at least one letter, one number, and one special character'
+    }
+  )
+  new_password: string
+}
+
 export class UserProfileResponseDto {
   @ApiProperty({
     example: {

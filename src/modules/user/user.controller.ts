@@ -28,6 +28,7 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
+  AdminActivateUserDto,
   AdminResetUserPasswordDto,
   AssignUserRoleDto,
   DeleteUserDto,
@@ -148,6 +149,48 @@ export class UserController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.userService.resetPasswordByAdmin(id, dto, user)
+  }
+
+  @Post(':id/activate/otp')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary:
+      "Request an OTP (sent to your email) to activate an unverified user's account and set their initial password (super admin only)"
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP sent successfully'
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request - User already activated or invalid request' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Only super admins can activate users' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  requestAdminActivateUserOtp(
+    @Param('id') id: string,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.userService.requestAdminActivateUserOtp(id, user)
+  }
+
+  @Patch(':id/activate')
+  @RequirePermission(ModuleType.USER, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary:
+      'Activate a user account using the OTP from POST .../activate/otp — sets their initial password and marks them verified (super admin only). Invalidates any pending invitation link.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User activated successfully'
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request - Invalid OTP or user already activated' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Only super admins can activate users' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  activateUserByAdmin(
+    @Param('id') id: string,
+    @Body() dto: AdminActivateUserDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.userService.activateUserByAdmin(id, dto, user)
   }
 
   @Patch(':id')
