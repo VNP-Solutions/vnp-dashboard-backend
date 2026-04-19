@@ -2,6 +2,7 @@ import { Prisma, User } from '@prisma/client'
 import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
+  AdminActivateUserDto,
   AdminResetUserPasswordDto,
   AssignUserRoleDto,
   DeleteUserDto,
@@ -205,6 +206,15 @@ export interface IUserService {
   resetPasswordByAdmin(
     id: string,
     data: AdminResetUserPasswordDto,
+    user: IUserWithPermissions
+  ): Promise<{ message: string }>
+  requestAdminActivateUserOtp(
+    id: string,
+    user: IUserWithPermissions
+  ): Promise<{ message: string }>
+  activateUserByAdmin(
+    id: string,
+    data: AdminActivateUserDto,
     user: IUserWithPermissions
   ): Promise<{ message: string }>
 }

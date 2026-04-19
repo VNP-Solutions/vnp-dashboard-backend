@@ -361,6 +361,12 @@ export class AuthService implements IAuthService {
       throw new BadRequestException('Invalid credentials')
     }
 
+    if (user.is_verified) {
+      throw new BadRequestException(
+        'This invitation link is no longer valid. Your account has already been verified.'
+      )
+    }
+
     if (!user.temp_password) {
       throw new BadRequestException('No pending invitation found')
     }
@@ -385,7 +391,7 @@ export class AuthService implements IAuthService {
   async requestPasswordReset(email: string): Promise<{ message: string }> {
     const user = await this.authRepository.findUserByEmail(email)
 
-    if (!user) {
+    if (!user || !user.is_verified) {
       return { message: 'If the email exists, an OTP has been sent' }
     }
 
@@ -408,6 +414,12 @@ export class AuthService implements IAuthService {
 
     if (!user) {
       throw new BadRequestException('Invalid credentials')
+    }
+
+    if (!user.is_verified) {
+      throw new BadRequestException(
+        'Account not yet verified. Please complete your invitation before resetting your password.'
+      )
     }
 
     const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
