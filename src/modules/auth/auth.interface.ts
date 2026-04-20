@@ -25,12 +25,16 @@ export interface IAuthRepository {
     userId: string,
     otp: number,
     expiresAt: Date,
-    adminPasswordResetForUserId?: string | null
+    adminPasswordResetForUserId?: string | null,
+    adminVerifyForUserId?: string | null
   ): Promise<void>
   findValidOtp(
     userId: string,
     otp: number,
-    options?: { adminPasswordResetForUserId?: string }
+    options?: {
+      adminPasswordResetForUserId?: string
+      adminVerifyForUserId?: string
+    }
   ): Promise<Otp | null>
   markOtpAsUsed(otpId: string): Promise<void>
   createUser(data: {

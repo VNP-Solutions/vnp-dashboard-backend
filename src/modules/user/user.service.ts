@@ -20,6 +20,7 @@ import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type { IAuthRepository } from '../auth/auth.interface'
 import { PrismaService } from '../prisma/prisma.service'
 import {
+  AdminActivateUserDto,
   AdminResetUserPasswordDto,
   AssignUserRoleDto,
   DeleteUserDto,
@@ -533,6 +534,12 @@ export class UserService implements IUserService {
       throw new NotFoundException('User not found')
     }
 
+    if (!targetUser.is_verified) {
+      throw new BadRequestException(
+        'Cannot reset the password of an unverified user. Please verify the user account first.'
+      )
+    }
+
     const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       currentUser,
       ModuleType.USER
@@ -551,6 +558,87 @@ export class UserService implements IUserService {
     }
 
     return targetUser
+  }
+
+  async requestAdminActivateUserOtp(
+    id: string,
+    currentUser: IUserWithPermissions
+  ): Promise<{ message: string }> {
+    if (!isUserSuperAdmin(currentUser)) {
+      throw new ForbiddenException('Only super admins can activate user accounts')
+    }
+
+    if (currentUser.id === id) {
+      throw new BadRequestException('You cannot activate your own account')
+    }
+
+    const targetUser = await this.userRepository.findById(id)
+
+    if (!targetUser) {
+      throw new NotFoundException('User not found')
+    }
+
+    if (targetUser.is_verified) {
+      throw new BadRequestException('This user is already activated')
+    }
+
+    const otp = EncryptionUtil.generateOtp()
+    const expiryMinutes = this.configService.get('auth.otpExpiryMinutes', {
+      infer: true
+    })!
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
+
+    await this.authRepository.createOtp(currentUser.id, otp, expiresAt, null, id)
+
+    await this.emailUtil.sendAdminUserVerifyOtpEmail(
+      currentUser.email,
+      otp,
+      `${targetUser.first_name} ${targetUser.last_name}`.trim(),
+      targetUser.email
+    )
+
+    console.log(
+      `Admin user activate OTP for ${currentUser.email} (target ${targetUser.email}): ${otp}`
+    )
+
+    return { message: 'An OTP has been sent to your email address' }
+  }
+
+  async activateUserByAdmin(
+    id: string,
+    data: AdminActivateUserDto,
+    currentUser: IUserWithPermissions
+  ): Promise<{ message: string }> {
+    if (!isUserSuperAdmin(currentUser)) {
+      throw new ForbiddenException('Only super admins can activate user accounts')
+    }
+
+    const targetUser = await this.userRepository.findById(id)
+
+    if (!targetUser) {
+      throw new NotFoundException('User not found')
+    }
+
+    if (targetUser.is_verified) {
+      throw new BadRequestException('This user is already activated')
+    }
+
+    const validOtp = await this.authRepository.findValidOtp(
+      currentUser.id,
+      data.otp,
+      { adminVerifyForUserId: id }
+    )
+
+    if (!validOtp) {
+      throw new BadRequestException('Invalid or expired OTP')
+    }
+
+    await this.authRepository.markOtpAsUsed(validOtp.id)
+
+    const hashedPassword = await EncryptionUtil.hashPassword(data.new_password)
+    await this.userRepository.updatePassword(id, hashedPassword)
+
+    return { message: 'User activated successfully' }
   }
 
   async findAll(query: UserQueryDto, user: IUserWithPermissions) {
