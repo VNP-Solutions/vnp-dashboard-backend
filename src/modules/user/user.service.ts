@@ -34,6 +34,8 @@ import type {
   UserWithDetails
 } from './user.interface'
 
+const DB_EMAIL_TX = { maxWait: 10_000, timeout: 60_000 } as const
+
 @Injectable()
 export class UserService implements IUserService {
   constructor(
@@ -470,19 +472,22 @@ export class UserService implements IUserService {
     })!
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
 
-    await this.authRepository.createOtp(
-      currentUser.id,
-      otp,
-      expiresAt,
-      id
-    )
+    await this.prisma.$transaction(async tx => {
+      await this.authRepository.createOtpTx(
+        tx,
+        currentUser.id,
+        otp,
+        expiresAt,
+        id
+      )
 
-    await this.emailUtil.sendAdminUserPasswordResetOtpEmail(
-      currentUser.email,
-      otp,
-      `${targetUser.first_name} ${targetUser.last_name}`.trim(),
-      targetUser.email
-    )
+      await this.emailUtil.sendAdminUserPasswordResetOtpEmail(
+        currentUser.email,
+        otp,
+        `${targetUser.first_name} ${targetUser.last_name}`.trim(),
+        targetUser.email
+      )
+    }, DB_EMAIL_TX)
 
     console.log(
       `Admin user password reset OTP for ${currentUser.email} (target ${targetUser.email}): ${otp}`
@@ -565,7 +570,9 @@ export class UserService implements IUserService {
     currentUser: IUserWithPermissions
   ): Promise<{ message: string }> {
     if (!isUserSuperAdmin(currentUser)) {
-      throw new ForbiddenException('Only super admins can activate user accounts')
+      throw new ForbiddenException(
+        'Only super admins can activate user accounts'
+      )
     }
 
     if (currentUser.id === id) {
@@ -588,14 +595,23 @@ export class UserService implements IUserService {
     })!
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
 
-    await this.authRepository.createOtp(currentUser.id, otp, expiresAt, null, id)
+    await this.prisma.$transaction(async tx => {
+      await this.authRepository.createOtpTx(
+        tx,
+        currentUser.id,
+        otp,
+        expiresAt,
+        null,
+        id
+      )
 
-    await this.emailUtil.sendAdminUserVerifyOtpEmail(
-      currentUser.email,
-      otp,
-      `${targetUser.first_name} ${targetUser.last_name}`.trim(),
-      targetUser.email
-    )
+      await this.emailUtil.sendAdminUserVerifyOtpEmail(
+        currentUser.email,
+        otp,
+        `${targetUser.first_name} ${targetUser.last_name}`.trim(),
+        targetUser.email
+      )
+    }, DB_EMAIL_TX)
 
     console.log(
       `Admin user activate OTP for ${currentUser.email} (target ${targetUser.email}): ${otp}`
@@ -610,7 +626,9 @@ export class UserService implements IUserService {
     currentUser: IUserWithPermissions
   ): Promise<{ message: string }> {
     if (!isUserSuperAdmin(currentUser)) {
-      throw new ForbiddenException('Only super admins can activate user accounts')
+      throw new ForbiddenException(
+        'Only super admins can activate user accounts'
+      )
     }
 
     const targetUser = await this.userRepository.findById(id)

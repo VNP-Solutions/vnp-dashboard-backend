@@ -11,6 +11,7 @@ import {
   ValidateNested
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
+import type { MultiRecipientEmailResult } from '../email/email.dto'
 
 export class CreateConsolidatedReportDto {
   @ApiProperty({
@@ -68,7 +69,10 @@ export class BulkCreateResultDto {
   @ApiProperty({ example: 3, description: 'Total reports in request' })
   totalReports: number
 
-  @ApiProperty({ example: 2, description: 'Successfully created reports count' })
+  @ApiProperty({
+    example: 2,
+    description: 'Successfully created reports count'
+  })
   successCount: number
 
   @ApiProperty({ example: 1, description: 'Failed reports count' })
@@ -85,6 +89,12 @@ export class BulkCreateResultDto {
     description: 'Array of successfully created report IDs'
   })
   successfulReportIds: string[]
+
+  @ApiPropertyOptional({
+    description:
+      'Present when at least one recipient did not receive the notification email; reports were still created'
+  })
+  email_delivery?: MultiRecipientEmailResult
 }
 
 export class UpdateConsolidatedReportDto extends PartialType(
@@ -123,7 +133,10 @@ export class BulkDeleteResultDto {
   @ApiProperty({ example: 3, description: 'Total reports in request' })
   totalReports: number
 
-  @ApiProperty({ example: 2, description: 'Successfully deleted reports count' })
+  @ApiProperty({
+    example: 2,
+    description: 'Successfully deleted reports count'
+  })
   successCount: number
 
   @ApiProperty({ example: 1, description: 'Failed deletions count' })

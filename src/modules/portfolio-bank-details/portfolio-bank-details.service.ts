@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException
 } from '@nestjs/common'
 import { BankSubType, BankType } from '@prisma/client'
@@ -28,6 +29,8 @@ import type {
 export class PortfolioBankDetailsService
   implements IPortfolioBankDetailsService
 {
+  private readonly logger = new Logger(PortfolioBankDetailsService.name)
+
   constructor(
     @Inject('IPortfolioBankDetailsRepository')
     private portfolioBankDetailsRepository: IPortfolioBankDetailsRepository,
@@ -402,12 +405,18 @@ export class PortfolioBankDetailsService
         return
       }
 
-      await this.emailUtil.sendBankDetailsUpdateEmail(
+      const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
         [portfolio.name],
         location ?? null,
         new Date()
       )
+      if (bankEmailResult.failed.length > 0) {
+        this.logger.warn(
+          'Portfolio bank details notification email partial failure',
+          { failed: bankEmailResult.failed }
+        )
+      }
     } catch (error) {
       console.error(
         'Error sending portfolio bank details notification:',
