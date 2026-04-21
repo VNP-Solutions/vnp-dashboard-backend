@@ -137,6 +137,33 @@ export class AuthRepository implements IAuthRepository {
     })
   }
 
+  /** Unused OTP matching the code (may be expired). Same scope filters as findValidOtp. */
+  async findUnusedOtpByCode(
+    userId: string,
+    otp: number,
+    options?: {
+      adminPasswordResetForUserId?: string
+      adminVerifyForUserId?: string
+    }
+  ): Promise<Otp | null> {
+    return this.prisma.otp.findFirst({
+      where: {
+        user_id: userId,
+        otp,
+        is_used: false,
+        admin_password_reset_for_user_id:
+          options?.adminPasswordResetForUserId !== undefined
+            ? options.adminPasswordResetForUserId
+            : null,
+        admin_verify_for_user_id:
+          options?.adminVerifyForUserId !== undefined
+            ? options.adminVerifyForUserId
+            : null
+      },
+      orderBy: { created_at: 'desc' }
+    })
+  }
+
   async markOtpAsUsed(otpId: string): Promise<void> {
     await this.prisma.otp.update({
       where: { id: otpId },

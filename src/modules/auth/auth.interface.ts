@@ -66,6 +66,14 @@ export interface IAuthRepository {
       adminVerifyForUserId?: string
     }
   ): Promise<Otp | null>
+  findUnusedOtpByCode(
+    userId: string,
+    otp: number,
+    options?: {
+      adminPasswordResetForUserId?: string
+      adminVerifyForUserId?: string
+    }
+  ): Promise<Otp | null>
   markOtpAsUsed(otpId: string): Promise<void>
   createUser(data: {
     email: string
