@@ -107,7 +107,7 @@ export class AuthService implements IAuthService {
 
       return { message: 'OTP sent to your email' }
     } catch (error) {
-      this.logError('requestLoginOtp', error)
+      this.logError('requestLoginOtp', error, email)
       throw error
     }
   }
@@ -135,7 +135,7 @@ export class AuthService implements IAuthService {
 
       return this.generateAuthResponse(userWithRole as unknown as UserWithRole)
     } catch (error) {
-      this.logError('verifyLoginOtp', error)
+      this.logError('verifyLoginOtp', error, data.email)
       throw error
     }
   }
@@ -277,7 +277,7 @@ export class AuthService implements IAuthService {
         message: `Invitation sent successfully. Temporary password is valid for ${expiryDays} days.`
       }
     } catch (error) {
-      this.logError('inviteUser', error)
+      this.logError('inviteUser', error, data.email)
       throw error
     }
   }
@@ -366,13 +366,15 @@ export class AuthService implements IAuthService {
         role.is_external
       )
 
-      console.log(`Invitation resent to ${email}. Temp password: ${tempPassword}`)
+      console.log(
+        `Invitation resent to ${email}. Temp password: ${tempPassword}`
+      )
 
       return {
         message: `Invitation resent successfully. Temporary password is valid for ${expiryDays} days.`
       }
     } catch (error) {
-      this.logError('resendInvitation', error)
+      this.logError('resendInvitation', error, email)
       throw error
     }
   }
@@ -412,7 +414,7 @@ export class AuthService implements IAuthService {
 
       return this.generateAuthResponse(updatedUser as unknown as UserWithRole)
     } catch (error) {
-      this.logError('verifyInvitation', error)
+      this.logError('verifyInvitation', error, data.email)
       throw error
     }
   }
@@ -438,7 +440,7 @@ export class AuthService implements IAuthService {
 
       return { message: 'If the email exists, an OTP has been sent' }
     } catch (error) {
-      this.logError('requestPasswordReset', error)
+      this.logError('requestPasswordReset', error, email)
       throw error
     }
   }
@@ -472,7 +474,7 @@ export class AuthService implements IAuthService {
 
       return { message: 'Password reset successfully' }
     } catch (error) {
-      this.logError('resetPassword', error)
+      this.logError('resetPassword', error, data.email)
       throw error
     }
   }
@@ -497,17 +499,38 @@ export class AuthService implements IAuthService {
 
       return this.generateAuthResponse(userWithRole as unknown as UserWithRole)
     } catch (error) {
-      this.logError('refreshAccessToken', error)
+      this.logError(
+        'refreshAccessToken',
+        error,
+        this.getEmailFromRefreshToken(refreshToken)
+      )
       throw new UnauthorizedException('Invalid or expired refresh token')
     }
   }
 
-  private logError(context: string, error: unknown): void {
+  private logError(context: string, error: unknown, email?: string): void {
     const errorResponse =
       error instanceof HttpException ? error.getResponse() : error
 
-    console.error(`[AuthService.${context}]`, errorResponse)
-    console.error(error)
+    console.error(
+      `[AuthService.${context}]`,
+      email ? { email, error: errorResponse } : errorResponse
+    )
+  }
+
+  private getEmailFromRefreshToken(refreshToken: string): string | undefined {
+    const decodedToken = this.jwtService.decode(refreshToken)
+
+    if (
+      decodedToken &&
+      typeof decodedToken === 'object' &&
+      'email' in decodedToken &&
+      typeof decodedToken.email === 'string'
+    ) {
+      return decodedToken.email
+    }
+
+    return undefined
   }
 
   private generateAuthResponse(user: UserWithRole): AuthResponseDto {
