@@ -418,7 +418,11 @@ export class AuthService implements IAuthService {
       await this.prisma.$transaction(async tx => {
         await tx.user.update({
           where: { id: user.id },
-          data: { password: hashedNewPassword, temp_password: null, is_verified: true }
+          data: {
+            password: hashedNewPassword,
+            temp_password: null,
+            is_verified: true
+          }
         })
       })
 
@@ -445,7 +449,9 @@ export class AuthService implements IAuthService {
       }
 
       if (!user.is_verified) {
-        return { message: 'If the email exists, an OTP has been sent' }
+        throw new BadRequestException(
+          'User is not verified, please verify the invitation first!'
+        )
       }
 
       const otp = EncryptionUtil.generateOtp()
@@ -461,7 +467,7 @@ export class AuthService implements IAuthService {
 
       console.log(`Password Reset OTP for ${user.email}: ${otp}`)
 
-      return { message: 'If the email exists, an OTP has been sent' }
+      return { message: 'An OTP has been sent to the email' }
     } catch (error) {
       this.logError('requestPasswordReset', error, email)
       throw error
