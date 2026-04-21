@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
@@ -73,7 +74,7 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(email)
 
     if (!user) {
-      throw new BadRequestException('User not found with this email address')
+      throw new NotFoundException('User not found with this email address')
     }
 
     if (user.temp_password) {
@@ -109,7 +110,7 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(data.email)
 
     if (!user) {
-      throw new BadRequestException('User not found with this email address')
+      throw new NotFoundException('User not found with this email address')
     }
 
     const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
@@ -358,7 +359,7 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(data.email)
 
     if (!user) {
-      throw new BadRequestException('User not found with this email address')
+      throw new NotFoundException('User not found with this email address')
     }
 
     if (user.is_verified) {
@@ -413,7 +414,7 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(data.email)
 
     if (!user) {
-      throw new BadRequestException('User not found with this email address')
+      throw new NotFoundException('User not found with this email address')
     }
 
     if (!user.is_verified) {
