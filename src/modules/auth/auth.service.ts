@@ -438,7 +438,13 @@ export class AuthService implements IAuthService {
     try {
       const user = await this.authRepository.findUserByEmail(email)
 
-      if (!user || !user.is_verified) {
+      if (!user) {
+        throw new NotFoundException(
+          "The user doesn't exist with this email address"
+        )
+      }
+
+      if (!user.is_verified) {
         return { message: 'If the email exists, an OTP has been sent' }
       }
 
