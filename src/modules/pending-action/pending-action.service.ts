@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   forwardRef
 } from '@nestjs/common'
@@ -16,6 +17,7 @@ import {
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import type { MultiRecipientEmailResult } from '../email/email.dto'
 import type { IPortfolioRepository } from '../portfolio/portfolio.interface'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IPropertyService } from '../property/property.interface'
@@ -31,6 +33,8 @@ import type {
 
 @Injectable()
 export class PendingActionService implements IPendingActionService {
+  private readonly logger = new Logger(PendingActionService.name)
+
   constructor(
     @Inject('IPendingActionRepository')
     private repository: IPendingActionRepository,
@@ -268,25 +272,30 @@ export class PendingActionService implements IPendingActionService {
     // Execute the actual action based on type
     await this.executeAction(pendingAction, user)
 
-    // Send email notification based on action type
+    let emailDelivery: MultiRecipientEmailResult | undefined
     if (pendingAction.action_type === PendingActionType.PROPERTY_TRANSFER) {
-      await this.sendTransferNotificationEmail(pendingAction)
+      emailDelivery = await this.sendTransferNotificationEmail(pendingAction)
     } else if (
       pendingAction.action_type === PendingActionType.PORTFOLIO_DEACTIVATE
     ) {
-      await this.sendPortfolioDeactivateNotificationEmail(pendingAction)
+      emailDelivery =
+        await this.sendPortfolioDeactivateNotificationEmail(pendingAction)
     } else if (
       pendingAction.action_type === PendingActionType.PORTFOLIO_ACTIVATE
     ) {
-      await this.sendPortfolioActivateNotificationEmail(pendingAction)
+      emailDelivery =
+        await this.sendPortfolioActivateNotificationEmail(pendingAction)
     }
 
     // Update the pending action status
-    return this.repository.update(id, {
+    const updated = await this.repository.update(id, {
       status: PendingActionStatus.APPROVED,
       approval_user_id: user.id,
       approved_at: new Date()
     })
+    return emailDelivery && emailDelivery.failed.length > 0
+      ? { ...updated, email_delivery: emailDelivery }
+      : updated
   }
 
   async reject(
@@ -315,19 +324,21 @@ export class PendingActionService implements IPendingActionService {
       throw new BadRequestException('Rejection reason is required')
     }
 
-    // Send rejection notification email
-    await this.sendRejectionNotificationEmail(
+    const emailDelivery = await this.sendRejectionNotificationEmail(
       pendingAction,
       data.rejection_reason
     )
 
     // Update the pending action status
-    return this.repository.update(id, {
+    const updated = await this.repository.update(id, {
       status: PendingActionStatus.REJECTED,
       approval_user_id: user.id,
       rejection_reason: data.rejection_reason,
       approved_at: new Date()
     })
+    return emailDelivery && emailDelivery.failed.length > 0
+      ? { ...updated, email_delivery: emailDelivery }
+      : updated
   }
 
   async findByPropertyId(propertyId: string) {
@@ -423,8 +434,10 @@ export class PendingActionService implements IPendingActionService {
 
         // Check that at least one amount is provided
         const hasAnyAmount =
-          pendingAction.audit_update_data.expedia_amount_confirmed !== undefined ||
-          pendingAction.audit_update_data.agoda_amount_confirmed !== undefined ||
+          pendingAction.audit_update_data.expedia_amount_confirmed !==
+            undefined ||
+          pendingAction.audit_update_data.agoda_amount_confirmed !==
+            undefined ||
           pendingAction.audit_update_data.booking_amount_confirmed !== undefined
 
         if (!hasAnyAmount) {
@@ -435,17 +448,23 @@ export class PendingActionService implements IPendingActionService {
 
         // Build update data with only the fields that are provided
         const updateData: any = {}
-        if (pendingAction.audit_update_data.expedia_amount_confirmed !== undefined) {
+        if (
+          pendingAction.audit_update_data.expedia_amount_confirmed !== undefined
+        ) {
           updateData.expedia_amount_confirmed = roundToDecimals(
             pendingAction.audit_update_data.expedia_amount_confirmed
           )
         }
-        if (pendingAction.audit_update_data.agoda_amount_confirmed !== undefined) {
+        if (
+          pendingAction.audit_update_data.agoda_amount_confirmed !== undefined
+        ) {
           updateData.agoda_amount_confirmed = roundToDecimals(
             pendingAction.audit_update_data.agoda_amount_confirmed
           )
         }
-        if (pendingAction.audit_update_data.booking_amount_confirmed !== undefined) {
+        if (
+          pendingAction.audit_update_data.booking_amount_confirmed !== undefined
+        ) {
           updateData.booking_amount_confirmed = roundToDecimals(
             pendingAction.audit_update_data.booking_amount_confirmed
           )
@@ -557,160 +576,142 @@ export class PendingActionService implements IPendingActionService {
   /**
    * Send email notification for property transfer
    */
-  private async sendTransferNotificationEmail(pendingAction: any) {
-    try {
-      const recipientEmails: string[] = []
+  private async sendTransferNotificationEmail(
+    pendingAction: any
+  ): Promise<MultiRecipientEmailResult | undefined> {
+    const recipientEmails: string[] = []
 
-      // Get the requesting user's email
-      const requestingUser = await this.prisma.user.findUnique({
-        where: { id: pendingAction.requested_user_id },
-        select: { email: true }
-      })
+    // Get the requesting user's email
+    const requestingUser = await this.prisma.user.findUnique({
+      where: { id: pendingAction.requested_user_id },
+      select: { email: true }
+    })
 
-      if (requestingUser?.email) {
-        recipientEmails.push(requestingUser.email)
-      }
-
-      // Get property details
-      const property = await this.prisma.property.findUnique({
-        where: { id: pendingAction.property_id },
-        select: { name: true, portfolio_id: true }
-      })
-
-      if (!property) {
-        console.error('Property not found for email notification')
-        return
-      }
-
-      // Get current portfolio contact email
-      const currentPortfolio = await this.portfolioRepository.findById(
-        property.portfolio_id
-      )
-
-      if (currentPortfolio?.contact_email) {
-        recipientEmails.push(currentPortfolio.contact_email)
-      }
-
-      // Get new portfolio details
-      const newPortfolio = await this.portfolioRepository.findById(
-        pendingAction.transfer_data.new_portfolio_id
-      )
-
-      if (!newPortfolio) {
-        console.error('New portfolio not found for email notification')
-        return
-      }
-
-      if (newPortfolio.contact_email) {
-        recipientEmails.push(newPortfolio.contact_email)
-      }
-
-      // Send the email to all recipients (duplicates will be removed by the email utility)
-      await this.emailUtil.sendPropertyTransferEmail(
-        recipientEmails,
-        property.name,
-        newPortfolio.name,
-        new Date()
-      )
-    } catch (error) {
-      // Log the error but don't fail the approval process
-      console.error(
-        'Failed to send property transfer notification email:',
-        error
-      )
+    if (requestingUser?.email) {
+      recipientEmails.push(requestingUser.email)
     }
+
+    // Get property details
+    const property = await this.prisma.property.findUnique({
+      where: { id: pendingAction.property_id },
+      select: { name: true, portfolio_id: true }
+    })
+
+    if (!property) {
+      console.error('Property not found for email notification')
+      return undefined
+    }
+
+    // Get current portfolio contact email
+    const currentPortfolio = await this.portfolioRepository.findById(
+      property.portfolio_id
+    )
+
+    if (currentPortfolio?.contact_email) {
+      recipientEmails.push(currentPortfolio.contact_email)
+    }
+
+    // Get new portfolio details
+    const newPortfolio = await this.portfolioRepository.findById(
+      pendingAction.transfer_data.new_portfolio_id
+    )
+
+    if (!newPortfolio) {
+      console.error('New portfolio not found for email notification')
+      return undefined
+    }
+
+    if (newPortfolio.contact_email) {
+      recipientEmails.push(newPortfolio.contact_email)
+    }
+
+    // Send the email to all recipients (duplicates will be removed by the email utility)
+    return this.emailUtil.sendPropertyTransferEmail(
+      recipientEmails,
+      property.name,
+      newPortfolio.name,
+      new Date()
+    )
   }
 
   /**
    * Send email notification for portfolio deactivation approval
    */
-  private async sendPortfolioDeactivateNotificationEmail(pendingAction: any) {
-    try {
-      const recipientEmails: string[] = []
+  private async sendPortfolioDeactivateNotificationEmail(
+    pendingAction: any
+  ): Promise<MultiRecipientEmailResult | undefined> {
+    const recipientEmails: string[] = []
 
-      // Get the requesting user's email
-      const requestingUser = await this.prisma.user.findUnique({
-        where: { id: pendingAction.requested_user_id },
-        select: { email: true }
-      })
+    // Get the requesting user's email
+    const requestingUser = await this.prisma.user.findUnique({
+      where: { id: pendingAction.requested_user_id },
+      select: { email: true }
+    })
 
-      if (requestingUser?.email) {
-        recipientEmails.push(requestingUser.email)
-      }
-
-      // Get portfolio details
-      const portfolio = await this.portfolioRepository.findById(
-        pendingAction.portfolio_id
-      )
-
-      if (!portfolio) {
-        console.error('Portfolio not found for deactivation email notification')
-        return
-      }
-
-      if (portfolio.contact_email) {
-        recipientEmails.push(portfolio.contact_email)
-      }
-
-      // Send the email to all recipients
-      await this.emailUtil.sendPortfolioDeactivateEmail(
-        recipientEmails,
-        portfolio.name,
-        new Date()
-      )
-    } catch (error) {
-      // Log the error but don't fail the approval process
-      console.error(
-        'Failed to send portfolio deactivation notification email:',
-        error
-      )
+    if (requestingUser?.email) {
+      recipientEmails.push(requestingUser.email)
     }
+
+    // Get portfolio details
+    const portfolio = await this.portfolioRepository.findById(
+      pendingAction.portfolio_id
+    )
+
+    if (!portfolio) {
+      console.error('Portfolio not found for deactivation email notification')
+      return undefined
+    }
+
+    if (portfolio.contact_email) {
+      recipientEmails.push(portfolio.contact_email)
+    }
+
+    // Send the email to all recipients
+    return this.emailUtil.sendPortfolioDeactivateEmail(
+      recipientEmails,
+      portfolio.name,
+      new Date()
+    )
   }
 
   /**
    * Send email notification for portfolio activation approval
    */
-  private async sendPortfolioActivateNotificationEmail(pendingAction: any) {
-    try {
-      const recipientEmails: string[] = []
+  private async sendPortfolioActivateNotificationEmail(
+    pendingAction: any
+  ): Promise<MultiRecipientEmailResult | undefined> {
+    const recipientEmails: string[] = []
 
-      // Get the requesting user's email
-      const requestingUser = await this.prisma.user.findUnique({
-        where: { id: pendingAction.requested_user_id },
-        select: { email: true }
-      })
+    // Get the requesting user's email
+    const requestingUser = await this.prisma.user.findUnique({
+      where: { id: pendingAction.requested_user_id },
+      select: { email: true }
+    })
 
-      if (requestingUser?.email) {
-        recipientEmails.push(requestingUser.email)
-      }
-
-      // Get portfolio details
-      const portfolio = await this.portfolioRepository.findById(
-        pendingAction.portfolio_id
-      )
-
-      if (!portfolio) {
-        console.error('Portfolio not found for activation email notification')
-        return
-      }
-
-      if (portfolio.contact_email) {
-        recipientEmails.push(portfolio.contact_email)
-      }
-
-      // Send the email to all recipients
-      await this.emailUtil.sendPortfolioActivateEmail(
-        recipientEmails,
-        portfolio.name,
-        new Date()
-      )
-    } catch (error) {
-      // Log the error but don't fail the approval process
-      console.error(
-        'Failed to send portfolio activation notification email:',
-        error
-      )
+    if (requestingUser?.email) {
+      recipientEmails.push(requestingUser.email)
     }
+
+    // Get portfolio details
+    const portfolio = await this.portfolioRepository.findById(
+      pendingAction.portfolio_id
+    )
+
+    if (!portfolio) {
+      console.error('Portfolio not found for activation email notification')
+      return undefined
+    }
+
+    if (portfolio.contact_email) {
+      recipientEmails.push(portfolio.contact_email)
+    }
+
+    // Send the email to all recipients
+    return this.emailUtil.sendPortfolioActivateEmail(
+      recipientEmails,
+      portfolio.name,
+      new Date()
+    )
   }
 
   /**
@@ -719,248 +720,231 @@ export class PendingActionService implements IPendingActionService {
   private async sendRejectionNotificationEmail(
     pendingAction: any,
     rejectionReason: string
-  ) {
-    try {
-      const recipientEmails: string[] = []
+  ): Promise<MultiRecipientEmailResult | undefined> {
+    const recipientEmails: string[] = []
 
-      // Get the requesting user's email
-      const requestingUser = await this.prisma.user.findUnique({
-        where: { id: pendingAction.requested_user_id },
-        select: { email: true }
-      })
+    // Get the requesting user's email
+    const requestingUser = await this.prisma.user.findUnique({
+      where: { id: pendingAction.requested_user_id },
+      select: { email: true }
+    })
 
-      if (requestingUser?.email) {
-        recipientEmails.push(requestingUser.email)
+    if (requestingUser?.email) {
+      recipientEmails.push(requestingUser.email)
+    }
+
+    switch (pendingAction.action_type) {
+      case PendingActionType.PROPERTY_TRANSFER: {
+        // Get property details
+        const property = await this.prisma.property.findUnique({
+          where: { id: pendingAction.property_id },
+          select: { name: true, portfolio_id: true }
+        })
+
+        if (!property) {
+          console.error('Property not found for rejection email notification')
+          return undefined
+        }
+
+        // Get current portfolio details and contact email
+        const currentPortfolio = await this.portfolioRepository.findById(
+          property.portfolio_id
+        )
+
+        if (!currentPortfolio) {
+          console.error(
+            'Current portfolio not found for rejection email notification'
+          )
+          return undefined
+        }
+
+        if (currentPortfolio.contact_email) {
+          recipientEmails.push(currentPortfolio.contact_email)
+        }
+
+        // Get target portfolio details and contact email
+        const targetPortfolio = await this.portfolioRepository.findById(
+          pendingAction.transfer_data.new_portfolio_id
+        )
+
+        if (!targetPortfolio) {
+          console.error(
+            'Target portfolio not found for rejection email notification'
+          )
+          return undefined
+        }
+
+        if (targetPortfolio.contact_email) {
+          recipientEmails.push(targetPortfolio.contact_email)
+        }
+
+        // Send rejection email
+        return this.emailUtil.sendPropertyTransferRejectionEmail(
+          recipientEmails,
+          property.name,
+          currentPortfolio.name,
+          targetPortfolio.name,
+          rejectionReason,
+          pendingAction.created_at
+        )
       }
 
-      switch (pendingAction.action_type) {
-        case PendingActionType.PROPERTY_TRANSFER: {
-          // Get property details
+      case PendingActionType.PROPERTY_DEACTIVATE: {
+        // Get property details
+        const property = await this.prisma.property.findUnique({
+          where: { id: pendingAction.property_id },
+          select: { name: true, portfolio_id: true }
+        })
+
+        if (!property) {
+          console.error('Property not found for rejection email notification')
+          return undefined
+        }
+
+        // Get portfolio details and contact email
+        const portfolio = await this.portfolioRepository.findById(
+          property.portfolio_id
+        )
+
+        if (!portfolio) {
+          console.error('Portfolio not found for rejection email notification')
+          return undefined
+        }
+
+        if (portfolio.contact_email) {
+          recipientEmails.push(portfolio.contact_email)
+        }
+
+        // Send rejection email
+        return this.emailUtil.sendPropertyDeactivateRejectionEmail(
+          recipientEmails,
+          property.name,
+          portfolio.name,
+          rejectionReason,
+          pendingAction.created_at
+        )
+      }
+
+      case PendingActionType.PROPERTY_ACTIVATE: {
+        // Get property details
+        const property = await this.prisma.property.findUnique({
+          where: { id: pendingAction.property_id },
+          select: { name: true, portfolio_id: true }
+        })
+
+        if (!property) {
+          console.error('Property not found for rejection email notification')
+          return undefined
+        }
+
+        // Get portfolio details and contact email
+        const portfolio = await this.portfolioRepository.findById(
+          property.portfolio_id
+        )
+
+        if (!portfolio) {
+          console.error('Portfolio not found for rejection email notification')
+          return undefined
+        }
+
+        if (portfolio.contact_email) {
+          recipientEmails.push(portfolio.contact_email)
+        }
+
+        // Send rejection email
+        return this.emailUtil.sendPropertyActivateRejectionEmail(
+          recipientEmails,
+          property.name,
+          portfolio.name,
+          rejectionReason,
+          pendingAction.created_at
+        )
+      }
+
+      case PendingActionType.PORTFOLIO_DEACTIVATE: {
+        // Get portfolio details and contact email
+        const portfolio = await this.portfolioRepository.findById(
+          pendingAction.portfolio_id
+        )
+
+        if (!portfolio) {
+          console.error('Portfolio not found for rejection email notification')
+          return undefined
+        }
+
+        if (portfolio.contact_email) {
+          recipientEmails.push(portfolio.contact_email)
+        }
+
+        // Send rejection email
+        return this.emailUtil.sendPortfolioDeactivateRejectionEmail(
+          recipientEmails,
+          portfolio.name,
+          rejectionReason,
+          pendingAction.created_at
+        )
+      }
+
+      case PendingActionType.PORTFOLIO_ACTIVATE: {
+        // Get portfolio details and contact email
+        const portfolio = await this.portfolioRepository.findById(
+          pendingAction.portfolio_id
+        )
+
+        if (!portfolio) {
+          console.error('Portfolio not found for rejection email notification')
+          return undefined
+        }
+
+        if (portfolio.contact_email) {
+          recipientEmails.push(portfolio.contact_email)
+        }
+
+        // Send rejection email
+        return this.emailUtil.sendPortfolioActivateRejectionEmail(
+          recipientEmails,
+          portfolio.name,
+          rejectionReason,
+          pendingAction.created_at
+        )
+      }
+
+      case PendingActionType.PROPERTY_DELETE: {
+        // For legacy delete actions, just notify the requesting user
+        // No need to notify portfolio contacts as this action type is deprecated
+        if (recipientEmails.length > 0) {
+          // Get property details if available
           const property = await this.prisma.property.findUnique({
             where: { id: pendingAction.property_id },
             select: { name: true, portfolio_id: true }
           })
 
-          if (!property) {
-            console.error('Property not found for rejection email notification')
-            return
-          }
-
-          // Get current portfolio details and contact email
-          const currentPortfolio = await this.portfolioRepository.findById(
-            property.portfolio_id
-          )
-
-          if (!currentPortfolio) {
-            console.error(
-              'Current portfolio not found for rejection email notification'
+          if (property) {
+            const portfolio = await this.portfolioRepository.findById(
+              property.portfolio_id
             )
-            return
-          }
 
-          if (currentPortfolio.contact_email) {
-            recipientEmails.push(currentPortfolio.contact_email)
-          }
-
-          // Get target portfolio details and contact email
-          const targetPortfolio = await this.portfolioRepository.findById(
-            pendingAction.transfer_data.new_portfolio_id
-          )
-
-          if (!targetPortfolio) {
-            console.error(
-              'Target portfolio not found for rejection email notification'
-            )
-            return
-          }
-
-          if (targetPortfolio.contact_email) {
-            recipientEmails.push(targetPortfolio.contact_email)
-          }
-
-          // Send rejection email
-          await this.emailUtil.sendPropertyTransferRejectionEmail(
-            recipientEmails,
-            property.name,
-            currentPortfolio.name,
-            targetPortfolio.name,
-            rejectionReason,
-            pendingAction.created_at
-          )
-          break
-        }
-
-        case PendingActionType.PROPERTY_DEACTIVATE: {
-          // Get property details
-          const property = await this.prisma.property.findUnique({
-            where: { id: pendingAction.property_id },
-            select: { name: true, portfolio_id: true }
-          })
-
-          if (!property) {
-            console.error('Property not found for rejection email notification')
-            return
-          }
-
-          // Get portfolio details and contact email
-          const portfolio = await this.portfolioRepository.findById(
-            property.portfolio_id
-          )
-
-          if (!portfolio) {
-            console.error(
-              'Portfolio not found for rejection email notification'
-            )
-            return
-          }
-
-          if (portfolio.contact_email) {
-            recipientEmails.push(portfolio.contact_email)
-          }
-
-          // Send rejection email
-          await this.emailUtil.sendPropertyDeactivateRejectionEmail(
-            recipientEmails,
-            property.name,
-            portfolio.name,
-            rejectionReason,
-            pendingAction.created_at
-          )
-          break
-        }
-
-        case PendingActionType.PROPERTY_ACTIVATE: {
-          // Get property details
-          const property = await this.prisma.property.findUnique({
-            where: { id: pendingAction.property_id },
-            select: { name: true, portfolio_id: true }
-          })
-
-          if (!property) {
-            console.error('Property not found for rejection email notification')
-            return
-          }
-
-          // Get portfolio details and contact email
-          const portfolio = await this.portfolioRepository.findById(
-            property.portfolio_id
-          )
-
-          if (!portfolio) {
-            console.error(
-              'Portfolio not found for rejection email notification'
-            )
-            return
-          }
-
-          if (portfolio.contact_email) {
-            recipientEmails.push(portfolio.contact_email)
-          }
-
-          // Send rejection email
-          await this.emailUtil.sendPropertyActivateRejectionEmail(
-            recipientEmails,
-            property.name,
-            portfolio.name,
-            rejectionReason,
-            pendingAction.created_at
-          )
-          break
-        }
-
-        case PendingActionType.PORTFOLIO_DEACTIVATE: {
-          // Get portfolio details and contact email
-          const portfolio = await this.portfolioRepository.findById(
-            pendingAction.portfolio_id
-          )
-
-          if (!portfolio) {
-            console.error(
-              'Portfolio not found for rejection email notification'
-            )
-            return
-          }
-
-          if (portfolio.contact_email) {
-            recipientEmails.push(portfolio.contact_email)
-          }
-
-          // Send rejection email
-          await this.emailUtil.sendPortfolioDeactivateRejectionEmail(
-            recipientEmails,
-            portfolio.name,
-            rejectionReason,
-            pendingAction.created_at
-          )
-          break
-        }
-
-        case PendingActionType.PORTFOLIO_ACTIVATE: {
-          // Get portfolio details and contact email
-          const portfolio = await this.portfolioRepository.findById(
-            pendingAction.portfolio_id
-          )
-
-          if (!portfolio) {
-            console.error(
-              'Portfolio not found for rejection email notification'
-            )
-            return
-          }
-
-          if (portfolio.contact_email) {
-            recipientEmails.push(portfolio.contact_email)
-          }
-
-          // Send rejection email
-          await this.emailUtil.sendPortfolioActivateRejectionEmail(
-            recipientEmails,
-            portfolio.name,
-            rejectionReason,
-            pendingAction.created_at
-          )
-          break
-        }
-
-        case PendingActionType.PROPERTY_DELETE: {
-          // For legacy delete actions, just notify the requesting user
-          // No need to notify portfolio contacts as this action type is deprecated
-          if (recipientEmails.length > 0) {
-            // Get property details if available
-            const property = await this.prisma.property.findUnique({
-              where: { id: pendingAction.property_id },
-              select: { name: true, portfolio_id: true }
-            })
-
-            if (property) {
-              const portfolio = await this.portfolioRepository.findById(
-                property.portfolio_id
+            if (portfolio) {
+              // Send a simple property deactivation rejection email
+              // (reusing the deactivate email template since DELETE is deprecated)
+              return this.emailUtil.sendPropertyDeactivateRejectionEmail(
+                recipientEmails,
+                property.name,
+                portfolio.name,
+                `${rejectionReason} (Note: DELETE actions are deprecated. Please contact support for assistance.)`,
+                pendingAction.created_at
               )
-
-              if (portfolio) {
-                // Send a simple property deactivation rejection email
-                // (reusing the deactivate email template since DELETE is deprecated)
-                await this.emailUtil.sendPropertyDeactivateRejectionEmail(
-                  recipientEmails,
-                  property.name,
-                  portfolio.name,
-                  `${rejectionReason} (Note: DELETE actions are deprecated. Please contact support for assistance.)`,
-                  pendingAction.created_at
-                )
-              }
             }
           }
-          break
         }
-
-        default:
-          console.warn(
-            `Unknown action type for rejection email: ${pendingAction.action_type}`
-          )
+        return undefined
       }
-    } catch (error) {
-      // Log the error but don't fail the rejection process
-      console.error('Failed to send rejection notification email:', error)
+
+      default:
+        console.warn(
+          `Unknown action type for rejection email: ${pendingAction.action_type}`
+        )
+        return undefined
     }
   }
 }

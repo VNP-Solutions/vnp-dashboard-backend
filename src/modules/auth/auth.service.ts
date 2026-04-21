@@ -30,6 +30,12 @@ import type {
   JwtPayload
 } from './auth.interface'
 
+/**
+ * Interactive transaction: DB changes commit only after the callback completes.
+ * Email is sent last so SMTP failure rolls back prior writes (MongoDB replica set required).
+ */
+const DB_EMAIL_TX = { maxWait: 10_000, timeout: 60_000 } as const
+
 interface UserWithRole {
   id: string
   email: string
@@ -100,8 +106,10 @@ export class AuthService implements IAuthService {
       })!
       const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
 
-      await this.authRepository.createOtp(user.id, otp, expiresAt)
-      await this.emailUtil.sendOtpEmail(user.email, otp)
+      await this.prisma.$transaction(async tx => {
+        await this.authRepository.createOtpTx(tx, user.id, otp, expiresAt)
+        await this.emailUtil.sendOtpEmail(user.email, otp)
+      }, DB_EMAIL_TX)
 
       console.log(`Login OTP for ${user.email}: ${otp}`)
 
@@ -239,35 +247,38 @@ export class AuthService implements IAuthService {
         infer: true
       })!
 
-      const user = await this.authRepository.createUser({
-        email: data.email,
-        first_name: data.first_name,
-        last_name: data.last_name,
-        language: data.language,
-        user_role_id: data.role_id,
-        password: hashedPassword,
-        job_title: data.job_title,
-        temp_password: tempPassword,
-        is_verified: false,
-        invited_by_id: inviterId,
-        invitation_sent_at: new Date()
-      })
+      await this.prisma.$transaction(async tx => {
+        const user = await this.authRepository.createUserTx(tx, {
+          email: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          language: data.language,
+          user_role_id: data.role_id,
+          password: hashedPassword,
+          job_title: data.job_title,
+          temp_password: tempPassword,
+          is_verified: false,
+          invited_by_id: inviterId,
+          invitation_sent_at: new Date()
+        })
 
-      if (data.portfolio_ids || data.property_ids) {
-        await this.authRepository.createUserAccess(
-          user.id,
-          data.portfolio_ids || [],
-          data.property_ids || []
+        if (data.portfolio_ids || data.property_ids) {
+          await this.authRepository.createUserAccessTx(
+            tx,
+            user.id,
+            data.portfolio_ids || [],
+            data.property_ids || []
+          )
+        }
+
+        await this.emailUtil.sendInvitationEmail(
+          data.email,
+          tempPassword,
+          targetRole.name,
+          data.first_name,
+          targetRole.is_external
         )
-      }
-
-      await this.emailUtil.sendInvitationEmail(
-        data.email,
-        tempPassword,
-        targetRole.name,
-        data.first_name,
-        targetRole.is_external
-      )
+      }, DB_EMAIL_TX)
 
       console.log(
         `Invitation sent to ${data.email}. Temp password: ${tempPassword}`
@@ -337,17 +348,6 @@ export class AuthService implements IAuthService {
         infer: true
       })!
 
-      // Update user with new temp password and invitation sent timestamp
-      await this.authRepository.updateUserPassword(user.id, hashedPassword)
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          temp_password: tempPassword,
-          invitation_sent_at: new Date()
-        }
-      })
-
-      // Fetch role details to get is_external flag
       const role = await this.prisma.userRole.findUnique({
         where: { id: user.user_role_id },
         select: { name: true, is_external: true }
@@ -357,14 +357,24 @@ export class AuthService implements IAuthService {
         throw new Error('Role not found')
       }
 
-      // Send invitation email
-      await this.emailUtil.sendInvitationEmail(
-        user.email,
-        tempPassword,
-        role.name,
-        user.first_name,
-        role.is_external
-      )
+      await this.prisma.$transaction(async tx => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            password: hashedPassword,
+            temp_password: tempPassword,
+            invitation_sent_at: new Date()
+          }
+        })
+
+        await this.emailUtil.sendInvitationEmail(
+          user.email,
+          tempPassword,
+          role.name,
+          user.first_name,
+          role.is_external
+        )
+      }, DB_EMAIL_TX)
 
       console.log(
         `Invitation resent to ${email}. Temp password: ${tempPassword}`
@@ -404,8 +414,13 @@ export class AuthService implements IAuthService {
       const hashedNewPassword = await EncryptionUtil.hashPassword(
         data.new_password
       )
-      await this.authRepository.updateUserPassword(user.id, hashedNewPassword)
-      await this.authRepository.clearTempPassword(user.id)
+
+      await this.prisma.$transaction(async tx => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { password: hashedNewPassword, temp_password: null, is_verified: true }
+        })
+      })
 
       const updatedUser = await this.authRepository.findUserByEmail(data.email)
       if (!updatedUser) {
@@ -433,8 +448,10 @@ export class AuthService implements IAuthService {
       })!
       const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
 
-      await this.authRepository.createOtp(user.id, otp, expiresAt)
-      await this.emailUtil.sendPasswordResetOtpEmail(user.email, otp)
+      await this.prisma.$transaction(async tx => {
+        await this.authRepository.createOtpTx(tx, user.id, otp, expiresAt)
+        await this.emailUtil.sendPasswordResetOtpEmail(user.email, otp)
+      }, DB_EMAIL_TX)
 
       console.log(`Password Reset OTP for ${user.email}: ${otp}`)
 
@@ -465,12 +482,20 @@ export class AuthService implements IAuthService {
         throw new BadRequestException('Invalid or expired OTP')
       }
 
-      await this.authRepository.markOtpAsUsed(validOtp.id)
-
       const hashedNewPassword = await EncryptionUtil.hashPassword(
         data.new_password
       )
-      await this.authRepository.updateUserPassword(user.id, hashedNewPassword)
+
+      await this.prisma.$transaction(async tx => {
+        await tx.otp.update({
+          where: { id: validOtp.id },
+          data: { is_used: true }
+        })
+        await tx.user.update({
+          where: { id: user.id },
+          data: { password: hashedNewPassword }
+        })
+      })
 
       return { message: 'Password reset successfully' }
     } catch (error) {

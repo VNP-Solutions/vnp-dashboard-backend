@@ -53,6 +53,62 @@ export class AuthRepository implements IAuthRepository {
     })
   }
 
+  async createOtpTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    otp: number,
+    expiresAt: Date,
+    adminPasswordResetForUserId?: string | null,
+    adminVerifyForUserId?: string | null
+  ): Promise<void> {
+    await tx.otp.create({
+      data: {
+        user_id: userId,
+        otp,
+        expires_at: expiresAt,
+        is_used: false,
+        admin_password_reset_for_user_id: adminPasswordResetForUserId ?? null,
+        admin_verify_for_user_id: adminVerifyForUserId ?? null
+      }
+    })
+  }
+
+  async createUserTx(
+    tx: Prisma.TransactionClient,
+    data: {
+      email: string
+      first_name: string
+      last_name: string
+      language: string
+      user_role_id: string
+      password: string
+      job_title?: string
+      temp_password?: string
+      is_verified: boolean
+      invited_by_id?: string
+      invitation_sent_at?: Date
+    }
+  ): Promise<User> {
+    return tx.user.create({
+      data: { ...data, email: data.email.toLowerCase() }
+    })
+  }
+
+  async createUserAccessTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    portfolioIds: string[],
+    propertyIds: string[]
+  ): Promise<void> {
+    await tx.userAccessedProperty.create({
+      data: {
+        user_id: userId,
+        portfolio_id: portfolioIds,
+        property_id: propertyIds
+      }
+    })
+  }
+
   async findValidOtp(
     userId: string,
     otp: number,
