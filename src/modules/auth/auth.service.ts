@@ -2,8 +2,10 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
@@ -70,61 +72,72 @@ export class AuthService implements IAuthService {
     email: string,
     password: string
   ): Promise<{ message: string }> {
-    const user = await this.authRepository.findUserByEmail(email)
+    try {
+      const user = await this.authRepository.findUserByEmail(email)
 
-    if (!user) {
-      throw new BadRequestException('Invalid credentials')
-    }
+      if (!user) {
+        throw new NotFoundException('User not found with this email address')
+      }
 
-    if (user.temp_password) {
-      throw new BadRequestException(
-        'Please complete your invitation verification first'
+      if (user.temp_password) {
+        throw new BadRequestException(
+          'Please complete your invitation verification first'
+        )
+      }
+
+      const isPasswordValid = await EncryptionUtil.comparePassword(
+        password,
+        user.password
       )
+
+      if (!isPasswordValid) {
+        throw new BadRequestException('Invalid password')
+      }
+
+      const otp = EncryptionUtil.generateOtp()
+      const expiryMinutes = this.configService.get('auth.otpExpiryMinutes', {
+        infer: true
+      })!
+      const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
+
+      await this.authRepository.createOtp(user.id, otp, expiresAt)
+      await this.emailUtil.sendOtpEmail(user.email, otp)
+
+      console.log(`Login OTP for ${user.email}: ${otp}`)
+
+      return { message: 'OTP sent to your email' }
+    } catch (error) {
+      this.logError('requestLoginOtp', error, email)
+      throw error
     }
-
-    const isPasswordValid = await EncryptionUtil.comparePassword(
-      password,
-      user.password
-    )
-
-    if (!isPasswordValid) {
-      throw new BadRequestException('Invalid credentials')
-    }
-
-    const otp = EncryptionUtil.generateOtp()
-    const expiryMinutes = this.configService.get('auth.otpExpiryMinutes', {
-      infer: true
-    })!
-    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
-
-    await this.authRepository.createOtp(user.id, otp, expiresAt)
-    await this.emailUtil.sendOtpEmail(user.email, otp)
-
-    console.log(`Login OTP for ${user.email}: ${otp}`)
-
-    return { message: 'OTP sent to your email' }
   }
 
   async verifyLoginOtp(data: VerifyLoginOtpDto): Promise<AuthResponseDto> {
-    const user = await this.authRepository.findUserByEmail(data.email)
+    try {
+      const user = await this.authRepository.findUserByEmail(data.email)
 
-    if (!user) {
-      throw new BadRequestException('Invalid credentials')
+      if (!user) {
+        throw new NotFoundException('User not found with this email address')
+      }
+
+      const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
+
+      if (!validOtp) {
+        throw new BadRequestException('Invalid or expired OTP')
+      }
+
+      await this.authRepository.markOtpAsUsed(validOtp.id)
+
+      const userWithRole = await this.authRepository.findUserByEmail(user.email)
+      if (!userWithRole) {
+        throw new BadRequestException('User not found')
+      }
+
+      return this.generateAuthResponse(userWithRole as unknown as UserWithRole)
+    } catch (error) {
+      this.logError('verifyLoginOtp', error, data.email)
+      throw error
     }
-
-    const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
-
-    if (!validOtp) {
-      throw new BadRequestException('Invalid or expired OTP')
-    }
-
-    await this.authRepository.markOtpAsUsed(validOtp.id)
-
-    const userWithRole = await this.authRepository.findUserByEmail(user.email)
-    if (!userWithRole) {
-      throw new BadRequestException('User not found')
-    }
-    return this.generateAuthResponse(userWithRole as unknown as UserWithRole)
   }
 
   async inviteUser(
@@ -132,135 +145,140 @@ export class AuthService implements IAuthService {
     inviterId: string,
     inviterRolePermissionLevel: string | undefined
   ): Promise<{ message: string }> {
-    // Check if user has permission to invite (permission_level must be 'all' or 'update' for CREATE permission)
-    if (
-      inviterRolePermissionLevel !== 'all' &&
-      inviterRolePermissionLevel !== 'update'
-    ) {
-      throw new ForbiddenException(
-        'You do not have permission to invite users. Only users with CREATE permission (all or update) can invite.'
-      )
-    }
-
-    const existingUser = await this.authRepository.findUserByEmail(data.email)
-
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists')
-    }
-
-    // Fetch inviter's full user object with permissions for validation
-    const inviterUser = await this.prisma.user.findUnique({
-      where: { id: inviterId },
-      include: { role: true }
-    })
-
-    if (!inviterUser || !inviterUser.role) {
-      throw new ForbiddenException('Inviter user or role not found')
-    }
-
-    // Fetch target role with full permissions
-    const targetRole = await this.prisma.userRole.findUnique({
-      where: { id: data.role_id }
-    })
-
-    if (!targetRole) {
-      throw new BadRequestException('Selected role not found')
-    }
-
-    // Validate role hierarchy: Can inviter assign this role?
-    if (!canInviteRole(inviterUser as any, targetRole)) {
-      throw new ForbiddenException(
-        'You cannot invite users with this role. The role has permissions equal to or higher than yours, or you cannot invite this user type (internal/external).'
-      )
-    }
-
-    // Validate portfolio/property access constraints for partial access users
-    if (data.portfolio_ids && data.portfolio_ids.length > 0) {
-      const accessiblePortfolioIds =
-        await this.permissionService.getAccessibleResourceIds(
-          inviterUser as any,
-          ModuleType.PORTFOLIO
+    try {
+      // Check if user has permission to invite (permission_level must be 'all' or 'update' for CREATE permission)
+      if (
+        inviterRolePermissionLevel !== 'all' &&
+        inviterRolePermissionLevel !== 'update'
+      ) {
+        throw new ForbiddenException(
+          'You do not have permission to invite users. Only users with CREATE permission (all or update) can invite.'
         )
-
-      if (Array.isArray(accessiblePortfolioIds)) {
-        // Inviter has partial access - validate they can only assign portfolios they have access to
-        const invalidPortfolioIds = data.portfolio_ids.filter(
-          id => !accessiblePortfolioIds.includes(id)
-        )
-
-        if (invalidPortfolioIds.length > 0) {
-          throw new ForbiddenException(
-            `You cannot assign access to portfolios you don't have access to: ${invalidPortfolioIds.join(', ')}`
-          )
-        }
       }
-      // If accessiblePortfolioIds === 'all', inviter can assign any portfolio
-    }
 
-    if (data.property_ids && data.property_ids.length > 0) {
-      const accessiblePropertyIds =
-        await this.permissionService.getAccessibleResourceIds(
-          inviterUser as any,
-          ModuleType.PROPERTY
-        )
+      const existingUser = await this.authRepository.findUserByEmail(data.email)
 
-      if (Array.isArray(accessiblePropertyIds)) {
-        // Inviter has partial access - validate they can only assign properties they have access to
-        const invalidPropertyIds = data.property_ids.filter(
-          id => !accessiblePropertyIds.includes(id)
-        )
-
-        if (invalidPropertyIds.length > 0) {
-          throw new ForbiddenException(
-            `You cannot assign access to properties you don't have access to: ${invalidPropertyIds.join(', ')}`
-          )
-        }
+      if (existingUser) {
+        throw new ConflictException('User with this email already exists')
       }
-      // If accessiblePropertyIds === 'all', inviter can assign any property
-    }
 
-    const tempPassword = EncryptionUtil.generateTempPassword()
-    const hashedPassword = await EncryptionUtil.hashPassword(tempPassword)
-    const expiryDays = this.configService.get('auth.tempPasswordExpiryDays', {
-      infer: true
-    })!
+      // Fetch inviter's full user object with permissions for validation
+      const inviterUser = await this.prisma.user.findUnique({
+        where: { id: inviterId },
+        include: { role: true }
+      })
 
-    const user = await this.authRepository.createUser({
-      email: data.email,
-      first_name: data.first_name,
-      last_name: data.last_name,
-      language: data.language,
-      user_role_id: data.role_id,
-      password: hashedPassword,
-      job_title: data.job_title,
-      temp_password: tempPassword,
-      is_verified: false,
-      invited_by_id: inviterId,
-      invitation_sent_at: new Date()
-    })
+      if (!inviterUser || !inviterUser.role) {
+        throw new ForbiddenException('Inviter user or role not found')
+      }
 
-    if (data.portfolio_ids || data.property_ids) {
-      await this.authRepository.createUserAccess(
-        user.id,
-        data.portfolio_ids || [],
-        data.property_ids || []
+      // Fetch target role with full permissions
+      const targetRole = await this.prisma.userRole.findUnique({
+        where: { id: data.role_id }
+      })
+
+      if (!targetRole) {
+        throw new BadRequestException('Selected role not found')
+      }
+
+      // Validate role hierarchy: Can inviter assign this role?
+      if (!canInviteRole(inviterUser as any, targetRole)) {
+        throw new ForbiddenException(
+          'You cannot invite users with this role. The role has permissions equal to or higher than yours, or you cannot invite this user type (internal/external).'
+        )
+      }
+
+      // Validate portfolio/property access constraints for partial access users
+      if (data.portfolio_ids && data.portfolio_ids.length > 0) {
+        const accessiblePortfolioIds =
+          await this.permissionService.getAccessibleResourceIds(
+            inviterUser as any,
+            ModuleType.PORTFOLIO
+          )
+
+        if (Array.isArray(accessiblePortfolioIds)) {
+          // Inviter has partial access - validate they can only assign portfolios they have access to
+          const invalidPortfolioIds = data.portfolio_ids.filter(
+            id => !accessiblePortfolioIds.includes(id)
+          )
+
+          if (invalidPortfolioIds.length > 0) {
+            throw new ForbiddenException(
+              `You cannot assign access to portfolios you don't have access to: ${invalidPortfolioIds.join(', ')}`
+            )
+          }
+        }
+        // If accessiblePortfolioIds === 'all', inviter can assign any portfolio
+      }
+
+      if (data.property_ids && data.property_ids.length > 0) {
+        const accessiblePropertyIds =
+          await this.permissionService.getAccessibleResourceIds(
+            inviterUser as any,
+            ModuleType.PROPERTY
+          )
+
+        if (Array.isArray(accessiblePropertyIds)) {
+          // Inviter has partial access - validate they can only assign properties they have access to
+          const invalidPropertyIds = data.property_ids.filter(
+            id => !accessiblePropertyIds.includes(id)
+          )
+
+          if (invalidPropertyIds.length > 0) {
+            throw new ForbiddenException(
+              `You cannot assign access to properties you don't have access to: ${invalidPropertyIds.join(', ')}`
+            )
+          }
+        }
+        // If accessiblePropertyIds === 'all', inviter can assign any property
+      }
+
+      const tempPassword = EncryptionUtil.generateTempPassword()
+      const hashedPassword = await EncryptionUtil.hashPassword(tempPassword)
+      const expiryDays = this.configService.get('auth.tempPasswordExpiryDays', {
+        infer: true
+      })!
+
+      const user = await this.authRepository.createUser({
+        email: data.email,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        language: data.language,
+        user_role_id: data.role_id,
+        password: hashedPassword,
+        job_title: data.job_title,
+        temp_password: tempPassword,
+        is_verified: false,
+        invited_by_id: inviterId,
+        invitation_sent_at: new Date()
+      })
+
+      if (data.portfolio_ids || data.property_ids) {
+        await this.authRepository.createUserAccess(
+          user.id,
+          data.portfolio_ids || [],
+          data.property_ids || []
+        )
+      }
+
+      await this.emailUtil.sendInvitationEmail(
+        data.email,
+        tempPassword,
+        targetRole.name,
+        data.first_name,
+        targetRole.is_external
       )
-    }
 
-    await this.emailUtil.sendInvitationEmail(
-      data.email,
-      tempPassword,
-      targetRole.name,
-      data.first_name,
-      targetRole.is_external
-    )
+      console.log(
+        `Invitation sent to ${data.email}. Temp password: ${tempPassword}`
+      )
 
-    console.log(
-      `Invitation sent to ${data.email}. Temp password: ${tempPassword}`
-    )
-
-    return {
-      message: `Invitation sent successfully. Temporary password is valid for ${expiryDays} days.`
+      return {
+        message: `Invitation sent successfully. Temporary password is valid for ${expiryDays} days.`
+      }
+    } catch (error) {
+      this.logError('inviteUser', error, data.email)
+      throw error
     }
   }
 
@@ -268,174 +286,197 @@ export class AuthService implements IAuthService {
     email: string,
     inviterRolePermissionLevel: string | undefined
   ): Promise<{ message: string }> {
-    // Check if user has permission to resend invitation (permission_level must be 'all' or 'update' for CREATE permission)
-    if (
-      inviterRolePermissionLevel !== 'all' &&
-      inviterRolePermissionLevel !== 'update'
-    ) {
-      throw new ForbiddenException(
-        'You do not have permission to resend invitations. Only users with CREATE permission (all or update) can resend.'
-      )
-    }
-
-    const user = await this.authRepository.findUserByEmail(email)
-
-    if (!user) {
-      throw new BadRequestException('User not found')
-    }
-
-    // Check if user has a pending invitation (temp_password exists and is_verified is false)
-    if (!user.temp_password || user.is_verified) {
-      throw new BadRequestException(
-        'No pending invitation found for this user. The user may have already verified their account.'
-      )
-    }
-
-    // Check 5-minute cooldown
-    const COOLDOWN_MINUTES = 5
-    if (user.invitation_sent_at) {
-      const timeSinceLastInvitation =
-        Date.now() - new Date(user.invitation_sent_at).getTime()
-      const cooldownMs = COOLDOWN_MINUTES * 60 * 1000
-
-      if (timeSinceLastInvitation < cooldownMs) {
-        const remainingSeconds = Math.ceil(
-          (cooldownMs - timeSinceLastInvitation) / 1000
+    try {
+      // Check if user has permission to resend invitation (permission_level must be 'all' or 'update' for CREATE permission)
+      if (
+        inviterRolePermissionLevel !== 'all' &&
+        inviterRolePermissionLevel !== 'update'
+      ) {
+        throw new ForbiddenException(
+          'You do not have permission to resend invitations. Only users with CREATE permission (all or update) can resend.'
         )
-        const remainingMinutes = Math.floor(remainingSeconds / 60)
-        const remainingSecs = remainingSeconds % 60
+      }
 
+      const user = await this.authRepository.findUserByEmail(email)
+
+      if (!user) {
+        throw new BadRequestException('User not found')
+      }
+
+      // Check if user has a pending invitation (temp_password exists and is_verified is false)
+      if (!user.temp_password || user.is_verified) {
         throw new BadRequestException(
-          `Please wait ${remainingMinutes}m ${remainingSecs}s before resending the invitation.`
+          'No pending invitation found for this user. The user may have already verified their account.'
         )
       }
-    }
 
-    // Generate new temporary password
-    const tempPassword = EncryptionUtil.generateTempPassword()
-    const hashedPassword = await EncryptionUtil.hashPassword(tempPassword)
-    const expiryDays = this.configService.get('auth.tempPasswordExpiryDays', {
-      infer: true
-    })!
+      // Check 5-minute cooldown
+      const COOLDOWN_MINUTES = 5
+      if (user.invitation_sent_at) {
+        const timeSinceLastInvitation =
+          Date.now() - new Date(user.invitation_sent_at).getTime()
+        const cooldownMs = COOLDOWN_MINUTES * 60 * 1000
 
-    // Update user with new temp password and invitation sent timestamp
-    await this.authRepository.updateUserPassword(user.id, hashedPassword)
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        temp_password: tempPassword,
-        invitation_sent_at: new Date()
+        if (timeSinceLastInvitation < cooldownMs) {
+          const remainingSeconds = Math.ceil(
+            (cooldownMs - timeSinceLastInvitation) / 1000
+          )
+          const remainingMinutes = Math.floor(remainingSeconds / 60)
+          const remainingSecs = remainingSeconds % 60
+
+          throw new BadRequestException(
+            `Please wait ${remainingMinutes}m ${remainingSecs}s before resending the invitation.`
+          )
+        }
       }
-    })
 
-    // Fetch role details to get is_external flag
-    const role = await this.prisma.userRole.findUnique({
-      where: { id: user.user_role_id },
-      select: { name: true, is_external: true }
-    })
+      // Generate new temporary password
+      const tempPassword = EncryptionUtil.generateTempPassword()
+      const hashedPassword = await EncryptionUtil.hashPassword(tempPassword)
+      const expiryDays = this.configService.get('auth.tempPasswordExpiryDays', {
+        infer: true
+      })!
 
-    if (!role) {
-      throw new Error('Role not found')
-    }
+      // Update user with new temp password and invitation sent timestamp
+      await this.authRepository.updateUserPassword(user.id, hashedPassword)
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          temp_password: tempPassword,
+          invitation_sent_at: new Date()
+        }
+      })
 
-    // Send invitation email
-    await this.emailUtil.sendInvitationEmail(
-      user.email,
-      tempPassword,
-      role.name,
-      user.first_name,
-      role.is_external
-    )
+      // Fetch role details to get is_external flag
+      const role = await this.prisma.userRole.findUnique({
+        where: { id: user.user_role_id },
+        select: { name: true, is_external: true }
+      })
 
-    console.log(`Invitation resent to ${email}. Temp password: ${tempPassword}`)
+      if (!role) {
+        throw new Error('Role not found')
+      }
 
-    return {
-      message: `Invitation resent successfully. Temporary password is valid for ${expiryDays} days.`
+      // Send invitation email
+      await this.emailUtil.sendInvitationEmail(
+        user.email,
+        tempPassword,
+        role.name,
+        user.first_name,
+        role.is_external
+      )
+
+      console.log(
+        `Invitation resent to ${email}. Temp password: ${tempPassword}`
+      )
+
+      return {
+        message: `Invitation resent successfully. Temporary password is valid for ${expiryDays} days.`
+      }
+    } catch (error) {
+      this.logError('resendInvitation', error, email)
+      throw error
     }
   }
 
   async verifyInvitation(data: VerifyInvitationDto): Promise<AuthResponseDto> {
-    const user = await this.authRepository.findUserByEmail(data.email)
+    try {
+      const user = await this.authRepository.findUserByEmail(data.email)
 
-    if (!user) {
-      throw new BadRequestException('Invalid credentials')
-    }
+      if (!user) {
+        throw new NotFoundException('User not found with this email address')
+      }
 
-    if (user.is_verified) {
-      throw new BadRequestException(
-        'This invitation link is no longer valid. Your account has already been verified.'
+      if (user.is_verified) {
+        throw new BadRequestException(
+          'This invitation link is no longer valid. Your account has already been verified.'
+        )
+      }
+
+      if (!user.temp_password) {
+        throw new BadRequestException('No pending invitation found')
+      }
+
+      if (user.temp_password !== data.temp_password) {
+        throw new BadRequestException('Invalid temporary password')
+      }
+
+      const hashedNewPassword = await EncryptionUtil.hashPassword(
+        data.new_password
       )
-    }
+      await this.authRepository.updateUserPassword(user.id, hashedNewPassword)
+      await this.authRepository.clearTempPassword(user.id)
 
-    if (!user.temp_password) {
-      throw new BadRequestException('No pending invitation found')
-    }
+      const updatedUser = await this.authRepository.findUserByEmail(data.email)
+      if (!updatedUser) {
+        throw new BadRequestException('User not found')
+      }
 
-    if (user.temp_password !== data.temp_password) {
-      throw new BadRequestException('Invalid temporary password')
+      return this.generateAuthResponse(updatedUser as unknown as UserWithRole)
+    } catch (error) {
+      this.logError('verifyInvitation', error, data.email)
+      throw error
     }
-
-    const hashedNewPassword = await EncryptionUtil.hashPassword(
-      data.new_password
-    )
-    await this.authRepository.updateUserPassword(user.id, hashedNewPassword)
-    await this.authRepository.clearTempPassword(user.id)
-
-    const updatedUser = await this.authRepository.findUserByEmail(data.email)
-    if (!updatedUser) {
-      throw new BadRequestException('User not found')
-    }
-    return this.generateAuthResponse(updatedUser as unknown as UserWithRole)
   }
 
   async requestPasswordReset(email: string): Promise<{ message: string }> {
-    const user = await this.authRepository.findUserByEmail(email)
+    try {
+      const user = await this.authRepository.findUserByEmail(email)
 
-    if (!user || !user.is_verified) {
+      if (!user || !user.is_verified) {
+        return { message: 'If the email exists, an OTP has been sent' }
+      }
+
+      const otp = EncryptionUtil.generateOtp()
+      const expiryMinutes = this.configService.get('auth.otpExpiryMinutes', {
+        infer: true
+      })!
+      const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
+
+      await this.authRepository.createOtp(user.id, otp, expiresAt)
+      await this.emailUtil.sendPasswordResetOtpEmail(user.email, otp)
+
+      console.log(`Password Reset OTP for ${user.email}: ${otp}`)
+
       return { message: 'If the email exists, an OTP has been sent' }
+    } catch (error) {
+      this.logError('requestPasswordReset', error, email)
+      throw error
     }
-
-    const otp = EncryptionUtil.generateOtp()
-    const expiryMinutes = this.configService.get('auth.otpExpiryMinutes', {
-      infer: true
-    })!
-    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
-
-    await this.authRepository.createOtp(user.id, otp, expiresAt)
-    await this.emailUtil.sendPasswordResetOtpEmail(user.email, otp)
-
-    console.log(`Password Reset OTP for ${user.email}: ${otp}`)
-
-    return { message: 'If the email exists, an OTP has been sent' }
   }
 
   async resetPassword(data: ResetPasswordDto): Promise<{ message: string }> {
-    const user = await this.authRepository.findUserByEmail(data.email)
+    try {
+      const user = await this.authRepository.findUserByEmail(data.email)
 
-    if (!user) {
-      throw new BadRequestException('Invalid credentials')
-    }
+      if (!user) {
+        throw new NotFoundException('User not found with this email address')
+      }
 
-    if (!user.is_verified) {
-      throw new BadRequestException(
-        'Account not yet verified. Please complete your invitation before resetting your password.'
+      if (!user.is_verified) {
+        throw new BadRequestException(
+          'Account not yet verified. Please complete your invitation before resetting your password.'
+        )
+      }
+
+      const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
+
+      if (!validOtp) {
+        throw new BadRequestException('Invalid or expired OTP')
+      }
+
+      await this.authRepository.markOtpAsUsed(validOtp.id)
+
+      const hashedNewPassword = await EncryptionUtil.hashPassword(
+        data.new_password
       )
+      await this.authRepository.updateUserPassword(user.id, hashedNewPassword)
+
+      return { message: 'Password reset successfully' }
+    } catch (error) {
+      this.logError('resetPassword', error, data.email)
+      throw error
     }
-
-    const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
-
-    if (!validOtp) {
-      throw new BadRequestException('Invalid or expired OTP')
-    }
-
-    await this.authRepository.markOtpAsUsed(validOtp.id)
-
-    const hashedNewPassword = await EncryptionUtil.hashPassword(
-      data.new_password
-    )
-    await this.authRepository.updateUserPassword(user.id, hashedNewPassword)
-
-    return { message: 'Password reset successfully' }
   }
 
   async refreshAccessToken(refreshToken: string): Promise<AuthResponseDto> {
@@ -457,9 +498,39 @@ export class AuthService implements IAuthService {
       }
 
       return this.generateAuthResponse(userWithRole as unknown as UserWithRole)
-    } catch {
+    } catch (error) {
+      this.logError(
+        'refreshAccessToken',
+        error,
+        this.getEmailFromRefreshToken(refreshToken)
+      )
       throw new UnauthorizedException('Invalid or expired refresh token')
     }
+  }
+
+  private logError(context: string, error: unknown, email?: string): void {
+    const errorResponse =
+      error instanceof HttpException ? error.getResponse() : error
+
+    console.error(
+      `[AuthService.${context}]`,
+      email ? { email, error: errorResponse } : errorResponse
+    )
+  }
+
+  private getEmailFromRefreshToken(refreshToken: string): string | undefined {
+    const decodedToken = this.jwtService.decode(refreshToken)
+
+    if (
+      decodedToken &&
+      typeof decodedToken === 'object' &&
+      'email' in decodedToken &&
+      typeof decodedToken.email === 'string'
+    ) {
+      return decodedToken.email
+    }
+
+    return undefined
   }
 
   private generateAuthResponse(user: UserWithRole): AuthResponseDto {
