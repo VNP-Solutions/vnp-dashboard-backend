@@ -73,7 +73,7 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(email)
 
     if (!user) {
-      throw new BadRequestException('Invalid credentials')
+      throw new BadRequestException('User not found with this email address')
     }
 
     if (user.temp_password) {
@@ -88,7 +88,7 @@ export class AuthService implements IAuthService {
     )
 
     if (!isPasswordValid) {
-      throw new BadRequestException('Invalid credentials')
+      throw new BadRequestException('Invalid password')
     }
 
     const otp = EncryptionUtil.generateOtp()
@@ -109,7 +109,7 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(data.email)
 
     if (!user) {
-      throw new BadRequestException('Invalid credentials')
+      throw new BadRequestException('User not found with this email address')
     }
 
     const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
@@ -358,7 +358,7 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(data.email)
 
     if (!user) {
-      throw new BadRequestException('Invalid credentials')
+      throw new BadRequestException('User not found with this email address')
     }
 
     if (user.is_verified) {
@@ -413,7 +413,7 @@ export class AuthService implements IAuthService {
     const user = await this.authRepository.findUserByEmail(data.email)
 
     if (!user) {
-      throw new BadRequestException('Invalid credentials')
+      throw new BadRequestException('User not found with this email address')
     }
 
     if (!user.is_verified) {
