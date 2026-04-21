@@ -138,7 +138,7 @@ export class AuthService implements IAuthService {
 
       const userWithRole = await this.authRepository.findUserByEmail(user.email)
       if (!userWithRole) {
-        throw new BadRequestException('User not found')
+        throw new BadRequestException('User not found with this email address')
       }
 
       return this.generateAuthResponse(userWithRole as unknown as UserWithRole)
