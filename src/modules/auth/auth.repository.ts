@@ -20,10 +20,13 @@ export class AuthRepository implements IAuthRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async findUserByEmail(email: string): Promise<UserWithRelations | null> {
+    const formattedEmail = email.includes('+')
+      ? email.replaceAll('+', '\\+')
+      : email
     return this.prisma.user.findFirst({
       where: {
-        // DON'T TOUCH IT, DISCUSS IT ABRAR BHAIYA BEFORE DOING IT. VERY DANGEROUS!!!!
-        email: { equals: email, mode: 'insensitive' }
+        // DON'T TOUCH IT, DISCUSS IT WITH ABRAR BHAIYA BEFORE DOING IT. VERY DANGEROUS!!!! ⚠️
+        email: { equals: formattedEmail, mode: 'insensitive' }
       },
       include: {
         role: true,
