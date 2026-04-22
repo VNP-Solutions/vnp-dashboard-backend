@@ -20,10 +20,13 @@ export class AuthRepository implements IAuthRepository {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
   async findUserByEmail(email: string): Promise<UserWithRelations | null> {
+    const formattedEmail = email.includes('+')
+      ? email.replaceAll('+', '\\+')
+      : email
     return this.prisma.user.findFirst({
       where: {
-        // DON'T TOUCH IT, DISCUSS IT ABRAR BHAIYA BEFORE DOING IT. VERY DANGEROUS!!!!
-        email: { equals: email, mode: 'insensitive' }
+        // DON'T TOUCH IT, DISCUSS IT WITH ABRAR BHAIYA BEFORE DOING IT. VERY DANGEROUS!!!! ⚠️
+        email: { equals: formattedEmail, mode: 'insensitive' }
       },
       include: {
         role: true,
@@ -56,6 +59,62 @@ export class AuthRepository implements IAuthRepository {
     })
   }
 
+  async createOtpTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    otp: number,
+    expiresAt: Date,
+    adminPasswordResetForUserId?: string | null,
+    adminVerifyForUserId?: string | null
+  ): Promise<void> {
+    await tx.otp.create({
+      data: {
+        user_id: userId,
+        otp,
+        expires_at: expiresAt,
+        is_used: false,
+        admin_password_reset_for_user_id: adminPasswordResetForUserId ?? null,
+        admin_verify_for_user_id: adminVerifyForUserId ?? null
+      }
+    })
+  }
+
+  async createUserTx(
+    tx: Prisma.TransactionClient,
+    data: {
+      email: string
+      first_name: string
+      last_name: string
+      language: string
+      user_role_id: string
+      password: string
+      job_title?: string
+      temp_password?: string
+      is_verified: boolean
+      invited_by_id?: string
+      invitation_sent_at?: Date
+    }
+  ): Promise<User> {
+    return tx.user.create({
+      data: { ...data, email: data.email.toLowerCase() }
+    })
+  }
+
+  async createUserAccessTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    portfolioIds: string[],
+    propertyIds: string[]
+  ): Promise<void> {
+    await tx.userAccessedProperty.create({
+      data: {
+        user_id: userId,
+        portfolio_id: portfolioIds,
+        property_id: propertyIds
+      }
+    })
+  }
+
   async findValidOtp(
     userId: string,
     otp: number,
@@ -81,6 +140,33 @@ export class AuthRepository implements IAuthRepository {
             ? options.adminVerifyForUserId
             : null
       }
+    })
+  }
+
+  /** Unused OTP matching the code (may be expired). Same scope filters as findValidOtp. */
+  async findUnusedOtpByCode(
+    userId: string,
+    otp: number,
+    options?: {
+      adminPasswordResetForUserId?: string
+      adminVerifyForUserId?: string
+    }
+  ): Promise<Otp | null> {
+    return this.prisma.otp.findFirst({
+      where: {
+        user_id: userId,
+        otp,
+        is_used: false,
+        admin_password_reset_for_user_id:
+          options?.adminPasswordResetForUserId !== undefined
+            ? options.adminPasswordResetForUserId
+            : null,
+        admin_verify_for_user_id:
+          options?.adminVerifyForUserId !== undefined
+            ? options.adminVerifyForUserId
+            : null
+      },
+      orderBy: { created_at: 'desc' }
     })
   }
 

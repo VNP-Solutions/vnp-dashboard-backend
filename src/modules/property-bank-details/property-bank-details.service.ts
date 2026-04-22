@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException
 } from '@nestjs/common'
 import { BankSubType, BankType } from '@prisma/client'
@@ -43,6 +44,8 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
 
 @Injectable()
 export class PropertyBankDetailsService implements IPropertyBankDetailsService {
+  private readonly logger = new Logger(PropertyBankDetailsService.name)
+
   constructor(
     @Inject('IPropertyBankDetailsRepository')
     private propertyBankDetailsRepository: IPropertyBankDetailsRepository,
@@ -1258,12 +1261,17 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       )
 
       // Send email using the new method with location
-      await this.emailUtil.sendBankDetailsUpdateEmail(
+      const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
         [property.name],
         location,
         new Date()
       )
+      if (bankEmailResult.failed.length > 0) {
+        this.logger.warn('Bank details notification email partial failure', {
+          failed: bankEmailResult.failed
+        })
+      }
 
       console.log(
         `\n✅ SUCCESS: Sent bank details ${action} notification to ${uniqueRecipients.length} recipient(s)`
@@ -1363,12 +1371,18 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
       // Send email using the new method with location
       const propertyNames = properties.map(p => p.name)
-      await this.emailUtil.sendBankDetailsUpdateEmail(
+      const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
         propertyNames,
         location,
         new Date()
       )
+      if (bankEmailResult.failed.length > 0) {
+        this.logger.warn(
+          'Bulk bank details notification email partial failure',
+          { failed: bankEmailResult.failed }
+        )
+      }
 
       console.log(
         `\n✅ SUCCESS: Sent bulk update notification to ${uniqueRecipients.length} recipient(s)`

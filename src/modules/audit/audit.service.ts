@@ -805,14 +805,6 @@ export class AuditService implements IAuditService {
       }
     }
 
-    // Check if status is changing and send email notification
-    if (
-      data.audit_status_id &&
-      data.audit_status_id !== audit.audit_status_id
-    ) {
-      await this.sendAuditStatusChangeNotification(audit, data.audit_status_id)
-    }
-
     // Round amount fields to 2 decimal places if provided
     const updateData = {
       ...data,
@@ -848,7 +840,25 @@ export class AuditService implements IAuditService {
           : data.booking_amount_confirmed
     }
 
-    return this.auditRepository.update(id, updateData)
+    const result = await this.auditRepository.update(id, updateData)
+
+    if (
+      data.audit_status_id &&
+      data.audit_status_id !== audit.audit_status_id
+    ) {
+      const emailDelivery = await this.sendAuditStatusChangeNotification(
+        audit,
+        data.audit_status_id
+      )
+      if (emailDelivery && emailDelivery.failed.length > 0) {
+        this.logger.warn(
+          `Audit status change notification email had recipient failures: ${JSON.stringify(emailDelivery.failed)}`
+        )
+        return { ...result, email_delivery: emailDelivery }
+      }
+    }
+
+    return result
   }
 
   async requestUpdateAmountConfirmed(
@@ -963,7 +973,9 @@ export class AuditService implements IAuditService {
       audit_update_data: auditUpdateData,
       reason: data.reason
     })
-    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingAction.id
+    )
 
     return {
       message:
@@ -1539,7 +1551,8 @@ export class AuditService implements IAuditService {
               result.errors.push({
                 row: rowNumber,
                 auditId: auditIdValue,
-                error: 'Invalid review collection date format (expected mm/dd/yyyy)'
+                error:
+                  'Invalid review collection date format (expected mm/dd/yyyy)'
               })
               result.failureCount++
               continue
@@ -2142,7 +2155,8 @@ export class AuditService implements IAuditService {
               result.errors.push({
                 row: rowNumber,
                 audit: expediaId,
-                error: 'Invalid review collection date format (expected mm/dd/yyyy)'
+                error:
+                  'Invalid review collection date format (expected mm/dd/yyyy)'
               })
               result.failureCount++
               continue
@@ -2481,62 +2495,58 @@ export class AuditService implements IAuditService {
   private async sendAuditStatusChangeNotification(
     audit: any,
     newStatusId: string
-  ) {
-    try {
-      // Get old and new status details
-      const oldStatus = await this.auditStatusRepository.findById(
-        audit.audit_status_id
-      )
-      const newStatus = await this.auditStatusRepository.findById(newStatusId)
+  ): Promise<{ sent: string[]; failed: { email: string; message: string }[] } | undefined> {
+    // Get old and new status details
+    const oldStatus = await this.auditStatusRepository.findById(
+      audit.audit_status_id
+    )
+    const newStatus = await this.auditStatusRepository.findById(newStatusId)
 
-      if (!oldStatus || !newStatus) {
-        console.error('Could not find audit status for email notification')
-        return
-      }
-
-      // Get property details
-      const property = await this.propertyRepository.findById(audit.property_id)
-
-      if (!property) {
-        console.error('Property not found for audit status change notification')
-        return
-      }
-
-      const recipientEmails: string[] = []
-
-      // Get portfolio details with contact_email
-      const portfolio = await this.prisma.portfolio.findUnique({
-        where: { id: property.portfolio_id },
-        select: { contact_email: true }
-      })
-
-      // Add portfolio contact email if exists
-      if (portfolio?.contact_email) {
-        recipientEmails.push(portfolio.contact_email)
-      }
-
-      // Generate audit name from type_of_ota array
-      const auditName =
-        audit.type_of_ota && audit.type_of_ota.length > 0
-          ? audit.type_of_ota
-              .map(
-                (ota: string) => `${ota.charAt(0).toUpperCase() + ota.slice(1)}`
-              )
-              .join(' + ') + ' Audit'
-          : 'Audit'
-
-      // Send the email
-      await this.emailUtil.sendAuditStatusChangeEmail(
-        recipientEmails,
-        auditName,
-        oldStatus.status,
-        newStatus.status,
-        new Date()
-      )
-    } catch (error) {
-      // Log the error but don't fail the status update
-      console.error('Failed to send audit status change notification:', error)
+    if (!oldStatus || !newStatus) {
+      this.logger.error('Could not find audit status for email notification')
+      return undefined
     }
+
+    // Get property details
+    const property = await this.propertyRepository.findById(audit.property_id)
+
+    if (!property) {
+      this.logger.error(
+        'Property not found for audit status change notification'
+      )
+      return undefined
+    }
+
+    const recipientEmails: string[] = []
+
+    // Get portfolio details with contact_email
+    const portfolio = await this.prisma.portfolio.findUnique({
+      where: { id: property.portfolio_id },
+      select: { contact_email: true }
+    })
+
+    // Add portfolio contact email if exists
+    if (portfolio?.contact_email) {
+      recipientEmails.push(portfolio.contact_email)
+    }
+
+    // Generate audit name from type_of_ota array
+    const auditName =
+      audit.type_of_ota && audit.type_of_ota.length > 0
+        ? audit.type_of_ota
+            .map(
+              (ota: string) => `${ota.charAt(0).toUpperCase() + ota.slice(1)}`
+            )
+            .join(' + ') + ' Audit'
+        : 'Audit'
+
+    return this.emailUtil.sendAuditStatusChangeEmail(
+      recipientEmails,
+      auditName,
+      oldStatus.status,
+      newStatus.status,
+      new Date()
+    )
   }
 
   async remove(id: string, user: IUserWithPermissions) {
@@ -2726,9 +2736,7 @@ export class AuditService implements IAuditService {
     validateSpreadsheetFile(file)
 
     const data = parseSpreadsheetToJson(file)
-    this.logger.info(
-      `File parsed successfully. Found ${data.length} data rows`
-    )
+    this.logger.info(`File parsed successfully. Found ${data.length} data rows`)
 
     // --- Column name resolution helpers ---
     const OTA_COLS = ['OTA', 'ota', 'Ota']
@@ -3109,7 +3117,9 @@ export class AuditService implements IAuditService {
         if (!validGroups.has(groupKey)) {
           const displayName =
             hotelName ??
-            (hotelIdStr && otaRaw ? `${otaRaw} ${hotelIdStr}` : hotelIdStr ?? 'Unknown')
+            (hotelIdStr && otaRaw
+              ? `${otaRaw} ${hotelIdStr}`
+              : (hotelIdStr ?? 'Unknown'))
           validGroups.set(groupKey, {
             rows: [],
             propertyId,
@@ -3130,10 +3140,8 @@ export class AuditService implements IAuditService {
       )
 
       // Log each error in detail
-      errors.forEach((err) => {
-        this.logger.error(
-          `  Row ${err.row} (${err.property}): ${err.error}`
-        )
+      errors.forEach(err => {
+        this.logger.error(`  Row ${err.row} (${err.property}): ${err.error}`)
       })
 
       return { success: false, errors }
@@ -3145,9 +3153,7 @@ export class AuditService implements IAuditService {
 
     // --- Resolve audit status IDs: find by name (case-insensitive), else create ---
     const uniqueStatusLabels = Array.from(
-      new Set(
-        Array.from(validGroups.values()).map(g => g.statusLabel.trim())
-      )
+      new Set(Array.from(validGroups.values()).map(g => g.statusLabel.trim()))
     ).filter(Boolean)
 
     const statusIdByNormalized = new Map<string, string>()
@@ -3158,8 +3164,7 @@ export class AuditService implements IAuditService {
       if (statusIdByNormalized.has(norm)) continue
 
       let matched =
-        allStatusesForImport.find(s => s.status.toLowerCase() === norm) ??
-        null
+        allStatusesForImport.find(s => s.status.toLowerCase() === norm) ?? null
       if (!matched) {
         matched = await this.auditStatusRepository.create({ status: label })
         allStatusesForImport = [...allStatusesForImport, matched]
@@ -3178,7 +3183,14 @@ export class AuditService implements IAuditService {
 
     for (const [
       _groupKey,
-      { rows, propertyId, displayName, batch, reviewCollectionDate, statusLabel }
+      {
+        rows,
+        propertyId,
+        displayName,
+        batch,
+        reviewCollectionDate,
+        statusLabel
+      }
     ] of validGroups) {
       const auditStatusId = statusIdByNormalized.get(statusLabel.toLowerCase())
       if (!auditStatusId) {
@@ -3190,9 +3202,10 @@ export class AuditService implements IAuditService {
       this.logger.info(
         `Processing property group: "${displayName}" (${rows.length} rows)` +
           `${batch ? `, Batch="${batch}"` : ''}` +
-          `${reviewCollectionDate
-            ? `, ReviewCollectionDate="${reviewCollectionDate}"`
-            : ''
+          `${
+            reviewCollectionDate
+              ? `, ReviewCollectionDate="${reviewCollectionDate}"`
+              : ''
           }` +
           `, Status="${statusLabel}"`
       )
@@ -3286,113 +3299,117 @@ export class AuditService implements IAuditService {
             `Agoda=$${agodaSum.toFixed(2)}, ` +
             `Booking=$${bookingSum.toFixed(2)}, ` +
             `Batch="${batch || 'None'}", ` +
-            `Review/Collection Date=${parsedReviewCollectionDate
-              ? parsedReviewCollectionDate.toISOString().split('T')[0]
-              : 'Not set'
+            `Review/Collection Date=${
+              parsedReviewCollectionDate
+                ? parsedReviewCollectionDate.toISOString().split('T')[0]
+                : 'Not set'
             }`
         )
 
         // Build per-property xlsx (always xlsx regardless of uploaded file type)
-      // Uses ExcelJS for bold headers and auto-fitted column widths
-      // SheetJS leaves Excel date cells as serial numbers; write real Date + numFmt so
-      // opened files show dates instead of raw numbers (e.g. 46125).
-      const isDateLikeColumnHeader = (header: string): boolean => {
-        const h = header.split('*')[0].trim().toLowerCase()
-        const markers = [
-          'date',
-          'check in',
-          'check-in',
-          'checkin',
-          'check out',
-          'checkout',
-          'review',
-          'collection',
-          'arrival',
-          'departure'
-        ]
-        return markers.some(m => h.includes(m))
-      }
-
-      const cellValueForExport = (header: string, raw: unknown): ExcelJS.CellValue => {
-        if (raw === undefined || raw === null || raw === '') return ''
-        if (!isDateLikeColumnHeader(header)) {
-          return raw as ExcelJS.CellValue
+        // Uses ExcelJS for bold headers and auto-fitted column widths
+        // SheetJS leaves Excel date cells as serial numbers; write real Date + numFmt so
+        // opened files show dates instead of raw numbers (e.g. 46125).
+        const isDateLikeColumnHeader = (header: string): boolean => {
+          const h = header.split('*')[0].trim().toLowerCase()
+          const markers = [
+            'date',
+            'check in',
+            'check-in',
+            'checkin',
+            'check out',
+            'checkout',
+            'review',
+            'collection',
+            'arrival',
+            'departure'
+          ]
+          return markers.some(m => h.includes(m))
         }
-        if (raw instanceof Date) return raw
-        const parsed = parseDate(raw)
-        return parsed ?? (raw as ExcelJS.CellValue)
-      }
 
-      const excelWb = new ExcelJS.Workbook()
-      const excelWs = excelWb.addWorksheet('Report')
-
-      // Header row — bold text
-      const headerRow = excelWs.addRow(originalHeaders)
-      headerRow.eachCell(cell => {
-        cell.font = { bold: true }
-      })
-
-      // Data rows
-      for (const dataRow of rows) {
-        const row = excelWs.addRow(
-          originalHeaders.map(h => cellValueForExport(h, dataRow[h]))
-        )
-        row.eachCell(cell => {
-          if (cell.value instanceof Date) {
-            // Match typical auto-import sheet display: month/day/year (US-style)
-            cell.numFmt = 'mm/dd/yyyy'
+        const cellValueForExport = (
+          header: string,
+          raw: unknown
+        ): ExcelJS.CellValue => {
+          if (raw === undefined || raw === null || raw === '') return ''
+          if (!isDateLikeColumnHeader(header)) {
+            return raw as ExcelJS.CellValue
           }
+          if (raw instanceof Date) return raw
+          const parsed = parseDate(raw)
+          return parsed ?? (raw as ExcelJS.CellValue)
+        }
+
+        const excelWb = new ExcelJS.Workbook()
+        const excelWs = excelWb.addWorksheet('Report')
+
+        // Header row — bold text
+        const headerRow = excelWs.addRow(originalHeaders)
+        headerRow.eachCell(cell => {
+          cell.font = { bold: true }
         })
-      }
 
-      // Column widths: based on the longest value in each column (header + data)
-      originalHeaders.forEach((header, colIdx) => {
-        const maxContentLen = rows.reduce((max, dataRow) => {
-          const exported = cellValueForExport(header, dataRow[header])
-          const len =
-            exported instanceof Date
-              ? 10
-              : typeof exported === 'number' ||
-                  typeof exported === 'string' ||
-                  typeof exported === 'boolean'
-                ? String(exported).length
-                : 12
-          return Math.max(max, len)
-        }, 0)
-        const width = Math.min(Math.max(header.length, maxContentLen) + 4, 60)
-        excelWs.getColumn(colIdx + 1).width = width
-      })
+        // Data rows
+        for (const dataRow of rows) {
+          const row = excelWs.addRow(
+            originalHeaders.map(h => cellValueForExport(h, dataRow[h]))
+          )
+          row.eachCell(cell => {
+            if (cell.value instanceof Date) {
+              // Match typical auto-import sheet display: month/day/year (US-style)
+              cell.numFmt = 'mm/dd/yyyy'
+            }
+          })
+        }
 
-      const xlsxBuffer = Buffer.from(await excelWb.xlsx.writeBuffer())
+        // Column widths: based on the longest value in each column (header + data)
+        originalHeaders.forEach((header, colIdx) => {
+          const maxContentLen = rows.reduce((max, dataRow) => {
+            const exported = cellValueForExport(header, dataRow[header])
+            const len =
+              exported instanceof Date
+                ? 10
+                : typeof exported === 'number' ||
+                    typeof exported === 'string' ||
+                    typeof exported === 'boolean'
+                  ? String(exported).length
+                  : 12
+            return Math.max(max, len)
+          }, 0)
+          const width = Math.min(Math.max(header.length, maxContentLen) + 4, 60)
+          excelWs.getColumn(colIdx + 1).width = width
+        })
 
-      // Upload to S3 via FileUploadService
-      const safeName = displayName.replace(/[^a-zA-Z0-9]/g, '_')
-      const fakeFile = {
-        buffer: xlsxBuffer,
-        originalname: `auto-import_${safeName}_${Date.now()}.xlsx`,
-        mimetype:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        size: xlsxBuffer.length,
-        fieldname: 'file',
-        encoding: '7bit',
-        stream: null as any,
-        destination: '',
-        filename: '',
-        path: ''
-      } as Express.Multer.File
+        const xlsxBuffer = Buffer.from(await excelWb.xlsx.writeBuffer())
 
-      const uploadResult = await this.fileUploadService.uploadFile(fakeFile)
+        // Upload to S3 via FileUploadService
+        const safeName = displayName.replace(/[^a-zA-Z0-9]/g, '_')
+        const fakeFile = {
+          buffer: xlsxBuffer,
+          originalname: `auto-import_${safeName}_${Date.now()}.xlsx`,
+          mimetype:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          size: xlsxBuffer.length,
+          fieldname: 'file',
+          encoding: '7bit',
+          stream: null as any,
+          destination: '',
+          filename: '',
+          path: ''
+        } as Express.Multer.File
 
-      // Persist report_url on the created audit
-      await this.auditRepository.update(audit.id, {
-        report_url: uploadResult.url
-      })
+        const uploadResult = await this.fileUploadService.uploadFile(fakeFile)
 
-      createdAudits.push({
-        property: displayName,
-        audit_id: audit.id,
-        report_url: uploadResult.url
-      })
+        // Persist report_url on the created audit
+        await this.auditRepository.update(audit.id, {
+          report_url: uploadResult.url
+        })
+
+        createdAudits.push({
+          property: displayName,
+          audit_id: audit.id,
+          report_url: uploadResult.url
+        })
 
         this.logger.success(
           `✓ Report uploaded for property "${displayName}": ${uploadResult.url}`
@@ -3414,7 +3431,7 @@ export class AuditService implements IAuditService {
     // Log summary of created audits
     if (createdAudits.length > 0) {
       this.logger.info('Summary of created audits:')
-      createdAudits.forEach((audit) => {
+      createdAudits.forEach(audit => {
         this.logger.info(
           `  - Property: "${audit.property}", Audit ID: ${audit.audit_id}, Report: ${audit.report_url}`
         )

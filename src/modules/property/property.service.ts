@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   forwardRef
 } from '@nestjs/common'
@@ -70,6 +71,8 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
 
 @Injectable()
 export class PropertyService implements IPropertyService {
+  private readonly logger = new Logger(PropertyService.name)
+
   constructor(
     @Inject('IPropertyRepository')
     private propertyRepository: IPropertyRepository,
@@ -1613,36 +1616,30 @@ export class PropertyService implements IPropertyService {
       )
 
       // Send transfer notification email to both portfolio contact emails
-      try {
-        // Get current portfolio details
-        const currentPortfolio = await this.portfolioRepository.findById(
-          property.portfolio_id
-        )
+      const currentPortfolio = await this.portfolioRepository.findById(
+        property.portfolio_id
+      )
 
-        const recipientEmails: string[] = []
+      const recipientEmails: string[] = []
 
-        // Add current portfolio contact email if exists
-        if (currentPortfolio?.contact_email) {
-          recipientEmails.push(currentPortfolio.contact_email)
-        }
-
-        // Add new portfolio contact email if exists
-        if (newPortfolio.contact_email) {
-          recipientEmails.push(newPortfolio.contact_email)
-        }
-
-        await this.emailUtil.sendPropertyTransferEmail(
-          recipientEmails,
-          property.name,
-          newPortfolio.name,
-          new Date()
-        )
-      } catch (emailError) {
-        // Log the error but don't fail the transfer
-        console.error('Failed to send property transfer email:', emailError)
+      if (currentPortfolio?.contact_email) {
+        recipientEmails.push(currentPortfolio.contact_email)
       }
 
-      return updatedProperty
+      if (newPortfolio.contact_email) {
+        recipientEmails.push(newPortfolio.contact_email)
+      }
+
+      const emailDelivery = await this.emailUtil.sendPropertyTransferEmail(
+        recipientEmails,
+        property.name,
+        newPortfolio.name,
+        new Date()
+      )
+
+      return emailDelivery.failed.length > 0
+        ? { ...updatedProperty, email_delivery: emailDelivery }
+        : updatedProperty
     }
 
     // All other users with UPDATE permission create pending action for approval
@@ -1671,7 +1668,9 @@ export class PropertyService implements IPropertyService {
       },
       reason: data.reason
     })
-    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingAction.id
+    )
 
     return {
       message:
@@ -1842,7 +1841,9 @@ export class PropertyService implements IPropertyService {
       requested_user_id: user.id,
       reason: 'Property deletion requested'
     })
-    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingAction.id
+    )
 
     return {
       message:
@@ -2010,7 +2011,9 @@ export class PropertyService implements IPropertyService {
       requested_user_id: user.id,
       reason: reason
     })
-    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingAction.id
+    )
 
     return {
       message:
@@ -2070,7 +2073,9 @@ export class PropertyService implements IPropertyService {
       requested_user_id: user.id,
       reason: reason
     })
-    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingAction.id
+    )
 
     return {
       message:
@@ -3989,12 +3994,17 @@ export class PropertyService implements IPropertyService {
       console.log(`✓ Total unique recipients: ${uniqueRecipients.length}`)
 
       // Send email using the new method with location
-      await this.emailUtil.sendBankDetailsUpdateEmail(
+      const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
         [property.name],
         location,
         new Date()
       )
+      if (bankEmailResult.failed.length > 0) {
+        this.logger.warn('Bank details notification email partial failure', {
+          failed: bankEmailResult.failed
+        })
+      }
 
       console.log(
         `\n✅ SUCCESS: Sent bank details ${action} notification to ${uniqueRecipients.length} recipient(s)`
@@ -4083,12 +4093,18 @@ export class PropertyService implements IPropertyService {
 
       // Send email using the new method with location
       const propertyNames = properties.map(p => p.name)
-      await this.emailUtil.sendBankDetailsUpdateEmail(
+      const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
         propertyNames,
         location,
         new Date()
       )
+      if (bankEmailResult.failed.length > 0) {
+        this.logger.warn(
+          'Bulk bank details notification email partial failure',
+          { failed: bankEmailResult.failed }
+        )
+      }
 
       console.log(
         `\n✅ SUCCESS: Sent bulk bank details ${action} notification to ${uniqueRecipients.length} recipient(s)`
