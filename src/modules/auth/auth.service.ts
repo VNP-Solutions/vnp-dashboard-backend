@@ -498,7 +498,14 @@ export class AuthService implements IAuthService {
       const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
 
       if (!validOtp) {
-        throw new BadRequestException('Invalid or expired OTP')
+        const unusedMatch = await this.authRepository.findUnusedOtpByCode(
+          user.id,
+          data.otp
+        )
+        if (unusedMatch && unusedMatch.expires_at < new Date()) {
+          throw new BadRequestException('OTP is expired')
+        }
+        throw new BadRequestException('Invalid OTP')
       }
 
       const hashedNewPassword = await EncryptionUtil.hashPassword(
