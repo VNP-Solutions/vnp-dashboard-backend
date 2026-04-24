@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException
 } from '@nestjs/common'
 import { BankSubType, BankType } from '@prisma/client'
@@ -17,6 +18,11 @@ import {
   parseSpreadsheetAllSheetsToJson,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
+import {
+  comparableBankDetailsEqual,
+  logBankDetailsEmailComparison,
+  toComparableBankDetails
+} from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import {
   getBankDetailsNotificationRoleDisplayLabel,
@@ -43,6 +49,8 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
 
 @Injectable()
 export class PropertyBankDetailsService implements IPropertyBankDetailsService {
+  private readonly logger = new Logger(PropertyBankDetailsService.name)
+
   constructor(
     @Inject('IPropertyBankDetailsRepository')
     private propertyBankDetailsRepository: IPropertyBankDetailsRepository,
@@ -318,6 +326,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     )
 
     // Send email notification to super admins and role users
+    logBankDetailsEmailComparison(
+      'property-bank-details create',
+      true,
+      `propertyId=${data.property_id}`
+    )
     await this.sendBankDetailsNotification(
       data.property_id,
       'created',
@@ -366,6 +379,11 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         })
 
         // Send email notification about deletion
+        logBankDetailsEmailComparison(
+          'property-bank-details update (delete)',
+          true,
+          `propertyId=${propertyId} action=deleted`
+        )
         await this.sendBankDetailsNotification(propertyId, 'deleted', location)
 
         return deleted
@@ -390,13 +408,32 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     // Update associated_user_id to current user
     (normalizedData as UpdatePropertyBankDetailsDto).associated_user_id = user.id
 
+    const beforeComparable = toComparableBankDetails(
+      bankDetails as unknown as Record<string, unknown>
+    )
+
     const result = await this.propertyBankDetailsRepository.update(
       propertyId,
       normalizedData as UpdatePropertyBankDetailsDto
     )
 
-    // Send email notification to super admins and role users
-    await this.sendBankDetailsNotification(propertyId, 'updated', location)
+    const afterComparable = toComparableBankDetails(
+      result as unknown as Record<string, unknown>
+    )
+    if (!comparableBankDetailsEqual(beforeComparable, afterComparable)) {
+      logBankDetailsEmailComparison(
+        'property-bank-details update',
+        true,
+        `propertyId=${propertyId} action=updated`
+      )
+      await this.sendBankDetailsNotification(propertyId, 'updated', location)
+    } else {
+      logBankDetailsEmailComparison(
+        'property-bank-details update',
+        false,
+        `propertyId=${propertyId}`
+      )
+    }
 
     return result
   }
@@ -857,12 +894,29 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             updateData.associated_user_id = user.id
 
             if (existingBankDetails) {
-              await this.propertyBankDetailsRepository.update(property.id, updateData)
+              const beforeComparable = toComparableBankDetails(
+                existingBankDetails as unknown as Record<string, unknown>
+              )
+              await this.propertyBankDetailsRepository.update(
+                property.id,
+                updateData
+              )
+              const afterRow =
+                await this.propertyBankDetailsRepository.findByPropertyId(
+                  property.id
+                )
+              const afterComparable = toComparableBankDetails(
+                afterRow as unknown as Record<string, unknown> | null | undefined
+              )
               console.log(
                 '\x1b[32m%s\x1b[0m',
                 `✅ [${sheetName}] Row ${rowNumber} SUCCESS: Updated bank details for '${expediaId}'`
               )
-              updatedPropertyIds.push(property.id)
+              if (
+                !comparableBankDetailsEqual(beforeComparable, afterComparable)
+              ) {
+                updatedPropertyIds.push(property.id)
+              }
             } else {
               updateData.property_id = property.id
               await this.propertyBankDetailsRepository.create(updateData)
@@ -938,14 +992,29 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       // Send alert notifications
       const allUpdatedPropertyIds = [...createdPropertyIds, ...updatedPropertyIds]
       if (allUpdatedPropertyIds.length > 0) {
+        logBankDetailsEmailComparison(
+          'property-bank-details bulk (user access alerts via sendEmail)',
+          true,
+          `property count=${allUpdatedPropertyIds.length}`
+        )
         await this.sendBulkUpdateAlerts(allUpdatedPropertyIds)
       }
 
       if (createdPropertyIds.length > 0) {
+        logBankDetailsEmailComparison(
+          'property-bank-details bulk (admin/role sendBankDetailsUpdateEmail)',
+          true,
+          `action=created count=${createdPropertyIds.length}`
+        )
         await this.sendBulkNotification(createdPropertyIds, 'created', location)
       }
 
       if (updatedPropertyIds.length > 0) {
+        logBankDetailsEmailComparison(
+          'property-bank-details bulk (admin/role sendBankDetailsUpdateEmail)',
+          true,
+          `action=updated count=${updatedPropertyIds.length}`
+        )
         await this.sendBulkNotification(updatedPropertyIds, 'updated', location)
       }
 
@@ -1258,12 +1327,17 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       )
 
       // Send email using the new method with location
-      await this.emailUtil.sendBankDetailsUpdateEmail(
+      const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
         [property.name],
         location,
         new Date()
       )
+      if (bankEmailResult.failed.length > 0) {
+        this.logger.warn('Bank details notification email partial failure', {
+          failed: bankEmailResult.failed
+        })
+      }
 
       console.log(
         `\n✅ SUCCESS: Sent bank details ${action} notification to ${uniqueRecipients.length} recipient(s)`
@@ -1363,12 +1437,18 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
 
       // Send email using the new method with location
       const propertyNames = properties.map(p => p.name)
-      await this.emailUtil.sendBankDetailsUpdateEmail(
+      const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
         propertyNames,
         location,
         new Date()
       )
+      if (bankEmailResult.failed.length > 0) {
+        this.logger.warn(
+          'Bulk bank details notification email partial failure',
+          { failed: bankEmailResult.failed }
+        )
+      }
 
       console.log(
         `\n✅ SUCCESS: Sent bulk update notification to ${uniqueRecipients.length} recipient(s)`

@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException
 } from '@nestjs/common'
 import { BankSubType, BankType } from '@prisma/client'
@@ -12,6 +13,11 @@ import {
   PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
+import {
+  comparableBankDetailsEqual,
+  logBankDetailsEmailComparison,
+  toComparableBankDetails
+} from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { isBankDetailsNotificationRecipientRole } from '../../common/utils/permission.util'
 import { PrismaService } from '../prisma/prisma.service'
@@ -28,6 +34,8 @@ import type {
 export class PortfolioBankDetailsService
   implements IPortfolioBankDetailsService
 {
+  private readonly logger = new Logger(PortfolioBankDetailsService.name)
+
   constructor(
     @Inject('IPortfolioBankDetailsRepository')
     private portfolioBankDetailsRepository: IPortfolioBankDetailsRepository,
@@ -402,12 +410,18 @@ export class PortfolioBankDetailsService
         return
       }
 
-      await this.emailUtil.sendBankDetailsUpdateEmail(
+      const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
         [portfolio.name],
         location ?? null,
         new Date()
       )
+      if (bankEmailResult.failed.length > 0) {
+        this.logger.warn(
+          'Portfolio bank details notification email partial failure',
+          { failed: bankEmailResult.failed }
+        )
+      }
     } catch (error) {
       console.error(
         'Error sending portfolio bank details notification:',
@@ -501,6 +515,11 @@ export class PortfolioBankDetailsService
     )
 
     // Send email notification to super admins and role users
+    logBankDetailsEmailComparison(
+      'portfolio-bank-details create',
+      true,
+      `portfolioId=${data.portfolio_id}`
+    )
     await this.sendBankDetailsNotification(
       data.portfolio_id,
       'created',
@@ -553,6 +572,11 @@ export class PortfolioBankDetailsService
         await this.removeFromChildProperties(portfolioId)
 
         // Send email notification about deletion
+        logBankDetailsEmailComparison(
+          'portfolio-bank-details update (delete)',
+          true,
+          `portfolioId=${portfolioId} action=deleted`
+        )
         await this.sendBankDetailsNotification(
           portfolioId,
           'deleted',
@@ -583,6 +607,10 @@ export class PortfolioBankDetailsService
     ;(normalizedData as UpdatePortfolioBankDetailsDto).associated_user_id =
       user.id
 
+    const beforeComparable = toComparableBankDetails(
+      bankDetails as unknown as Record<string, unknown>
+    )
+
     const result = await this.portfolioBankDetailsRepository.update(
       portfolioId,
       normalizedData as UpdatePortfolioBankDetailsDto
@@ -591,12 +619,27 @@ export class PortfolioBankDetailsService
     // Copy updated bank details to all child properties
     await this.copyToChildProperties(portfolioId, normalizedData, user.id)
 
-    // Send email notification to super admins and role users
-    await this.sendBankDetailsNotification(
-      portfolioId,
-      'updated',
-      location
+    const afterComparable = toComparableBankDetails(
+      result as unknown as Record<string, unknown>
     )
+    if (!comparableBankDetailsEqual(beforeComparable, afterComparable)) {
+      logBankDetailsEmailComparison(
+        'portfolio-bank-details update',
+        true,
+        `portfolioId=${portfolioId} action=updated`
+      )
+      await this.sendBankDetailsNotification(
+        portfolioId,
+        'updated',
+        location
+      )
+    } else {
+      logBankDetailsEmailComparison(
+        'portfolio-bank-details update',
+        false,
+        `portfolioId=${portfolioId}`
+      )
+    }
 
     return result
   }

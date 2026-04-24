@@ -28,7 +28,45 @@ export interface IAuthRepository {
     adminPasswordResetForUserId?: string | null,
     adminVerifyForUserId?: string | null
   ): Promise<void>
+  createOtpTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    otp: number,
+    expiresAt: Date,
+    adminPasswordResetForUserId?: string | null,
+    adminVerifyForUserId?: string | null
+  ): Promise<void>
+  createUserTx(
+    tx: Prisma.TransactionClient,
+    data: {
+      email: string
+      first_name: string
+      last_name: string
+      language: string
+      user_role_id: string
+      password: string
+      job_title?: string
+      temp_password?: string
+      is_verified: boolean
+      invited_by_id?: string
+      invitation_sent_at?: Date
+    }
+  ): Promise<User>
+  createUserAccessTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    portfolioIds: string[],
+    propertyIds: string[]
+  ): Promise<void>
   findValidOtp(
+    userId: string,
+    otp: number,
+    options?: {
+      adminPasswordResetForUserId?: string
+      adminVerifyForUserId?: string
+    }
+  ): Promise<Otp | null>
+  findUnusedOtpByCode(
     userId: string,
     otp: number,
     options?: {

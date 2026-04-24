@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -14,6 +16,7 @@ import {
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import { EmailUtil } from '../../common/utils/email.util'
+import type { MultiRecipientEmailResult } from '../email/email.dto'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   BulkCreateConsolidatedReportDto,
@@ -31,6 +34,8 @@ import type {
 
 @Injectable()
 export class ConsolidatedReportService implements IConsolidatedReportService {
+  private readonly logger = new Logger(ConsolidatedReportService.name)
+
   constructor(
     @Inject('IConsolidatedReportRepository')
     private consolidatedReportRepository: IConsolidatedReportRepository,
@@ -70,7 +75,9 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
       user_id: user.id
     })
 
-    void this.sendConsolidatedReportEmail(data.portfolio_id, [consolidatedReport.url])
+    void this.sendConsolidatedReportEmail(data.portfolio_id, [
+      consolidatedReport.url
+    ])
 
     return consolidatedReport
   }
@@ -133,44 +140,62 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
       }
     }
 
-    // Send email notification for all successfully uploaded reports
+    let emailDelivery: MultiRecipientEmailResult | undefined
     if (result.successCount > 0) {
       const successfulUrls = data.reports
         .filter((_, i) => !result.errors.some(e => e.index === i))
         .map(r => r.url)
-      void this.sendConsolidatedReportEmail(data.portfolio_id, successfulUrls)
+      emailDelivery = await this.sendConsolidatedReportEmail(
+        data.portfolio_id,
+        successfulUrls
+      )
     }
 
-    return result
+    return emailDelivery && emailDelivery.failed.length > 0
+      ? { ...result, email_delivery: emailDelivery }
+      : result
   }
 
   private async sendConsolidatedReportEmail(
     portfolioId: string,
     reportUrls: string[]
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult | undefined> {
     try {
       const portfolio = await this.prisma.portfolio.findUnique({
         where: { id: portfolioId },
         select: { name: true, contact_email: true }
       })
 
-      if (!portfolio?.contact_email) return
+      if (!portfolio?.contact_email) return undefined
 
       const recipientEmails = portfolio.contact_email
         .split(',')
         .map(e => e.trim())
         .filter(e => e.length > 0)
 
-      if (recipientEmails.length === 0) return
+      if (recipientEmails.length === 0) return undefined
 
-      await this.emailUtil.sendConsolidatedReportUploadedEmail(
+      return this.emailUtil.sendConsolidatedReportUploadedEmail(
         recipientEmails,
         portfolio.name,
         reportUrls,
         new Date()
       )
     } catch (error) {
-      console.error('Failed to send consolidated report email:', error)
+      const msg =
+        error instanceof HttpException
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : String(error)
+      this.logger.error(
+        'Failed to send consolidated report notification email',
+        error instanceof Error ? error.stack : error
+      )
+      return {
+        sent: [],
+        failed: [{ email: '(notification)', message: msg }]
+      }
     }
   }
 

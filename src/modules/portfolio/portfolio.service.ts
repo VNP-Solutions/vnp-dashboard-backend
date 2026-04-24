@@ -12,20 +12,20 @@ import {
   PermissionAction
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
-import { maskBankDetails } from '../../common/utils/bank-details.util'
 import { roundAmount } from '../../common/utils/amount.util'
-import {
-  parseSpreadsheetToJson,
-  validateSpreadsheetFile
-} from '../../common/utils/spreadsheet.util'
-import { COMPLETED_AUDIT_STATUSES } from '../../common/utils/audit.util'
+import { maskBankDetails } from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
+  isExternalUser,
   isInternalUser,
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
+import {
+  parseSpreadsheetToJson,
+  validateSpreadsheetFile
+} from '../../common/utils/spreadsheet.util'
 import { splitEmails } from '../../common/validators/comma-separated-emails.validator'
 import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
 import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
@@ -61,6 +61,25 @@ export class PortfolioService implements IPortfolioService {
     @Inject(PrismaService)
     private prisma: PrismaService
   ) {}
+
+  /**
+   * External users must not receive commission or sales-agent fields on portfolio reads.
+   */
+  private omitCommissionableAndSalesAgentForExternal<T extends Record<string, unknown>>(
+    user: IUserWithPermissions,
+    portfolio: T
+  ): T {
+    if (!isExternalUser(user)) {
+      return portfolio
+    }
+    const {
+      is_commissionable: _ic,
+      sales_agent_id: _said,
+      salesAgent: _sa,
+      ...rest
+    } = portfolio
+    return rest as T
+  }
 
   /**
    * Check if user can upload contract documents to a portfolio
@@ -305,12 +324,17 @@ export class PortfolioService implements IPortfolioService {
 
       const portfolioData = {
         ...portfolioWithoutPendingActions,
-        bankDetails: maskBankDetails(portfolioWithoutPendingActions.bankDetails),
+        bankDetails: maskBankDetails(
+          portfolioWithoutPendingActions.bankDetails
+        ),
         has_pending_action: pendingActions.length > 0,
         pending_actions: pendingActions
       }
 
-      return portfolioData
+      return this.omitCommissionableAndSalesAgentForExternal(
+        user,
+        portfolioData
+      )
     })
 
     return QueryBuilder.buildPaginatedResult(
@@ -459,7 +483,10 @@ export class PortfolioService implements IPortfolioService {
         pending_actions: pendingActions
       }
 
-      return portfolioData
+      return this.omitCommissionableAndSalesAgentForExternal(
+        user,
+        portfolioData
+      )
     })
 
     return enrichedData
@@ -492,10 +519,14 @@ export class PortfolioService implements IPortfolioService {
       throw new NotFoundException('Portfolio not found')
     }
 
-    return {
+    const withMaskedBanks = {
       ...portfolio,
       bankDetails: maskBankDetails(portfolio.bankDetails)
     }
+    return this.omitCommissionableAndSalesAgentForExternal(
+      user,
+      withMaskedBanks as Record<string, unknown>
+    ) as typeof withMaskedBanks
   }
 
   async findOneSecure(id: string, user: IUserWithPermissions) {
@@ -523,7 +554,10 @@ export class PortfolioService implements IPortfolioService {
       throw new NotFoundException('Portfolio not found')
     }
 
-    return portfolio
+    return this.omitCommissionableAndSalesAgentForExternal(
+      user,
+      portfolio as unknown as Record<string, unknown>
+    ) as typeof portfolio
   }
 
   async findManyByIdsSecure(
@@ -568,17 +602,17 @@ export class PortfolioService implements IPortfolioService {
           return null
         }
 
-        return portfolio
+        return this.omitCommissionableAndSalesAgentForExternal(
+          user,
+          portfolio as unknown as Record<string, unknown>
+        ) as typeof portfolio
       })
     )
 
     return results.filter((p): p is NonNullable<typeof p> => p !== null)
   }
 
-  async findAllSecure(
-    query: PortfolioQueryDto,
-    user: IUserWithPermissions
-  ) {
+  async findAllSecure(query: PortfolioQueryDto, user: IUserWithPermissions) {
     const accessibleIds = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PORTFOLIO
@@ -668,9 +702,7 @@ export class PortfolioService implements IPortfolioService {
     }
 
     const baseWhere =
-      accessibleIds === 'all'
-        ? {}
-        : { id: { in: accessibleIds } }
+      accessibleIds === 'all' ? {} : { id: { in: accessibleIds } }
 
     const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
       mergedQuery,
@@ -691,12 +723,15 @@ export class PortfolioService implements IPortfolioService {
 
     const enrichedData = data.map((portfolio: any) => {
       const pendingActions = portfolio.pendingActions || []
-      const { pendingActions: _pendingActions, ...portfolioWithoutPendingActions } = portfolio
-      return {
+      const {
+        pendingActions: _pendingActions,
+        ...portfolioWithoutPendingActions
+      } = portfolio
+      return this.omitCommissionableAndSalesAgentForExternal(user, {
         ...portfolioWithoutPendingActions,
         has_pending_action: pendingActions.length > 0,
         pending_actions: pendingActions
-      }
+      })
     })
 
     return QueryBuilder.buildPaginatedResult(
@@ -706,7 +741,6 @@ export class PortfolioService implements IPortfolioService {
       query.limit || 10
     )
   }
-
 
   async update(
     id: string,
@@ -1461,20 +1495,20 @@ export class PortfolioService implements IPortfolioService {
             'Access contact'
           ])
 
-        // Extract contract URL/Documents (OPTIONAL)
-        const contractUrl = findHeaderValue(row, [
-          'Documents',
-          'Contract URL',
-          'Contract Url',
-          'Contract url'
-        ])
+          // Extract contract URL/Documents (OPTIONAL)
+          const contractUrl = findHeaderValue(row, [
+            'Documents',
+            'Contract URL',
+            'Contract Url',
+            'Contract url'
+          ])
 
-        // Extract commissionable (OPTIONAL) - map "Yes"/"No" to true/false
-        const commissionableRaw = findHeaderValue(row, [
-          'Commissionable',
-          'Is Commissionable',
-          'is_commissionable'
-        ])
+          // Extract commissionable (OPTIONAL) - map "Yes"/"No" to true/false
+          const commissionableRaw = findHeaderValue(row, [
+            'Commissionable',
+            'Is Commissionable',
+            'is_commissionable'
+          ])
 
           let isCommissionable = false
           if (commissionableRaw) {
@@ -2098,8 +2132,10 @@ export class PortfolioService implements IPortfolioService {
       amountCollectable.booking += bookingCollectable
       amountConfirmed.booking += bookingConfirmed
 
-      amountCollectable.total += expediaCollectable + agodaCollectable + bookingCollectable
-      amountConfirmed.total += expediaConfirmed + agodaConfirmed + bookingConfirmed
+      amountCollectable.total +=
+        expediaCollectable + agodaCollectable + bookingCollectable
+      amountConfirmed.total +=
+        expediaConfirmed + agodaConfirmed + bookingConfirmed
     })
 
     // Get recent 10 audits for the portfolio

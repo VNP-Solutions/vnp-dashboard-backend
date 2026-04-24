@@ -88,3 +88,9 @@ export interface EmailAttachment {
   content: Buffer
   contentType: string
 }
+
+/** Result of sending the same notification to multiple recipients (best-effort per address). */
+export interface MultiRecipientEmailResult {
+  sent: string[]
+  failed: { email: string; message: string }[]
+}

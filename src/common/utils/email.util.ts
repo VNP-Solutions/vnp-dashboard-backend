@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import * as http from 'http'
 import * as https from 'https'
@@ -8,12 +13,14 @@ import { Configuration } from '../../config/configuration'
 import { DeploymentEnvironment } from '../../config/configuration.schema'
 import type {
   AttachmentUrlDto,
-  EmailAttachment
+  EmailAttachment,
+  MultiRecipientEmailResult
 } from '../../modules/email/email.dto'
 import { PrismaService } from '../../modules/prisma/prisma.service'
 
 @Injectable()
 export class EmailUtil {
+  private readonly logger = new Logger(EmailUtil.name)
   private transporter: nodemailer.Transporter
   private static smtpVerified = false
 
@@ -56,6 +63,86 @@ export class EmailUtil {
         }
       })
     }
+  }
+
+  /** Human-readable SMTP / nodemailer error (includes response code when present). */
+  private smtpErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      const any = error as Error & { response?: string; responseCode?: number }
+      const parts = [any.message]
+      if (any.responseCode != null) parts.push(`code=${any.responseCode}`)
+      if (any.response) parts.push(String(any.response).trim())
+      return parts.filter(Boolean).join(' — ')
+    }
+    return String(error)
+  }
+
+  private classifySmtpFailure(error: unknown): 'auth' | 'network' | 'unknown' {
+    const err = error instanceof Error ? error : null
+    const any = err as
+      | (Error & { responseCode?: number; code?: string; response?: string })
+      | null
+    const text = [
+      err?.message,
+      any?.response,
+      any?.code,
+      any?.responseCode != null ? String(any.responseCode) : ''
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+
+    if (
+      any?.responseCode === 535 ||
+      any?.responseCode === 534 ||
+      any?.code === 'EAUTH' ||
+      text.includes('invalid login') ||
+      text.includes('badcredentials') ||
+      text.includes('username and password not accepted') ||
+      text.includes('authentication failed')
+    ) {
+      return 'auth'
+    }
+    if (
+      any?.code === 'ECONNREFUSED' ||
+      any?.code === 'ETIMEDOUT' ||
+      any?.code === 'ENOTFOUND' ||
+      any?.code === 'ECONNRESET' ||
+      any?.code === 'ESOCKETTIMEDOUT' ||
+      text.includes('greeting never received') ||
+      (text.includes('timeout') && !text.includes('invalid login'))
+    ) {
+      return 'network'
+    }
+    return 'unknown'
+  }
+
+  /**
+   * Short message safe to return to API clients. Technical detail is logged separately.
+   */
+  private userFacingSmtpError(
+    error: unknown,
+    context: 'otp' | 'invitation' | 'passwordReset' | 'verify' | 'generic'
+  ): string {
+    const kind = this.classifySmtpFailure(error)
+    const intro =
+      context === 'otp'
+        ? "We couldn't send your login code."
+        : context === 'invitation'
+          ? "We couldn't send the invitation email."
+          : context === 'passwordReset'
+            ? "We couldn't send the password reset email."
+            : context === 'verify'
+              ? "We couldn't send the verification email."
+              : "We couldn't send the email."
+
+    if (kind === 'auth') {
+      return `${intro} The email service is temporarily unavailable. Please try again later or contact support.`
+    }
+    if (kind === 'network') {
+      return `${intro} We couldn't reach the email service. Please try again in a few minutes.`
+    }
+    return `${intro} Please try again later or contact support if the problem continues.`
   }
 
   /**
@@ -109,9 +196,12 @@ export class EmailUtil {
       const info = await this.transporter.sendMail(mailOptions)
       console.log('✓ OTP email sent:', { to: email, messageId: info.messageId })
     } catch (error) {
-      console.error('✗ Failed to send OTP email:', error)
-      throw new BadRequestException(
-        `Failed to send OTP email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      this.logger.error(
+        `Failed to send OTP email: ${this.smtpErrorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined
+      )
+      throw new ServiceUnavailableException(
+        this.userFacingSmtpError(error, 'otp')
       )
     }
   }
@@ -162,9 +252,12 @@ export class EmailUtil {
           messageId: info.messageId
         })
       } catch (error) {
-        console.error('✗ Failed to send internal invitation email:', error)
-        throw new BadRequestException(
-          `Failed to send invitation email: ${error instanceof Error ? error.message : 'Unknown error'}`
+        this.logger.error(
+          `Failed to send internal invitation email: ${this.smtpErrorMessage(error)}`,
+          error instanceof Error ? error.stack : undefined
+        )
+        throw new ServiceUnavailableException(
+          this.userFacingSmtpError(error, 'invitation')
         )
       }
       return
@@ -202,9 +295,12 @@ export class EmailUtil {
         messageId: info.messageId
       })
     } catch (error) {
-      console.error('✗ Failed to send external invitation email:', error)
-      throw new BadRequestException(
-        `Failed to send invitation email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      this.logger.error(
+        `Failed to send external invitation email: ${this.smtpErrorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined
+      )
+      throw new ServiceUnavailableException(
+        this.userFacingSmtpError(error, 'invitation')
       )
     }
   }
@@ -248,9 +344,12 @@ export class EmailUtil {
         messageId: info.messageId
       })
     } catch (error) {
-      console.error('✗ Failed to send password reset OTP email:', error)
-      throw new BadRequestException(
-        `Failed to send password reset OTP email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      this.logger.error(
+        `Failed to send password reset OTP email: ${this.smtpErrorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined
+      )
+      throw new ServiceUnavailableException(
+        this.userFacingSmtpError(error, 'passwordReset')
       )
     }
   }
@@ -307,9 +406,12 @@ export class EmailUtil {
         messageId: info.messageId
       })
     } catch (error) {
-      console.error('✗ Failed to send admin user password reset OTP email:', error)
-      throw new BadRequestException(
-        `Failed to send password reset OTP email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      this.logger.error(
+        `Failed to send admin user password reset OTP email: ${this.smtpErrorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined
+      )
+      throw new ServiceUnavailableException(
+        this.userFacingSmtpError(error, 'passwordReset')
       )
     }
   }
@@ -367,9 +469,12 @@ export class EmailUtil {
         messageId: info.messageId
       })
     } catch (error) {
-      console.error('✗ Failed to send admin user verify OTP email:', error)
-      throw new BadRequestException(
-        `Failed to send verify OTP email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      this.logger.error(
+        `Failed to send admin user verify OTP email: ${this.smtpErrorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined
+      )
+      throw new ServiceUnavailableException(
+        this.userFacingSmtpError(error, 'verify')
       )
     }
   }
@@ -448,14 +553,13 @@ export class EmailUtil {
         attachmentCount: attachments?.length || 0
       })
     } catch (error) {
-      console.error('✗ Failed to send email:', {
+      this.logger.error('Failed to send email', {
         to: recipients,
         subject,
-        error: error instanceof Error ? error.message : error,
-        stack: error instanceof Error ? error.stack : undefined
+        error: this.smtpErrorMessage(error)
       })
-      throw new BadRequestException(
-        `Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      throw new ServiceUnavailableException(
+        this.userFacingSmtpError(error, 'generic')
       )
     }
   }
@@ -628,7 +732,7 @@ export class EmailUtil {
     propertyName: string,
     newPortfolioName: string,
     effectiveDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -638,14 +742,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for property transfer notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping property transfer email for "${propertyName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the effective date
@@ -654,6 +758,9 @@ export class EmailUtil {
       month: 'long',
       day: 'numeric'
     })
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -690,14 +797,20 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send property transfer email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send property transfer email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendAuditStatusChangeEmail(
@@ -706,7 +819,7 @@ export class EmailUtil {
     oldStatus: string,
     newStatus: string,
     effectiveDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -716,14 +829,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for audit status change notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping audit status change email for "${auditName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the effective date
@@ -738,6 +851,9 @@ export class EmailUtil {
       this.configService.get('dashboardUrl', { infer: true }) ||
         'https://new.dashboardvnps.com/'
     )
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -780,14 +896,20 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send audit status change email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send audit status change email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendPropertyTransferRejectionEmail(
@@ -797,7 +919,7 @@ export class EmailUtil {
     targetPortfolioName: string,
     rejectionReason: string,
     requestedDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -807,14 +929,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for property transfer rejection notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping property transfer rejection email for "${propertyName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the requested date
@@ -823,6 +945,9 @@ export class EmailUtil {
       month: 'long',
       day: 'numeric'
     })
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -864,14 +989,20 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send property transfer rejection email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send property transfer rejection email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendPropertyDeactivateRejectionEmail(
@@ -880,7 +1011,7 @@ export class EmailUtil {
     portfolioName: string,
     rejectionReason: string,
     requestedDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -890,14 +1021,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for property deactivation rejection notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping property deactivation rejection email for "${propertyName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the requested date
@@ -906,6 +1037,9 @@ export class EmailUtil {
       month: 'long',
       day: 'numeric'
     })
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -947,14 +1081,20 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send property deactivation rejection email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send property deactivation rejection email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendPortfolioDeactivateRejectionEmail(
@@ -962,7 +1102,7 @@ export class EmailUtil {
     portfolioName: string,
     rejectionReason: string,
     requestedDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -972,14 +1112,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for portfolio deactivation rejection notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping portfolio deactivation rejection email for "${portfolioName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the requested date
@@ -988,6 +1128,9 @@ export class EmailUtil {
       month: 'long',
       day: 'numeric'
     })
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -1029,14 +1172,20 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send portfolio deactivation rejection email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send portfolio deactivation rejection email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendPropertyActivateRejectionEmail(
@@ -1045,7 +1194,7 @@ export class EmailUtil {
     portfolioName: string,
     rejectionReason: string,
     requestedDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -1055,14 +1204,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for property activation rejection notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping property activation rejection email for "${propertyName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the requested date
@@ -1071,6 +1220,9 @@ export class EmailUtil {
       month: 'long',
       day: 'numeric'
     })
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -1112,14 +1264,20 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send property activation rejection email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send property activation rejection email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendAuditReportUrlUpdatedEmail(
@@ -1129,7 +1287,7 @@ export class EmailUtil {
     portfolioName: string,
     reportUrl: string,
     updatedDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -1139,14 +1297,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for audit report URL update notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping audit report upload email for "${auditName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the update date
@@ -1161,6 +1319,9 @@ export class EmailUtil {
       this.configService.get('dashboardUrl', { infer: true }) ||
         'https://new.dashboardvnps.com/'
     )
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -1206,14 +1367,20 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send audit report upload email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send audit report upload email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendConsolidatedReportUploadedEmail(
@@ -1221,7 +1388,7 @@ export class EmailUtil {
     portfolioName: string,
     reportUrls: string[],
     uploadedDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -1231,14 +1398,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for consolidated report upload notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping consolidated report upload email for portfolio "${portfolioName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the upload date
@@ -1257,6 +1424,9 @@ export class EmailUtil {
     // Limit report URLs to first 5 to avoid email being too long
     const displayUrls = reportUrls.slice(0, 5)
     const hasMoreUrls = reportUrls.length > 5
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -1322,21 +1492,27 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send consolidated report upload email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send consolidated report upload email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendPortfolioDeactivateEmail(
     recipientEmails: string[],
     portfolioName: string,
     effectiveDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -1346,14 +1522,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for portfolio deactivation notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping portfolio deactivation email for "${portfolioName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the effective date
@@ -1362,6 +1538,9 @@ export class EmailUtil {
       month: 'long',
       day: 'numeric'
     })
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -1398,21 +1577,27 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send portfolio deactivation email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send portfolio deactivation email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendPortfolioActivateEmail(
     recipientEmails: string[],
     portfolioName: string,
     effectiveDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -1422,14 +1607,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for portfolio activation notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping portfolio activation email for "${portfolioName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the effective date
@@ -1438,6 +1623,9 @@ export class EmailUtil {
       month: 'long',
       day: 'numeric'
     })
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -1474,14 +1662,20 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send portfolio activation email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send portfolio activation email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendPortfolioActivateRejectionEmail(
@@ -1489,7 +1683,7 @@ export class EmailUtil {
     portfolioName: string,
     rejectionReason: string,
     requestedDate: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -1499,14 +1693,14 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for portfolio activation rejection notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
       console.log(
         `[staging] Skipping portfolio activation rejection email for "${portfolioName}" to ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the requested date
@@ -1515,6 +1709,9 @@ export class EmailUtil {
       month: 'long',
       day: 'numeric'
     })
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient for personalization
     for (const userEmail of uniqueEmails) {
@@ -1556,14 +1753,20 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send portfolio activation rejection email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send portfolio activation rejection email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   async sendBankDetailsUpdateEmail(
@@ -1571,7 +1774,7 @@ export class EmailUtil {
     propertyNames: string[],
     location: string | null,
     timestamp: Date
-  ): Promise<void> {
+  ): Promise<MultiRecipientEmailResult> {
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -1581,14 +1784,17 @@ export class EmailUtil {
       console.warn(
         'No valid recipient emails provided for bank details update notification'
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     if (!this.isNotificationEmailAllowed()) {
+      const deploymentEnv = this.configService.get('deploymentEnv', {
+        infer: true
+      })
       console.log(
-        `[staging] Skipping bank details update email for properties [${propertyNames.join(', ')}] to ${uniqueEmails.join(', ')}`
+        `[bank details email] Skipping send: DEPLOYMENT_ENV="${String(deploymentEnv)}" (bank notification emails are only sent in non-staging deployment envs; use production/development to deliver). Affected property names: [${propertyNames.join(', ')}] Recipients: ${uniqueEmails.join(', ')}`
       )
-      return
+      return { sent: [], failed: [] }
     }
 
     // Format the timestamp
@@ -1605,6 +1811,9 @@ export class EmailUtil {
     const propertyList = propertyNames
       .map(name => `<li>🏢 ${name}</li>`)
       .join('')
+
+    const failures: { email: string; message: string }[] = []
+    const sent: string[] = []
 
     // Send individual emails to each recipient
     for (const userEmail of uniqueEmails) {
@@ -1645,14 +1854,20 @@ export class EmailUtil {
           to: userEmail,
           messageId: info.messageId
         })
+        sent.push(userEmail)
       } catch (error) {
-        console.error(
-          `✗ Failed to send bank details update email to ${userEmail}:`,
-          error
+        const detail = this.smtpErrorMessage(error)
+        this.logger.error(
+          `Failed to send bank details update email to ${userEmail}: ${detail}`,
+          error instanceof Error ? error.stack : undefined
         )
-        // Continue sending to other recipients even if one fails
+        failures.push({
+          email: userEmail,
+          message: this.userFacingSmtpError(error, 'generic')
+        })
       }
     }
+    return { sent, failed: failures }
   }
 
   /**
@@ -1761,14 +1976,17 @@ export class EmailUtil {
         `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Status</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(pa.status)}</td></tr>`
       )
       rows.push(
-        `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Requested at</strong></td><td style="padding:8px;border:1px solid #ddd;">${pa.created_at.toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZoneName: 'short'
-        })}</td></tr>`
+        `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Requested at</strong></td><td style="padding:8px;border:1px solid #ddd;">${pa.created_at.toLocaleString(
+          'en-US',
+          {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZoneName: 'short'
+          }
+        )}</td></tr>`
       )
       rows.push(
         `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Requested by</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(reqName || '(no name)')} (${escapeHtml(pa.requestedBy.email)})</td></tr>`
@@ -1815,13 +2033,17 @@ export class EmailUtil {
         const aud = pa.audit_update_data
         const parts: string[] = []
         if (aud.expedia_amount_confirmed !== undefined) {
-          parts.push(`Expedia amount confirmed: ${aud.expedia_amount_confirmed}`)
+          parts.push(
+            `Expedia amount confirmed: ${aud.expedia_amount_confirmed}`
+          )
         }
         if (aud.agoda_amount_confirmed !== undefined) {
           parts.push(`Agoda amount confirmed: ${aud.agoda_amount_confirmed}`)
         }
         if (aud.booking_amount_confirmed !== undefined) {
-          parts.push(`Booking amount confirmed: ${aud.booking_amount_confirmed}`)
+          parts.push(
+            `Booking amount confirmed: ${aud.booking_amount_confirmed}`
+          )
         }
         rows.push(
           `<tr><td style="padding:8px;border:1px solid #ddd;"><strong>Requested amount updates</strong></td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(parts.join('; '))}</td></tr>`
@@ -1829,6 +2051,8 @@ export class EmailUtil {
       }
 
       const tableHtml = `<table style="border-collapse:collapse;width:100%;max-width:640px;">${rows.join('')}</table>`
+
+      const notifyFailures: { email: string; message: string }[] = []
 
       for (const userEmail of superAdminEmails) {
         try {
@@ -1863,16 +2087,28 @@ export class EmailUtil {
             messageId: info.messageId
           })
         } catch (error) {
-          console.error(
-            `✗ Failed to send pending action notification to ${userEmail}:`,
-            error
+          const detail = this.smtpErrorMessage(error)
+          this.logger.error(
+            `Failed to send pending action notification to ${userEmail}: ${detail}`,
+            error instanceof Error ? error.stack : undefined
           )
+          notifyFailures.push({
+            email: userEmail,
+            message: this.userFacingSmtpError(error, 'generic')
+          })
         }
       }
+
+      if (notifyFailures.length > 0) {
+        this.logger.error(
+          `Pending action notification: ${notifyFailures.length}/${superAdminEmails.length} super admin recipient(s) did not receive email`,
+          { pendingActionId, failures: notifyFailures }
+        )
+      }
     } catch (error) {
-      console.error(
-        '✗ Failed pending action super-admin notification:',
-        error
+      this.logger.error(
+        'Failed pending action super-admin notification (unexpected)',
+        error instanceof Error ? error.stack : error
       )
     }
   }

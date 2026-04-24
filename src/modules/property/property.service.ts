@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   forwardRef
 } from '@nestjs/common'
@@ -18,7 +19,12 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount } from '../../common/utils/amount.util'
-import { maskBankDetails } from '../../common/utils/bank-details.util'
+import {
+  comparableBankDetailsEqual,
+  logBankDetailsEmailComparison,
+  maskBankDetails,
+  toComparableBankDetails
+} from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
@@ -70,6 +76,8 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
 
 @Injectable()
 export class PropertyService implements IPropertyService {
+  private readonly logger = new Logger(PropertyService.name)
+
   constructor(
     @Inject('IPropertyRepository')
     private propertyRepository: IPropertyRepository,
@@ -250,6 +258,11 @@ export class PropertyService implements IPropertyService {
 
     // Send email notification to super admins and role users if bank details were created
     if (bankDetailsToCreate) {
+      logBankDetailsEmailComparison(
+        'property complete-create',
+        true,
+        `propertyId=${property.id}`
+      )
       await this.sendBankDetailsNotificationToSuperAdmins(
         property.id,
         'created',
@@ -322,6 +335,10 @@ export class PropertyService implements IPropertyService {
       ? data.bank_details
       : undefined
 
+    const beforeBankComparable = toComparableBankDetails(
+      property.bankDetails as Record<string, unknown> | null | undefined
+    )
+
     // Update property with credentials and bank details in a transaction
     const updatedProperty = await this.propertyRepository.completeUpdate(
       id,
@@ -331,11 +348,33 @@ export class PropertyService implements IPropertyService {
       user.id
     )
 
-    // Send email notification to super admins and role users if bank details were updated or deleted
+    // Send email only when persisted bank details (business fields) actually changed
     if (bankDetailsToUpdate) {
-      const action =
-        bankDetailsToUpdate.bank_type === 'none' ? 'deleted' : 'updated'
-      await this.sendBankDetailsNotificationToSuperAdmins(id, action, location)
+      const afterBankComparable = toComparableBankDetails(
+        updatedProperty.bankDetails as Record<string, unknown> | null | undefined
+      )
+      if (
+        !comparableBankDetailsEqual(beforeBankComparable, afterBankComparable)
+      ) {
+        const action =
+          bankDetailsToUpdate.bank_type === 'none' ? 'deleted' : 'updated'
+        logBankDetailsEmailComparison(
+          'property complete-update',
+          true,
+          `propertyId=${id} action=${action}`
+        )
+        await this.sendBankDetailsNotificationToSuperAdmins(
+          id,
+          action,
+          location
+        )
+      } else {
+        logBankDetailsEmailComparison(
+          'property complete-update',
+          false,
+          `propertyId=${id}`
+        )
+      }
     }
 
     return updatedProperty
@@ -1613,36 +1652,30 @@ export class PropertyService implements IPropertyService {
       )
 
       // Send transfer notification email to both portfolio contact emails
-      try {
-        // Get current portfolio details
-        const currentPortfolio = await this.portfolioRepository.findById(
-          property.portfolio_id
-        )
+      const currentPortfolio = await this.portfolioRepository.findById(
+        property.portfolio_id
+      )
 
-        const recipientEmails: string[] = []
+      const recipientEmails: string[] = []
 
-        // Add current portfolio contact email if exists
-        if (currentPortfolio?.contact_email) {
-          recipientEmails.push(currentPortfolio.contact_email)
-        }
-
-        // Add new portfolio contact email if exists
-        if (newPortfolio.contact_email) {
-          recipientEmails.push(newPortfolio.contact_email)
-        }
-
-        await this.emailUtil.sendPropertyTransferEmail(
-          recipientEmails,
-          property.name,
-          newPortfolio.name,
-          new Date()
-        )
-      } catch (emailError) {
-        // Log the error but don't fail the transfer
-        console.error('Failed to send property transfer email:', emailError)
+      if (currentPortfolio?.contact_email) {
+        recipientEmails.push(currentPortfolio.contact_email)
       }
 
-      return updatedProperty
+      if (newPortfolio.contact_email) {
+        recipientEmails.push(newPortfolio.contact_email)
+      }
+
+      const emailDelivery = await this.emailUtil.sendPropertyTransferEmail(
+        recipientEmails,
+        property.name,
+        newPortfolio.name,
+        new Date()
+      )
+
+      return emailDelivery.failed.length > 0
+        ? { ...updatedProperty, email_delivery: emailDelivery }
+        : updatedProperty
     }
 
     // All other users with UPDATE permission create pending action for approval
@@ -1671,7 +1704,9 @@ export class PropertyService implements IPropertyService {
       },
       reason: data.reason
     })
-    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingAction.id
+    )
 
     return {
       message:
@@ -1842,7 +1877,9 @@ export class PropertyService implements IPropertyService {
       requested_user_id: user.id,
       reason: 'Property deletion requested'
     })
-    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingAction.id
+    )
 
     return {
       message:
@@ -2010,7 +2047,9 @@ export class PropertyService implements IPropertyService {
       requested_user_id: user.id,
       reason: reason
     })
-    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingAction.id
+    )
 
     return {
       message:
@@ -2070,7 +2109,9 @@ export class PropertyService implements IPropertyService {
       requested_user_id: user.id,
       reason: reason
     })
-    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(pendingAction.id)
+    void this.emailUtil.notifySuperAdminsOfPendingActionRequest(
+      pendingAction.id
+    )
 
     return {
       message:
@@ -2866,9 +2907,20 @@ export class PropertyService implements IPropertyService {
 
           // Create or update bank details
           if (existingBankDetails) {
-            // Update existing bank details
+            const beforeComparable = toComparableBankDetails(
+              existingBankDetails as Record<string, unknown>
+            )
             await this.bankDetailsRepository.update(propertyId, bankDetailsData)
-            bankDetailsUpdatedPropertyIds.push(propertyId)
+            const afterRow =
+              await this.bankDetailsRepository.findByPropertyId(propertyId)
+            const afterComparable = toComparableBankDetails(
+              afterRow as Record<string, unknown> | null | undefined
+            )
+            if (
+              !comparableBankDetailsEqual(beforeComparable, afterComparable)
+            ) {
+              bankDetailsUpdatedPropertyIds.push(propertyId)
+            }
           } else {
             // Create new bank details
             bankDetailsData.property_id = propertyId
@@ -2916,6 +2968,11 @@ export class PropertyService implements IPropertyService {
 
       // Send email notifications to super admins and role users for bank details created/updated during bulk import
       if (bankDetailsCreatedPropertyIds.length > 0) {
+        logBankDetailsEmailComparison(
+          'property bulk-import (admin/role email)',
+          true,
+          `action=created count=${bankDetailsCreatedPropertyIds.length} propertyIds=${bankDetailsCreatedPropertyIds.join(',')}`
+        )
         await this.sendBulkBankDetailsNotificationToSuperAdmins(
           bankDetailsCreatedPropertyIds,
           'created',
@@ -2923,6 +2980,11 @@ export class PropertyService implements IPropertyService {
         )
       }
       if (bankDetailsUpdatedPropertyIds.length > 0) {
+        logBankDetailsEmailComparison(
+          'property bulk-import (admin/role email)',
+          true,
+          `action=updated count=${bankDetailsUpdatedPropertyIds.length} propertyIds=${bankDetailsUpdatedPropertyIds.join(',')}`
+        )
         await this.sendBulkBankDetailsNotificationToSuperAdmins(
           bankDetailsUpdatedPropertyIds,
           'updated',
@@ -3989,12 +4051,17 @@ export class PropertyService implements IPropertyService {
       console.log(`✓ Total unique recipients: ${uniqueRecipients.length}`)
 
       // Send email using the new method with location
-      await this.emailUtil.sendBankDetailsUpdateEmail(
+      const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
         [property.name],
         location,
         new Date()
       )
+      if (bankEmailResult.failed.length > 0) {
+        this.logger.warn('Bank details notification email partial failure', {
+          failed: bankEmailResult.failed
+        })
+      }
 
       console.log(
         `\n✅ SUCCESS: Sent bank details ${action} notification to ${uniqueRecipients.length} recipient(s)`
@@ -4083,12 +4150,18 @@ export class PropertyService implements IPropertyService {
 
       // Send email using the new method with location
       const propertyNames = properties.map(p => p.name)
-      await this.emailUtil.sendBankDetailsUpdateEmail(
+      const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
         propertyNames,
         location,
         new Date()
       )
+      if (bankEmailResult.failed.length > 0) {
+        this.logger.warn(
+          'Bulk bank details notification email partial failure',
+          { failed: bankEmailResult.failed }
+        )
+      }
 
       console.log(
         `\n✅ SUCCESS: Sent bulk bank details ${action} notification to ${uniqueRecipients.length} recipient(s)`
