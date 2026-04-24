@@ -17,6 +17,7 @@ import { maskBankDetails } from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
+  isExternalUser,
   isInternalUser,
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
@@ -60,6 +61,25 @@ export class PortfolioService implements IPortfolioService {
     @Inject(PrismaService)
     private prisma: PrismaService
   ) {}
+
+  /**
+   * External users must not receive commission or sales-agent fields on portfolio reads.
+   */
+  private omitCommissionableAndSalesAgentForExternal<T extends Record<string, unknown>>(
+    user: IUserWithPermissions,
+    portfolio: T
+  ): T {
+    if (!isExternalUser(user)) {
+      return portfolio
+    }
+    const {
+      is_commissionable: _ic,
+      sales_agent_id: _said,
+      salesAgent: _sa,
+      ...rest
+    } = portfolio
+    return rest as T
+  }
 
   /**
    * Check if user can upload contract documents to a portfolio
@@ -311,7 +331,10 @@ export class PortfolioService implements IPortfolioService {
         pending_actions: pendingActions
       }
 
-      return portfolioData
+      return this.omitCommissionableAndSalesAgentForExternal(
+        user,
+        portfolioData
+      )
     })
 
     return QueryBuilder.buildPaginatedResult(
@@ -460,7 +483,10 @@ export class PortfolioService implements IPortfolioService {
         pending_actions: pendingActions
       }
 
-      return portfolioData
+      return this.omitCommissionableAndSalesAgentForExternal(
+        user,
+        portfolioData
+      )
     })
 
     return enrichedData
@@ -493,10 +519,14 @@ export class PortfolioService implements IPortfolioService {
       throw new NotFoundException('Portfolio not found')
     }
 
-    return {
+    const withMaskedBanks = {
       ...portfolio,
       bankDetails: maskBankDetails(portfolio.bankDetails)
     }
+    return this.omitCommissionableAndSalesAgentForExternal(
+      user,
+      withMaskedBanks as Record<string, unknown>
+    ) as typeof withMaskedBanks
   }
 
   async findOneSecure(id: string, user: IUserWithPermissions) {
@@ -524,7 +554,10 @@ export class PortfolioService implements IPortfolioService {
       throw new NotFoundException('Portfolio not found')
     }
 
-    return portfolio
+    return this.omitCommissionableAndSalesAgentForExternal(
+      user,
+      portfolio as unknown as Record<string, unknown>
+    ) as typeof portfolio
   }
 
   async findManyByIdsSecure(
@@ -569,7 +602,10 @@ export class PortfolioService implements IPortfolioService {
           return null
         }
 
-        return portfolio
+        return this.omitCommissionableAndSalesAgentForExternal(
+          user,
+          portfolio as unknown as Record<string, unknown>
+        ) as typeof portfolio
       })
     )
 
@@ -691,11 +727,11 @@ export class PortfolioService implements IPortfolioService {
         pendingActions: _pendingActions,
         ...portfolioWithoutPendingActions
       } = portfolio
-      return {
+      return this.omitCommissionableAndSalesAgentForExternal(user, {
         ...portfolioWithoutPendingActions,
         has_pending_action: pendingActions.length > 0,
         pending_actions: pendingActions
-      }
+      })
     })
 
     return QueryBuilder.buildPaginatedResult(
