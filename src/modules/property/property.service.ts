@@ -19,7 +19,12 @@ import {
 } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount } from '../../common/utils/amount.util'
-import { maskBankDetails } from '../../common/utils/bank-details.util'
+import {
+  comparableBankDetailsEqual,
+  logBankDetailsEmailComparison,
+  maskBankDetails,
+  toComparableBankDetails
+} from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
@@ -253,6 +258,11 @@ export class PropertyService implements IPropertyService {
 
     // Send email notification to super admins and role users if bank details were created
     if (bankDetailsToCreate) {
+      logBankDetailsEmailComparison(
+        'property complete-create',
+        true,
+        `propertyId=${property.id}`
+      )
       await this.sendBankDetailsNotificationToSuperAdmins(
         property.id,
         'created',
@@ -325,6 +335,10 @@ export class PropertyService implements IPropertyService {
       ? data.bank_details
       : undefined
 
+    const beforeBankComparable = toComparableBankDetails(
+      property.bankDetails as Record<string, unknown> | null | undefined
+    )
+
     // Update property with credentials and bank details in a transaction
     const updatedProperty = await this.propertyRepository.completeUpdate(
       id,
@@ -334,11 +348,33 @@ export class PropertyService implements IPropertyService {
       user.id
     )
 
-    // Send email notification to super admins and role users if bank details were updated or deleted
+    // Send email only when persisted bank details (business fields) actually changed
     if (bankDetailsToUpdate) {
-      const action =
-        bankDetailsToUpdate.bank_type === 'none' ? 'deleted' : 'updated'
-      await this.sendBankDetailsNotificationToSuperAdmins(id, action, location)
+      const afterBankComparable = toComparableBankDetails(
+        updatedProperty.bankDetails as Record<string, unknown> | null | undefined
+      )
+      if (
+        !comparableBankDetailsEqual(beforeBankComparable, afterBankComparable)
+      ) {
+        const action =
+          bankDetailsToUpdate.bank_type === 'none' ? 'deleted' : 'updated'
+        logBankDetailsEmailComparison(
+          'property complete-update',
+          true,
+          `propertyId=${id} action=${action}`
+        )
+        await this.sendBankDetailsNotificationToSuperAdmins(
+          id,
+          action,
+          location
+        )
+      } else {
+        logBankDetailsEmailComparison(
+          'property complete-update',
+          false,
+          `propertyId=${id}`
+        )
+      }
     }
 
     return updatedProperty
@@ -2871,9 +2907,20 @@ export class PropertyService implements IPropertyService {
 
           // Create or update bank details
           if (existingBankDetails) {
-            // Update existing bank details
+            const beforeComparable = toComparableBankDetails(
+              existingBankDetails as Record<string, unknown>
+            )
             await this.bankDetailsRepository.update(propertyId, bankDetailsData)
-            bankDetailsUpdatedPropertyIds.push(propertyId)
+            const afterRow =
+              await this.bankDetailsRepository.findByPropertyId(propertyId)
+            const afterComparable = toComparableBankDetails(
+              afterRow as Record<string, unknown> | null | undefined
+            )
+            if (
+              !comparableBankDetailsEqual(beforeComparable, afterComparable)
+            ) {
+              bankDetailsUpdatedPropertyIds.push(propertyId)
+            }
           } else {
             // Create new bank details
             bankDetailsData.property_id = propertyId
@@ -2921,6 +2968,11 @@ export class PropertyService implements IPropertyService {
 
       // Send email notifications to super admins and role users for bank details created/updated during bulk import
       if (bankDetailsCreatedPropertyIds.length > 0) {
+        logBankDetailsEmailComparison(
+          'property bulk-import (admin/role email)',
+          true,
+          `action=created count=${bankDetailsCreatedPropertyIds.length} propertyIds=${bankDetailsCreatedPropertyIds.join(',')}`
+        )
         await this.sendBulkBankDetailsNotificationToSuperAdmins(
           bankDetailsCreatedPropertyIds,
           'created',
@@ -2928,6 +2980,11 @@ export class PropertyService implements IPropertyService {
         )
       }
       if (bankDetailsUpdatedPropertyIds.length > 0) {
+        logBankDetailsEmailComparison(
+          'property bulk-import (admin/role email)',
+          true,
+          `action=updated count=${bankDetailsUpdatedPropertyIds.length} propertyIds=${bankDetailsUpdatedPropertyIds.join(',')}`
+        )
         await this.sendBulkBankDetailsNotificationToSuperAdmins(
           bankDetailsUpdatedPropertyIds,
           'updated',

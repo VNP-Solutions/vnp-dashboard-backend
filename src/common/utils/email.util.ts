@@ -1788,8 +1788,11 @@ export class EmailUtil {
     }
 
     if (!this.isNotificationEmailAllowed()) {
+      const deploymentEnv = this.configService.get('deploymentEnv', {
+        infer: true
+      })
       console.log(
-        `[staging] Skipping bank details update email for properties [${propertyNames.join(', ')}] to ${uniqueEmails.join(', ')}`
+        `[bank details email] Skipping send: DEPLOYMENT_ENV="${String(deploymentEnv)}" (bank notification emails are only sent in non-staging deployment envs; use production/development to deliver). Affected property names: [${propertyNames.join(', ')}] Recipients: ${uniqueEmails.join(', ')}`
       )
       return { sent: [], failed: [] }
     }
