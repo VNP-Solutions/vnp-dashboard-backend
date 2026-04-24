@@ -2913,7 +2913,6 @@ export class AuditService implements IAuditService {
     const errors: AutoImportAuditErrorDto[] = []
 
     // Caches to avoid repeated DB calls for the same lookup key
-    const portfolioCache = new Map<string, boolean>() // name  → exists
     const propertyIdCache = new Map<string, string | null>() // lookup key → id | null
     const accessCache = new Map<string, boolean>() // id    → hasAccess
 
@@ -3001,20 +3000,7 @@ export class AuditService implements IAuditService {
         )
       }
 
-      // --- Portfolio ---
-      if (!portfolioName) {
-        rowErrors.push('Portfolio name is missing')
-      } else {
-        if (!portfolioCache.has(portfolioName)) {
-          const p = await this.portfolioRepository.findByName(portfolioName)
-          portfolioCache.set(portfolioName, !!p)
-        }
-        if (!portfolioCache.get(portfolioName)) {
-          rowErrors.push(
-            `Portfolio "${portfolioName}" not found in the database`
-          )
-        }
-      }
+      // Portfolio / check-in / check-out are carried through to the generated report sheet only (no DB or ordering validation).
 
       // --- Property: OTA + Hotel ID (credentials) preferred; else Hotel Name ---
       let propertyId: string | undefined
@@ -3066,25 +3052,6 @@ export class AuditService implements IAuditService {
             `Access denied: You do not have access to property "${propertyLabel}"`
           )
         }
-      }
-
-      // --- Check-in / Check-out (optional): validate only when a value is present ---
-      const checkIn = checkInRaw ? parseDate(checkInRaw) : null
-      if (checkInRaw && !checkIn) {
-        rowErrors.push(
-          `Check In date "${checkInRaw}" could not be parsed. Expected format: MM/DD/YYYY`
-        )
-      }
-
-      const checkOut = checkOutRaw ? parseDate(checkOutRaw) : null
-      if (checkOutRaw && !checkOut) {
-        rowErrors.push(
-          `Check Out date "${checkOutRaw}" could not be parsed. Expected format: MM/DD/YYYY`
-        )
-      }
-
-      if (checkIn && checkOut && checkIn >= checkOut) {
-        rowErrors.push('Check In date must be before Check Out date')
       }
 
       // --- Amount Collected ---
