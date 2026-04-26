@@ -134,8 +134,11 @@ export class UserRepository implements IUserRepository {
       }
     }
 
-    // Fetch portfolio and property details
-    const [portfolios, properties] = await Promise.all([
+    const byNameAsc = (a: { name: string }, b: { name: string }) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+
+    // Fetch portfolio list and properties (each with parent portfolio for API shape)
+    const [portfolioRows, propertyRows] = await Promise.all([
       accessRecord.portfolio_id.length > 0
         ? this.prisma.portfolio.findMany({
             where: { id: { in: accessRecord.portfolio_id } },
@@ -145,10 +148,58 @@ export class UserRepository implements IUserRepository {
       accessRecord.property_id.length > 0
         ? this.prisma.property.findMany({
             where: { id: { in: accessRecord.property_id } },
-            select: { id: true, name: true }
+            select: {
+              id: true,
+              name: true,
+              portfolio: { select: { id: true, name: true } }
+            }
           })
         : []
     ])
+
+    const portfolioById = new Map<
+      string,
+      (typeof portfolioRows)[number]
+    >()
+    for (const p of portfolioRows) {
+      portfolioById.set(p.id, p)
+    }
+    const portfolios = accessRecord.portfolio_id
+      .map(id => portfolioById.get(id))
+      .filter((p): p is NonNullable<typeof p> => p != null)
+      .sort(byNameAsc)
+
+    const propertyById = new Map<
+      string,
+      (typeof propertyRows)[number]
+    >()
+    for (const p of propertyRows) {
+      propertyById.set(p.id, p)
+    }
+    const portfolioOrder = new Map<string, number>()
+    portfolios.forEach((pf, index) => portfolioOrder.set(pf.id, index))
+
+    const portfolioRank = (portfolioId: string): number =>
+      portfolioOrder.get(portfolioId) ?? portfolios.length
+
+    const properties = accessRecord.property_id
+      .map(id => propertyById.get(id))
+      .filter((p): p is NonNullable<typeof p> => p != null)
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        portfolio: { id: p.portfolio.id, name: p.portfolio.name }
+      }))
+      .sort((a, b) => {
+        const ra = portfolioRank(a.portfolio.id)
+        const rb = portfolioRank(b.portfolio.id)
+        if (ra !== rb) return ra - rb
+        if (a.portfolio.id !== b.portfolio.id) {
+          const byPortfolio = byNameAsc(a.portfolio, b.portfolio)
+          if (byPortfolio !== 0) return byPortfolio
+        }
+        return byNameAsc(a, b)
+      })
 
     return {
       ...user,
