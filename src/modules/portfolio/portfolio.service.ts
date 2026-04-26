@@ -31,6 +31,7 @@ import type { IContractUrlRepository } from '../contract-url/contract-url.interf
 import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IServiceTypeRepository } from '../service-type/service-type.interface'
+import { Prisma } from '@prisma/client'
 import {
   BulkImportResultDto,
   BulkUpdateResultDto,
@@ -2077,20 +2078,31 @@ export class PortfolioService implements IPortfolioService {
       }
     }
 
+    // Time window: align with how audits are understood elsewhere (e.g. sales reports):
+    // use review_collection_date when set; fall back to created_at when it is not (legacy rows).
+    const auditInDurationWhere: Prisma.AuditWhereInput = {
+      property_id: { in: propertyIds },
+      is_archived: false,
+      OR: [
+        {
+          review_collection_date: {
+            gte: startDate,
+            lte: now
+          }
+        },
+        {
+          AND: [
+            { review_collection_date: null },
+            { created_at: { gte: startDate, lte: now } }
+          ]
+        }
+      ]
+    }
+
     // Get aggregate data for amount collectable and confirmed
-    // Filter by audits that were created within the time period
     const auditAggregates = await this.prisma.audit.groupBy({
       by: ['type_of_ota'],
-      where: {
-        property_id: {
-          in: propertyIds
-        },
-        is_archived: false,
-        created_at: {
-          gte: startDate,
-          lte: now
-        }
-      },
+      where: auditInDurationWhere,
       _sum: {
         expedia_amount_collectable: true,
         expedia_amount_confirmed: true,
@@ -2138,35 +2150,50 @@ export class PortfolioService implements IPortfolioService {
         expediaConfirmed + agodaConfirmed + bookingConfirmed
     })
 
-    // Get recent 10 audits for the portfolio
+    // Recent audits in the same window as the amounts (and ordered by business date)
     const recentAudits = await this.prisma.audit.findMany({
-      where: {
-        property_id: {
-          in: propertyIds
-        },
-        is_archived: false
-      },
-      orderBy: {
-        created_at: 'desc'
-      },
+      where: auditInDurationWhere,
+      orderBy: [
+        { review_collection_date: 'desc' },
+        { created_at: 'desc' }
+      ],
       take: 10,
       include: {
         property: {
           select: {
+            id: true,
             name: true
+          }
+        },
+        batch: {
+          select: {
+            id: true,
+            batch_no: true,
+            order: true
           }
         },
         auditStatus: {
           select: {
+            id: true,
             status: true
           }
         }
       }
     })
 
-    // Format recent audits for response
+    // Format recent audits (fields aligned with GET /audit list rows)
     const formattedRecentAudits = recentAudits.map(audit => ({
       id: audit.id,
+      property_id: audit.property_id,
+      audit_status_id: audit.audit_status_id,
+      batch_id: audit.batch_id,
+      batch: audit.batch,
+      review_collection_date: audit.review_collection_date
+        ? new Date(audit.review_collection_date).toISOString()
+        : null,
+      report_url: audit.report_url ?? null,
+      created_at: audit.created_at.toISOString(),
+      updated_at: audit.updated_at.toISOString(),
       type_of_ota: audit.type_of_ota,
       expedia_amount_collectable: audit.expedia_amount_collectable,
       expedia_amount_confirmed: audit.expedia_amount_confirmed,
