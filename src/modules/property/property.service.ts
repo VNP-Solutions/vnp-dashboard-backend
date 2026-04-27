@@ -133,11 +133,19 @@ const ACCESS_LEVELS_SHEET_HEADERS = [
 ] as const
 
 /**
- * Comma-separated Agoda / Booking access (Expedia is shown in the Expedia ID column only).
+ * Comma-separated OTA access levels.
+ * Expedia / Booking: listed when both username and password are present.
+ * Agoda: listed when username is present (password not required).
  */
 function formatPropertyOtaAccessLevels(
   credentials:
-    | { agoda_id?: string | null; booking_id?: string | null }
+    | {
+        expedia_username?: string | null
+        expedia_password?: string | null
+        agoda_username?: string | null
+        booking_username?: string | null
+        booking_password?: string | null
+      }
     | null
     | undefined
 ): string {
@@ -146,10 +154,13 @@ function formatPropertyOtaAccessLevels(
   }
   const parts: string[] = []
   const has = (v: string | null | undefined) => v != null && v.trim() !== ''
-  if (has(credentials.agoda_id)) {
+  if (has(credentials.expedia_username) && has(credentials.expedia_password)) {
+    parts.push('Expedia')
+  }
+  if (has(credentials.agoda_username)) {
     parts.push('Agoda')
   }
-  if (has(credentials.booking_id)) {
+  if (has(credentials.booking_username) && has(credentials.booking_password)) {
     parts.push('Booking')
   }
   return parts.join(', ')
