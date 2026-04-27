@@ -260,8 +260,12 @@ export class UserRepository implements IUserRepository {
   }
 
   async delete(id: string): Promise<User> {
-    return this.prisma.user.delete({
-      where: { id }
+    return this.prisma.$transaction(async tx => {
+      await tx.user.updateMany({
+        where: { invited_by_id: id },
+        data: { invited_by_id: null }
+      })
+      return tx.user.delete({ where: { id } })
     })
   }
 
