@@ -134,9 +134,11 @@ export class CreatePropertyCredentialsDto {
   property_id: string
 
   @ApiProperty({
-    description: 'Expedia credentials (required)',
+    description: 'Expedia credentials (required - only expedia id is required; username and password are optional but must be provided together)',
     type: ExpediaCredentialsDto
   })
+  @ValidateNested()
+  @Type(() => ExpediaCredentialsDto)
   @IsNotEmpty()
   expedia: ExpediaCredentialsDto
 
@@ -184,13 +186,13 @@ export class PropertyCredentialsResponseDto {
 
 export class BulkUpdateCredentialsDto {
   @ApiPropertyOptional({
-    description: 'Expedia credentials to update (username and password must be provided together)',
-    type: OtaCredentialsDto
+    description: 'Expedia credentials to update (expedia id is required when this block is provided; username and password are optional but must be provided together)',
+    type: ExpediaCredentialsDto
   })
   @ValidateNested()
-  @Type(() => OtaCredentialsDto)
+  @Type(() => ExpediaCredentialsDto)
   @IsOptional()
-  expedia?: OtaCredentialsDto
+  expedia?: ExpediaCredentialsDto
 
   @ApiPropertyOptional({
     description: 'Agoda credentials to update (username can be provided without password)',
