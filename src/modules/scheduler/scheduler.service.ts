@@ -203,7 +203,8 @@ export class SchedulerService {
     //   recipients.push(summary.portfolioContactEmail)
     // }
 
-    // Find users with partial access to this property
+    // Find users with partial access to this property (no user join — avoids Prisma
+    // throwing on orphan UserAccessedProperty rows whose user_id has no User)
     const userAccesses = await this.prisma.userAccessedProperty.findMany({
       where: {
         OR: [
@@ -219,25 +220,39 @@ export class SchedulerService {
           }
         ]
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            is_verified: true,
-            role: {
-              select: {
-                property_permission: true
-              }
-            }
-          }
-        }
+      select: {
+        user_id: true,
+        property_id: true,
+        portfolio_id: true
       }
     })
 
+    const userIds = [...new Set(userAccesses.map(a => a.user_id))]
+    const users =
+      userIds.length === 0
+        ? []
+        : await this.prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: {
+              id: true,
+              email: true,
+              is_verified: true,
+              role: {
+                select: {
+                  property_permission: true
+                }
+              }
+            }
+          })
+
+    const userById = new Map(users.map(u => [u.id, u]))
+
     // Add verified users who have partial property access
     for (const userAccess of userAccesses) {
-      const user = userAccess.user
+      const user = userById.get(userAccess.user_id)
+      if (!user) {
+        continue
+      }
 
       // Only include verified users
       if (!user.is_verified) {

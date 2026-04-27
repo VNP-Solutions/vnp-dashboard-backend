@@ -28,6 +28,7 @@
     "migrate:audit-ota": "ts-node scripts/migrate-audit-ota-to-array.ts",
     "verify:audit-ota": "ts-node scripts/verify-audit-ota-migration.ts",
     "validate:migration": "ts-node scripts/validate-migration.ts",
+    "cleanup:orphans": "ts-node scripts/cleanup-orphaned-records.ts",
     "delete:stripe-bank-details": "ts-node scripts/delete-stripe-bank-details.ts",
     "remove:sales-agent": "ts-node scripts/remove-sales-agent.ts",
     "generate": "prisma generate",
