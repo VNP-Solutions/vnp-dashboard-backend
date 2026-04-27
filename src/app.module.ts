@@ -8,6 +8,7 @@ import { PermissionGuard } from './common/guards/permission.guard'
 import { RestrictedPropertySensitiveDataGuard } from './common/guards/restricted-property-sensitive-data.guard'
 import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { LoggerMiddleware } from './common/middlewares/logger.middleware'
+import { OtaPasswordPlaintextCacheModule } from './common/modules/ota-password-plaintext-cache.module'
 import { PermissionService } from './common/services/permission.service'
 import { ConfigService } from './config/config.service'
 import configuration from './config/configuration'
@@ -41,6 +42,7 @@ import { UserModule } from './modules/user/user.module'
 
 @Module({
   imports: [
+    OtaPasswordPlaintextCacheModule,
     ConfigModule.forRoot({
       load: [configuration],
       validate,

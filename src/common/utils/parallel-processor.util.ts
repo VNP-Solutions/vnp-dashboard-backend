@@ -48,24 +48,13 @@ export class ParallelProcessor {
   private static readonly DEFAULT_WORKER_COUNT = 8
   private static readonly MIN_ITEMS_FOR_PARALLEL = 100
 
-  /** Set `PARALLEL_WORKERS_LOG=0` (or `false` / `off`) to disable colored worker logs. */
-  private static workerLogsEnabled(): boolean {
-    const v = process.env.PARALLEL_WORKERS_LOG
-    if (v === '0' || v === 'false' || v === 'off') {
-      return false
-    }
-    return true
-  }
-
   private static logBatchBlue(message: string): void {
-    if (!this.workerLogsEnabled()) return
     console.log(
       `${ANSI.green('[ParallelProcessor]')}${ANSI.reset} ${ANSI.blue(message)}`
     )
   }
 
   private static logBatchGreen(message: string): void {
-    if (!this.workerLogsEnabled()) return
     console.log(
       `${ANSI.green('[ParallelProcessor]')}${ANSI.reset} ${ANSI.green(message)}`
     )
@@ -77,7 +66,6 @@ export class ParallelProcessor {
     total: number,
     detail: string
   ): void {
-    if (!this.workerLogsEnabled()) return
     const label = `${ANSI.green('[ParallelProcessor]')}${ANSI.reset}`
     const who = ANSI.blue(`Worker ${index}/${total}`)
     if (phase === 'start') {
@@ -142,13 +130,11 @@ export class ParallelProcessor {
 
     // For small datasets, process sequentially (avoid thread overhead)
     if (items.length < minItems) {
-      if (this.workerLogsEnabled()) {
-        console.log(
-          `${ANSI.green('[ParallelProcessor]')}${ANSI.reset} ${ANSI.dim(
-            `sequential path (${items.length} items < min ${minItems} — no workers)`
-          )}`
-        )
-      }
+      console.log(
+        `${ANSI.green('[ParallelProcessor]')}${ANSI.reset} ${ANSI.dim(
+          `sequential path (${items.length} items < min ${minItems} — no workers)`
+        )}`
+      )
       return this.processSequentially<T, R>(items, processorCode, context)
     }
 

@@ -18,6 +18,7 @@ import {
   PermissionAction,
   PermissionLevel
 } from '../../common/interfaces/permission.interface'
+import { OtaPasswordPlaintextCacheService } from '../../common/services/ota-password-plaintext-cache.service'
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount } from '../../common/utils/amount.util'
 import {
@@ -144,7 +145,8 @@ export class PropertyService implements IPropertyService {
     @Inject(ConfigService)
     private configService: ConfigService<Configuration>,
     @Inject(EmailUtil)
-    private emailUtil: EmailUtil
+    private emailUtil: EmailUtil,
+    private otaPasswordPlaintextCache: OtaPasswordPlaintextCacheService
   ) {
     const encryptionSecret = this.configService.get('encryption.secret', {
       infer: true
@@ -184,26 +186,48 @@ export class PropertyService implements IPropertyService {
       return map
     }
 
+    const { hits, misses } = this.otaPasswordPlaintextCache.partition(ciphertexts)
+
+    this.logger.log(
+      `OTA password plaintext cache: hits=${hits.size} misses=${misses.length} (unique ciphertexts=${ciphertexts.length}) — ParallelProcessor runs only for misses`
+    )
+
+    for (const [enc, plain] of hits) {
+      map.set(enc, plain)
+    }
+
+    if (misses.length === 0) {
+      return map
+    }
+
     const context = { derivedKey: this.encryptionKey.toString('hex') }
     const results = await ParallelProcessor.processWithWorkers<
       string,
       { enc: string; plain: string } | null
-    >(ciphertexts, OTA_PASSWORD_DECRYPT_PROCESSOR_CODE, context)
+    >(misses, OTA_PASSWORD_DECRYPT_PROCESSOR_CODE, context)
 
+    const freshlyDecrypted = new Map<string, string>()
     for (const r of results) {
       if (r && typeof r === 'object' && 'enc' in r && 'plain' in r) {
         map.set(r.enc, r.plain)
+        freshlyDecrypted.set(r.enc, r.plain)
       }
     }
 
-    for (const enc of ciphertexts) {
+    for (const enc of misses) {
       if (!map.has(enc)) {
         try {
-          map.set(enc, EncryptionUtil.decryptWithKey(enc, this.encryptionKey))
+          const plain = EncryptionUtil.decryptWithKey(enc, this.encryptionKey)
+          map.set(enc, plain)
+          freshlyDecrypted.set(enc, plain)
         } catch {
           // Omit from map so applyOtaPasswordMapToCredentialsCopy keeps original value
         }
       }
+    }
+
+    if (freshlyDecrypted.size > 0) {
+      this.otaPasswordPlaintextCache.recordDecrypted(freshlyDecrypted)
     }
 
     return map
