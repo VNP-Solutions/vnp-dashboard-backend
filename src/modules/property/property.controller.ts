@@ -469,6 +469,41 @@ export class PropertyController {
     res.send(buffer)
   }
 
+  @Get('export/access-levels')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
+  @ApiOperation({
+    summary:
+      'Download Access Levels as Excel (same filters as export/all; always .xlsx, two sheets)',
+    description:
+      'Same query parameters as `GET /property/export/all`. Returns an `.xlsx` with tabs ' +
+      '"Access Guidance" (static instructions) and "Access Levels" (property/portfolio + OTA access summary). ' +
+      'Uses the same export pipeline (including OTA decrypt caching) as other property exports.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Excel file (Access Guidance + Access Levels)',
+    content: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {}
+    }
+  })
+  async exportAccessLevels(
+    @Query() query: PropertyQueryDto,
+    @CurrentUser() user: IUserWithPermissions,
+    @Res() res: Response
+  ): Promise<void> {
+    const buffer = await this.propertyService.exportAccessLevelsXlsx(query, user)
+    const dateStr = new Date().toISOString().split('T')[0]
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="property-access-levels-${dateStr}.xlsx"`
+    )
+    res.send(buffer)
+  }
+
   @Post('by-portfolios')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
   @ApiOperation({

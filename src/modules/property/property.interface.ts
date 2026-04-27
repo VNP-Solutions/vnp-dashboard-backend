@@ -206,6 +206,10 @@ export interface IPropertyService {
     query: PropertyFileExportQueryDto,
     user: IUserWithPermissions
   ): Promise<Buffer>
+  exportAccessLevelsXlsx(
+    query: PropertyQueryDto,
+    user: IUserWithPermissions
+  ): Promise<Buffer>
   findOneSecure(
     id: string,
     user: IUserWithPermissions

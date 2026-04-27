@@ -97,6 +97,64 @@ const PROPERTY_FLAT_EXPORT_HEADERS = [
   'Booking Password'
 ] as const
 
+/** Static copy for the "Access Guidance" tab of `export/access-levels` */
+const ACCESS_GUIDANCE_COPY = {
+  accessEmailLabel: 'Access Email',
+  accessPhoneLabel: 'Access Phone Number',
+  accessEmail: 'ar@htlaccounting.com',
+  accessPhone: '9234234324',
+  instructionsTitle: 'Instructions for adding the access to each OTA',
+  expedia: {
+    title: 'Expedia (EPC)',
+    body:
+      'Have the Property Admin grant Property User access.\nUse email: ar@htlaccounting.com (custom username allowed).\nPhone (if required): 9234234324.'
+  },
+  booking: {
+    title: 'Booking.com (admin.booking.com)',
+    body:
+      'You must be an Admin-Level User. From dashboard, select Invite a New User. Permissions: enable Finance and Reservations access. Send the invite once complete.\nEmail: ar@htlaccounting.com\nPhone (if required): 9234234324.'
+  },
+  agoda: {
+    title: 'Agoda / Priceline (ycs.agoda.com)',
+    body:
+      'You must be an Admin-Level User. Send an Invite a New User request from your dashboard. Permissions: enable Finance and Reservations access. Send the invite once complete.\nEmail: ar@htlaccounting.com\nPhone: 9234234324.'
+  }
+} as const
+
+const ACCESS_LEVELS_SHEET_HEADERS = [
+  'Portfolio',
+  'Property',
+  'Expedia ID',
+  'Access Levels',
+  'Date of Export',
+  'Portfolio Contact Email',
+  'Portfolio Access Email',
+  'Portfolio Contact Number'
+] as const
+
+/**
+ * Comma-separated Agoda / Booking access (Expedia is shown in the Expedia ID column only).
+ */
+function formatPropertyOtaAccessLevels(
+  credentials:
+    | { agoda_id?: string | null; booking_id?: string | null }
+    | null
+    | undefined
+): string {
+  if (!credentials) {
+    return ''
+  }
+  const parts: string[] = []
+  const has = (v: string | null | undefined) => v != null && v.trim() !== ''
+  if (has(credentials.agoda_id)) {
+    parts.push('Agoda')
+  }
+  if (has(credentials.booking_id)) {
+    parts.push('Booking')
+  }
+  return parts.join(', ')
+}
+
 /**
  * Worker / sequential processor for one encrypted OTA password string (iv:ciphertext).
  * Must match EncryptionUtil.decryptWithKey behavior; uses pre-derived key in context.
@@ -1202,6 +1260,95 @@ export class PropertyService implements IPropertyService {
       return this.buildPropertyFlatExportXlsx(properties)
     }
     return this.buildPropertyFlatExportCsv(properties)
+  }
+
+  async exportAccessLevelsXlsx(
+    query: PropertyQueryDto,
+    user: IUserWithPermissions
+  ): Promise<Buffer> {
+    const properties = await this.findAllForExport(query, user)
+    return this.buildAccessLevelsXlsxBuffer(properties)
+  }
+
+  private fillAccessGuidanceSheet(sheet: ExcelJS.Worksheet): void {
+    sheet.getColumn(1).width = 56
+    sheet.getColumn(2).width = 38
+    const c = ACCESS_GUIDANCE_COPY
+    const bold: Partial<ExcelJS.Font> = { bold: true }
+
+    sheet.getRow(1).getCell(1).value = c.accessEmailLabel
+    sheet.getRow(1).getCell(1).font = bold
+    sheet.getRow(1).getCell(2).value = c.accessEmail
+    sheet.getRow(2).getCell(1).value = c.accessPhoneLabel
+    sheet.getRow(2).getCell(1).font = bold
+    sheet.getRow(2).getCell(2).value = c.accessPhone
+
+    sheet.getRow(5).getCell(1).value = c.instructionsTitle
+    sheet.getRow(5).getCell(1).font = bold
+
+    sheet.getRow(7).getCell(1).value = c.expedia.title
+    sheet.getRow(7).getCell(1).font = bold
+    const expediaBody = sheet.getRow(8).getCell(1)
+    expediaBody.value = c.expedia.body
+    expediaBody.alignment = { wrapText: true, vertical: 'top' }
+
+    sheet.getRow(11).getCell(1).value = c.booking.title
+    sheet.getRow(11).getCell(1).font = bold
+    const bookingBody = sheet.getRow(12).getCell(1)
+    bookingBody.value = c.booking.body
+    bookingBody.alignment = { wrapText: true, vertical: 'top' }
+
+    sheet.getRow(16).getCell(1).value = c.agoda.title
+    sheet.getRow(16).getCell(1).font = bold
+    const agodaBody = sheet.getRow(17).getCell(1)
+    agodaBody.value = c.agoda.body
+    agodaBody.alignment = { wrapText: true, vertical: 'top' }
+  }
+
+  private fillAccessLevelsSheet(
+    sheet: ExcelJS.Worksheet,
+    properties: any[],
+    exportDateStr: string
+  ): void {
+    const headerRow = sheet.addRow([...ACCESS_LEVELS_SHEET_HEADERS])
+    headerRow.font = { bold: true }
+    headerRow.alignment = { wrapText: true, vertical: 'middle' }
+    for (const p of properties) {
+      const port = p.portfolio
+      const cred = p.credentials
+      sheet.addRow([
+        port?.name ?? '',
+        p.name ?? '',
+        cred?.expedia_id ?? '',
+        formatPropertyOtaAccessLevels(cred),
+        exportDateStr,
+        port?.contact_email ?? '',
+        port?.access_email ?? '',
+        port?.access_phone ?? ''
+      ])
+    }
+    const widths = [24, 28, 16, 24, 16, 28, 28, 26]
+    widths.forEach((w, i) => {
+      sheet.getColumn(i + 1).width = w
+    })
+    sheet.views = [{ state: 'frozen', ySplit: 1 }]
+  }
+
+  private async buildAccessLevelsXlsxBuffer(
+    properties: any[]
+  ): Promise<Buffer> {
+    const exportDateStr = new Date().toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
+    const workbook = new ExcelJS.Workbook()
+    const guidance = workbook.addWorksheet('Access Guidance')
+    this.fillAccessGuidanceSheet(guidance)
+    const levels = workbook.addWorksheet('Access Levels')
+    this.fillAccessLevelsSheet(levels, properties, exportDateStr)
+    const buf = await workbook.xlsx.writeBuffer()
+    return Buffer.from(buf)
   }
 
   private buildPropertyFlatExportRow(property: {
