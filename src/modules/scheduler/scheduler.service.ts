@@ -1,5 +1,5 @@
 import { Injectable, Logger, Inject } from '@nestjs/common'
-import { Cron } from '@nestjs/schedule'
+// import { Cron } from '@nestjs/schedule' // uncomment when re-enabling scheduled emails
 import { PrismaService } from '../prisma/prisma.service'
 import { EmailUtil } from '../../common/utils/email.util'
 import {
@@ -20,11 +20,13 @@ export class SchedulerService {
    * Cron job that runs every Monday at 10 AM to send audit reports
    * Schedule: Every Monday at 10:00 AM
    * Cron expression: 0 10 * * 1 (minute hour day-of-month month day-of-week)
+   *
+   * Temporarily disabled — uncomment @Cron + Cron import to resume scheduled sends.
    */
-  @Cron('0 10 * * 1', {
-    name: 'weeklyAuditReport',
-    timeZone: 'UTC'
-  })
+  // @Cron('0 10 * * 1', {
+  //   name: 'weeklyAuditReport',
+  //   timeZone: 'UTC'
+  // })
   async handleWeeklyAuditReport() {
     this.logger.log('Starting weekly audit report generation...')
 
