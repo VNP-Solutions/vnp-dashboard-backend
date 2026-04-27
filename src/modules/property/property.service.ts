@@ -133,11 +133,19 @@ const ACCESS_LEVELS_SHEET_HEADERS = [
 ] as const
 
 /**
- * Comma-separated Agoda / Booking access (Expedia is shown in the Expedia ID column only).
+ * Comma-separated OTA access levels.
+ * Expedia / Booking: listed when both username and password are present.
+ * Agoda: listed when username is present (password not required).
  */
 function formatPropertyOtaAccessLevels(
   credentials:
-    | { agoda_id?: string | null; booking_id?: string | null }
+    | {
+        expedia_username?: string | null
+        expedia_password?: string | null
+        agoda_username?: string | null
+        booking_username?: string | null
+        booking_password?: string | null
+      }
     | null
     | undefined
 ): string {
@@ -146,10 +154,13 @@ function formatPropertyOtaAccessLevels(
   }
   const parts: string[] = []
   const has = (v: string | null | undefined) => v != null && v.trim() !== ''
-  if (has(credentials.agoda_id)) {
+  if (has(credentials.expedia_username) && has(credentials.expedia_password)) {
+    parts.push('Expedia')
+  }
+  if (has(credentials.agoda_username)) {
     parts.push('Agoda')
   }
-  if (has(credentials.booking_id)) {
+  if (has(credentials.booking_username) && has(credentials.booking_password)) {
     parts.push('Booking')
   }
   return parts.join(', ')
@@ -509,6 +520,17 @@ export class PropertyService implements IPropertyService {
 
     // Check ownership: Only the owner portfolio can update the property
     await this.validatePropertyOwnership(property, user)
+
+    // If credentials are not being updated, ensure the property already has an Expedia ID.
+    // Properties created before credentials were required may not have one.
+    if (!data.credentials) {
+      const existingExpediaId = (property as any).credentials?.expedia_id
+      if (!existingExpediaId) {
+        throw new BadRequestException(
+          'This property has no Expedia ID. Credentials with an Expedia ID must be provided.'
+        )
+      }
+    }
 
     // Validate property name uniqueness if being updated
     if (data.property?.name && data.property.name !== property.name) {

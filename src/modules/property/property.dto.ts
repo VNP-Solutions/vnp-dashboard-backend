@@ -508,7 +508,7 @@ export class ActivatePropertyDto {
 
 export class CompletePropertyCredentialsDto {
   @ApiProperty({
-    description: 'Expedia credentials (required, username and password must be provided together)',
+    description: 'Expedia credentials (required - only expedia id is required; username and password are optional but must be provided together)',
     type: ExpediaCredentialsDto
   })
   @ValidateNested()
@@ -712,14 +712,14 @@ export class CompleteCreatePropertyDto {
   @IsNotEmpty()
   property: CreatePropertyDto
 
-  @ApiPropertyOptional({
-    description: 'Property credentials (optional)',
+  @ApiProperty({
+    description: 'Property credentials (required - expedia id is the only required field)',
     type: CompletePropertyCredentialsDto
   })
   @ValidateNested()
   @Type(() => CompletePropertyCredentialsDto)
-  @IsOptional()
-  credentials?: CompletePropertyCredentialsDto
+  @IsNotEmpty()
+  credentials: CompletePropertyCredentialsDto
 
   @ApiPropertyOptional({
     description: 'Property bank details (optional)',
