@@ -1,4 +1,3 @@
-import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
@@ -157,9 +156,34 @@ export class CreatePropertyCredentialsDto {
   booking?: OtaCredentialsDto
 }
 
-export class UpdatePropertyCredentialsDto extends PartialType(
-  CreatePropertyCredentialsDto
-) {}
+export class UpdatePropertyCredentialsDto {
+  @ApiProperty({
+    description: 'Expedia credentials (required - only expedia id is required; username and password are optional but must be provided together)',
+    type: ExpediaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => ExpediaCredentialsDto)
+  @IsNotEmpty()
+  expedia: ExpediaCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Agoda credentials (optional, username can be provided without password)',
+    type: AgodaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => AgodaCredentialsDto)
+  @IsOptional()
+  agoda?: AgodaCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Booking.com credentials (optional, username and password must be provided together)',
+    type: OtaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => OtaCredentialsDto)
+  @IsOptional()
+  booking?: OtaCredentialsDto
+}
 
 export class PropertyCredentialsResponseDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })

@@ -712,14 +712,14 @@ export class CompleteCreatePropertyDto {
   @IsNotEmpty()
   property: CreatePropertyDto
 
-  @ApiPropertyOptional({
-    description: 'Property credentials (optional)',
+  @ApiProperty({
+    description: 'Property credentials (required - expedia id is the only required field)',
     type: CompletePropertyCredentialsDto
   })
   @ValidateNested()
   @Type(() => CompletePropertyCredentialsDto)
-  @IsOptional()
-  credentials?: CompletePropertyCredentialsDto
+  @IsNotEmpty()
+  credentials: CompletePropertyCredentialsDto
 
   @ApiPropertyOptional({
     description: 'Property bank details (optional)',

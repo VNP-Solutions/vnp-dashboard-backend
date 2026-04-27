@@ -510,6 +510,17 @@ export class PropertyService implements IPropertyService {
     // Check ownership: Only the owner portfolio can update the property
     await this.validatePropertyOwnership(property, user)
 
+    // If credentials are not being updated, ensure the property already has an Expedia ID.
+    // Properties created before credentials were required may not have one.
+    if (!data.credentials) {
+      const existingExpediaId = (property as any).credentials?.expedia_id
+      if (!existingExpediaId) {
+        throw new BadRequestException(
+          'This property has no Expedia ID. Credentials with an Expedia ID must be provided.'
+        )
+      }
+    }
+
     // Validate property name uniqueness if being updated
     if (data.property?.name && data.property.name !== property.name) {
       const existingProperty = await this.propertyRepository.findByName(
