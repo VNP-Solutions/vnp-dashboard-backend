@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { OtaPasswordPlaintextCacheService } from '../../common/services/ota-password-plaintext-cache.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { Configuration } from '../../config/configuration'
 import { PrismaService } from '../prisma/prisma.service'
@@ -11,13 +12,16 @@ export class PropertyCredentialsRepository
 {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
-    @Inject(ConfigService) private configService: ConfigService<Configuration>
+    @Inject(ConfigService) private configService: ConfigService<Configuration>,
+    private otaPasswordPlaintextCache: OtaPasswordPlaintextCacheService
   ) {}
 
   async create(data: any) {
-    return this.prisma.propertyCredentials.create({
+    const created = await this.prisma.propertyCredentials.create({
       data
     })
+    this.otaPasswordPlaintextCache.invalidate()
+    return created
   }
 
   async findByPropertyId(propertyId: string) {
@@ -62,10 +66,12 @@ export class PropertyCredentialsRepository
   }
 
   async update(propertyId: string, data: any) {
-    return this.prisma.propertyCredentials.update({
+    const updated = await this.prisma.propertyCredentials.update({
       where: { property_id: propertyId },
       data
     })
+    this.otaPasswordPlaintextCache.invalidate()
+    return updated
   }
 
   async findManyByPropertyIds(propertyIds: string[]) {
@@ -105,6 +111,9 @@ export class PropertyCredentialsRepository
       where: { property_id: { in: propertyIds } },
       data
     })
+    if (result.count > 0) {
+      this.otaPasswordPlaintextCache.invalidate()
+    }
     return { count: result.count }
   }
 }

@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { BankSubType, BankType, Prisma } from '@prisma/client'
+import * as ExcelJS from 'exceljs'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -17,6 +18,7 @@ import {
   PermissionAction,
   PermissionLevel
 } from '../../common/interfaces/permission.interface'
+import { OtaPasswordPlaintextCacheService } from '../../common/services/ota-password-plaintext-cache.service'
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount } from '../../common/utils/amount.util'
 import {
@@ -36,6 +38,7 @@ import {
   isInternalUser,
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
+import { ParallelProcessor } from '../../common/utils/parallel-processor.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   parseSpreadsheetToJson,
@@ -56,6 +59,7 @@ import {
   CreatePropertyDto,
   GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
+  PropertyFileExportQueryDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
@@ -74,9 +78,112 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
   'VNP Admin'
 ]
 
+/** Column headers for GET /property/export/file (flat OTA + property fields) */
+const PROPERTY_FLAT_EXPORT_HEADERS = [
+  'Expedia ID*',
+  'Portfolio*',
+  'Property Name*',
+  'Property Address',
+  'Property Currency*',
+  'Card Descriptor',
+  'Property ID*',
+  'Agoda ID',
+  'Booking ID',
+  'Expedia Username',
+  'Expedia Password',
+  'Agoda Username',
+  'Agoda Password',
+  'Booking Username',
+  'Booking Password'
+] as const
+
+/** Static copy for the "Access Guidance" tab of `export/access-levels` */
+const ACCESS_GUIDANCE_COPY = {
+  accessEmailLabel: 'Access Email',
+  accessPhoneLabel: 'Access Phone Number',
+  accessEmail: 'ar@htlaccounting.com',
+  accessPhone: '9234234324',
+  instructionsTitle: 'Instructions for adding the access to each OTA',
+  expedia: {
+    title: 'Expedia (EPC)',
+    body:
+      'Have the Property Admin grant Property User access.\nUse email: ar@htlaccounting.com (custom username allowed).\nPhone (if required): 9234234324.'
+  },
+  booking: {
+    title: 'Booking.com (admin.booking.com)',
+    body:
+      'You must be an Admin-Level User. From dashboard, select Invite a New User. Permissions: enable Finance and Reservations access. Send the invite once complete.\nEmail: ar@htlaccounting.com\nPhone (if required): 9234234324.'
+  },
+  agoda: {
+    title: 'Agoda / Priceline (ycs.agoda.com)',
+    body:
+      'You must be an Admin-Level User. Send an Invite a New User request from your dashboard. Permissions: enable Finance and Reservations access. Send the invite once complete.\nEmail: ar@htlaccounting.com\nPhone: 9234234324.'
+  }
+} as const
+
+const ACCESS_LEVELS_SHEET_HEADERS = [
+  'Portfolio',
+  'Property',
+  'Expedia ID',
+  'Access Levels',
+  'Date of Export',
+  'Portfolio Contact Email',
+  'Portfolio Access Email',
+  'Portfolio Contact Number'
+] as const
+
+/**
+ * Comma-separated Agoda / Booking access (Expedia is shown in the Expedia ID column only).
+ */
+function formatPropertyOtaAccessLevels(
+  credentials:
+    | { agoda_id?: string | null; booking_id?: string | null }
+    | null
+    | undefined
+): string {
+  if (!credentials) {
+    return ''
+  }
+  const parts: string[] = []
+  const has = (v: string | null | undefined) => v != null && v.trim() !== ''
+  if (has(credentials.agoda_id)) {
+    parts.push('Agoda')
+  }
+  if (has(credentials.booking_id)) {
+    parts.push('Booking')
+  }
+  return parts.join(', ')
+}
+
+/**
+ * Worker / sequential processor for one encrypted OTA password string (iv:ciphertext).
+ * Must match EncryptionUtil.decryptWithKey behavior; uses pre-derived key in context.
+ */
+const OTA_PASSWORD_DECRYPT_PROCESSOR_CODE = `
+    const crypto = require('crypto');
+    const ALGORITHM = 'aes-256-cbc';
+    const key = Buffer.from(context.derivedKey, 'hex');
+    const parts = item.split(':');
+    if (parts.length !== 2) return null;
+    const ivHex = parts[0];
+    const encrypted = parts[1];
+    if (!ivHex || ivHex.length !== 32 || !encrypted) return null;
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return { enc: item, plain: decrypted };
+  `
+
 @Injectable()
 export class PropertyService implements IPropertyService {
   private readonly logger = new Logger(PropertyService.name)
+
+  /**
+   * Pre-derived AES key (same idea as global report). Avoids `scryptSync` on every
+   * OTA password decrypt; bulk work uses this with `decryptWithKey` / workers.
+   */
+  private readonly encryptionKey: Buffer
 
   constructor(
     @Inject('IPropertyRepository')
@@ -96,8 +203,118 @@ export class PropertyService implements IPropertyService {
     @Inject(ConfigService)
     private configService: ConfigService<Configuration>,
     @Inject(EmailUtil)
-    private emailUtil: EmailUtil
-  ) {}
+    private emailUtil: EmailUtil,
+    private otaPasswordPlaintextCache: OtaPasswordPlaintextCacheService
+  ) {
+    const encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+    this.encryptionKey = EncryptionUtil.deriveKey(encryptionSecret)
+  }
+
+  /** Unique non-empty OTA password ciphertexts across a list of properties (for batch decrypt). */
+  private collectUniqueOtaPasswordCiphertexts(properties: any[]): string[] {
+    const unique = new Set<string>()
+    for (const p of properties) {
+      const c = p?.credentials
+      if (!c) continue
+      for (const field of [
+        'expedia_password',
+        'agoda_password',
+        'booking_password'
+      ] as const) {
+        const v = c[field]
+        if (typeof v === 'string' && v.length > 0) {
+          unique.add(v)
+        }
+      }
+    }
+    return Array.from(unique)
+  }
+
+  /**
+   * Decrypt each unique ciphertext once (global report pattern), using pre-derived key.
+   * For large sets, uses worker threads via ParallelProcessor.
+   */
+  private async buildOtaPasswordPlaintextMap(
+    ciphertexts: string[]
+  ): Promise<Map<string, string>> {
+    const map = new Map<string, string>()
+    if (ciphertexts.length === 0) {
+      return map
+    }
+
+    const { hits, misses } = this.otaPasswordPlaintextCache.partition(ciphertexts)
+
+    this.logger.log(
+      `OTA password plaintext cache: hits=${hits.size} misses=${misses.length} (unique ciphertexts=${ciphertexts.length}) — ParallelProcessor runs only for misses`
+    )
+
+    for (const [enc, plain] of hits) {
+      map.set(enc, plain)
+    }
+
+    if (misses.length === 0) {
+      return map
+    }
+
+    const context = { derivedKey: this.encryptionKey.toString('hex') }
+    const results = await ParallelProcessor.processWithWorkers<
+      string,
+      { enc: string; plain: string } | null
+    >(misses, OTA_PASSWORD_DECRYPT_PROCESSOR_CODE, context)
+
+    const freshlyDecrypted = new Map<string, string>()
+    for (const r of results) {
+      if (r && typeof r === 'object' && 'enc' in r && 'plain' in r) {
+        map.set(r.enc, r.plain)
+        freshlyDecrypted.set(r.enc, r.plain)
+      }
+    }
+
+    for (const enc of misses) {
+      if (!map.has(enc)) {
+        try {
+          const plain = EncryptionUtil.decryptWithKey(enc, this.encryptionKey)
+          map.set(enc, plain)
+          freshlyDecrypted.set(enc, plain)
+        } catch {
+          // Omit from map so applyOtaPasswordMapToCredentialsCopy keeps original value
+        }
+      }
+    }
+
+    if (freshlyDecrypted.size > 0) {
+      this.otaPasswordPlaintextCache.recordDecrypted(freshlyDecrypted)
+    }
+
+    return map
+  }
+
+  /** Apply pre-built map; ciphertexts not in map are left unchanged (failed decrypt). */
+  private applyOtaPasswordMapToCredentialsCopy(
+    credentials: any,
+    passwordMap: Map<string, string>
+  ): any {
+    if (!credentials) {
+      return null
+    }
+    const out = { ...credentials }
+    for (const field of [
+      'expedia_password',
+      'agoda_password',
+      'booking_password'
+    ] as const) {
+      const enc = out[field]
+      if (!enc || typeof enc !== 'string') {
+        continue
+      }
+      if (passwordMap.has(enc)) {
+        out[field] = passwordMap.get(enc)!
+      }
+    }
+    return out
+  }
 
   private async assertNoPendingPropertyAction(
     propertyId: string
@@ -646,10 +863,10 @@ export class PropertyService implements IPropertyService {
         await this.getAuditAggregatesForProperties(propertyIds)
     }
 
-    // Get encryption secret for decrypting passwords
-    const encryptionSecret = this.configService.get('encryption.secret', {
-      infer: true
-    })!
+    // Decrypt OTA passwords: one map for unique ciphertexts (pre-derived key + optional workers)
+    const otaPasswordPlainMap = await this.buildOtaPasswordPlaintextMap(
+      this.collectUniqueOtaPasswordCiphertexts(data)
+    )
 
     // Add access_type field, viewing context, and pending action info to each property
     // Also decrypt credential passwords
@@ -667,47 +884,10 @@ export class PropertyService implements IPropertyService {
         ...propertyWithoutPendingActions
       } = property
 
-      // Decrypt credential passwords if credentials exist
-      let decryptedCredentials = propertyWithoutPendingActions.credentials
-      if (decryptedCredentials) {
-        decryptedCredentials = { ...decryptedCredentials }
-
-        // Decrypt Expedia password
-        if (decryptedCredentials.expedia_password) {
-          try {
-            decryptedCredentials.expedia_password = EncryptionUtil.decrypt(
-              decryptedCredentials.expedia_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-
-        // Decrypt Agoda password
-        if (decryptedCredentials.agoda_password) {
-          try {
-            decryptedCredentials.agoda_password = EncryptionUtil.decrypt(
-              decryptedCredentials.agoda_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-
-        // Decrypt Booking password
-        if (decryptedCredentials.booking_password) {
-          try {
-            decryptedCredentials.booking_password = EncryptionUtil.decrypt(
-              decryptedCredentials.booking_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-      }
+      const decryptedCredentials = this.applyOtaPasswordMapToCredentialsCopy(
+        propertyWithoutPendingActions.credentials,
+        otaPasswordPlainMap
+      )
 
       // Filter bank details based on user permission
       // If user doesn't have READ permission for bank_details, set bankDetails to null
@@ -799,15 +979,12 @@ export class PropertyService implements IPropertyService {
       }
     }
 
-    // Handle portfolio_id filter with shared properties support
+    // When portfolio_id is set: only properties *owned* by that portfolio.
+    // Excludes properties that only appear via show_in_portfolio (shared into this portfolio).
     let portfolioFilter: any = {}
     if (query.portfolio_id) {
-      // Include both owned properties and shared properties for this portfolio
       portfolioFilter = {
-        OR: [
-          { portfolio_id: query.portfolio_id },
-          { show_in_portfolio: { has: query.portfolio_id } }
-        ]
+        portfolio_id: query.portfolio_id
       }
     }
 
@@ -836,7 +1013,7 @@ export class PropertyService implements IPropertyService {
         'is_active',
         'bank_type',
         'bank_sub_type',
-        // 'portfolio_id' removed - handled separately with OR logic for shared properties
+        // 'portfolio_id' removed - handled separately (export: owned only when portfolio_id is set)
         'currency_id'
       ],
       sortableFields: [
@@ -1007,10 +1184,9 @@ export class PropertyService implements IPropertyService {
         await this.getAuditAggregatesForProperties(propertyIds)
     }
 
-    // Get encryption secret for decrypting passwords
-    const encryptionSecret = this.configService.get('encryption.secret', {
-      infer: true
-    })!
+    const otaPasswordPlainMap = await this.buildOtaPasswordPlaintextMap(
+      this.collectUniqueOtaPasswordCiphertexts(data)
+    )
 
     // Add access_type field and pending action info to each property
     // Also decrypt credential passwords for export
@@ -1028,47 +1204,10 @@ export class PropertyService implements IPropertyService {
         ...propertyWithoutPendingActions
       } = property
 
-      // Decrypt credential passwords if credentials exist
-      let decryptedCredentials = propertyWithoutPendingActions.credentials
-      if (decryptedCredentials) {
-        decryptedCredentials = { ...decryptedCredentials }
-
-        // Decrypt Expedia password
-        if (decryptedCredentials.expedia_password) {
-          try {
-            decryptedCredentials.expedia_password = EncryptionUtil.decrypt(
-              decryptedCredentials.expedia_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-
-        // Decrypt Agoda password
-        if (decryptedCredentials.agoda_password) {
-          try {
-            decryptedCredentials.agoda_password = EncryptionUtil.decrypt(
-              decryptedCredentials.agoda_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-
-        // Decrypt Booking password
-        if (decryptedCredentials.booking_password) {
-          try {
-            decryptedCredentials.booking_password = EncryptionUtil.decrypt(
-              decryptedCredentials.booking_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-      }
+      const decryptedCredentials = this.applyOtaPasswordMapToCredentialsCopy(
+        propertyWithoutPendingActions.credentials,
+        otaPasswordPlainMap
+      )
 
       // Filter bank details based on user permission
       // If user doesn't have READ permission for bank_details, set bankDetails to null
@@ -1103,6 +1242,217 @@ export class PropertyService implements IPropertyService {
     })
 
     return enrichedData
+  }
+
+  async exportPropertiesFile(
+    query: PropertyFileExportQueryDto,
+    user: IUserWithPermissions
+  ): Promise<Buffer> {
+    const { fileType, ...listQuery } = query
+    const list = listQuery as PropertyQueryDto
+    const properties = this.filterFileExportToOwnedPortfolioOnly(
+      list,
+      await this.findAllForExport(list, user)
+    )
+    if (fileType === 'xlsx') {
+      return this.buildPropertyFlatExportXlsx(properties)
+    }
+    return this.buildPropertyFlatExportCsv(properties)
+  }
+
+  async exportAccessLevelsXlsx(
+    query: PropertyQueryDto,
+    user: IUserWithPermissions
+  ): Promise<Buffer> {
+    const properties = this.filterFileExportToOwnedPortfolioOnly(
+      query,
+      await this.findAllForExport(query, user)
+    )
+    return this.buildAccessLevelsXlsxBuffer(properties)
+  }
+
+  /**
+   * `GET /export/file` and `GET /export/access-levels`: when `portfolio_id` is set, only rows for
+   * properties **owned** by that portfolio (excludes "shared in" / `show_in_portfolio`).
+   * `findAllForExport` already enforces this in the DB query; this is a second pass for file exports.
+   */
+  private filterFileExportToOwnedPortfolioOnly(
+    query: PropertyQueryDto,
+    properties: any[]
+  ): any[] {
+    const raw = query.portfolio_id?.trim()
+    if (!raw) {
+      return properties
+    }
+    return properties.filter(p => p.portfolio_id === raw)
+  }
+
+  private fillAccessGuidanceSheet(sheet: ExcelJS.Worksheet): void {
+    sheet.getColumn(1).width = 56
+    sheet.getColumn(2).width = 38
+    const c = ACCESS_GUIDANCE_COPY
+    const bold: Partial<ExcelJS.Font> = { bold: true }
+
+    sheet.getRow(1).getCell(1).value = c.accessEmailLabel
+    sheet.getRow(1).getCell(1).font = bold
+    sheet.getRow(1).getCell(2).value = c.accessEmail
+    sheet.getRow(2).getCell(1).value = c.accessPhoneLabel
+    sheet.getRow(2).getCell(1).font = bold
+    sheet.getRow(2).getCell(2).value = c.accessPhone
+
+    sheet.getRow(5).getCell(1).value = c.instructionsTitle
+    sheet.getRow(5).getCell(1).font = bold
+
+    sheet.getRow(7).getCell(1).value = c.expedia.title
+    sheet.getRow(7).getCell(1).font = bold
+    const expediaBody = sheet.getRow(8).getCell(1)
+    expediaBody.value = c.expedia.body
+    expediaBody.alignment = { wrapText: true, vertical: 'top' }
+
+    sheet.getRow(11).getCell(1).value = c.booking.title
+    sheet.getRow(11).getCell(1).font = bold
+    const bookingBody = sheet.getRow(12).getCell(1)
+    bookingBody.value = c.booking.body
+    bookingBody.alignment = { wrapText: true, vertical: 'top' }
+
+    sheet.getRow(16).getCell(1).value = c.agoda.title
+    sheet.getRow(16).getCell(1).font = bold
+    const agodaBody = sheet.getRow(17).getCell(1)
+    agodaBody.value = c.agoda.body
+    agodaBody.alignment = { wrapText: true, vertical: 'top' }
+  }
+
+  private fillAccessLevelsSheet(
+    sheet: ExcelJS.Worksheet,
+    properties: any[],
+    exportDateStr: string
+  ): void {
+    const headerRow = sheet.addRow([...ACCESS_LEVELS_SHEET_HEADERS])
+    headerRow.font = { bold: true }
+    headerRow.alignment = { wrapText: true, vertical: 'middle' }
+    for (const p of properties) {
+      const port = p.portfolio
+      const cred = p.credentials
+      sheet.addRow([
+        port?.name ?? '',
+        p.name ?? '',
+        cred?.expedia_id ?? '',
+        formatPropertyOtaAccessLevels(cred),
+        exportDateStr,
+        port?.contact_email ?? '',
+        port?.access_email ?? '',
+        port?.access_phone ?? ''
+      ])
+    }
+    const widths = [24, 28, 16, 24, 16, 28, 28, 26]
+    widths.forEach((w, i) => {
+      sheet.getColumn(i + 1).width = w
+    })
+    sheet.views = [{ state: 'frozen', ySplit: 1 }]
+  }
+
+  private async buildAccessLevelsXlsxBuffer(
+    properties: any[]
+  ): Promise<Buffer> {
+    const exportDateStr = new Date().toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
+    const workbook = new ExcelJS.Workbook()
+    const guidance = workbook.addWorksheet('Access Guidance')
+    this.fillAccessGuidanceSheet(guidance)
+    const levels = workbook.addWorksheet('Access Levels')
+    this.fillAccessLevelsSheet(levels, properties, exportDateStr)
+    const buf = await workbook.xlsx.writeBuffer()
+    return Buffer.from(buf)
+  }
+
+  private buildPropertyFlatExportRow(property: {
+    id: string
+    name: string
+    address: string
+    card_descriptor: string | null
+    currency?: { code: string } | null
+    portfolio?: { name: string } | null
+    credentials?: {
+      expedia_id?: string
+      agoda_id?: string | null
+      booking_id?: string | null
+      expedia_username?: string | null
+      expedia_password?: string | null
+      agoda_username?: string | null
+      agoda_password?: string | null
+      booking_username?: string | null
+      booking_password?: string | null
+    } | null
+  }): string[] {
+    const c = property.credentials
+    return [
+      c?.expedia_id ?? '',
+      property.portfolio?.name ?? '',
+      property.name ?? '',
+      property.address ?? '',
+      property.currency?.code ?? '',
+      property.card_descriptor ?? '',
+      property.id ?? '',
+      c?.agoda_id ?? '',
+      c?.booking_id ?? '',
+      c?.expedia_username ?? '',
+      c?.expedia_password ?? '',
+      c?.agoda_username ?? '',
+      c?.agoda_password ?? '',
+      c?.booking_username ?? '',
+      c?.booking_password ?? ''
+    ]
+  }
+
+  private async buildPropertyFlatExportXlsx(properties: any[]): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook()
+    const sheet = workbook.addWorksheet('Properties', {
+      views: [{ state: 'frozen', ySplit: 1 }]
+    })
+    const headerRow = sheet.addRow([...PROPERTY_FLAT_EXPORT_HEADERS])
+    headerRow.font = { bold: true }
+    headerRow.alignment = { vertical: 'middle', wrapText: true }
+
+    for (const p of properties) {
+      sheet.addRow(this.buildPropertyFlatExportRow(p))
+    }
+
+    const widths = [16, 22, 28, 32, 14, 22, 26, 14, 14, 22, 22, 22, 22, 22, 22]
+    widths.forEach((w, i) => {
+      sheet.getColumn(i + 1).width = w
+    })
+
+    const buf = await workbook.xlsx.writeBuffer()
+    return Buffer.from(buf)
+  }
+
+  private buildPropertyFlatExportCsv(properties: any[]): Buffer {
+    const escapeCsv = (val: unknown): string => {
+      const str =
+        val === null || val === undefined
+          ? ''
+          : typeof val === 'object'
+            ? JSON.stringify(val)
+            : String(val as string | number | boolean)
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
+
+    const lines: string[] = [
+      [...PROPERTY_FLAT_EXPORT_HEADERS]
+        .map(h => escapeCsv(h))
+        .join(',')
+    ]
+    for (const p of properties) {
+      const row = this.buildPropertyFlatExportRow(p)
+      lines.push(row.map(escapeCsv).join(','))
+    }
+    return Buffer.from(lines.join('\r\n'), 'utf-8')
   }
 
   async getPropertiesByPortfolios(

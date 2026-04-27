@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { OtaPasswordPlaintextCacheService } from '../../common/services/ota-password-plaintext-cache.service'
 import {
   BankAccountType,
   BankSubType,
@@ -18,7 +19,10 @@ import type { IPropertyRepository } from './property.interface'
 
 @Injectable()
 export class PropertyRepository implements IPropertyRepository {
-  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    private otaPasswordPlaintextCache: OtaPasswordPlaintextCacheService
+  ) {}
 
   async create(data: CreatePropertyDto) {
     const createData: any = { ...data }
@@ -57,8 +61,9 @@ export class PropertyRepository implements IPropertyRepository {
   ) {
     const encryptionSecret = process.env.JWT_ACCESS_SECRET || ''
 
-    return this.prisma.$transaction(
-      async tx => {
+    return this.prisma
+      .$transaction(
+        async tx => {
       // Create property data
       const createData: any = { ...propertyData }
       if (propertyData.next_due_date) {
@@ -238,6 +243,12 @@ export class PropertyRepository implements IPropertyRepository {
       timeout: 30000 // 30 seconds timeout for complex create operations
     }
   )
+  .then(result => {
+    if (credentialsData) {
+      this.otaPasswordPlaintextCache.invalidate()
+    }
+    return result
+  })
   }
 
   async completeUpdate(
@@ -473,6 +484,12 @@ export class PropertyRepository implements IPropertyRepository {
         timeout: 30000 // 30 seconds timeout for complex update operations
       }
     )
+    .then(result => {
+      if (credentialsData) {
+        this.otaPasswordPlaintextCache.invalidate()
+      }
+      return result
+    })
   }
 
   async findAll(

@@ -1,5 +1,5 @@
 import { Injectable, Logger, Inject } from '@nestjs/common'
-import { Cron } from '@nestjs/schedule'
+// import { Cron } from '@nestjs/schedule' // uncomment when re-enabling scheduled emails
 import { PrismaService } from '../prisma/prisma.service'
 import { EmailUtil } from '../../common/utils/email.util'
 import {
@@ -20,11 +20,13 @@ export class SchedulerService {
    * Cron job that runs every Monday at 10 AM to send audit reports
    * Schedule: Every Monday at 10:00 AM
    * Cron expression: 0 10 * * 1 (minute hour day-of-month month day-of-week)
+   *
+   * Temporarily disabled — uncomment @Cron + Cron import to resume scheduled sends.
    */
-  @Cron('0 10 * * 1', {
-    name: 'weeklyAuditReport',
-    timeZone: 'UTC'
-  })
+  // @Cron('0 10 * * 1', {
+  //   name: 'weeklyAuditReport',
+  //   timeZone: 'UTC'
+  // })
   async handleWeeklyAuditReport() {
     this.logger.log('Starting weekly audit report generation...')
 
@@ -203,7 +205,8 @@ export class SchedulerService {
     //   recipients.push(summary.portfolioContactEmail)
     // }
 
-    // Find users with partial access to this property
+    // Find users with partial access to this property (no user join — avoids Prisma
+    // throwing on orphan UserAccessedProperty rows whose user_id has no User)
     const userAccesses = await this.prisma.userAccessedProperty.findMany({
       where: {
         OR: [
@@ -219,25 +222,39 @@ export class SchedulerService {
           }
         ]
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            is_verified: true,
-            role: {
-              select: {
-                property_permission: true
-              }
-            }
-          }
-        }
+      select: {
+        user_id: true,
+        property_id: true,
+        portfolio_id: true
       }
     })
 
+    const userIds = [...new Set(userAccesses.map(a => a.user_id))]
+    const users =
+      userIds.length === 0
+        ? []
+        : await this.prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: {
+              id: true,
+              email: true,
+              is_verified: true,
+              role: {
+                select: {
+                  property_permission: true
+                }
+              }
+            }
+          })
+
+    const userById = new Map(users.map(u => [u.id, u]))
+
     // Add verified users who have partial property access
     for (const userAccess of userAccesses) {
-      const user = userAccess.user
+      const user = userById.get(userAccess.user_id)
+      if (!user) {
+        continue
+      }
 
       // Only include verified users
       if (!user.is_verified) {
