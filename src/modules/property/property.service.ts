@@ -979,15 +979,12 @@ export class PropertyService implements IPropertyService {
       }
     }
 
-    // Handle portfolio_id filter with shared properties support
+    // When portfolio_id is set: only properties *owned* by that portfolio.
+    // Excludes properties that only appear via show_in_portfolio (shared into this portfolio).
     let portfolioFilter: any = {}
     if (query.portfolio_id) {
-      // Include both owned properties and shared properties for this portfolio
       portfolioFilter = {
-        OR: [
-          { portfolio_id: query.portfolio_id },
-          { show_in_portfolio: { has: query.portfolio_id } }
-        ]
+        portfolio_id: query.portfolio_id
       }
     }
 
@@ -1016,7 +1013,7 @@ export class PropertyService implements IPropertyService {
         'is_active',
         'bank_type',
         'bank_sub_type',
-        // 'portfolio_id' removed - handled separately with OR logic for shared properties
+        // 'portfolio_id' removed - handled separately (export: owned only when portfolio_id is set)
         'currency_id'
       ],
       sortableFields: [
@@ -1252,9 +1249,10 @@ export class PropertyService implements IPropertyService {
     user: IUserWithPermissions
   ): Promise<Buffer> {
     const { fileType, ...listQuery } = query
-    const properties = await this.findAllForExport(
-      listQuery as PropertyQueryDto,
-      user
+    const list = listQuery as PropertyQueryDto
+    const properties = this.filterFileExportToOwnedPortfolioOnly(
+      list,
+      await this.findAllForExport(list, user)
     )
     if (fileType === 'xlsx') {
       return this.buildPropertyFlatExportXlsx(properties)
@@ -1266,8 +1264,27 @@ export class PropertyService implements IPropertyService {
     query: PropertyQueryDto,
     user: IUserWithPermissions
   ): Promise<Buffer> {
-    const properties = await this.findAllForExport(query, user)
+    const properties = this.filterFileExportToOwnedPortfolioOnly(
+      query,
+      await this.findAllForExport(query, user)
+    )
     return this.buildAccessLevelsXlsxBuffer(properties)
+  }
+
+  /**
+   * `GET /export/file` and `GET /export/access-levels`: when `portfolio_id` is set, only rows for
+   * properties **owned** by that portfolio (excludes "shared in" / `show_in_portfolio`).
+   * `findAllForExport` already enforces this in the DB query; this is a second pass for file exports.
+   */
+  private filterFileExportToOwnedPortfolioOnly(
+    query: PropertyQueryDto,
+    properties: any[]
+  ): any[] {
+    const raw = query.portfolio_id?.trim()
+    if (!raw) {
+      return properties
+    }
+    return properties.filter(p => p.portfolio_id === raw)
   }
 
   private fillAccessGuidanceSheet(sheet: ExcelJS.Worksheet): void {

@@ -435,7 +435,9 @@ export class PropertyController {
     description:
       'Same query parameters as `GET /property/export/all` (search, filters, sort, etc.), ' +
       'with an additional required `fileType` of `xlsx` or `csv`. ' +
-      'Response is a file attachment with a flat table of OTA credentials and property fields.'
+      'Response is a file attachment with a flat table of OTA credentials and property fields. ' +
+      'If `portfolio_id` is set, only properties **owned** by that portfolio are included (properties ' +
+      'only shared *into* that portfolio via show_in are excluded).'
   })
   @ApiResponse({
     status: 200,
@@ -477,7 +479,9 @@ export class PropertyController {
     description:
       'Same query parameters as `GET /property/export/all`. Returns an `.xlsx` with tabs ' +
       '"Access Guidance" (static instructions) and "Access Levels" (property/portfolio + OTA access summary). ' +
-      'Uses the same export pipeline (including OTA decrypt caching) as other property exports.'
+      'Uses the same export pipeline (including OTA decrypt caching) as other property exports. ' +
+      'If `portfolio_id` is set, only properties **owned** by that portfolio are included (properties ' +
+      'only shared *into* that portfolio via show_in are excluded).'
   })
   @ApiResponse({
     status: 200,
