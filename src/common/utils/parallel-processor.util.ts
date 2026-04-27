@@ -1,6 +1,16 @@
 import { Worker } from 'worker_threads'
 import * as os from 'os'
 
+const ANSI = {
+  reset: '\x1b[0m',
+  /** bright blue – spin-up and worker identity */
+  blue: (s: string) => `\x1b[94m${s}\x1b[0m`,
+  /** bright green – labels, completion */
+  green: (s: string) => `\x1b[92m${s}\x1b[0m`,
+  /** dim – counts / detail */
+  dim: (s: string) => `\x1b[2m${s}\x1b[0m`
+} as const
+
 /**
  * Configuration for parallel processing
  */
@@ -38,15 +48,71 @@ export class ParallelProcessor {
   private static readonly DEFAULT_WORKER_COUNT = 8
   private static readonly MIN_ITEMS_FOR_PARALLEL = 100
 
+  /** Set `PARALLEL_WORKERS_LOG=0` (or `false` / `off`) to disable colored worker logs. */
+  private static workerLogsEnabled(): boolean {
+    const v = process.env.PARALLEL_WORKERS_LOG
+    if (v === '0' || v === 'false' || v === 'off') {
+      return false
+    }
+    return true
+  }
+
+  private static logBatchBlue(message: string): void {
+    if (!this.workerLogsEnabled()) return
+    console.log(
+      `${ANSI.green('[ParallelProcessor]')}${ANSI.reset} ${ANSI.blue(message)}`
+    )
+  }
+
+  private static logBatchGreen(message: string): void {
+    if (!this.workerLogsEnabled()) return
+    console.log(
+      `${ANSI.green('[ParallelProcessor]')}${ANSI.reset} ${ANSI.green(message)}`
+    )
+  }
+
+  private static logWorkerEvent(
+    phase: 'start' | 'done' | 'error',
+    index: number,
+    total: number,
+    detail: string
+  ): void {
+    if (!this.workerLogsEnabled()) return
+    const label = `${ANSI.green('[ParallelProcessor]')}${ANSI.reset}`
+    const who = ANSI.blue(`Worker ${index}/${total}`)
+    if (phase === 'start') {
+      console.log(`${label} ${who} ${ANSI.dim(detail)}`)
+    } else if (phase === 'done') {
+      console.log(
+        `${label} ${who} ${ANSI.green('done')}${ANSI.reset} — ${ANSI.dim(detail)}`
+      )
+    } else {
+      console.log(
+        `${label} ${who} ${ANSI.green('error')}${ANSI.reset} — ${ANSI.dim(detail)}`
+      )
+    }
+  }
+
   /**
-   * Get the configured worker count from environment or default
+   * How many worker threads to target when splitting work (see `processWithWorkers`).
+   *
+   * - **`PARALLEL_WORKERS` is set (positive integer):** `min(parseInt, logical CPU count × 2)`.
+   *   Example: 8 CPUs → at most **16** workers, even if `PARALLEL_WORKERS=32`.
+   * - **`PARALLEL_WORKERS` is unset or invalid:** `min(8, logical CPU count)`.
+   *   On a 4-core host → **4**; on 16-core → **8** (the default 8 is the ceiling in this case).
+   *
+   * **Actual threads:** one `Worker` is spawned per **chunk**; chunk count is
+   * `ceil(items / ceil(items / workerCount))` (at most on the order of `workerCount`).
+   * If there are **fewer than `minItemsForParallel` items (default 100)**, no workers run —
+   * processing stays on the main thread.
    */
   static getWorkerCount(): number {
-    const envWorkers = process.env.PARALLEL_WORKERS
+    const envRaw = process.env.PARALLEL_WORKERS
+    const envWorkers = envRaw != null && envRaw !== '' ? envRaw.trim() : ''
     if (envWorkers) {
       const parsed = parseInt(envWorkers, 10)
       if (!isNaN(parsed) && parsed > 0) {
-        return Math.min(parsed, os.cpus().length * 2) // Cap at 2x CPU cores
+        return Math.min(parsed, os.cpus().length * 2)
       }
     }
     return Math.min(this.DEFAULT_WORKER_COUNT, os.cpus().length)
@@ -76,18 +142,34 @@ export class ParallelProcessor {
 
     // For small datasets, process sequentially (avoid thread overhead)
     if (items.length < minItems) {
+      if (this.workerLogsEnabled()) {
+        console.log(
+          `${ANSI.green('[ParallelProcessor]')}${ANSI.reset} ${ANSI.dim(
+            `sequential path (${items.length} items < min ${minItems} — no workers)`
+          )}`
+        )
+      }
       return this.processSequentially<T, R>(items, processorCode, context)
     }
 
     // Split items into chunks for each worker
     const chunks = this.splitIntoChunks(items, workerCount)
 
+    this.logBatchBlue(
+      `starting ${chunks.length} worker thread(s) for ${items.length} item(s) (target workers=${workerCount}, CPUs=${os.cpus().length})`
+    )
+
     // Process chunks in parallel using worker threads
-    const workerPromises = chunks.map(chunk =>
-      this.runWorker<T, R>(chunk, processorCode, context)
+    const workerPromises = chunks.map((chunk, i) =>
+      this.runWorker<T, R>(chunk, processorCode, context, i + 1, chunks.length)
     )
 
     const results = await Promise.all(workerPromises)
+    const totalResults = results.reduce((n, r) => n + (r?.results?.length ?? 0), 0)
+    const totalErr = results.reduce((n, r) => n + (r?.errors?.length ?? 0), 0)
+    this.logBatchGreen(
+      `all workers finished: ${totalResults} result(s), ${totalErr} internal row error(s), ${chunks.length} thread(s)`
+    )
 
     // Combine results from all workers
     return results.flatMap(r => r.results)
@@ -182,8 +264,16 @@ export class ParallelProcessor {
   private static runWorker<T, R>(
     chunk: T[],
     processorCode: string,
-    context: Record<string, any>
+    context: Record<string, any>,
+    workerIndex: number,
+    totalWorkers: number
   ): Promise<WorkerResult<R>> {
+    this.logWorkerEvent(
+      'start',
+      workerIndex,
+      totalWorkers,
+      `processing ${chunk.length} item(s)…`
+    )
     return new Promise((resolve, reject) => {
       // Create inline worker code
       const workerCode = `
@@ -221,15 +311,35 @@ export class ParallelProcessor {
       })
 
       worker.on('message', (result: WorkerResult<R>) => {
+        const rCount = result?.results?.length ?? 0
+        const eCount = result?.errors?.length ?? 0
+        this.logWorkerEvent(
+          'done',
+          workerIndex,
+          totalWorkers,
+          `${rCount} result(s)${eCount > 0 ? `, ${eCount} per-item error(s)` : ''}`
+        )
         resolve(result)
       })
 
       worker.on('error', err => {
+        this.logWorkerEvent(
+          'error',
+          workerIndex,
+          totalWorkers,
+          err?.message || String(err)
+        )
         reject(err)
       })
 
       worker.on('exit', code => {
         if (code !== 0) {
+          this.logWorkerEvent(
+            'error',
+            workerIndex,
+            totalWorkers,
+            `exited with code ${code}`
+          )
           reject(new Error(`Worker exited with code ${code}`))
         }
       })

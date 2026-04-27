@@ -11,11 +11,13 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
+import type { Response } from 'express'
 import {
   ApiBearerAuth,
   ApiBody,
@@ -48,6 +50,7 @@ import {
   GetPropertiesByIdsSecureDto,
   GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
+  PropertyFileExportQueryDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SecurePropertyDto,
@@ -422,6 +425,48 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.propertyService.findAllForExport(query, user)
+  }
+
+  @Get('export/file')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
+  @ApiOperation({
+    summary:
+      'Download property export as Excel or CSV (same filters as export/all, plus fileType)',
+    description:
+      'Same query parameters as `GET /property/export/all` (search, filters, sort, etc.), ' +
+      'with an additional required `fileType` of `xlsx` or `csv`. ' +
+      'Response is a file attachment with a flat table of OTA credentials and property fields.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'File download (Excel or CSV)',
+    content: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {},
+      'text/csv': {}
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Invalid or missing fileType' })
+  async exportPropertiesFile(
+    @Query() query: PropertyFileExportQueryDto,
+    @CurrentUser() user: IUserWithPermissions,
+    @Res() res: Response
+  ): Promise<void> {
+    const buffer = await this.propertyService.exportPropertiesFile(query, user)
+    const { fileType } = query
+    const dateStr = new Date().toISOString().split('T')[0]
+    const ext = fileType === 'csv' ? 'csv' : 'xlsx'
+    const filename = `properties-export-${dateStr}.${ext}`
+
+    if (fileType === 'csv') {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    } else {
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      )
+    }
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send(buffer)
   }
 
   @Post('by-portfolios')

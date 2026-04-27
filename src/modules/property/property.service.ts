@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { BankSubType, BankType, Prisma } from '@prisma/client'
+import * as ExcelJS from 'exceljs'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -36,6 +37,7 @@ import {
   isInternalUser,
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
+import { ParallelProcessor } from '../../common/utils/parallel-processor.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   parseSpreadsheetToJson,
@@ -56,6 +58,7 @@ import {
   CreatePropertyDto,
   GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
+  PropertyFileExportQueryDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
@@ -74,9 +77,54 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
   'VNP Admin'
 ]
 
+/** Column headers for GET /property/export/file (flat OTA + property fields) */
+const PROPERTY_FLAT_EXPORT_HEADERS = [
+  'Expedia ID*',
+  'Portfolio*',
+  'Property Name*',
+  'Property Address',
+  'Property Currency*',
+  'Card Descriptor',
+  'Property ID*',
+  'Agoda ID',
+  'Booking ID',
+  'Expedia Username',
+  'Expedia Password',
+  'Agoda Username',
+  'Agoda Password',
+  'Booking Username',
+  'Booking Password'
+] as const
+
+/**
+ * Worker / sequential processor for one encrypted OTA password string (iv:ciphertext).
+ * Must match EncryptionUtil.decryptWithKey behavior; uses pre-derived key in context.
+ */
+const OTA_PASSWORD_DECRYPT_PROCESSOR_CODE = `
+    const crypto = require('crypto');
+    const ALGORITHM = 'aes-256-cbc';
+    const key = Buffer.from(context.derivedKey, 'hex');
+    const parts = item.split(':');
+    if (parts.length !== 2) return null;
+    const ivHex = parts[0];
+    const encrypted = parts[1];
+    if (!ivHex || ivHex.length !== 32 || !encrypted) return null;
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return { enc: item, plain: decrypted };
+  `
+
 @Injectable()
 export class PropertyService implements IPropertyService {
   private readonly logger = new Logger(PropertyService.name)
+
+  /**
+   * Pre-derived AES key (same idea as global report). Avoids `scryptSync` on every
+   * OTA password decrypt; bulk work uses this with `decryptWithKey` / workers.
+   */
+  private readonly encryptionKey: Buffer
 
   constructor(
     @Inject('IPropertyRepository')
@@ -97,7 +145,94 @@ export class PropertyService implements IPropertyService {
     private configService: ConfigService<Configuration>,
     @Inject(EmailUtil)
     private emailUtil: EmailUtil
-  ) {}
+  ) {
+    const encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+    this.encryptionKey = EncryptionUtil.deriveKey(encryptionSecret)
+  }
+
+  /** Unique non-empty OTA password ciphertexts across a list of properties (for batch decrypt). */
+  private collectUniqueOtaPasswordCiphertexts(properties: any[]): string[] {
+    const unique = new Set<string>()
+    for (const p of properties) {
+      const c = p?.credentials
+      if (!c) continue
+      for (const field of [
+        'expedia_password',
+        'agoda_password',
+        'booking_password'
+      ] as const) {
+        const v = c[field]
+        if (typeof v === 'string' && v.length > 0) {
+          unique.add(v)
+        }
+      }
+    }
+    return Array.from(unique)
+  }
+
+  /**
+   * Decrypt each unique ciphertext once (global report pattern), using pre-derived key.
+   * For large sets, uses worker threads via ParallelProcessor.
+   */
+  private async buildOtaPasswordPlaintextMap(
+    ciphertexts: string[]
+  ): Promise<Map<string, string>> {
+    const map = new Map<string, string>()
+    if (ciphertexts.length === 0) {
+      return map
+    }
+
+    const context = { derivedKey: this.encryptionKey.toString('hex') }
+    const results = await ParallelProcessor.processWithWorkers<
+      string,
+      { enc: string; plain: string } | null
+    >(ciphertexts, OTA_PASSWORD_DECRYPT_PROCESSOR_CODE, context)
+
+    for (const r of results) {
+      if (r && typeof r === 'object' && 'enc' in r && 'plain' in r) {
+        map.set(r.enc, r.plain)
+      }
+    }
+
+    for (const enc of ciphertexts) {
+      if (!map.has(enc)) {
+        try {
+          map.set(enc, EncryptionUtil.decryptWithKey(enc, this.encryptionKey))
+        } catch {
+          // Omit from map so applyOtaPasswordMapToCredentialsCopy keeps original value
+        }
+      }
+    }
+
+    return map
+  }
+
+  /** Apply pre-built map; ciphertexts not in map are left unchanged (failed decrypt). */
+  private applyOtaPasswordMapToCredentialsCopy(
+    credentials: any,
+    passwordMap: Map<string, string>
+  ): any {
+    if (!credentials) {
+      return null
+    }
+    const out = { ...credentials }
+    for (const field of [
+      'expedia_password',
+      'agoda_password',
+      'booking_password'
+    ] as const) {
+      const enc = out[field]
+      if (!enc || typeof enc !== 'string') {
+        continue
+      }
+      if (passwordMap.has(enc)) {
+        out[field] = passwordMap.get(enc)!
+      }
+    }
+    return out
+  }
 
   private async assertNoPendingPropertyAction(
     propertyId: string
@@ -646,10 +781,10 @@ export class PropertyService implements IPropertyService {
         await this.getAuditAggregatesForProperties(propertyIds)
     }
 
-    // Get encryption secret for decrypting passwords
-    const encryptionSecret = this.configService.get('encryption.secret', {
-      infer: true
-    })!
+    // Decrypt OTA passwords: one map for unique ciphertexts (pre-derived key + optional workers)
+    const otaPasswordPlainMap = await this.buildOtaPasswordPlaintextMap(
+      this.collectUniqueOtaPasswordCiphertexts(data)
+    )
 
     // Add access_type field, viewing context, and pending action info to each property
     // Also decrypt credential passwords
@@ -667,47 +802,10 @@ export class PropertyService implements IPropertyService {
         ...propertyWithoutPendingActions
       } = property
 
-      // Decrypt credential passwords if credentials exist
-      let decryptedCredentials = propertyWithoutPendingActions.credentials
-      if (decryptedCredentials) {
-        decryptedCredentials = { ...decryptedCredentials }
-
-        // Decrypt Expedia password
-        if (decryptedCredentials.expedia_password) {
-          try {
-            decryptedCredentials.expedia_password = EncryptionUtil.decrypt(
-              decryptedCredentials.expedia_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-
-        // Decrypt Agoda password
-        if (decryptedCredentials.agoda_password) {
-          try {
-            decryptedCredentials.agoda_password = EncryptionUtil.decrypt(
-              decryptedCredentials.agoda_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-
-        // Decrypt Booking password
-        if (decryptedCredentials.booking_password) {
-          try {
-            decryptedCredentials.booking_password = EncryptionUtil.decrypt(
-              decryptedCredentials.booking_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-      }
+      const decryptedCredentials = this.applyOtaPasswordMapToCredentialsCopy(
+        propertyWithoutPendingActions.credentials,
+        otaPasswordPlainMap
+      )
 
       // Filter bank details based on user permission
       // If user doesn't have READ permission for bank_details, set bankDetails to null
@@ -1007,10 +1105,9 @@ export class PropertyService implements IPropertyService {
         await this.getAuditAggregatesForProperties(propertyIds)
     }
 
-    // Get encryption secret for decrypting passwords
-    const encryptionSecret = this.configService.get('encryption.secret', {
-      infer: true
-    })!
+    const otaPasswordPlainMap = await this.buildOtaPasswordPlaintextMap(
+      this.collectUniqueOtaPasswordCiphertexts(data)
+    )
 
     // Add access_type field and pending action info to each property
     // Also decrypt credential passwords for export
@@ -1028,47 +1125,10 @@ export class PropertyService implements IPropertyService {
         ...propertyWithoutPendingActions
       } = property
 
-      // Decrypt credential passwords if credentials exist
-      let decryptedCredentials = propertyWithoutPendingActions.credentials
-      if (decryptedCredentials) {
-        decryptedCredentials = { ...decryptedCredentials }
-
-        // Decrypt Expedia password
-        if (decryptedCredentials.expedia_password) {
-          try {
-            decryptedCredentials.expedia_password = EncryptionUtil.decrypt(
-              decryptedCredentials.expedia_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-
-        // Decrypt Agoda password
-        if (decryptedCredentials.agoda_password) {
-          try {
-            decryptedCredentials.agoda_password = EncryptionUtil.decrypt(
-              decryptedCredentials.agoda_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-
-        // Decrypt Booking password
-        if (decryptedCredentials.booking_password) {
-          try {
-            decryptedCredentials.booking_password = EncryptionUtil.decrypt(
-              decryptedCredentials.booking_password,
-              encryptionSecret
-            )
-          } catch {
-            // If decryption fails, keep the original value
-          }
-        }
-      }
+      const decryptedCredentials = this.applyOtaPasswordMapToCredentialsCopy(
+        propertyWithoutPendingActions.credentials,
+        otaPasswordPlainMap
+      )
 
       // Filter bank details based on user permission
       // If user doesn't have READ permission for bank_details, set bankDetails to null
@@ -1103,6 +1163,108 @@ export class PropertyService implements IPropertyService {
     })
 
     return enrichedData
+  }
+
+  async exportPropertiesFile(
+    query: PropertyFileExportQueryDto,
+    user: IUserWithPermissions
+  ): Promise<Buffer> {
+    const { fileType, ...listQuery } = query
+    const properties = await this.findAllForExport(
+      listQuery as PropertyQueryDto,
+      user
+    )
+    if (fileType === 'xlsx') {
+      return this.buildPropertyFlatExportXlsx(properties)
+    }
+    return this.buildPropertyFlatExportCsv(properties)
+  }
+
+  private buildPropertyFlatExportRow(property: {
+    id: string
+    name: string
+    address: string
+    card_descriptor: string | null
+    currency?: { code: string } | null
+    portfolio?: { name: string } | null
+    credentials?: {
+      expedia_id?: string
+      agoda_id?: string | null
+      booking_id?: string | null
+      expedia_username?: string | null
+      expedia_password?: string | null
+      agoda_username?: string | null
+      agoda_password?: string | null
+      booking_username?: string | null
+      booking_password?: string | null
+    } | null
+  }): string[] {
+    const c = property.credentials
+    return [
+      c?.expedia_id ?? '',
+      property.portfolio?.name ?? '',
+      property.name ?? '',
+      property.address ?? '',
+      property.currency?.code ?? '',
+      property.card_descriptor ?? '',
+      property.id ?? '',
+      c?.agoda_id ?? '',
+      c?.booking_id ?? '',
+      c?.expedia_username ?? '',
+      c?.expedia_password ?? '',
+      c?.agoda_username ?? '',
+      c?.agoda_password ?? '',
+      c?.booking_username ?? '',
+      c?.booking_password ?? ''
+    ]
+  }
+
+  private async buildPropertyFlatExportXlsx(properties: any[]): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook()
+    const sheet = workbook.addWorksheet('Properties', {
+      views: [{ state: 'frozen', ySplit: 1 }]
+    })
+    const headerRow = sheet.addRow([...PROPERTY_FLAT_EXPORT_HEADERS])
+    headerRow.font = { bold: true }
+    headerRow.alignment = { vertical: 'middle', wrapText: true }
+
+    for (const p of properties) {
+      sheet.addRow(this.buildPropertyFlatExportRow(p))
+    }
+
+    const widths = [16, 22, 28, 32, 14, 22, 26, 14, 14, 22, 22, 22, 22, 22, 22]
+    widths.forEach((w, i) => {
+      sheet.getColumn(i + 1).width = w
+    })
+
+    const buf = await workbook.xlsx.writeBuffer()
+    return Buffer.from(buf)
+  }
+
+  private buildPropertyFlatExportCsv(properties: any[]): Buffer {
+    const escapeCsv = (val: unknown): string => {
+      const str =
+        val === null || val === undefined
+          ? ''
+          : typeof val === 'object'
+            ? JSON.stringify(val)
+            : String(val as string | number | boolean)
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
+
+    const lines: string[] = [
+      [...PROPERTY_FLAT_EXPORT_HEADERS]
+        .map(h => escapeCsv(h))
+        .join(',')
+    ]
+    for (const p of properties) {
+      const row = this.buildPropertyFlatExportRow(p)
+      lines.push(row.map(escapeCsv).join(','))
+    }
+    return Buffer.from(lines.join('\r\n'), 'utf-8')
   }
 
   async getPropertiesByPortfolios(

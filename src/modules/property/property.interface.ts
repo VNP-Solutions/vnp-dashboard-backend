@@ -11,6 +11,7 @@ import {
   CreatePropertyDto,
   GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
+  PropertyFileExportQueryDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
@@ -201,6 +202,10 @@ export interface IPropertyService {
     query: PropertyQueryDto,
     user: IUserWithPermissions
   ): Promise<PropertyWithPendingActions[]>
+  exportPropertiesFile(
+    query: PropertyFileExportQueryDto,
+    user: IUserWithPermissions
+  ): Promise<Buffer>
   findOneSecure(
     id: string,
     user: IUserWithPermissions

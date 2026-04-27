@@ -203,6 +203,21 @@ export class PropertyQueryDto extends QueryDto {
   credential_type?: string
 }
 
+/**
+ * Same query as {@link PropertyQueryDto} with an additional file type for spreadsheet download.
+ */
+export class PropertyFileExportQueryDto extends PropertyQueryDto {
+  @ApiProperty({
+    description: 'Download format: xlsx (Excel) or csv',
+    enum: ['xlsx', 'csv'],
+    example: 'xlsx'
+  })
+  @IsIn(['xlsx', 'csv'])
+  @IsNotEmpty()
+  @IsString()
+  fileType: 'xlsx' | 'csv'
+}
+
 export class SharePropertyDto {
   @ApiProperty({
     example: ['507f1f77bcf86cd799439014', '507f1f77bcf86cd799439015'],
