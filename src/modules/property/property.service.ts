@@ -532,6 +532,30 @@ export class PropertyService implements IPropertyService {
       }
     }
 
+    if (data.credentials) {
+      const exp = data.credentials.expedia
+      const idInPayload =
+        exp.id !== undefined && String(exp.id).trim() !== ''
+      const hasUsername = exp.username !== undefined
+      const hasPassword = exp.password !== undefined
+      const isUpdatingExpedia =
+        idInPayload || hasUsername || hasPassword
+      const existingCred = (property as any).credentials
+      const existingExpediaId = existingCred?.expedia_id
+
+      if (isUpdatingExpedia && !idInPayload && !existingExpediaId) {
+        throw new BadRequestException(
+          'Expedia ID must be provided when the property does not already have one stored.'
+        )
+      }
+
+      if (!existingCred && !idInPayload) {
+        throw new BadRequestException(
+          'Expedia ID is required when creating credentials for this property.'
+        )
+      }
+    }
+
     // Validate property name uniqueness if being updated
     if (data.property?.name && data.property.name !== property.name) {
       const existingProperty = await this.propertyRepository.findByName(

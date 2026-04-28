@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import {
   CompleteBankDetailsDto,
   CompletePropertyCredentialsDto,
+  CompletePropertyCredentialsUpdateDto,
   CreatePropertyDto,
   UpdatePropertyDto
 } from './property.dto'
@@ -254,7 +255,7 @@ export class PropertyRepository implements IPropertyRepository {
   async completeUpdate(
     propertyId: string,
     propertyData?: UpdatePropertyDto,
-    credentialsData?: CompletePropertyCredentialsDto,
+    credentialsData?: CompletePropertyCredentialsUpdateDto,
     bankDetailsData?: CompleteBankDetailsDto,
     userId?: string
   ) {
@@ -281,9 +282,21 @@ export class PropertyRepository implements IPropertyRepository {
             where: { property_id: propertyId }
           })
 
+          const exp = credentialsData.expedia
+          const idInPayload =
+            exp.id !== undefined && String(exp.id).trim() !== ''
+          const resolvedExpediaId = idInPayload
+            ? exp.id!
+            : existingCredentials?.expedia_id ?? null
+
+          if (!resolvedExpediaId) {
+            throw new Error(
+              'Expedia ID could not be resolved for credentials update'
+            )
+          }
+
           const credentialsPayload: any = {
-            // Only expedia_id is required, username and password are optional
-            expedia_id: credentialsData.expedia.id,
+            expedia_id: resolvedExpediaId,
             expedia_username: credentialsData.expedia.username || null,
             expedia_password: credentialsData.expedia.password
               ? EncryptionUtil.encrypt(

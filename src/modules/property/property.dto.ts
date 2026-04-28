@@ -17,9 +17,10 @@ import {
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
 import {
+  AgodaCredentialsDto,
   ExpediaCredentialsDto,
   OtaCredentialsDto,
-  AgodaCredentialsDto
+  PatchExpediaCredentialsDto
 } from '../property-credentials/property-credentials.dto'
 
 export type AccessType = 'owned' | 'shared'
@@ -535,6 +536,37 @@ export class CompletePropertyCredentialsDto {
   booking?: OtaCredentialsDto
 }
 
+/** Same as {@link CompletePropertyCredentialsDto}, but Expedia `id` is optional when credentials already exist in DB (enforced in PropertyService.completeUpdate). */
+export class CompletePropertyCredentialsUpdateDto {
+  @ApiProperty({
+    description:
+      'Expedia credentials (Expedia id required only when none is stored yet; username and password optional but must be provided together)',
+    type: PatchExpediaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => PatchExpediaCredentialsDto)
+  @IsNotEmpty()
+  expedia: PatchExpediaCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Agoda credentials (optional, username can be provided without password)',
+    type: AgodaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => AgodaCredentialsDto)
+  @IsOptional()
+  agoda?: AgodaCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Booking.com credentials (optional, username and password must be provided together)',
+    type: OtaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => OtaCredentialsDto)
+  @IsOptional()
+  booking?: OtaCredentialsDto
+}
+
 export class CompleteBankDetailsDto {
   @ApiProperty({
     enum: ['bank', 'stripe', 'none'],
@@ -743,12 +775,12 @@ export class CompleteUpdatePropertyDto {
 
   @ApiPropertyOptional({
     description: 'Property credentials to update (optional)',
-    type: CompletePropertyCredentialsDto
+    type: CompletePropertyCredentialsUpdateDto
   })
   @ValidateNested()
-  @Type(() => CompletePropertyCredentialsDto)
+  @Type(() => CompletePropertyCredentialsUpdateDto)
   @IsOptional()
-  credentials?: CompletePropertyCredentialsDto
+  credentials?: CompletePropertyCredentialsUpdateDto
 
   @ApiPropertyOptional({
     description: 'Property bank details to update (optional)',

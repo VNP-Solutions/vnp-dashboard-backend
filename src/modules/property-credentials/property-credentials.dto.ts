@@ -123,6 +123,36 @@ export class ExpediaCredentialsDto {
   password?: string
 }
 
+/** Expedia payload for PATCH-style updates (single or bulk): id optional when DB already has expedia_id. */
+export class PatchExpediaCredentialsDto {
+  @ApiPropertyOptional({
+    example: 'EXP123456',
+    description:
+      'Expedia ID. Required only when no expedia ID is stored yet (enforced in credential/property update logic).'
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  id?: string
+
+  @ApiPropertyOptional({
+    example: 'hotel_user@example.com',
+    description: 'Expedia username (optional, but must be provided with password)'
+  })
+  @IsString()
+  @IsOptional()
+  @UsernamePasswordTogether({ message: 'Username and password must be provided together' })
+  username?: string
+
+  @ApiPropertyOptional({
+    example: 'SecurePassword123!',
+    description: 'Expedia password (will be encrypted, optional but must be provided with username)'
+  })
+  @IsString()
+  @IsOptional()
+  password?: string
+}
+
 export class CreatePropertyCredentialsDto {
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
@@ -158,13 +188,14 @@ export class CreatePropertyCredentialsDto {
 
 export class UpdatePropertyCredentialsDto {
   @ApiProperty({
-    description: 'Expedia credentials (required - only expedia id is required; username and password are optional but must be provided together)',
-    type: ExpediaCredentialsDto
+    description:
+      'Expedia credentials (expedia id required only when none is stored yet; username and password optional but must be provided together)',
+    type: PatchExpediaCredentialsDto
   })
   @ValidateNested()
-  @Type(() => ExpediaCredentialsDto)
+  @Type(() => PatchExpediaCredentialsDto)
   @IsNotEmpty()
-  expedia: ExpediaCredentialsDto
+  expedia: PatchExpediaCredentialsDto
 
   @ApiPropertyOptional({
     description: 'Agoda credentials (optional, username can be provided without password)',
@@ -210,13 +241,14 @@ export class PropertyCredentialsResponseDto {
 
 export class BulkUpdateCredentialsDto {
   @ApiPropertyOptional({
-    description: 'Expedia credentials to update (expedia id is required when this block is provided; username and password are optional but must be provided together)',
-    type: ExpediaCredentialsDto
+    description:
+      'Expedia credentials to update (id optional if each target property already has an expedia ID; username and password optional but must be provided together)',
+    type: PatchExpediaCredentialsDto
   })
   @ValidateNested()
-  @Type(() => ExpediaCredentialsDto)
+  @Type(() => PatchExpediaCredentialsDto)
   @IsOptional()
-  expedia?: ExpediaCredentialsDto
+  expedia?: PatchExpediaCredentialsDto
 
   @ApiPropertyOptional({
     description: 'Agoda credentials to update (username can be provided without password)',

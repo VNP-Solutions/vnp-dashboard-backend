@@ -7,6 +7,7 @@ import {
   CompleteBankDetailsDto,
   CompleteCreatePropertyDto,
   CompletePropertyCredentialsDto,
+  CompletePropertyCredentialsUpdateDto,
   CompleteUpdatePropertyDto,
   CreatePropertyDto,
   GetPropertiesBankDetailsSecureDto,
@@ -146,7 +147,7 @@ export interface IPropertyRepository {
   completeUpdate(
     propertyId: string,
     propertyData?: UpdatePropertyDto,
-    credentialsData?: CompletePropertyCredentialsDto,
+    credentialsData?: CompletePropertyCredentialsUpdateDto,
     bankDetailsData?: CompleteBankDetailsDto,
     userId?: string
   ): Promise<PropertyWithFullDetails>

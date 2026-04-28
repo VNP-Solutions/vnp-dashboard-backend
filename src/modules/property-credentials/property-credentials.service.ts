@@ -138,13 +138,30 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
     // If a credential (agoda/booking) is not in the payload, it will be cleared
     const updateData: any = {}
 
-    // Handle Expedia credentials - only expedia_id is required
+    // Handle Expedia credentials — id optional when DB already stores expedia_id
     if (data.expedia) {
-      updateData.expedia_id = data.expedia.id
+      const exp = data.expedia
+      const idInPayload =
+        exp.id !== undefined && String(exp.id).trim() !== ''
+      const hasUsername = exp.username !== undefined
+      const hasPassword = exp.password !== undefined
+      const isUpdatingExpedia =
+        idInPayload || hasUsername || hasPassword
+
+      if (isUpdatingExpedia && !idInPayload && !existingCredentials.expedia_id) {
+        throw new BadRequestException(
+          'Expedia ID must be provided when the property does not already have one stored.'
+        )
+      }
+
+      if (idInPayload) {
+        updateData.expedia_id = exp.id
+      }
+
       // Username and password are optional but must be provided together (validated in DTO)
-      updateData.expedia_username = data.expedia.username || null
-      updateData.expedia_password = data.expedia.password
-        ? EncryptionUtil.encrypt(data.expedia.password, encryptionSecret)
+      updateData.expedia_username = exp.username || null
+      updateData.expedia_password = exp.password
+        ? EncryptionUtil.encrypt(exp.password, encryptionSecret)
         : null
     } else {
       // If expedia is not provided, clear it
@@ -268,6 +285,34 @@ export class PropertyCredentialsService implements IPropertyCredentialsService {
     const existingCredMap = new Map(
       existingCredentials.map(cred => [cred.property_id, cred])
     )
+
+    if (credentials.expedia) {
+      const exp = credentials.expedia
+      const idInPayload =
+        exp.id !== undefined && String(exp.id).trim() !== ''
+      const hasUsername = exp.username !== undefined
+      const hasPassword = exp.password !== undefined
+      const isUpdatingExpedia =
+        idInPayload || hasUsername || hasPassword
+
+      if (isUpdatingExpedia && !idInPayload) {
+        const missingExpediaIdForProperties: string[] = []
+        for (const propertyId of foundPropertyIds) {
+          const existingCred = existingCredMap.get(propertyId)
+          if (!existingCred) {
+            continue
+          }
+          if (!existingCred.expedia_id) {
+            missingExpediaIdForProperties.push(propertyId)
+          }
+        }
+        if (missingExpediaIdForProperties.length > 0) {
+          throw new BadRequestException(
+            `Expedia ID must be provided in the request for properties that do not already have one: ${missingExpediaIdForProperties.join(', ')}`
+          )
+        }
+      }
+    }
 
     const encryptionSecret = this.configService.get('encryption.secret', {
       infer: true
