@@ -14,7 +14,7 @@ export class EmailService implements IEmailService {
 
   async sendEmail(
     data: SendEmailDto,
-    user: IUserWithPermissions,
+    user: IUserWithPermissions | undefined,
     uploadedAttachments?: EmailAttachment[]
   ) {
     // Default send_sender_data to true if not specified
@@ -25,8 +25,12 @@ export class EmailService implements IEmailService {
 
     // Append sender information if requested
     if (shouldSendSenderData) {
-      const senderInfo = await this.buildSenderInfo(user.id, user)
-      fullEmailBody = `${data.body}\n\n${senderInfo}`
+      if (user?.id) {
+        const senderInfo = await this.buildSenderInfo(user.id, user)
+        fullEmailBody = `${data.body}\n\n${senderInfo}`
+      } else {
+        fullEmailBody = `${data.body}\n\n${this.anonymousSenderFooter()}`
+      }
     }
 
     // Combine attachments from file uploads and URLs
@@ -89,5 +93,10 @@ export class EmailService implements IEmailService {
     ]
 
     return senderDetails.join('\n')
+  }
+
+  private anonymousSenderFooter(): string {
+    const divider = '-----------------------------------'
+    return [divider, 'This email was sent via VNP Dashboard.'].join('\n')
   }
 }
