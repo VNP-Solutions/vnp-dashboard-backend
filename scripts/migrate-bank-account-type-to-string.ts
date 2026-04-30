@@ -1,4 +1,9 @@
+import { config } from 'dotenv'
+import { resolve } from 'path'
 import { MongoClient } from 'mongodb'
+
+// Load `.env` from project root (same as Prisma CLI); standalone ts-node does not do this by default.
+config({ path: resolve(process.cwd(), '.env') })
 
 /**
  * Ensures `bank_account_type` is always a string on PropertyBankDetails and
@@ -10,7 +15,9 @@ import { MongoClient } from 'mongodb'
 async function main(): Promise<void> {
   const dbUrl = process.env.DATABASE_URL
   if (!dbUrl) {
-    throw new Error('DATABASE_URL not found in environment variables')
+    throw new Error(
+      'DATABASE_URL not found. Add it to .env in the project root, or export it before running this script.'
+    )
   }
 
   const client = new MongoClient(dbUrl)
