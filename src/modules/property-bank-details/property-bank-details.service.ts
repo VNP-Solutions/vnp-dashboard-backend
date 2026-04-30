@@ -15,6 +15,7 @@ import {
 import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
+  isNineDigitUsRoutingNumber,
   normalizeUsRoutingNumberFromSpreadsheet,
   parseSpreadsheetAllSheetsToJson,
   validateSpreadsheetFile
@@ -127,9 +128,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           }
           if (!data.routing_number || !data.routing_number.trim()) {
             missingFields.push('routing_number')
-          } else if (data.routing_number.trim().length < 9) {
+          } else if (!isNineDigitUsRoutingNumber(data.routing_number)) {
             throw new BadRequestException(
-              'Routing number must be at least 9 digits for ACH'
+              'Routing number must be 9 digits for ACH'
             )
           }
           if (!data.bank_account_type) {
@@ -148,9 +149,9 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           // beneficiary_address is now OPTIONAL for Domestic Wire
           if (!data.routing_number || !data.routing_number.trim()) {
             missingFields.push('routing_number')
-          } else if (data.routing_number.trim().length < 9) {
+          } else if (!isNineDigitUsRoutingNumber(data.routing_number)) {
             throw new BadRequestException(
-              'Routing number must be at least 9 digits for Domestic Wire'
+              'Routing number must be 9 digits for Domestic Wire'
             )
           }
           break
@@ -794,16 +795,16 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             if (comments !== undefined) updateData.comments = comments
 
             if (routingNumber !== undefined) {
-              if (routingNumber.trim().length < 9) {
+              if (!isNineDigitUsRoutingNumber(routingNumber)) {
                 console.log(
                   '\x1b[33m%s\x1b[0m',
-                  `⚠️  [${sheetName}] Row ${rowNumber} WARNING: Routing number '${routingNumber}' < 9 digits for '${expediaId}'`
+                  `⚠️  [${sheetName}] Row ${rowNumber} WARNING: Routing number '${routingNumber}' must be 9 digits for '${expediaId}'`
                 )
                 result.errors.push({
                   row: rowNumber,
                   sheet: sheetName,
                   property: expediaId,
-                  error: 'Routing number must be at least 9 digits. Routing number was not updated.'
+                  error: 'Routing number must be 9 digits. Routing number was not updated.'
                 })
               } else {
                 updateData.routing_number = routingNumber
@@ -857,8 +858,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                 if (!mergedData.account_number?.trim()) missingFields.push('Account Number')
                 if (!mergedData.routing_number?.trim()) {
                   missingFields.push('Routing Number')
-                } else if (mergedData.routing_number.trim().length < 9) {
-                  missingFields.push('Routing Number (must be at least 9 digits)')
+                } else if (!isNineDigitUsRoutingNumber(mergedData.routing_number)) {
+                  missingFields.push('Routing Number (must be 9 digits)')
                 }
                 if (!mergedData.bank_account_type) missingFields.push('Bank Account Type')
                 break
@@ -868,8 +869,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                 if (!mergedData.account_number?.trim()) missingFields.push('Account Number')
                 if (!mergedData.routing_number?.trim()) {
                   missingFields.push('Routing Number')
-                } else if (mergedData.routing_number.trim().length < 9) {
-                  missingFields.push('Routing Number (must be at least 9 digits)')
+                } else if (!isNineDigitUsRoutingNumber(mergedData.routing_number)) {
+                  missingFields.push('Routing Number (must be 9 digits)')
                 }
                 break
 

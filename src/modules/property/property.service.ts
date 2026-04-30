@@ -41,6 +41,7 @@ import {
 import { ParallelProcessor } from '../../common/utils/parallel-processor.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
+  isNineDigitUsRoutingNumber,
   normalizeUsRoutingNumberFromSpreadsheet,
   parseSpreadsheetToJson,
   validateSpreadsheetFile
@@ -3268,10 +3269,10 @@ export class PropertyService implements IPropertyService {
               bankDetailsData.swift_bic_iban = swiftBicIban
             }
             if (routingNumber !== undefined) {
-              // Validate routing number has at least 9 digits
-              if (routingNumber.trim().length < 9) {
+              // Routing number must be exactly 9 digits
+              if (!isNineDigitUsRoutingNumber(routingNumber)) {
                 console.warn(
-                  `⚠️  Row ${rowNumber} - Property "${propertyName}": routing number '${routingNumber}' has less than 9 digits. Routing number was not saved.`
+                  `⚠️  Row ${rowNumber} - Property "${propertyName}": routing number '${routingNumber}' must be 9 digits. Routing number was not saved.`
                 )
                 // Don't set routing number, but continue processing other fields
               } else {

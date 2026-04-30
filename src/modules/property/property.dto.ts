@@ -13,6 +13,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Length,
   ValidateNested
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
@@ -662,10 +663,11 @@ export class CompleteBankDetailsDto {
 
   @ApiPropertyOptional({
     example: '021000021',
-    description: 'Routing number (minimum 9 digits)'
+    description: 'Routing number (9 digits)'
   })
   @IsString()
   @IsOptional()
+  @Length(9, 9, { message: 'Routing number must be 9 digits' })
   routing_number?: string
 
   @ApiPropertyOptional({

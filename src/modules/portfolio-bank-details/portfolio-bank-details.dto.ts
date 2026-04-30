@@ -6,7 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  MinLength
+  Length
 } from 'class-validator'
 
 export class CreatePortfolioBankDetailsDto {
@@ -116,11 +116,11 @@ export class CreatePortfolioBankDetailsDto {
   @ApiPropertyOptional({
     example: '021000021',
     description:
-      'Routing number (minimum 9 digits). Required for ACH and Domestic US Wire.'
+      'Routing number (9 digits). Required for ACH and Domestic US Wire.'
   })
   @IsString()
   @IsOptional()
-  @MinLength(9, { message: 'Routing number must be at least 9 digits' })
+  @Length(9, 9, { message: 'Routing number must be 9 digits' })
   routing_number?: string
 
   @ApiPropertyOptional({

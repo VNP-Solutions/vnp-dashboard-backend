@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx'
 const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv']
 
 /**
- * US ABA routing numbers are 9 digits. Excel often stores them as numeric cells, which
+ * Routing numbers are 9 digits here. Excel often stores them as numeric cells, which
  * drops leading zeros (e.g. 043306826 → 43306826). After sheet_to_json + String(value),
  * that becomes an 8-digit string and fails validation. Left-pad all-digit strings
  * shorter than 9 characters to recover the intended routing number.
@@ -23,6 +23,16 @@ export function normalizeUsRoutingNumberFromSpreadsheet(
     return trimmed.padStart(9, '0')
   }
   return trimmed
+}
+
+/** True if the value is exactly 9 digits (after trim). */
+export function isNineDigitUsRoutingNumber(
+  value: string | undefined | null
+): boolean {
+  if (value === undefined || value === null) {
+    return false
+  }
+  return /^\d{9}$/.test(value.trim())
 }
 
 /**
