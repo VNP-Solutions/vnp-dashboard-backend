@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { OtaPasswordPlaintextCacheService } from '../../common/services/ota-password-plaintext-cache.service'
 import {
-  BankAccountType,
   BankSubType,
   BankType,
   Prisma,
@@ -156,10 +155,8 @@ export class PropertyRepository implements IPropertyRepository {
         if (bankDetailsData.bank_wiring_routing_number) {
           bankData.bank_wiring_routing_number = bankDetailsData.bank_wiring_routing_number
         }
-        if (bankDetailsData.bank_account_type) {
-          bankData.bank_account_type =
-            bankDetailsData.bank_account_type as BankAccountType
-        }
+        bankData.bank_account_type =
+          bankDetailsData.bank_account_type?.trim() ?? ''
         if (bankDetailsData.currency) {
           bankData.currency = bankDetailsData.currency
         }
@@ -397,9 +394,13 @@ export class PropertyRepository implements IPropertyRepository {
             if (bankDetailsData.bank_wiring_routing_number) {
               bankData.bank_wiring_routing_number = bankDetailsData.bank_wiring_routing_number
             }
-            if (bankDetailsData.bank_account_type) {
+            if (bankDetailsData.bank_account_type !== undefined) {
               bankData.bank_account_type =
-                bankDetailsData.bank_account_type as BankAccountType
+                bankDetailsData.bank_account_type?.trim() ?? ''
+            }
+
+            if (!existingBankDetails && bankData.bank_account_type === undefined) {
+              bankData.bank_account_type = ''
             }
             if (bankDetailsData.currency) {
               bankData.currency = bankDetailsData.currency

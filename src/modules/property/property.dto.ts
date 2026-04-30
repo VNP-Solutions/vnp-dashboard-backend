@@ -13,8 +13,10 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Length,
   ValidateNested
 } from 'class-validator'
+import { RejectNumericBankIdentifier } from '../../common/decorators/bank-identifier.decorator'
 import { QueryDto } from '../../common/dto/query.dto'
 import {
   AgodaCredentialsDto,
@@ -614,8 +616,10 @@ export class CompleteBankDetailsDto {
 
   @ApiPropertyOptional({
     example: '1234567890',
-    description: 'Bank account number'
+    description:
+      'Bank account number. Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros.'
   })
+  @RejectNumericBankIdentifier()
   @IsString()
   @IsOptional()
   account_number?: string
@@ -646,40 +650,48 @@ export class CompleteBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'GB29NWBK60161331926819',
-    description: 'IBAN or Account Number (for International Wire)'
+    description:
+      'IBAN or Account Number (for International Wire). Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros.'
   })
+  @RejectNumericBankIdentifier()
   @IsString()
   @IsOptional()
   iban_number?: string
 
   @ApiPropertyOptional({
     example: 'CHASUS33XXX',
-    description: 'SWIFT/BIC Code (for International Wire)'
+    description:
+      'SWIFT/BIC Code (for International Wire). Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros.'
   })
+  @RejectNumericBankIdentifier()
   @IsString()
   @IsOptional()
   swift_bic_number?: string
 
   @ApiPropertyOptional({
     example: '021000021',
-    description: 'Routing number (minimum 9 digits)'
+    description:
+      'Routing number (9 digits). Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros. Stored exactly as submitted; the server does not pad or rewrite digits.'
   })
+  @RejectNumericBankIdentifier()
   @IsString()
   @IsOptional()
+  @Length(9, 9, { message: 'Routing number must be 9 digits' })
   routing_number?: string
 
   @ApiPropertyOptional({
     example: '121000248',
-    description: 'Bank wiring routing number for wire transfers (optional, only for Domestic Wire)'
+    description:
+      'Bank wiring routing number for wire transfers (optional, Domestic Wire). Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros. Stored exactly as submitted; the server does not pad or rewrite digits.'
   })
+  @RejectNumericBankIdentifier()
   @IsString()
   @IsOptional()
   bank_wiring_routing_number?: string
 
   @ApiPropertyOptional({
-    enum: ['checking', 'savings'],
     example: 'checking',
-    description: 'Bank account type'
+    description: 'Bank account type (free-form string)'
   })
   @IsString()
   @IsOptional()

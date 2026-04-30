@@ -41,6 +41,7 @@ import {
 import { ParallelProcessor } from '../../common/utils/parallel-processor.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
+  isNineDigitUsRoutingNumber,
   parseSpreadsheetToJson,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
@@ -3192,7 +3193,7 @@ export class PropertyService implements IPropertyService {
             bankDetailsData.bank_branch = null
             bankDetailsData.swift_bic_iban = null
             bankDetailsData.routing_number = null
-            bankDetailsData.bank_account_type = null
+            bankDetailsData.bank_account_type = ''
             bankDetailsData.currency = null
           } else if (bankTypeNormalized === 'bank') {
             // Bank account - validate bank_sub_type is provided
@@ -3265,10 +3266,10 @@ export class PropertyService implements IPropertyService {
               bankDetailsData.swift_bic_iban = swiftBicIban
             }
             if (routingNumber !== undefined) {
-              // Validate routing number has at least 9 digits
-              if (routingNumber.trim().length < 9) {
+              // Routing number must be exactly 9 digits
+              if (!isNineDigitUsRoutingNumber(routingNumber)) {
                 console.warn(
-                  `⚠️  Row ${rowNumber} - Property "${propertyName}": routing number '${routingNumber}' has less than 9 digits. Routing number was not saved.`
+                  `⚠️  Row ${rowNumber} - Property "${propertyName}": routing number '${routingNumber}' must be 9 digits. Routing number was not saved.`
                 )
                 // Don't set routing number, but continue processing other fields
               } else {
@@ -3276,17 +3277,7 @@ export class PropertyService implements IPropertyService {
               }
             }
             if (bankAccountType !== undefined) {
-              const normalizedAccountType = bankAccountType.toLowerCase()
-              if (!['checking', 'savings'].includes(normalizedAccountType)) {
-                console.warn(
-                  `⚠️  Row ${rowNumber} - Property "${propertyName}": Invalid bank account type '${bankAccountType}'. Property was created but bank account type was not saved.`
-                )
-                result.successCount++
-                result.successfulImports.push(propertyName)
-                logSuccess(rowNumber, propertyName, 'created')
-                continue
-              }
-              bankDetailsData.bank_account_type = normalizedAccountType
+              bankDetailsData.bank_account_type = bankAccountType.trim()
             }
             if (bankCurrency !== undefined) {
               bankDetailsData.currency = bankCurrency
