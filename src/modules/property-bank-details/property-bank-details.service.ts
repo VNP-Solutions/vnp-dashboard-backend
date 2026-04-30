@@ -15,8 +15,8 @@ import {
 import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
+  filterWhollyEmptySpreadsheetRows,
   isNineDigitUsRoutingNumber,
-  normalizeUsRoutingNumberFromSpreadsheet,
   parseSpreadsheetAllSheetsToJson,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
@@ -489,7 +489,19 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     const updatedPropertyIds: string[] = []
 
     try {
-      const allSheets = parseSpreadsheetAllSheetsToJson(file)
+      const parsedSheets = parseSpreadsheetAllSheetsToJson(file)
+      const allSheets = parsedSheets
+        .map(({ sheetName, data }) => ({
+          sheetName,
+          data: filterWhollyEmptySpreadsheetRows(data)
+        }))
+        .filter(sheet => sheet.data.length > 0)
+
+      if (allSheets.length === 0) {
+        throw new BadRequestException(
+          'File contains no data rows (only headers or blank rows)'
+        )
+      }
 
       // Helper function to find header value with flexible naming
       const findHeaderValue = (
@@ -707,27 +719,23 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               'BIC Code',
               'swift_bic_number'
             ])
-            const routingNumber = normalizeUsRoutingNumberFromSpreadsheet(
-              findHeaderValue(row, [
-                'Bank Routing Number',
-                'Bank routing number',
-                'Routing Number',
-                'Routing number',
-                'routing_number',
-                'Routing',
-                'Routing No',
-                'ABA Number',
-                'ABA'
-              ])
-            )
-            const bankWiringRoutingNumber = normalizeUsRoutingNumberFromSpreadsheet(
-              findHeaderValue(row, [
-                'Bank Wiring Routing Number',
-                'Bank wiring routing number',
-                'Wiring Routing Number',
-                'Wiring routing number'
-              ])
-            )
+            const routingNumber = findHeaderValue(row, [
+              'Bank Routing Number',
+              'Bank routing number',
+              'Routing Number',
+              'Routing number',
+              'routing_number',
+              'Routing',
+              'Routing No',
+              'ABA Number',
+              'ABA'
+            ])
+            const bankWiringRoutingNumber = findHeaderValue(row, [
+              'Bank Wiring Routing Number',
+              'Bank wiring routing number',
+              'Wiring Routing Number',
+              'Wiring routing number'
+            ])
             const bankAccountType = findHeaderValue(row, [
               'Bank Account Type',
               'Bank account type',

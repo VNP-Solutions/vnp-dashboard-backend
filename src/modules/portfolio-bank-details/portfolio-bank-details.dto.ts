@@ -123,7 +123,7 @@ export class CreatePortfolioBankDetailsDto {
   @ApiPropertyOptional({
     example: '021000021',
     description:
-      'Routing number (9 digits). Required for ACH and Domestic US Wire. Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros.'
+      'Routing number (9 digits). Required for ACH and Domestic US Wire. Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros. Stored exactly as submitted; the server does not pad or rewrite digits.'
   })
   @RejectNumericBankIdentifier()
   @IsString()
@@ -134,7 +134,7 @@ export class CreatePortfolioBankDetailsDto {
   @ApiPropertyOptional({
     example: '121000248',
     description:
-      'Bank wiring routing number for wire transfers. Optional field, only applicable for Domestic Wire transfers. Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros.'
+      'Bank wiring routing number for wire transfers. Optional field, only applicable for Domestic Wire transfers. Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros. Stored exactly as submitted; the server does not pad or rewrite digits.'
   })
   @RejectNumericBankIdentifier()
   @IsString()

@@ -14,29 +14,6 @@ const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv']
  */
 const SHEET_TO_JSON_OPTS: XLSX.Sheet2JSONOpts = { raw: false, defval: null }
 
-/**
- * **US routing / wiring routing columns only.** Excel numeric cells drop leading zeros;
- * after import, all-digit strings shorter than 9 are left-padded to 9 (fixed ABA width).
- *
- * Do **not** use this for variable-length fields such as `account_number` — width is unknown
- * and padding would corrupt data.
- */
-export function normalizeUsRoutingNumberFromSpreadsheet(
-  value: string | undefined
-): string | undefined {
-  if (value === undefined) {
-    return undefined
-  }
-  const trimmed = value.trim()
-  if (!trimmed) {
-    return undefined
-  }
-  if (/^\d+$/.test(trimmed) && trimmed.length < 9) {
-    return trimmed.padStart(9, '0')
-  }
-  return trimmed
-}
-
 /** True if the value is exactly 9 digits (after trim). */
 export function isNineDigitUsRoutingNumber(
   value: string | undefined | null
@@ -45,6 +22,45 @@ export function isNineDigitUsRoutingNumber(
     return false
   }
   return /^\d{9}$/.test(value.trim())
+}
+
+/**
+ * Rows SheetJS still emits for blank lines inside the worksheet "used range" (often all
+ * `null` / empty strings). These should not be treated as failed import rows.
+ */
+export function isSpreadsheetRowWhollyEmpty(
+  row: Record<string, unknown>
+): boolean {
+  for (const key of Object.keys(row)) {
+    const v = row[key]
+    if (v === undefined || v === null) {
+      continue
+    }
+    if (typeof v === 'string') {
+      if (v.trim() !== '') {
+        return false
+      }
+      continue
+    }
+    if (typeof v === 'number' && !Number.isNaN(v)) {
+      return false
+    }
+    if (typeof v === 'bigint') {
+      return false
+    }
+    if (typeof v === 'boolean') {
+      return false
+    }
+    return false
+  }
+  return true
+}
+
+/** Drops header-only / blank placeholder rows from `sheet_to_json` output. */
+export function filterWhollyEmptySpreadsheetRows<T extends Record<string, unknown>>(
+  rows: T[]
+): T[] {
+  return rows.filter(row => !isSpreadsheetRowWhollyEmpty(row))
 }
 
 /**
