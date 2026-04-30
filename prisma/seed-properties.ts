@@ -1,10 +1,4 @@
-import {
-  BankAccountType,
-  BankSubType,
-  BankType,
-  PrismaClient,
-  Property
-} from '@prisma/client'
+import { BankSubType, BankType, PrismaClient, Property } from '@prisma/client'
 import { EncryptionUtil } from '../src/common/utils/encryption.util'
 
 const prisma = new PrismaClient()
@@ -580,13 +574,9 @@ async function main() {
                 !isStripe && Math.random() > 0.6
                   ? generateRoutingNumber()
                   : null,
-              bank_account_type:
-                !isStripe && Math.random() > 0.5
-                  ? getRandomElement([
-                      BankAccountType.checking,
-                      BankAccountType.savings
-                    ])
-                  : null,
+              bank_account_type: !isStripe
+                ? getRandomElement(['checking', 'savings'])
+                : '',
               currency: currency.code,
               stripe_account_email: isStripe
                 ? `stripe+${property.id.substring(0, 8)}@example.com`

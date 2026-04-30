@@ -133,7 +133,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               'Routing number must be 9 digits for ACH'
             )
           }
-          if (!data.bank_account_type) {
+          if (!data.bank_account_type?.trim()) {
             missingFields.push('bank_account_type')
           }
           break
@@ -812,26 +812,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             }
 
             if (bankAccountType !== undefined) {
-              const normalizedAccountType = bankAccountType.toLowerCase().trim()
-              if (normalizedAccountType === 'checking' || normalizedAccountType === 'check') {
-                updateData.bank_account_type = 'checking'
-              } else if (normalizedAccountType === 'savings' || normalizedAccountType === 'saving') {
-                updateData.bank_account_type = 'savings'
-              } else {
-                console.log(
-                  '\x1b[31m%s\x1b[0m',
-                  `❌ [${sheetName}] Row ${rowNumber} FAILED: Invalid bank account type '${bankAccountType}' for '${expediaId}'`
-                )
-                result.errors.push({
-                  row: rowNumber,
-                  sheet: sheetName,
-                  property: expediaId,
-                  error: `Invalid bank account type: ${bankAccountType}. Must be one of: checking, savings`
-                })
-                result.failureCount++
-                sheetResult.failureCount++
-                continue
-              }
+              updateData.bank_account_type = bankAccountType.trim()
             }
 
             // Validate required fields based on sub-type
@@ -861,7 +842,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                 } else if (!isNineDigitUsRoutingNumber(mergedData.routing_number)) {
                   missingFields.push('Routing Number (must be 9 digits)')
                 }
-                if (!mergedData.bank_account_type) missingFields.push('Bank Account Type')
+                if (!mergedData.bank_account_type?.trim()) missingFields.push('Bank Account Type')
                 break
 
               case BankSubType.domestic_wire:

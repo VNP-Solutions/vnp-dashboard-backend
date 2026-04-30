@@ -679,9 +679,8 @@ export class CompleteBankDetailsDto {
   bank_wiring_routing_number?: string
 
   @ApiPropertyOptional({
-    enum: ['checking', 'savings'],
     example: 'checking',
-    description: 'Bank account type'
+    description: 'Bank account type (free-form string)'
   })
   @IsString()
   @IsOptional()

@@ -314,7 +314,7 @@ export class PropertyController {
             currency: 'USD',
             bank_address: '270 Park Avenue, New York, NY 10017',
             routing_number: null,
-            bank_account_type: null,
+            bank_account_type: '',
             comments: 'Switching to international wire for better global coverage'
           }
         }

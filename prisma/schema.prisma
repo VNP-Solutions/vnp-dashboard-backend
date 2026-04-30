@@ -215,7 +215,7 @@ model PropertyBankDetails {
   swift_bic_number           String?
   routing_number             String?
   bank_wiring_routing_number String?
-  bank_account_type          BankAccountType?
+  bank_account_type          String
   currency                   String?
   stripe_account_email       String?
   contact_name               String?
@@ -245,7 +245,7 @@ model PortfolioBankDetails {
   swift_bic_number           String?
   routing_number             String?
   bank_wiring_routing_number String?
-  bank_account_type          BankAccountType?
+  bank_account_type          String
   currency                   String?
   stripe_account_email       String?
   contact_name               String?
@@ -517,11 +517,6 @@ enum BankSubType {
   ach
   domestic_wire
   international_wire
-}
-
-enum BankAccountType {
-  checking
-  savings
 }
 
 enum PermissionLevel {

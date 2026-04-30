@@ -116,7 +116,7 @@ export class PortfolioBankDetailsService
               'Routing number must be 9 digits for ACH'
             )
           }
-          if (!data.bank_account_type) {
+          if (!data.bank_account_type?.trim()) {
             missingFields.push('bank_account_type')
           }
           break

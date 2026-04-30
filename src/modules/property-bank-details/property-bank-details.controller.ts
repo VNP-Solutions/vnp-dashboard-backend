@@ -285,7 +285,7 @@ export class PropertyBankDetailsController {
         value: {
           bank_sub_type: 'domestic_wire',
           beneficiary_address: '789 Business Blvd, Chicago, IL 60601',
-          bank_account_type: null,
+          bank_account_type: '',
           comments: 'Switching to domestic wire for faster processing'
         }
       }

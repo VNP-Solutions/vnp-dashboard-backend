@@ -1,6 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { BankAccountType, BankSubType } from '@prisma/client'
+import { BankSubType } from '@prisma/client'
 import {
   IsEnum,
   IsNotEmpty,
@@ -133,13 +133,13 @@ export class CreatePropertyBankDetailsDto {
   bank_wiring_routing_number?: string
 
   @ApiPropertyOptional({
-    enum: BankAccountType,
-    example: BankAccountType.checking,
-    description: 'Bank account type (checking or savings). Required for ACH.'
+    example: 'checking',
+    description:
+      'Bank account type (free-form string, e.g. checking, savings). Required for ACH; use empty or omit for other sub-types when not applicable.'
   })
-  @IsEnum(BankAccountType)
+  @IsString()
   @IsOptional()
-  bank_account_type?: BankAccountType
+  bank_account_type?: string
 
   @ApiPropertyOptional({
     example: 'USD',

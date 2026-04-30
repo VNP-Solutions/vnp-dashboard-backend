@@ -3196,7 +3196,7 @@ export class PropertyService implements IPropertyService {
             bankDetailsData.bank_branch = null
             bankDetailsData.swift_bic_iban = null
             bankDetailsData.routing_number = null
-            bankDetailsData.bank_account_type = null
+            bankDetailsData.bank_account_type = ''
             bankDetailsData.currency = null
           } else if (bankTypeNormalized === 'bank') {
             // Bank account - validate bank_sub_type is provided
@@ -3280,17 +3280,7 @@ export class PropertyService implements IPropertyService {
               }
             }
             if (bankAccountType !== undefined) {
-              const normalizedAccountType = bankAccountType.toLowerCase()
-              if (!['checking', 'savings'].includes(normalizedAccountType)) {
-                console.warn(
-                  `⚠️  Row ${rowNumber} - Property "${propertyName}": Invalid bank account type '${bankAccountType}'. Property was created but bank account type was not saved.`
-                )
-                result.successCount++
-                result.successfulImports.push(propertyName)
-                logSuccess(rowNumber, propertyName, 'created')
-                continue
-              }
-              bankDetailsData.bank_account_type = normalizedAccountType
+              bankDetailsData.bank_account_type = bankAccountType.trim()
             }
             if (bankCurrency !== undefined) {
               bankDetailsData.currency = bankCurrency
