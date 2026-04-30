@@ -4,10 +4,22 @@ import * as XLSX from 'xlsx'
 const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv']
 
 /**
- * Routing numbers are 9 digits here. Excel often stores them as numeric cells, which
- * drops leading zeros (e.g. 043306826 → 43306826). After sheet_to_json + String(value),
- * that becomes an 8-digit string and fails validation. Left-pad all-digit strings
- * shorter than 9 characters to recover the intended routing number.
+ * Use formatted cell values (not raw numbers) where SheetJS provides them (`raw: false`),
+ * so number formats like nine-digit routing with leading zeros are preserved when the
+ * workbook stores them correctly. This does **not** recover leading zeros once Excel has
+ * already stored an account-only column as a plain number—in that case format those
+ * spreadsheet columns as **Text** before entry, or the value cannot be reconstructed.
+ *
+ * Matches {@link parseSpreadsheetAllSheetsToJson} and bulk bank/property imports.
+ */
+const SHEET_TO_JSON_OPTS: XLSX.Sheet2JSONOpts = { raw: false, defval: null }
+
+/**
+ * **US routing / wiring routing columns only.** Excel numeric cells drop leading zeros;
+ * after import, all-digit strings shorter than 9 are left-padded to 9 (fixed ABA width).
+ *
+ * Do **not** use this for variable-length fields such as `account_number` — width is unknown
+ * and padding would corrupt data.
  */
 export function normalizeUsRoutingNumberFromSpreadsheet(
   value: string | undefined
@@ -70,7 +82,7 @@ export function parseSpreadsheetToJson(file: Express.Multer.File): any[] {
   }
 
   const worksheet = workbook.Sheets[sheetName]
-  const data = XLSX.utils.sheet_to_json(worksheet)
+  const data = XLSX.utils.sheet_to_json(worksheet, SHEET_TO_JSON_OPTS)
 
   if (!data || data.length === 0) {
     throw new BadRequestException('File is empty or contains no data rows')
@@ -109,7 +121,7 @@ export function parseSpreadsheetAllSheetsToJson(
 
   for (const sheetName of workbook.SheetNames) {
     const worksheet = workbook.Sheets[sheetName]
-    const data = XLSX.utils.sheet_to_json(worksheet)
+    const data = XLSX.utils.sheet_to_json(worksheet, SHEET_TO_JSON_OPTS)
 
     if (data && data.length > 0) {
       result.push({ sheetName, data })
