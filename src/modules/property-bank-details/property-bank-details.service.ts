@@ -18,6 +18,7 @@ import {
   filterWhollyEmptySpreadsheetRows,
   isNineDigitUsRoutingNumber,
   parseSpreadsheetAllSheetsToJson,
+  spreadsheetCellValueToPlainString,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
 import {
@@ -511,7 +512,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
-            return String(value).trim()
+            const plain = spreadsheetCellValueToPlainString(value)
+            if (plain !== '') return plain
           }
         }
 
@@ -522,7 +524,8 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             if (cleanKey.toLowerCase() === name.toLowerCase()) {
               const value = row[key]
               if (value !== undefined && value !== null && value !== '') {
-                return String(value).trim()
+                const plain = spreadsheetCellValueToPlainString(value)
+                if (plain !== '') return plain
               }
             }
           }

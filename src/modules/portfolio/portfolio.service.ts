@@ -24,6 +24,7 @@ import {
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   parseSpreadsheetToJson,
+  spreadsheetCellValueToPlainString,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
 import { splitEmails } from '../../common/validators/comma-separated-emails.validator'
@@ -1354,7 +1355,10 @@ export class PortfolioService implements IPortfolioService {
             if (cleanKey === cleanName) {
               const value = row[key]
               if (value !== undefined && value !== null && value !== '') {
-                return String(value).trim()
+                const plain = spreadsheetCellValueToPlainString(value)
+                if (plain !== '') {
+                  return plain
+                }
               }
             }
           }
@@ -1661,7 +1665,10 @@ export class PortfolioService implements IPortfolioService {
             if (cleanKey === cleanName) {
               const value = row[key]
               if (value !== undefined && value !== null && value !== '') {
-                return String(value).trim()
+                const plain = spreadsheetCellValueToPlainString(value)
+                if (plain !== '') {
+                  return plain
+                }
               }
             }
           }

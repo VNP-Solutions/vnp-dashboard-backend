@@ -43,6 +43,7 @@ import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   isNineDigitUsRoutingNumber,
   parseSpreadsheetToJson,
+  spreadsheetCellValueToPlainString,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
 import { Configuration } from '../../config/configuration'
@@ -2607,7 +2608,8 @@ export class PropertyService implements IPropertyService {
             if (cleanKey === cleanName) {
               const value = row[key]
               if (value !== undefined && value !== null && value !== '') {
-                return String(value).trim()
+                const plain = spreadsheetCellValueToPlainString(value)
+                if (plain !== '') return plain
               }
             }
           }
@@ -3426,10 +3428,9 @@ export class PropertyService implements IPropertyService {
         for (const name of possibleNames) {
           const value = row[name]
           if (value !== undefined && value !== null && value !== '') {
-            const trimmed = String(value).trim()
-            // Return only if trimmed value is not empty
-            if (trimmed !== '') {
-              return trimmed
+            const plain = spreadsheetCellValueToPlainString(value)
+            if (plain !== '') {
+              return plain
             }
           }
         }
@@ -3443,10 +3444,9 @@ export class PropertyService implements IPropertyService {
             if (cleanKey.toLowerCase() === name.toLowerCase()) {
               const value = row[key]
               if (value !== undefined && value !== null && value !== '') {
-                const trimmed = String(value).trim()
-                // Return only if trimmed value is not empty
-                if (trimmed !== '') {
-                  return trimmed
+                const plain = spreadsheetCellValueToPlainString(value)
+                if (plain !== '') {
+                  return plain
                 }
               }
             }
