@@ -6,7 +6,7 @@ import {
   Logger,
   NotFoundException
 } from '@nestjs/common'
-import { BankSubType, BankType } from '@prisma/client'
+import { BankSubType, BankType, Prisma } from '@prisma/client'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   ModuleType,
@@ -49,6 +49,35 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
   'Client portfolio manager',
   'VNP Admin'
 ]
+
+/**
+ * Convert a raw error (possibly a Prisma internal error) into a clean,
+ * user-readable string safe for inclusion in bulk-update API responses.
+ */
+function sanitizeBulkRowError(error: unknown): string {
+  if (
+    error instanceof Prisma.PrismaClientValidationError ||
+    error instanceof Prisma.PrismaClientKnownRequestError ||
+    error instanceof Prisma.PrismaClientUnknownRequestError
+  ) {
+    // Prisma error messages contain internal file paths and query traces.
+    // Extract only the final human-readable sentence after the last newline
+    // that starts with "Error", or fall back to a generic message.
+    const raw = (error as Error).message ?? ''
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean)
+    const errorLine = lines.find(l => l.startsWith('Error')) ?? lines[lines.length - 1]
+    if (errorLine) {
+      return `Database error: ${errorLine.replace(/^Error\s*/, '')}`
+    }
+    return 'A database error occurred while processing this row. The existing record may contain invalid data.'
+  }
+
+  if (error instanceof Error) {
+    return error.message || 'Unknown error occurred'
+  }
+
+  return 'Unknown error occurred'
+}
 
 @Injectable()
 export class PropertyBankDetailsService implements IPropertyBankDetailsService {
@@ -983,15 +1012,17 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                 'ExpediaID'
               ]) || 'Unknown'
 
+            const friendlyMessage = sanitizeBulkRowError(error)
+
             console.log(
               '\x1b[31m%s\x1b[0m',
-              `❌ [${sheetName}] Row ${rowNumber} FAILED: ${error.message || 'Unknown error'} for '${expediaIdFromRow}'`
+              `❌ [${sheetName}] Row ${rowNumber} FAILED: ${friendlyMessage} for '${expediaIdFromRow}'`
             )
             result.errors.push({
               row: rowNumber,
               sheet: sheetName,
               property: expediaIdFromRow,
-              error: error.message || 'Unknown error occurred'
+              error: friendlyMessage
             })
             result.failureCount++
             sheetResult.failureCount++
