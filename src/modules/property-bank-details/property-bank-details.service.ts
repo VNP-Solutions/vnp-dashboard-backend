@@ -15,6 +15,7 @@ import {
 import { PermissionService } from '../../common/services/permission.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
+  normalizeUsRoutingNumberFromSpreadsheet,
   parseSpreadsheetAllSheetsToJson,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
@@ -705,23 +706,27 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               'BIC Code',
               'swift_bic_number'
             ])
-            const routingNumber = findHeaderValue(row, [
-              'Bank Routing Number',
-              'Bank routing number',
-              'Routing Number',
-              'Routing number',
-              'routing_number',
-              'Routing',
-              'Routing No',
-              'ABA Number',
-              'ABA'
-            ])
-            const bankWiringRoutingNumber = findHeaderValue(row, [
-              'Bank Wiring Routing Number',
-              'Bank wiring routing number',
-              'Wiring Routing Number',
-              'Wiring routing number'
-            ])
+            const routingNumber = normalizeUsRoutingNumberFromSpreadsheet(
+              findHeaderValue(row, [
+                'Bank Routing Number',
+                'Bank routing number',
+                'Routing Number',
+                'Routing number',
+                'routing_number',
+                'Routing',
+                'Routing No',
+                'ABA Number',
+                'ABA'
+              ])
+            )
+            const bankWiringRoutingNumber = normalizeUsRoutingNumberFromSpreadsheet(
+              findHeaderValue(row, [
+                'Bank Wiring Routing Number',
+                'Bank wiring routing number',
+                'Wiring Routing Number',
+                'Wiring routing number'
+              ])
+            )
             const bankAccountType = findHeaderValue(row, [
               'Bank Account Type',
               'Bank account type',

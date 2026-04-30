@@ -41,6 +41,7 @@ import {
 import { ParallelProcessor } from '../../common/utils/parallel-processor.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
+  normalizeUsRoutingNumberFromSpreadsheet,
   parseSpreadsheetToJson,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
@@ -3135,15 +3136,17 @@ export class PropertyService implements IPropertyService {
             'IBAN',
             'Iban'
           ])
-          const routingNumber = findHeaderValue(row, [
-            'Routing Number',
-            'Routing number',
-            'routing_number',
-            'Routing',
-            'Routing No',
-            'ABA Number',
-            'ABA'
-          ])
+          const routingNumber = normalizeUsRoutingNumberFromSpreadsheet(
+            findHeaderValue(row, [
+              'Routing Number',
+              'Routing number',
+              'routing_number',
+              'Routing',
+              'Routing No',
+              'ABA Number',
+              'ABA'
+            ])
+          )
           const bankAccountType = findHeaderValue(row, [
             'Bank Account Type',
             'Bank account type',

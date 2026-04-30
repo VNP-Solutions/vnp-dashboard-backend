@@ -4,6 +4,28 @@ import * as XLSX from 'xlsx'
 const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv']
 
 /**
+ * US ABA routing numbers are 9 digits. Excel often stores them as numeric cells, which
+ * drops leading zeros (e.g. 043306826 → 43306826). After sheet_to_json + String(value),
+ * that becomes an 8-digit string and fails validation. Left-pad all-digit strings
+ * shorter than 9 characters to recover the intended routing number.
+ */
+export function normalizeUsRoutingNumberFromSpreadsheet(
+  value: string | undefined
+): string | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return undefined
+  }
+  if (/^\d+$/.test(trimmed) && trimmed.length < 9) {
+    return trimmed.padStart(9, '0')
+  }
+  return trimmed
+}
+
+/**
  * Validates that the uploaded file is a supported spreadsheet format (.xlsx, .xls, or .csv).
  * @throws BadRequestException if file format is not supported
  */
