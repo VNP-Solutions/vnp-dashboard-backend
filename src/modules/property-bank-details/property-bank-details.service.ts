@@ -802,20 +802,19 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             if (bankAddress !== undefined) updateData.bank_address = bankAddress
             if (comments !== undefined) updateData.comments = comments
 
-            if (routingNumber !== undefined) {
-              if (!isNineDigitUsRoutingNumber(routingNumber)) {
+            const routingCandidateFromSheet =
+              routingNumber !== undefined && routingNumber.trim() !== ''
+                ? routingNumber.trim()
+                : undefined
+
+            if (routingCandidateFromSheet !== undefined) {
+              if (isNineDigitUsRoutingNumber(routingCandidateFromSheet)) {
+                updateData.routing_number = routingCandidateFromSheet
+              } else {
                 console.log(
                   '\x1b[33m%s\x1b[0m',
-                  `⚠️  [${sheetName}] Row ${rowNumber} WARNING: Routing number '${routingNumber}' must be 9 digits for '${expediaId}'`
+                  `⚠️  [${sheetName}] Row ${rowNumber}: routing number '${routingCandidateFromSheet}' is not 9 digits for '${expediaId}'`
                 )
-                result.errors.push({
-                  row: rowNumber,
-                  sheet: sheetName,
-                  property: expediaId,
-                  error: 'Routing number must be 9 digits. Routing number was not updated.'
-                })
-              } else {
-                updateData.routing_number = routingNumber
               }
             }
 
@@ -823,14 +822,19 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               updateData.bank_account_type = bankAccountType.trim()
             }
 
-            // Validate required fields based on sub-type
-            const missingFields: string[] = []
+            // Validate required fields based on sub-type (clear messages for missing vs invalid)
+            const missingParts: string[] = []
+            const invalidParts: string[] = []
             const mergedData = {
               hotel_portfolio_name: updateData.hotel_portfolio_name ?? existingBankDetails?.hotel_portfolio_name,
               beneficiary_name: updateData.beneficiary_name ?? existingBankDetails?.beneficiary_name,
               account_number: updateData.account_number ?? existingBankDetails?.account_number,
               bank_name: updateData.bank_name ?? existingBankDetails?.bank_name,
-              routing_number: updateData.routing_number ?? existingBankDetails?.routing_number,
+              routing_number:
+                updateData.routing_number ??
+                routingCandidateFromSheet ??
+                existingBankDetails?.routing_number ??
+                undefined,
               bank_wiring_routing_number: updateData.bank_wiring_routing_number ?? existingBankDetails?.bank_wiring_routing_number,
               iban_number: updateData.iban_number ?? existingBankDetails?.iban_number,
               swift_bic_number: updateData.swift_bic_number ?? existingBankDetails?.swift_bic_number,
@@ -838,48 +842,90 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
               currency: updateData.currency ?? existingBankDetails?.currency
             }
 
-            if (!mergedData.hotel_portfolio_name?.trim()) missingFields.push('Hotel Portfolio Name')
-            if (!mergedData.bank_name?.trim()) missingFields.push('Bank Name')
+            const bankSubLabel =
+              bankSubType === BankSubType.ach
+                ? 'ACH'
+                : bankSubType === BankSubType.domestic_wire
+                  ? 'Domestic Wire'
+                  : 'International Wire'
+
+            if (!mergedData.hotel_portfolio_name?.trim()) {
+              missingParts.push('Hotel Portfolio Name')
+            }
+            if (!mergedData.bank_name?.trim()) missingParts.push('Bank Name')
 
             switch (bankSubType) {
               case BankSubType.ach:
-                if (!mergedData.beneficiary_name?.trim()) missingFields.push('Beneficiary Name')
-                if (!mergedData.account_number?.trim()) missingFields.push('Account Number')
-                if (!mergedData.routing_number?.trim()) {
-                  missingFields.push('Routing Number')
-                } else if (!isNineDigitUsRoutingNumber(mergedData.routing_number)) {
-                  missingFields.push('Routing Number (must be 9 digits)')
+                if (!mergedData.beneficiary_name?.trim()) {
+                  missingParts.push('Beneficiary Name')
                 }
-                if (!mergedData.bank_account_type?.trim()) missingFields.push('Bank Account Type')
+                if (!mergedData.account_number?.trim()) {
+                  missingParts.push('Account Number')
+                }
+                {
+                  const r = mergedData.routing_number?.trim()
+                  if (!r) missingParts.push('Routing Number')
+                  else if (!isNineDigitUsRoutingNumber(r)) {
+                    invalidParts.push(
+                      /^\d+$/.test(r)
+                        ? `Routing Number must be exactly 9 digits (${String(r.length)} digit(s) provided)`
+                        : 'Routing Number must be exactly 9 numeric digits only (remove spaces or other characters)'
+                    )
+                  }
+                }
+                if (!mergedData.bank_account_type?.trim()) {
+                  missingParts.push('Bank Account Type')
+                }
                 break
 
               case BankSubType.domestic_wire:
-                if (!mergedData.beneficiary_name?.trim()) missingFields.push('Beneficiary Name')
-                if (!mergedData.account_number?.trim()) missingFields.push('Account Number')
-                if (!mergedData.routing_number?.trim()) {
-                  missingFields.push('Routing Number')
-                } else if (!isNineDigitUsRoutingNumber(mergedData.routing_number)) {
-                  missingFields.push('Routing Number (must be 9 digits)')
+                if (!mergedData.beneficiary_name?.trim()) {
+                  missingParts.push('Beneficiary Name')
+                }
+                if (!mergedData.account_number?.trim()) {
+                  missingParts.push('Account Number')
+                }
+                {
+                  const r = mergedData.routing_number?.trim()
+                  if (!r) missingParts.push('Routing Number')
+                  else if (!isNineDigitUsRoutingNumber(r)) {
+                    invalidParts.push(
+                      /^\d+$/.test(r)
+                        ? `Routing Number must be exactly 9 digits (${String(r.length)} digit(s) provided)`
+                        : 'Routing Number must be exactly 9 numeric digits only (remove spaces or other characters)'
+                    )
+                  }
                 }
                 break
 
               case BankSubType.international_wire:
-                if (!mergedData.beneficiary_name?.trim()) missingFields.push('Beneficiary Name')
-                if (!mergedData.iban_number?.trim()) missingFields.push('IBAN or Account Number')
-                if (!mergedData.swift_bic_number?.trim()) missingFields.push('SWIFT/BIC Code')
+                if (!mergedData.beneficiary_name?.trim()) {
+                  missingParts.push('Beneficiary Name')
+                }
+                if (!mergedData.iban_number?.trim()) {
+                  missingParts.push('IBAN or Account Number')
+                }
+                if (!mergedData.swift_bic_number?.trim()) {
+                  missingParts.push('SWIFT/BIC Code')
+                }
                 break
             }
 
-            if (missingFields.length > 0) {
+            if (missingParts.length > 0 || invalidParts.length > 0) {
+              const details = [
+                ...missingParts.map(f => `${f} is missing`),
+                ...invalidParts
+              ].join('; ')
+              const errorMessage = `${bankSubLabel}: ${details}`
               console.log(
                 '\x1b[31m%s\x1b[0m',
-                `❌ [${sheetName}] Row ${rowNumber} FAILED: Missing required fields for ${bankSubType}: ${missingFields.join(', ')}`
+                `❌ [${sheetName}] Row ${rowNumber} FAILED: ${errorMessage}`
               )
               result.errors.push({
                 row: rowNumber,
                 sheet: sheetName,
                 property: expediaId,
-                error: `Missing required fields for ${bankSubType}: ${missingFields.join(', ')}`
+                error: errorMessage
               })
               result.failureCount++
               sheetResult.failureCount++

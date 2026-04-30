@@ -241,10 +241,22 @@ export class BulkUpdateBankDetailsResultDto {
 
   @ApiProperty({
     example: [
-      { row: 3, sheet: 'ACH', property: 'EXP123456', error: 'Property not found for this Expedia ID' },
-      { row: 5, sheet: 'Domestic Wire', property: 'EXP789012', error: 'Missing required fields for domestic_wire: Routing Number' }
+      {
+        row: 3,
+        sheet: 'ACH',
+        property: 'EXP123456',
+        error: 'Property not found for this Expedia ID'
+      },
+      {
+        row: 5,
+        sheet: 'Domestic Wire',
+        property: 'EXP789012',
+        error:
+          'Domestic Wire: Routing Number must be exactly 9 digits (7 digit(s) provided)'
+      }
     ],
-    description: 'List of errors encountered during bulk update. Property field contains Expedia ID. Sheet field indicates which tab the error came from (for multi-tab files).'
+    description:
+      'List of errors from bulk update. Messages distinguish missing columns ("X is missing") from invalid values (e.g. routing length). Sheet is the workbook tab.'
   })
   errors: Array<{
     row: number
