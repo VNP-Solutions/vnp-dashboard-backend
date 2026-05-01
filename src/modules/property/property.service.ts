@@ -23,6 +23,7 @@ import {
   comparableBankDetailsEqual,
   logBankDetailsEmailComparison,
   maskBankDetails,
+  normalizeBankAccountTypeInput,
   toComparableBankDetails
 } from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
@@ -2880,8 +2881,10 @@ export class PropertyService implements IPropertyService {
               }
             }
             if (bankAccountType !== undefined) {
-              const normalizedAccountType = bankAccountType.toLowerCase()
-              if (!['checking', 'savings'].includes(normalizedAccountType)) {
+              const mappedType = normalizeBankAccountTypeInput(
+                String(bankAccountType)
+              )
+              if (!mappedType) {
                 console.warn(
                   `⚠️  Row ${rowNumber} - Property "${propertyName}": Invalid bank account type '${bankAccountType}'. Property was created but bank account type was not saved.`
                 )
@@ -2890,7 +2893,7 @@ export class PropertyService implements IPropertyService {
                 logSuccess(rowNumber, propertyName, 'created')
                 continue
               }
-              bankDetailsData.bank_account_type = normalizedAccountType
+              bankDetailsData.bank_account_type = mappedType
             }
             if (bankCurrency !== undefined) {
               bankDetailsData.currency = bankCurrency

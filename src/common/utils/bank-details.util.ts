@@ -1,3 +1,26 @@
+import { BankAccountType } from '@prisma/client'
+
+/** Human-readable list for validation errors (matches Prisma enum string values). */
+export const BANK_ACCOUNT_TYPE_ALLOWED =
+  'checking, savings, DACA, Ops' as const
+
+/**
+ * Maps spreadsheet or free-text input to canonical Prisma {@link BankAccountType}.
+ * Accepts DACA/daca, Ops/ops (any casing), checking/check, savings/saving.
+ */
+export function normalizeBankAccountTypeInput(
+  raw: string
+): BankAccountType | null {
+  const t = raw.trim()
+  if (!t) return null
+  const lower = t.toLowerCase()
+  if (lower === 'checking' || lower === 'check') return BankAccountType.checking
+  if (lower === 'savings' || lower === 'saving') return BankAccountType.savings
+  if (lower === 'daca') return BankAccountType.DACA
+  if (lower === 'ops') return BankAccountType.Ops
+  return null
+}
+
 /**
  * Business-meaningful bank fields used for "did anything change?" before notifications.
  * Excludes id, property/portfolio id, associated_user_id, and timestamps.

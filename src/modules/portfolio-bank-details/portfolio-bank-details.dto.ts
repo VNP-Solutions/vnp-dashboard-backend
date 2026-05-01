@@ -135,7 +135,8 @@ export class CreatePortfolioBankDetailsDto {
   @ApiPropertyOptional({
     enum: BankAccountType,
     example: BankAccountType.checking,
-    description: 'Bank account type (checking or savings). Required for ACH.'
+    description:
+      'Bank account type (checking, savings, DACA, Ops). Required for ACH.'
   })
   @IsEnum(BankAccountType)
   @IsOptional()

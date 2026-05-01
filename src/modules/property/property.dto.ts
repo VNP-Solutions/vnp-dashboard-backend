@@ -5,10 +5,12 @@ import {
   PartialType
 } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
+import { BankAccountType } from '@prisma/client'
 import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -630,13 +632,14 @@ export class CompleteBankDetailsDto {
   bank_wiring_routing_number?: string
 
   @ApiPropertyOptional({
-    enum: ['checking', 'savings'],
-    example: 'checking',
-    description: 'Bank account type'
+    enum: BankAccountType,
+    example: BankAccountType.checking,
+    description:
+      'Bank account type (checking, savings, DACA, Ops). Required for ACH when creating/updating bank details.'
   })
-  @IsString()
+  @IsEnum(BankAccountType)
   @IsOptional()
-  bank_account_type?: string
+  bank_account_type?: BankAccountType
 
   @ApiPropertyOptional({
     example: 'USD',

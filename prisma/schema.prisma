@@ -522,6 +522,8 @@ enum BankSubType {
 enum BankAccountType {
   checking
   savings
+  DACA
+  Ops
 }
 
 enum PermissionLevel {
