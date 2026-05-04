@@ -19,10 +19,8 @@ import {
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
 import {
-  BANK_ACCOUNT_TYPE_ALLOWED,
   comparableBankDetailsEqual,
   logBankDetailsEmailComparison,
-  normalizeBankAccountTypeInput,
   toComparableBankDetails
 } from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
@@ -808,10 +806,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
             }
 
             if (bankAccountType !== undefined) {
-              const mappedType = normalizeBankAccountTypeInput(
-                String(bankAccountType)
-              )
-              if (!mappedType) {
+              const normalizedAccountType = bankAccountType.toLowerCase().trim()
+              if (normalizedAccountType === 'checking' || normalizedAccountType === 'check') {
+                updateData.bank_account_type = 'checking'
+              } else if (normalizedAccountType === 'savings' || normalizedAccountType === 'saving') {
+                updateData.bank_account_type = 'savings'
+              } else {
                 console.log(
                   '\x1b[31m%s\x1b[0m',
                   `❌ [${sheetName}] Row ${rowNumber} FAILED: Invalid bank account type '${bankAccountType}' for '${expediaId}'`
@@ -820,13 +820,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
                   row: rowNumber,
                   sheet: sheetName,
                   property: expediaId,
-                  error: `Invalid bank account type: ${bankAccountType}. Must be one of: ${BANK_ACCOUNT_TYPE_ALLOWED}`
+                  error: `Invalid bank account type: ${bankAccountType}. Must be one of: checking, savings`
                 })
                 result.failureCount++
                 sheetResult.failureCount++
                 continue
               }
-              updateData.bank_account_type = mappedType
             }
 
             // Validate required fields based on sub-type

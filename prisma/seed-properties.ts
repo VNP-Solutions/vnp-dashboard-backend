@@ -584,9 +584,7 @@ async function main() {
                 !isStripe && Math.random() > 0.5
                   ? getRandomElement([
                       BankAccountType.checking,
-                      BankAccountType.savings,
-                      BankAccountType.DACA,
-                      BankAccountType.Ops
+                      BankAccountType.savings
                     ])
                   : null,
               currency: currency.code,
