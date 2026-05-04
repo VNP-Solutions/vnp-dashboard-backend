@@ -436,16 +436,6 @@ export class UserService implements IUserService {
       throw new ForbiddenException('Super admin users cannot be deleted')
     }
 
-    const invitedUserCount = await this.prisma.user.count({
-      where: { invited_by_id: id }
-    })
-
-    if (invitedUserCount > 0) {
-      throw new BadRequestException(
-        `This user has invited ${invitedUserCount} other user(s). Those accounts must be removed or have their inviter cleared before this user can be deleted.`
-      )
-    }
-
     // Verify current user's password
     const currentUserFromDb = await this.prisma.user.findUnique({
       where: { id: currentUser.id },

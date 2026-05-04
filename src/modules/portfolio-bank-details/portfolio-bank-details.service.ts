@@ -20,6 +20,7 @@ import {
 } from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { isBankDetailsNotificationRecipientRole } from '../../common/utils/permission.util'
+import { isNineDigitUsRoutingNumber } from '../../common/utils/spreadsheet.util'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   CreatePortfolioBankDetailsDto,
@@ -110,12 +111,12 @@ export class PortfolioBankDetailsService
           }
           if (!data.routing_number || !data.routing_number.trim()) {
             missingFields.push('routing_number')
-          } else if (data.routing_number.trim().length < 9) {
+          } else if (!isNineDigitUsRoutingNumber(data.routing_number)) {
             throw new BadRequestException(
-              'Routing number must be at least 9 digits for ACH'
+              'Routing number must be 9 digits for ACH'
             )
           }
-          if (!data.bank_account_type) {
+          if (!data.bank_account_type?.trim()) {
             missingFields.push('bank_account_type')
           }
           break
@@ -130,9 +131,9 @@ export class PortfolioBankDetailsService
           }
           if (!data.routing_number || !data.routing_number.trim()) {
             missingFields.push('routing_number')
-          } else if (data.routing_number.trim().length < 9) {
+          } else if (!isNineDigitUsRoutingNumber(data.routing_number)) {
             throw new BadRequestException(
-              'Routing number must be at least 9 digits for Domestic Wire'
+              'Routing number must be 9 digits for Domestic Wire'
             )
           }
           break

@@ -13,13 +13,16 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Length,
   ValidateNested
 } from 'class-validator'
+import { RejectNumericBankIdentifier } from '../../common/decorators/bank-identifier.decorator'
 import { QueryDto } from '../../common/dto/query.dto'
 import {
+  AgodaCredentialsDto,
   ExpediaCredentialsDto,
   OtaCredentialsDto,
-  AgodaCredentialsDto
+  PatchExpediaCredentialsDto
 } from '../property-credentials/property-credentials.dto'
 
 export type AccessType = 'owned' | 'shared'
@@ -201,6 +204,21 @@ export class PropertyQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   credential_type?: string
+}
+
+/**
+ * Same query as {@link PropertyQueryDto} with an additional file type for spreadsheet download.
+ */
+export class PropertyFileExportQueryDto extends PropertyQueryDto {
+  @ApiProperty({
+    description: 'Download format: xlsx (Excel) or csv',
+    enum: ['xlsx', 'csv'],
+    example: 'xlsx'
+  })
+  @IsIn(['xlsx', 'csv'])
+  @IsNotEmpty()
+  @IsString()
+  fileType: 'xlsx' | 'csv'
 }
 
 export class SharePropertyDto {
@@ -493,13 +511,44 @@ export class ActivatePropertyDto {
 
 export class CompletePropertyCredentialsDto {
   @ApiProperty({
-    description: 'Expedia credentials (required, username and password must be provided together)',
+    description: 'Expedia credentials (required - only expedia id is required; username and password are optional but must be provided together)',
     type: ExpediaCredentialsDto
   })
   @ValidateNested()
   @Type(() => ExpediaCredentialsDto)
   @IsNotEmpty()
   expedia: ExpediaCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Agoda credentials (optional, username can be provided without password)',
+    type: AgodaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => AgodaCredentialsDto)
+  @IsOptional()
+  agoda?: AgodaCredentialsDto
+
+  @ApiPropertyOptional({
+    description: 'Booking.com credentials (optional, username and password must be provided together)',
+    type: OtaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => OtaCredentialsDto)
+  @IsOptional()
+  booking?: OtaCredentialsDto
+}
+
+/** Same as {@link CompletePropertyCredentialsDto}, but Expedia `id` is optional when credentials already exist in DB (enforced in PropertyService.completeUpdate). */
+export class CompletePropertyCredentialsUpdateDto {
+  @ApiProperty({
+    description:
+      'Expedia credentials (Expedia id required only when none is stored yet; username and password optional but must be provided together)',
+    type: PatchExpediaCredentialsDto
+  })
+  @ValidateNested()
+  @Type(() => PatchExpediaCredentialsDto)
+  @IsNotEmpty()
+  expedia: PatchExpediaCredentialsDto
 
   @ApiPropertyOptional({
     description: 'Agoda credentials (optional, username can be provided without password)',
@@ -567,8 +616,10 @@ export class CompleteBankDetailsDto {
 
   @ApiPropertyOptional({
     example: '1234567890',
-    description: 'Bank account number'
+    description:
+      'Bank account number. Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros.'
   })
+  @RejectNumericBankIdentifier()
   @IsString()
   @IsOptional()
   account_number?: string
@@ -599,40 +650,48 @@ export class CompleteBankDetailsDto {
 
   @ApiPropertyOptional({
     example: 'GB29NWBK60161331926819',
-    description: 'IBAN or Account Number (for International Wire)'
+    description:
+      'IBAN or Account Number (for International Wire). Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros.'
   })
+  @RejectNumericBankIdentifier()
   @IsString()
   @IsOptional()
   iban_number?: string
 
   @ApiPropertyOptional({
     example: 'CHASUS33XXX',
-    description: 'SWIFT/BIC Code (for International Wire)'
+    description:
+      'SWIFT/BIC Code (for International Wire). Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros.'
   })
+  @RejectNumericBankIdentifier()
   @IsString()
   @IsOptional()
   swift_bic_number?: string
 
   @ApiPropertyOptional({
     example: '021000021',
-    description: 'Routing number (minimum 9 digits)'
+    description:
+      'Routing number (9 digits). Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros. Stored exactly as submitted; the server does not pad or rewrite digits.'
   })
+  @RejectNumericBankIdentifier()
   @IsString()
   @IsOptional()
+  @Length(9, 9, { message: 'Routing number must be 9 digits' })
   routing_number?: string
 
   @ApiPropertyOptional({
     example: '121000248',
-    description: 'Bank wiring routing number for wire transfers (optional, only for Domestic Wire)'
+    description:
+      'Bank wiring routing number for wire transfers (optional, Domestic Wire). Must be a quoted JSON string — bare numeric JSON cannot preserve leading zeros. Stored exactly as submitted; the server does not pad or rewrite digits.'
   })
+  @RejectNumericBankIdentifier()
   @IsString()
   @IsOptional()
   bank_wiring_routing_number?: string
 
   @ApiPropertyOptional({
-    enum: ['checking', 'savings'],
     example: 'checking',
-    description: 'Bank account type'
+    description: 'Bank account type (free-form string)'
   })
   @IsString()
   @IsOptional()
@@ -697,14 +756,14 @@ export class CompleteCreatePropertyDto {
   @IsNotEmpty()
   property: CreatePropertyDto
 
-  @ApiPropertyOptional({
-    description: 'Property credentials (optional)',
+  @ApiProperty({
+    description: 'Property credentials (required - expedia id is the only required field)',
     type: CompletePropertyCredentialsDto
   })
   @ValidateNested()
   @Type(() => CompletePropertyCredentialsDto)
-  @IsOptional()
-  credentials?: CompletePropertyCredentialsDto
+  @IsNotEmpty()
+  credentials: CompletePropertyCredentialsDto
 
   @ApiPropertyOptional({
     description: 'Property bank details (optional)',
@@ -728,12 +787,12 @@ export class CompleteUpdatePropertyDto {
 
   @ApiPropertyOptional({
     description: 'Property credentials to update (optional)',
-    type: CompletePropertyCredentialsDto
+    type: CompletePropertyCredentialsUpdateDto
   })
   @ValidateNested()
-  @Type(() => CompletePropertyCredentialsDto)
+  @Type(() => CompletePropertyCredentialsUpdateDto)
   @IsOptional()
-  credentials?: CompletePropertyCredentialsDto
+  credentials?: CompletePropertyCredentialsUpdateDto
 
   @ApiPropertyOptional({
     description: 'Property bank details to update (optional)',

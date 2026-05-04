@@ -4,7 +4,9 @@ const prisma = new PrismaClient()
 
 async function cleanupOrphanedRecords() {
   try {
-    console.log('Starting cleanup of orphaned notes and tasks...')
+    console.log(
+      'Starting cleanup of orphaned notes, tasks, and user access rows...'
+    )
 
     // Get all user IDs that exist
     const users = await prisma.user.findMany({
@@ -59,6 +61,40 @@ async function cleanupOrphanedRecords() {
       console.log(`Deleted ${deletedTasks.count} orphaned tasks`)
     }
 
+    // UserAccessedProperty rows whose user was removed (orphan user_id breaks Prisma user includes)
+    if (validUserIds.length === 0) {
+      console.log(
+        'No users in database — skipping UserAccessedProperty orphan cleanup'
+      )
+    } else {
+      const orphanedAccess = await prisma.userAccessedProperty.findMany({
+        where: {
+          user_id: {
+            not: {
+              in: validUserIds
+            }
+          }
+        },
+        select: { id: true, user_id: true }
+      })
+      console.log(
+        `Found ${orphanedAccess.length} UserAccessedProperty row(s) with missing user`
+      )
+
+      if (orphanedAccess.length > 0) {
+        const deletedAccess = await prisma.userAccessedProperty.deleteMany({
+          where: {
+            id: {
+              in: orphanedAccess.map(r => r.id)
+            }
+          }
+        })
+        console.log(
+          `Deleted ${deletedAccess.count} orphaned UserAccessedProperty row(s)`
+        )
+      }
+    }
+
     console.log('Cleanup completed successfully!')
   } catch (error) {
     console.error('Error during cleanup:', error)
@@ -68,4 +104,4 @@ async function cleanupOrphanedRecords() {
   }
 }
 
-cleanupOrphanedRecords()
+void cleanupOrphanedRecords()

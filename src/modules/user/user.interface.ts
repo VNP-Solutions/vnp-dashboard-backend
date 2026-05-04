@@ -114,6 +114,10 @@ export type AccessedPortfolio = {
 export type AccessedProperty = {
   id: string
   name: string
+  portfolio: {
+    id: string
+    name: string
+  }
 }
 
 export type UserWithDetails = Omit<

@@ -18,14 +18,13 @@ import {
 } from '@nestjs/swagger'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { Public } from '../auth/decorators/public.decorator'
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard'
 import { EmailAttachment, SendEmailDto } from './email.dto'
 import type { IEmailService } from './email.interface'
 
 @ApiTags('Email')
-@ApiBearerAuth('JWT-auth')
 @Controller('email')
-@UseGuards(JwtAuthGuard)
 export class EmailController {
   constructor(
     @Inject('IEmailService')
@@ -33,6 +32,9 @@ export class EmailController {
   ) {}
 
   @Post('send')
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @UseInterceptors(FilesInterceptor('attachments', 5)) // Allow up to 5 file attachments
   @ApiConsumes('multipart/form-data', 'application/json')
   @ApiOperation({
@@ -40,7 +42,8 @@ export class EmailController {
     description:
       'Send an email to any recipient with optional attachments. Attachments can be provided in two ways: ' +
       '1) Direct file upload (multipart/form-data) or 2) URLs to files (application/json with attachment_urls). ' +
-      'Both methods can be combined in a single request.'
+      'Both methods can be combined in a single request. ' +
+      'Authentication is optional: without a Bearer token the sender footer is generic; with a valid JWT the logged-in user is used in the footer when send_sender_data is true.'
   })
   @ApiBody({
     description:
@@ -110,11 +113,12 @@ export class EmailController {
   })
   @ApiResponse({
     status: 401,
-    description: 'Unauthorized - Access token missing, invalid, or expired'
+    description:
+      'Unauthorized — only when an Authorization Bearer token is sent but invalid or expired'
   })
   sendEmail(
     @Body() sendEmailDto: SendEmailDto,
-    @CurrentUser() user: IUserWithPermissions,
+    @CurrentUser() user: IUserWithPermissions | Record<string, never>,
     @UploadedFiles() files?: Express.Multer.File[]
   ) {
     // Convert uploaded files to EmailAttachment format
@@ -124,6 +128,11 @@ export class EmailController {
       contentType: file.mimetype
     }))
 
-    return this.emailService.sendEmail(sendEmailDto, user, attachments)
+    const authUser =
+      user && typeof user === 'object' && 'id' in user && typeof user.id === 'string'
+        ? (user as IUserWithPermissions)
+        : undefined
+
+    return this.emailService.sendEmail(sendEmailDto, authUser, attachments)
   }
 }

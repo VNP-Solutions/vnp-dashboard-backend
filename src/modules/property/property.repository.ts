@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { OtaPasswordPlaintextCacheService } from '../../common/services/ota-password-plaintext-cache.service'
 import {
-  BankAccountType,
   BankSubType,
   BankType,
   Prisma,
@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import {
   CompleteBankDetailsDto,
   CompletePropertyCredentialsDto,
+  CompletePropertyCredentialsUpdateDto,
   CreatePropertyDto,
   UpdatePropertyDto
 } from './property.dto'
@@ -18,7 +19,10 @@ import type { IPropertyRepository } from './property.interface'
 
 @Injectable()
 export class PropertyRepository implements IPropertyRepository {
-  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    private otaPasswordPlaintextCache: OtaPasswordPlaintextCacheService
+  ) {}
 
   async create(data: CreatePropertyDto) {
     const createData: any = { ...data }
@@ -57,8 +61,9 @@ export class PropertyRepository implements IPropertyRepository {
   ) {
     const encryptionSecret = process.env.JWT_ACCESS_SECRET || ''
 
-    return this.prisma.$transaction(
-      async tx => {
+    return this.prisma
+      .$transaction(
+        async tx => {
       // Create property data
       const createData: any = { ...propertyData }
       if (propertyData.next_due_date) {
@@ -150,10 +155,8 @@ export class PropertyRepository implements IPropertyRepository {
         if (bankDetailsData.bank_wiring_routing_number) {
           bankData.bank_wiring_routing_number = bankDetailsData.bank_wiring_routing_number
         }
-        if (bankDetailsData.bank_account_type) {
-          bankData.bank_account_type =
-            bankDetailsData.bank_account_type as BankAccountType
-        }
+        bankData.bank_account_type =
+          bankDetailsData.bank_account_type?.trim() ?? ''
         if (bankDetailsData.currency) {
           bankData.currency = bankDetailsData.currency
         }
@@ -238,12 +241,18 @@ export class PropertyRepository implements IPropertyRepository {
       timeout: 30000 // 30 seconds timeout for complex create operations
     }
   )
+  .then(result => {
+    if (credentialsData) {
+      this.otaPasswordPlaintextCache.invalidate()
+    }
+    return result
+  })
   }
 
   async completeUpdate(
     propertyId: string,
     propertyData?: UpdatePropertyDto,
-    credentialsData?: CompletePropertyCredentialsDto,
+    credentialsData?: CompletePropertyCredentialsUpdateDto,
     bankDetailsData?: CompleteBankDetailsDto,
     userId?: string
   ) {
@@ -270,9 +279,21 @@ export class PropertyRepository implements IPropertyRepository {
             where: { property_id: propertyId }
           })
 
+          const exp = credentialsData.expedia
+          const idInPayload =
+            exp.id !== undefined && String(exp.id).trim() !== ''
+          const resolvedExpediaId = idInPayload
+            ? exp.id!
+            : existingCredentials?.expedia_id ?? null
+
+          if (!resolvedExpediaId) {
+            throw new Error(
+              'Expedia ID could not be resolved for credentials update'
+            )
+          }
+
           const credentialsPayload: any = {
-            // Only expedia_id is required, username and password are optional
-            expedia_id: credentialsData.expedia.id,
+            expedia_id: resolvedExpediaId,
             expedia_username: credentialsData.expedia.username || null,
             expedia_password: credentialsData.expedia.password
               ? EncryptionUtil.encrypt(
@@ -373,9 +394,13 @@ export class PropertyRepository implements IPropertyRepository {
             if (bankDetailsData.bank_wiring_routing_number) {
               bankData.bank_wiring_routing_number = bankDetailsData.bank_wiring_routing_number
             }
-            if (bankDetailsData.bank_account_type) {
+            if (bankDetailsData.bank_account_type !== undefined) {
               bankData.bank_account_type =
-                bankDetailsData.bank_account_type as BankAccountType
+                bankDetailsData.bank_account_type?.trim() ?? ''
+            }
+
+            if (!existingBankDetails && bankData.bank_account_type === undefined) {
+              bankData.bank_account_type = ''
             }
             if (bankDetailsData.currency) {
               bankData.currency = bankDetailsData.currency
@@ -473,6 +498,12 @@ export class PropertyRepository implements IPropertyRepository {
         timeout: 30000 // 30 seconds timeout for complex update operations
       }
     )
+    .then(result => {
+      if (credentialsData) {
+        this.otaPasswordPlaintextCache.invalidate()
+      }
+      return result
+    })
   }
 
   async findAll(

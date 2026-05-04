@@ -7,10 +7,12 @@ import {
   CompleteBankDetailsDto,
   CompleteCreatePropertyDto,
   CompletePropertyCredentialsDto,
+  CompletePropertyCredentialsUpdateDto,
   CompleteUpdatePropertyDto,
   CreatePropertyDto,
   GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
+  PropertyFileExportQueryDto,
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
@@ -145,7 +147,7 @@ export interface IPropertyRepository {
   completeUpdate(
     propertyId: string,
     propertyData?: UpdatePropertyDto,
-    credentialsData?: CompletePropertyCredentialsDto,
+    credentialsData?: CompletePropertyCredentialsUpdateDto,
     bankDetailsData?: CompleteBankDetailsDto,
     userId?: string
   ): Promise<PropertyWithFullDetails>
@@ -201,6 +203,14 @@ export interface IPropertyService {
     query: PropertyQueryDto,
     user: IUserWithPermissions
   ): Promise<PropertyWithPendingActions[]>
+  exportPropertiesFile(
+    query: PropertyFileExportQueryDto,
+    user: IUserWithPermissions
+  ): Promise<Buffer>
+  exportAccessLevelsXlsx(
+    query: PropertyQueryDto,
+    user: IUserWithPermissions
+  ): Promise<Buffer>
   findOneSecure(
     id: string,
     user: IUserWithPermissions

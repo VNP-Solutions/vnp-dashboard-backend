@@ -267,9 +267,57 @@ export class PortfolioStatsAmountDto {
   agoda: number
 }
 
+export class PortfolioStatsAuditBatchDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  id: string
+
+  @ApiProperty({ example: 'B-2024-01' })
+  batch_no: string
+
+  @ApiProperty({ example: 0 })
+  order: number
+}
+
 export class PortfolioStatsAuditDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Audit ID' })
   id: string
+
+  @ApiProperty({ example: '507f1f77bcf86cd799439012', description: 'Property ID' })
+  property_id: string
+
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439013',
+    description: 'Audit status ID (same as GET /audit list)'
+  })
+  audit_status_id: string
+
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439014',
+    description: 'Audit batch ID, if the audit is part of a batch'
+  })
+  batch_id: string | null
+
+  @ApiPropertyOptional({
+    type: PortfolioStatsAuditBatchDto,
+    description: 'Batch details (same shape as GET /audit list `batch` include)'
+  })
+  batch: PortfolioStatsAuditBatchDto | null
+
+  @ApiPropertyOptional({
+    example: '2024-07-15T00:00:00.000Z',
+    description:
+      'Review / collection date (when set; corresponds to the main audit list row)'
+  })
+  review_collection_date: string | null
+
+  @ApiPropertyOptional({ example: 'https://example.com/report.pdf' })
+  report_url: string | null
+
+  @ApiProperty({ example: '2024-01-10T12:00:00.000Z' })
+  created_at: string
+
+  @ApiProperty({ example: '2024-01-15T12:00:00.000Z' })
+  updated_at: string
 
   @ApiProperty({
     example: ['expedia', 'agoda'],
@@ -319,7 +367,8 @@ export class PortfolioStatsResponseDto {
 
   @ApiProperty({
     type: [PortfolioStatsAuditDto],
-    description: 'Recent 10 audits for the portfolio'
+    description:
+      'Up to 10 most recent audits in the selected duration (by review collection date when set, else creation date)'
   })
   recent_audits: PortfolioStatsAuditDto[]
 }

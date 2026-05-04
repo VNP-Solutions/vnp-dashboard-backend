@@ -56,9 +56,7 @@ export class PropertyBankDetailsRepository
     if (data.bank_wiring_routing_number) {
       createData.bank_wiring_routing_number = data.bank_wiring_routing_number
     }
-    if (data.bank_account_type) {
-      createData.bank_account_type = data.bank_account_type
-    }
+    createData.bank_account_type = data.bank_account_type?.trim() ?? ''
     if (data.currency) {
       createData.currency = data.currency
     }
@@ -145,7 +143,7 @@ export class PropertyBankDetailsRepository
       updateData.bank_wiring_routing_number = data.bank_wiring_routing_number
     }
     if (data.bank_account_type !== undefined) {
-      updateData.bank_account_type = data.bank_account_type
+      updateData.bank_account_type = data.bank_account_type?.trim() ?? ''
     }
     if (data.currency !== undefined) {
       updateData.currency = data.currency

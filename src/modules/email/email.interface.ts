@@ -4,7 +4,7 @@ import { EmailAttachment, SendEmailDto } from './email.dto'
 export interface IEmailService {
   sendEmail(
     data: SendEmailDto,
-    user: IUserWithPermissions,
+    user: IUserWithPermissions | undefined,
     attachments?: EmailAttachment[]
   ): Promise<{ message: string }>
 }
