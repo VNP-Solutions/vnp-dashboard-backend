@@ -62,6 +62,13 @@ export function comparableBankDetailsEqual(
   return true
 }
 
+/** One affected scope in banking-details notification emails. */
+export type BankDetailsNotificationItem = {
+  portfolioName: string
+  /** When null, the update is portfolio-level (not one property row). */
+  propertyName: string | null
+}
+
 /** ANSI blue for bank-details email decision logging (see logBankDetailsEmailComparison). */
 const LOG_BLUE = '\x1b[34m'
 const LOG_RESET = '\x1b[0m'
