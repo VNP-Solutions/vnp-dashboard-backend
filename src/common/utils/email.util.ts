@@ -17,6 +17,7 @@ import type {
   MultiRecipientEmailResult
 } from '../../modules/email/email.dto'
 import { PrismaService } from '../../modules/prisma/prisma.service'
+import type { BankDetailsNotificationItem } from './bank-details.util'
 
 @Injectable()
 export class EmailUtil {
@@ -1771,10 +1772,19 @@ export class EmailUtil {
 
   async sendBankDetailsUpdateEmail(
     recipientEmails: string[],
-    propertyNames: string[],
+    items: BankDetailsNotificationItem[],
+    updatedByUserId: string,
+    updatedByEmailFallback: string,
     location: string | null,
     timestamp: Date
   ): Promise<MultiRecipientEmailResult> {
+    const escapeHtml = (s: string) =>
+      s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+
     // Remove duplicates and filter out empty emails
     const uniqueEmails = [
       ...new Set(recipientEmails.filter(email => email && email.trim()))
@@ -1791,8 +1801,15 @@ export class EmailUtil {
       const deploymentEnv = this.configService.get('deploymentEnv', {
         infer: true
       })
+      const scopeSummary = items
+        .map(i =>
+          i.propertyName != null
+            ? `${i.portfolioName} / ${i.propertyName}`
+            : `${i.portfolioName} (portfolio-level)`
+        )
+        .join('; ')
       console.log(
-        `[bank details email] Skipping send: DEPLOYMENT_ENV="${String(deploymentEnv)}" (bank notification emails are only sent in non-staging deployment envs; use production/development to deliver). Affected property names: [${propertyNames.join(', ')}] Recipients: ${uniqueEmails.join(', ')}`
+        `[bank details email] Skipping send: DEPLOYMENT_ENV="${String(deploymentEnv)}" (bank notification emails are only sent in non-staging deployment envs; use production/development to deliver). Affected scopes: [${scopeSummary}] Recipients: ${uniqueEmails.join(', ')}`
       )
       return { sent: [], failed: [] }
     }
@@ -1807,10 +1824,51 @@ export class EmailUtil {
       timeZoneName: 'short'
     })
 
-    // Create property list for email body
-    const propertyList = propertyNames
-      .map(name => `<li>🏢 ${name}</li>`)
+    const propertyLabel = items.every(i => i.propertyName == null)
+      ? items.length === 1
+        ? 'portfolio'
+        : 'portfolios'
+      : items.length === 1
+        ? 'property'
+        : 'properties'
+
+    const itemBlocksHtml = items
+      .map(item => {
+        const propDisplay =
+          item.propertyName != null
+            ? escapeHtml(item.propertyName)
+            : escapeHtml('Portfolio-level (all properties)')
+        return `<li style="list-style: none; margin-bottom: 14px; padding: 12px; background-color: #f8f9fa; border-radius: 6px;">
+  <div style="margin-bottom: 6px;"><strong>📁 Portfolio:</strong> ${escapeHtml(item.portfolioName)}</div>
+  <div><strong>🏢 Property:</strong> ${propDisplay}</div>
+</li>`
+      })
       .join('')
+
+    const itemsPlainText = items
+      .map(item =>
+        item.propertyName != null
+          ? `📁 Portfolio: ${item.portfolioName}\n🏢 Property: ${item.propertyName}`
+          : `📁 Portfolio: ${item.portfolioName}\n🏢 Property: Portfolio-level (all properties)`
+      )
+      .join('\n\n')
+
+    const actorRow = await this.prisma.user.findUnique({
+      where: { id: updatedByUserId },
+      select: { first_name: true, last_name: true, email: true }
+    })
+    const nameParts = [actorRow?.first_name, actorRow?.last_name]
+      .map(s => (typeof s === 'string' ? s.trim() : ''))
+      .filter(Boolean)
+    const displayName = nameParts.join(' ').trim()
+    const actorEmail = (
+      actorRow?.email ??
+      updatedByEmailFallback ??
+      ''
+    ).trim()
+    const nameForLine = displayName || 'User'
+    const updatedByHtml = `${escapeHtml(nameForLine)} (${escapeHtml(actorEmail)})`
+    const updatedByText = `${nameForLine} (${actorEmail})`
 
     const failures: { email: string; message: string }[] = []
     const sent: string[] = []
@@ -1818,14 +1876,21 @@ export class EmailUtil {
     // Send individual emails to each recipient
     for (const userEmail of uniqueEmails) {
       try {
-        // Fetch user's first name from database
-        const user = await this.prisma.user.findUnique({
+        const recipient = await this.prisma.user.findUnique({
           where: { email: userEmail },
-          select: { first_name: true }
+          select: { first_name: true, last_name: true }
         })
 
-        const firstName = user?.first_name?.split(' ')[0] || ''
-        const greeting = firstName ? `Hi ${firstName},` : 'Hi,'
+        const greetParts = [recipient?.first_name, recipient?.last_name]
+          .map(s => (typeof s === 'string' ? s.trim() : ''))
+          .filter(Boolean)
+        const recipientFullName = greetParts.join(' ').trim()
+        const greetingPlain = recipientFullName
+          ? `Hi ${recipientFullName},`
+          : 'Hi,'
+        const greetingHtml = recipientFullName
+          ? `Hi ${escapeHtml(recipientFullName)},`
+          : 'Hi,'
 
         const mailOptions = {
           from: this.configService.get('smtp.email', { infer: true }),
@@ -1833,20 +1898,21 @@ export class EmailUtil {
           subject: 'Banking Details have been updated',
           html: `
             <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-              <p><strong>${greeting}</strong></p>
-              <p>We are writing to inform you that banking details have been updated for the following properties:</p>
-              <ul style="list-style: none; padding-left: 0;">
-                ${propertyList}
+              <p><strong>${greetingHtml}</strong></p>
+              <p>We are writing to inform you that banking details have been updated for the following ${propertyLabel}:</p>
+              <ul style="list-style: none; padding-left: 0; margin: 16px 0;">
+                ${itemBlocksHtml}
               </ul>
+              <p><strong>👤 Updated by:</strong> ${updatedByHtml}</p>
               <p><strong>🕒 Update Time:</strong> ${formattedTimestamp}</p>
-              ${location ? `<p><strong>📍 Location:</strong> ${location}</p>` : ''}
+              ${location ? `<p><strong>📍 Location:</strong> ${escapeHtml(location)}</p>` : ''}
               <p style="color: #dc3545; font-weight: bold;">If you or your team didn't make the changes please contact admin immediately.</p>
               <div style="margin-top: 30px; color: #666;">
                 <p>Warm regards,<br><strong>VNP Solutions Support Team</strong></p>
               </div>
             </div>
           `,
-          text: `${greeting}\n\nWe are writing to inform you that banking details have been updated for the following properties:\n\n${propertyNames.join('\n')}\n\n🕒 Update Time: ${formattedTimestamp}\n${location ? `\n📍 Location: ${location}` : ''}\n\nIf you or your team didn't make the changes please contact admin immediately.\n\nWarm regards,\nVNP Solutions Support Team`
+          text: `${greetingPlain}\n\nWe are writing to inform you that banking details have been updated for the following ${propertyLabel}:\n\n${itemsPlainText}\n\n👤 Updated by: ${updatedByText}\n\n🕒 Update Time: ${formattedTimestamp}\n${location ? `\n📍 Location: ${location}` : ''}\n\nIf you or your team didn't make the changes please contact admin immediately.\n\nWarm regards,\nVNP Solutions Support Team`
         }
 
         const info = await this.transporter.sendMail(mailOptions)

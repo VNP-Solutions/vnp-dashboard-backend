@@ -496,6 +496,7 @@ export class PropertyService implements IPropertyService {
       await this.sendBankDetailsNotificationToSuperAdmins(
         property.id,
         'created',
+        user,
         location
       )
     }
@@ -631,6 +632,7 @@ export class PropertyService implements IPropertyService {
         await this.sendBankDetailsNotificationToSuperAdmins(
           id,
           action,
+          user,
           location
         )
       } else {
@@ -3365,6 +3367,7 @@ export class PropertyService implements IPropertyService {
         await this.sendBulkBankDetailsNotificationToSuperAdmins(
           bankDetailsCreatedPropertyIds,
           'created',
+          user,
           location
         )
       }
@@ -3377,6 +3380,7 @@ export class PropertyService implements IPropertyService {
         await this.sendBulkBankDetailsNotificationToSuperAdmins(
           bankDetailsUpdatedPropertyIds,
           'updated',
+          user,
           location
         )
       }
@@ -4381,6 +4385,7 @@ export class PropertyService implements IPropertyService {
   private async sendBankDetailsNotificationToSuperAdmins(
     propertyId: string,
     action: 'created' | 'updated' | 'deleted',
+    user: IUserWithPermissions,
     location: string | null = null
   ): Promise<void> {
     try {
@@ -4396,7 +4401,12 @@ export class PropertyService implements IPropertyService {
         where: { id: propertyId },
         select: {
           id: true,
-          name: true
+          name: true,
+          portfolio: {
+            select: {
+              name: true
+            }
+          }
         }
       })
 
@@ -4440,7 +4450,14 @@ export class PropertyService implements IPropertyService {
       // Send email using the new method with location
       const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
-        [property.name],
+        [
+          {
+            portfolioName: property.portfolio.name,
+            propertyName: property.name
+          }
+        ],
+        user.id,
+        user.email,
         location,
         new Date()
       )
@@ -4471,6 +4488,7 @@ export class PropertyService implements IPropertyService {
   private async sendBulkBankDetailsNotificationToSuperAdmins(
     propertyIds: string[],
     action: 'created' | 'updated',
+    user: IUserWithPermissions,
     location: string | null = null
   ): Promise<void> {
     try {
@@ -4490,7 +4508,12 @@ export class PropertyService implements IPropertyService {
         },
         select: {
           id: true,
-          name: true
+          name: true,
+          portfolio: {
+            select: {
+              name: true
+            }
+          }
         }
       })
 
@@ -4536,10 +4559,15 @@ export class PropertyService implements IPropertyService {
       console.log(`✓ Total unique recipients: ${uniqueRecipients.length}`)
 
       // Send email using the new method with location
-      const propertyNames = properties.map(p => p.name)
+      const items = properties.map(p => ({
+        portfolioName: p.portfolio.name,
+        propertyName: p.name
+      }))
       const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
-        propertyNames,
+        items,
+        user.id,
+        user.email,
         location,
         new Date()
       )
