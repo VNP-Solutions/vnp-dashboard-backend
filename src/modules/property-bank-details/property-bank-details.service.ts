@@ -366,6 +366,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
     await this.sendBankDetailsNotification(
       data.property_id,
       'created',
+      user,
       location
     )
 
@@ -416,7 +417,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           true,
           `propertyId=${propertyId} action=deleted`
         )
-        await this.sendBankDetailsNotification(propertyId, 'deleted', location)
+        await this.sendBankDetailsNotification(propertyId, 'deleted', user, location)
 
         return deleted
       } else {
@@ -458,7 +459,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         true,
         `propertyId=${propertyId} action=updated`
       )
-      await this.sendBankDetailsNotification(propertyId, 'updated', location)
+      await this.sendBankDetailsNotification(propertyId, 'updated', user, location)
     } else {
       logBankDetailsEmailComparison(
         'property-bank-details update',
@@ -1081,7 +1082,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           true,
           `action=created count=${createdPropertyIds.length}`
         )
-        await this.sendBulkNotification(createdPropertyIds, 'created', location)
+        await this.sendBulkNotification(createdPropertyIds, 'created', user, location)
       }
 
       if (updatedPropertyIds.length > 0) {
@@ -1090,7 +1091,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
           true,
           `action=updated count=${updatedPropertyIds.length}`
         )
-        await this.sendBulkNotification(updatedPropertyIds, 'updated', location)
+        await this.sendBulkNotification(updatedPropertyIds, 'updated', user, location)
       }
 
       return result
@@ -1339,6 +1340,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   private async sendBankDetailsNotification(
     propertyId: string,
     action: 'created' | 'updated' | 'deleted',
+    user: IUserWithPermissions,
     location: string | null = null
   ): Promise<void> {
     try {
@@ -1358,7 +1360,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         where: { id: propertyId },
         select: {
           id: true,
-          name: true
+          name: true,
+          portfolio: {
+            select: {
+              name: true
+            }
+          }
         }
       })
 
@@ -1404,7 +1411,14 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       // Send email using the new method with location
       const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
-        [property.name],
+        [
+          {
+            portfolioName: property.portfolio.name,
+            propertyName: property.name
+          }
+        ],
+        user.id,
+        user.email,
         location,
         new Date()
       )
@@ -1439,6 +1453,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
   private async sendBulkNotification(
     propertyIds: string[],
     action: 'created' | 'updated',
+    user: IUserWithPermissions,
     location: string | null = null
   ): Promise<void> {
     try {
@@ -1454,7 +1469,7 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       console.log(`Properties count: ${propertyIds.length}`)
       console.log(`Action: ${action.toUpperCase()}`)
 
-      // Get all properties with their names
+      // Get all properties with portfolio names for notification rows
       const properties = await this.prisma.property.findMany({
         where: {
           id: {
@@ -1463,7 +1478,12 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
         },
         select: {
           id: true,
-          name: true
+          name: true,
+          portfolio: {
+            select: {
+              name: true
+            }
+          }
         }
       })
 
@@ -1511,10 +1531,15 @@ export class PropertyBankDetailsService implements IPropertyBankDetailsService {
       )
 
       // Send email using the new method with location
-      const propertyNames = properties.map(p => p.name)
+      const items = properties.map(p => ({
+        portfolioName: p.portfolio.name,
+        propertyName: p.name
+      }))
       const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
-        propertyNames,
+        items,
+        user.id,
+        user.email,
         location,
         new Date()
       )

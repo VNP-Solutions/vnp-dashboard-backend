@@ -379,6 +379,7 @@ export class PortfolioBankDetailsService
   private async sendBankDetailsNotification(
     portfolioId: string,
     action: 'created' | 'updated' | 'deleted',
+    user: IUserWithPermissions,
     location?: string | null
   ): Promise<void> {
     try {
@@ -413,7 +414,14 @@ export class PortfolioBankDetailsService
 
       const bankEmailResult = await this.emailUtil.sendBankDetailsUpdateEmail(
         uniqueRecipients,
-        [portfolio.name],
+        [
+          {
+            portfolioName: portfolio.name,
+            propertyName: null
+          }
+        ],
+        user.id,
+        user.email,
         location ?? null,
         new Date()
       )
@@ -524,6 +532,7 @@ export class PortfolioBankDetailsService
     await this.sendBankDetailsNotification(
       data.portfolio_id,
       'created',
+      user,
       location
     )
 
@@ -581,6 +590,7 @@ export class PortfolioBankDetailsService
         await this.sendBankDetailsNotification(
           portfolioId,
           'deleted',
+          user,
           location
         )
 
@@ -632,6 +642,7 @@ export class PortfolioBankDetailsService
       await this.sendBankDetailsNotification(
         portfolioId,
         'updated',
+        user,
         location
       )
     } else {
