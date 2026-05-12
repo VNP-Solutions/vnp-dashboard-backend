@@ -2087,6 +2087,8 @@ export class PortfolioService implements IPortfolioService {
 
     // Time window: align with how audits are understood elsewhere (e.g. sales reports):
     // use review_collection_date when set; fall back to created_at when it is not (legacy rows).
+    // On MongoDB, `field: null` does not match documents where the field was never stored; include
+    // `isSet: false` so omitted review_collection_date still uses created_at for the window.
     const auditInDurationWhere: Prisma.AuditWhereInput = {
       property_id: { in: propertyIds },
       is_archived: false,
@@ -2099,7 +2101,12 @@ export class PortfolioService implements IPortfolioService {
         },
         {
           AND: [
-            { review_collection_date: null },
+            {
+              OR: [
+                { review_collection_date: null },
+                { review_collection_date: { isSet: false } }
+              ]
+            },
             { created_at: { gte: startDate, lte: now } }
           ]
         }
