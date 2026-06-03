@@ -29,6 +29,7 @@ import {
 } from '../../common/utils/bank-details.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { ParallelProcessor } from '../../common/utils/parallel-processor.util'
 import {
   canCreateBankDetails,
   canReadBankDetails,
@@ -38,7 +39,6 @@ import {
   isInternalUser,
   isUserSuperAdmin
 } from '../../common/utils/permission.util'
-import { ParallelProcessor } from '../../common/utils/parallel-processor.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import {
   isNineDigitUsRoutingNumber,
@@ -108,18 +108,15 @@ const ACCESS_GUIDANCE_COPY = {
   instructionsTitle: 'Instructions for adding the access to each OTA',
   expedia: {
     title: 'Expedia (EPC)',
-    body:
-      'Have the Property Admin grant Property User access.\nUse email: ar@htlaccounting.com (custom username allowed).\nPhone (if required): 9234234324.'
+    body: 'Have the Property Admin grant Property User access.\nUse email: ar@htlaccounting.com (custom username allowed).\nPhone (if required): 9234234324.'
   },
   booking: {
     title: 'Booking.com (admin.booking.com)',
-    body:
-      'You must be an Admin-Level User. From dashboard, select Invite a New User. Permissions: enable Finance and Reservations access. Send the invite once complete.\nEmail: ar@htlaccounting.com\nPhone (if required): 9234234324.'
+    body: 'You must be an Admin-Level User. From dashboard, select Invite a New User. Permissions: enable Finance and Reservations access. Send the invite once complete.\nEmail: ar@htlaccounting.com\nPhone (if required): 9234234324.'
   },
   agoda: {
     title: 'Agoda / Priceline (ycs.agoda.com)',
-    body:
-      'You must be an Admin-Level User. Send an Invite a New User request from your dashboard. Permissions: enable Finance and Reservations access. Send the invite once complete.\nEmail: ar@htlaccounting.com\nPhone: 9234234324.'
+    body: 'You must be an Admin-Level User. Send an Invite a New User request from your dashboard. Permissions: enable Finance and Reservations access. Send the invite once complete.\nEmail: ar@htlaccounting.com\nPhone: 9234234324.'
   }
 } as const
 
@@ -257,7 +254,8 @@ export class PropertyService implements IPropertyService {
       return map
     }
 
-    const { hits, misses } = this.otaPasswordPlaintextCache.partition(ciphertexts)
+    const { hits, misses } =
+      this.otaPasswordPlaintextCache.partition(ciphertexts)
 
     this.logger.log(
       `OTA password plaintext cache: hits=${hits.size} misses=${misses.length} (unique ciphertexts=${ciphertexts.length}) — ParallelProcessor runs only for misses`
@@ -537,12 +535,10 @@ export class PropertyService implements IPropertyService {
 
     if (data.credentials) {
       const exp = data.credentials.expedia
-      const idInPayload =
-        exp.id !== undefined && String(exp.id).trim() !== ''
+      const idInPayload = exp.id !== undefined && String(exp.id).trim() !== ''
       const hasUsername = exp.username !== undefined
       const hasPassword = exp.password !== undefined
-      const isUpdatingExpedia =
-        idInPayload || hasUsername || hasPassword
+      const isUpdatingExpedia = idInPayload || hasUsername || hasPassword
       const existingCred = (property as any).credentials
       const existingExpediaId = existingCred?.expedia_id
 
@@ -617,7 +613,10 @@ export class PropertyService implements IPropertyService {
     // Send email only when persisted bank details (business fields) actually changed
     if (bankDetailsToUpdate) {
       const afterBankComparable = toComparableBankDetails(
-        updatedProperty.bankDetails as Record<string, unknown> | null | undefined
+        updatedProperty.bankDetails as
+          | Record<string, unknown>
+          | null
+          | undefined
       )
       if (
         !comparableBankDetailsEqual(beforeBankComparable, afterBankComparable)
@@ -1457,7 +1456,9 @@ export class PropertyService implements IPropertyService {
     ]
   }
 
-  private async buildPropertyFlatExportXlsx(properties: any[]): Promise<Buffer> {
+  private async buildPropertyFlatExportXlsx(
+    properties: any[]
+  ): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook()
     const sheet = workbook.addWorksheet('Properties', {
       views: [{ state: 'frozen', ySplit: 1 }]
@@ -1494,9 +1495,7 @@ export class PropertyService implements IPropertyService {
     }
 
     const lines: string[] = [
-      [...PROPERTY_FLAT_EXPORT_HEADERS]
-        .map(h => escapeCsv(h))
-        .join(',')
+      [...PROPERTY_FLAT_EXPORT_HEADERS].map(h => escapeCsv(h)).join(',')
     ]
     for (const p of properties) {
       const row = this.buildPropertyFlatExportRow(p)
@@ -1557,10 +1556,13 @@ export class PropertyService implements IPropertyService {
       }))
     }
 
-    // Owned by one of the portfolios only — exclude properties only shown in via show_in_portfolio
+    // Owned by or shown in any of the requested portfolios
     const whereClause = {
       ...baseWhere,
-      portfolio_id: { in: data.portfolio_ids }
+      OR: [
+        { portfolio_id: { in: data.portfolio_ids } },
+        { show_in_portfolio: { hasSome: data.portfolio_ids } }
+      ]
     }
 
     const queryOptions = {
@@ -1574,14 +1576,24 @@ export class PropertyService implements IPropertyService {
       hasAuditAccess
     )
 
-    // Add access_type field to each property and filter bank details based on permission
-    return properties.map((property: any) => ({
-      ...property,
-      bankDetails: canReadBankDetails(user)
-        ? maskBankDetails(property.bankDetails)
-        : null,
-      access_type: 'owned' as const
-    }))
+    return properties.map((property: any) => {
+      const isOwned = data.portfolio_ids.includes(property.portfolio_id)
+      const accessType = isOwned ? ('owned' as const) : ('shared' as const)
+      const viewingPortfolioId = isOwned
+        ? property.portfolio_id
+        : data.portfolio_ids.find(id =>
+            (property.show_in_portfolio || []).includes(id)
+          )
+
+      return {
+        ...property,
+        bankDetails: canReadBankDetails(user)
+          ? maskBankDetails(property.bankDetails)
+          : null,
+        access_type: accessType,
+        viewing_portfolio_id: viewingPortfolioId
+      }
+    })
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
