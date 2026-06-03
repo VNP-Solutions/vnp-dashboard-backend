@@ -17,7 +17,6 @@ import {
   UseInterceptors
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import type { Response } from 'express'
 import {
   ApiBearerAuth,
   ApiBody,
@@ -26,6 +25,7 @@ import {
   ApiResponse,
   ApiTags
 } from '@nestjs/swagger'
+import type { Response } from 'express'
 import { RequirePermission } from '../../common/decorators/require-permission.decorator'
 import { PermissionGuard } from '../../common/guards/permission.guard'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -33,8 +33,8 @@ import {
   ModuleType,
   PermissionAction
 } from '../../common/interfaces/permission.interface'
-import { getLocationFromRequest } from '../../common/utils/ip.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { getLocationFromRequest } from '../../common/utils/ip.util'
 import type { IAuthRepository } from '../auth/auth.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
@@ -47,8 +47,8 @@ import {
   CreatePropertyDto,
   DeactivatePropertyDto,
   DeletePropertyDto,
-  GetPropertiesByIdsSecureDto,
   GetPropertiesBankDetailsSecureDto,
+  GetPropertiesByIdsSecureDto,
   GetPropertiesByPortfoliosDto,
   PropertyFileExportQueryDto,
   PropertyQueryDto,
@@ -139,7 +139,8 @@ export class PropertyController {
       },
       withInternationalWire: {
         summary: 'Property with International Wire',
-        description: 'Complete property creation with international wire details',
+        description:
+          'Complete property creation with international wire details',
         value: {
           property: {
             name: 'Royal Suites London',
@@ -186,7 +187,8 @@ export class PropertyController {
     schema: {
       example: {
         success: true,
-        message: 'Property created successfully with credentials and bank details',
+        message:
+          'Property created successfully with credentials and bank details',
         data: {
           id: '507f1f77bcf86cd799439030',
           name: 'Grand Plaza Hotel',
@@ -238,10 +240,16 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions,
     @Req() req: any
   ) {
-    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const context = {
+      switchToHttp: () => ({ getRequest: () => req })
+    } as ExecutionContext
     const location = await getLocationFromRequest(context)
 
-    return this.propertyService.completeCreate(completeCreateDto, user, location)
+    return this.propertyService.completeCreate(
+      completeCreateDto,
+      user,
+      location
+    )
   }
 
   @Patch(':id/complete-update')
@@ -260,12 +268,14 @@ export class PropertyController {
     examples: {
       updateBankDetails: {
         summary: 'Update Bank Details Only',
-        description: 'Update property bank details without changing property or credentials',
+        description:
+          'Update property bank details without changing property or credentials',
         value: {
           bank_details: {
             contact_name: 'Jane Doe',
             email_address: 'jane.doe@hotel.com',
-            comments: 'Updated contact person - Jane is now handling all bank inquiries'
+            comments:
+              'Updated contact person - Jane is now handling all bank inquiries'
           }
         }
       },
@@ -306,7 +316,8 @@ export class PropertyController {
       },
       changeBankSubType: {
         summary: 'Change Bank Sub-Type from ACH to International Wire',
-        description: 'Update bank sub-type and add required international wire fields',
+        description:
+          'Update bank sub-type and add required international wire fields',
         value: {
           bank_details: {
             bank_sub_type: 'international_wire',
@@ -315,7 +326,8 @@ export class PropertyController {
             bank_address: '270 Park Avenue, New York, NY 10017',
             routing_number: null,
             bank_account_type: '',
-            comments: 'Switching to international wire for better global coverage'
+            comments:
+              'Switching to international wire for better global coverage'
           }
         }
       }
@@ -387,10 +399,17 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions,
     @Req() req: any
   ) {
-    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const context = {
+      switchToHttp: () => ({ getRequest: () => req })
+    } as ExecutionContext
     const location = await getLocationFromRequest(context)
 
-    return this.propertyService.completeUpdate(id, completeUpdateDto, user, location)
+    return this.propertyService.completeUpdate(
+      id,
+      completeUpdateDto,
+      user,
+      location
+    )
   }
 
   @Get()
@@ -495,7 +514,10 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions,
     @Res() res: Response
   ): Promise<void> {
-    const buffer = await this.propertyService.exportAccessLevelsXlsx(query, user)
+    const buffer = await this.propertyService.exportAccessLevelsXlsx(
+      query,
+      user
+    )
     const dateStr = new Date().toISOString().split('T')[0]
     res.setHeader(
       'Content-Type',
@@ -512,12 +534,12 @@ export class PropertyController {
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
   @ApiOperation({
     summary:
-      'Get properties owned by specific portfolios (excludes show-in; used for user invitation flows). If empty array is provided, returns all accessible properties.'
+      'Get properties for specific portfolios (owned and show-in). If empty array is provided, returns all accessible properties.'
   })
   @ApiResponse({
     status: 200,
     description:
-      'Properties owned by the specified portfolios retrieved successfully. Returns all accessible properties if empty array provided.'
+      'Properties for the specified portfolios retrieved successfully (owned and show-in). Returns all accessible properties if empty array provided.'
   })
   @ApiResponse({
     status: 400,
@@ -563,7 +585,10 @@ export class PropertyController {
     description: 'Paginated list of properties with full bank details'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
   async findAllSecure(
     @Query() query: PropertyQueryDto,
     @Body() body: SecurePropertyListDto,
@@ -582,7 +607,8 @@ export class PropertyController {
   @Post('by-ids/secure')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
   @ApiOperation({
-    summary: 'Get specific properties by IDs with full bank details (password required)',
+    summary:
+      'Get specific properties by IDs with full bank details (password required)',
     description:
       'Returns full details including unmasked bank details for the specified property IDs. ' +
       'IDs the user has no access to are silently excluded from the results. ' +
@@ -594,7 +620,10 @@ export class PropertyController {
     description: 'List of properties with full bank details'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
   async findManyByIdsSecure(
     @Body() body: GetPropertiesByIdsSecureDto,
     @CurrentUser() user: IUserWithPermissions
@@ -626,7 +655,10 @@ export class PropertyController {
       'Array of property id/name, portfolio, and full bank_details (no masking)'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
   async findAllBankDetailsSecure(
     @Body() body: GetPropertiesBankDetailsSecureDto,
     @CurrentUser() user: IUserWithPermissions
@@ -667,7 +699,10 @@ export class PropertyController {
     description: 'Property with full bank details retrieved successfully'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 403, description: 'Forbidden - No access to this property' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - No access to this property'
+  })
   @ApiResponse({ status: 404, description: 'Property not found' })
   async findOneSecure(
     @Param('id') id: string,
@@ -1132,7 +1167,9 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions,
     @Req() req: any
   ) {
-    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const context = {
+      switchToHttp: () => ({ getRequest: () => req })
+    } as ExecutionContext
     const location = await getLocationFromRequest(context)
 
     return this.propertyService.bulkImport(file, user, location)
@@ -1185,7 +1222,8 @@ export class PropertyController {
     `
   })
   @ApiBody({
-    description: 'Excel (.xlsx/.xls) or CSV file containing property update data',
+    description:
+      'Excel (.xlsx/.xls) or CSV file containing property update data',
     schema: {
       type: 'object',
       properties: {
@@ -1211,10 +1249,7 @@ export class PropertyController {
             error: 'Property not found with Expedia ID: EXP-12345'
           }
         ],
-        successfulUpdates: [
-          'EXP-67890',
-          'EXP-11223'
-        ]
+        successfulUpdates: ['EXP-67890', 'EXP-11223']
       }
     }
   })
@@ -1232,7 +1267,9 @@ export class PropertyController {
     @CurrentUser() user: IUserWithPermissions,
     @Req() req: any
   ) {
-    const context = { switchToHttp: () => ({ getRequest: () => req }) } as ExecutionContext
+    const context = {
+      switchToHttp: () => ({ getRequest: () => req })
+    } as ExecutionContext
     const location = await getLocationFromRequest(context)
 
     return this.propertyService.bulkUpdate(file, user, location)

@@ -174,7 +174,8 @@ export class PropertyQueryDto extends QueryDto {
   bank_type?: string
 
   @ApiPropertyOptional({
-    description: 'Filter by bank sub type (ach/domestic_wire/international_wire/all)',
+    description:
+      'Filter by bank sub type (ach/domestic_wire/international_wire/all)',
     example: 'ach'
   })
   @IsOptional()
@@ -356,7 +357,7 @@ export class GetPropertiesByPortfoliosDto {
   @ApiProperty({
     example: ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439013'],
     description:
-      'Array of Portfolio IDs to get properties from (owned by those portfolios only; not show-in). If empty array is provided, returns all properties accessible to the user.',
+      'Array of Portfolio IDs to get properties from (owned by or shown in those portfolios). If empty array is provided, returns all properties accessible to the user.',
     type: [String]
   })
   @IsArray()
@@ -511,7 +512,8 @@ export class ActivatePropertyDto {
 
 export class CompletePropertyCredentialsDto {
   @ApiProperty({
-    description: 'Expedia credentials (required - only expedia id is required; username and password are optional but must be provided together)',
+    description:
+      'Expedia credentials (required - only expedia id is required; username and password are optional but must be provided together)',
     type: ExpediaCredentialsDto
   })
   @ValidateNested()
@@ -520,7 +522,8 @@ export class CompletePropertyCredentialsDto {
   expedia: ExpediaCredentialsDto
 
   @ApiPropertyOptional({
-    description: 'Agoda credentials (optional, username can be provided without password)',
+    description:
+      'Agoda credentials (optional, username can be provided without password)',
     type: AgodaCredentialsDto
   })
   @ValidateNested()
@@ -529,7 +532,8 @@ export class CompletePropertyCredentialsDto {
   agoda?: AgodaCredentialsDto
 
   @ApiPropertyOptional({
-    description: 'Booking.com credentials (optional, username and password must be provided together)',
+    description:
+      'Booking.com credentials (optional, username and password must be provided together)',
     type: OtaCredentialsDto
   })
   @ValidateNested()
@@ -551,7 +555,8 @@ export class CompletePropertyCredentialsUpdateDto {
   expedia: PatchExpediaCredentialsDto
 
   @ApiPropertyOptional({
-    description: 'Agoda credentials (optional, username can be provided without password)',
+    description:
+      'Agoda credentials (optional, username can be provided without password)',
     type: AgodaCredentialsDto
   })
   @ValidateNested()
@@ -560,7 +565,8 @@ export class CompletePropertyCredentialsUpdateDto {
   agoda?: AgodaCredentialsDto
 
   @ApiPropertyOptional({
-    description: 'Booking.com credentials (optional, username and password must be provided together)',
+    description:
+      'Booking.com credentials (optional, username and password must be provided together)',
     type: OtaCredentialsDto
   })
   @ValidateNested()
@@ -757,7 +763,8 @@ export class CompleteCreatePropertyDto {
   property: CreatePropertyDto
 
   @ApiProperty({
-    description: 'Property credentials (required - expedia id is the only required field)',
+    description:
+      'Property credentials (required - expedia id is the only required field)',
     type: CompletePropertyCredentialsDto
   })
   @ValidateNested()
