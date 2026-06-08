@@ -10,6 +10,7 @@ import {
   CompletePropertyCredentialsUpdateDto,
   CompleteUpdatePropertyDto,
   CreatePropertyDto,
+  ExternalPropertyQueryDto,
   GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
   PropertyFileExportQueryDto,
@@ -158,9 +159,7 @@ export interface IPropertyRepository {
   ): Promise<PropertyWithPendingActions[]>
   count(whereClause: any, propertyIds?: string[]): Promise<number>
   findById(id: string): Promise<PropertyWithFullDetails | null>
-  findManyForBankDetailsSecureList(
-    where: Prisma.PropertyWhereInput
-  ): Promise<
+  findManyForBankDetailsSecureList(where: Prisma.PropertyWhereInput): Promise<
     Array<{
       id: string
       name: string
@@ -199,6 +198,11 @@ export interface IPropertyService {
     query: PropertyQueryDto,
     user: IUserWithPermissions
   ): Promise<PaginatedResult<PropertyWithPendingActions>>
+  findAllForApiKeyPortfolio(
+    portfolioId: string,
+    query: ExternalPropertyQueryDto
+  ): Promise<PaginatedResult<any>>
+  findOneForApiKey(propertyId: string, portfolioId: string): Promise<any>
   findAllForExport(
     query: PropertyQueryDto,
     user: IUserWithPermissions

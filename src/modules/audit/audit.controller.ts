@@ -33,14 +33,14 @@ import type { IAuthRepository } from '../auth/auth.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import {
-  AutoImportAuditResultDto,
   AuditQueryDto,
+  AutoImportAuditResultDto,
   BulkArchiveAuditDto,
   BulkDeleteAuditDto,
-  DeleteAuditsByPortfolioDto,
   BulkUploadReportDto,
   CreateAuditDto,
   DeleteAuditDto,
+  DeleteAuditsByPortfolioDto,
   GlobalStatsResponseDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
@@ -412,7 +412,8 @@ export class AuditController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Auto-import audits from OTA reservation sheet (Internal users only)',
+    summary:
+      'Auto-import audits from OTA reservation sheet (Internal users only)',
     description: `
     Upload an Excel (.xlsx, .xls) or CSV file containing OTA reservation rows.
 
@@ -437,7 +438,7 @@ export class AuditController {
     - OTA types are collected from all rows of that group.
     - Amounts are summed per OTA type; both collectable and confirmed are set to the same sum.
     - Audit status is taken from the Status column (find existing by name, case-insensitive, or create a new status record).
-    - A per-property Excel sheet (all original columns, filtered to that property) is uploaded to S3 and its URL is stored as report_url on the audit.
+    - A per-property Excel sheet (all original columns, filtered to that property) is uploaded to S3 and its URL is stored as report_url on the audit. The same row data is also stored as report_data (JSON array with normalized snake_case keys — known columns map to schema keys like hotel_name and amount_collected; extra columns are converted to snake_case).
     - If Batch column is present, audits are assigned to the specified batch (created if doesn't exist).
     - If Review/Collection Date column is present, the date value is set on the audit (first value per property+status group is used).
 
@@ -448,7 +449,8 @@ export class AuditController {
     `
   })
   @ApiBody({
-    description: 'Excel (.xlsx/.xls) or CSV file containing OTA reservation rows',
+    description:
+      'Excel (.xlsx/.xls) or CSV file containing OTA reservation rows',
     schema: {
       type: 'object',
       properties: {
@@ -463,7 +465,8 @@ export class AuditController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request – Invalid file, missing columns, or validation errors found'
+    description:
+      'Bad Request – Invalid file, missing columns, or validation errors found'
   })
   @ApiResponse({
     status: 403,
@@ -552,7 +555,8 @@ export class AuditController {
   @Post('delete-by-portfolio/:portfolioId')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.DELETE)
   @ApiOperation({
-    summary: 'Delete all audits for a portfolio (Super admin only, requires password verification)',
+    summary:
+      'Delete all audits for a portfolio (Super admin only, requires password verification)',
     description:
       'Only super admins can use this endpoint. All audits belonging to any property in the given portfolio will be permanently deleted. Password verification is required. This action cannot be undone.'
   })
@@ -561,7 +565,8 @@ export class AuditController {
     description: 'All audits for the portfolio deleted successfully',
     schema: {
       example: {
-        message: 'Successfully deleted 42 audit(s) for portfolio "ARP Hospitality"',
+        message:
+          'Successfully deleted 42 audit(s) for portfolio "ARP Hospitality"',
         deleted_count: 42
       }
     }
@@ -728,7 +733,7 @@ export class AuditController {
   @ApiOperation({
     summary: 'Update an audit (Internal users only)',
     description:
-      'Only internal users can update audits. This includes editing audit details and adding audits to batches. Note: Non-super-admin internal users can only set amount_confirmed fields once per OTA type. Once an OTA type\'s amount_confirmed has been set, only super admins can update it.'
+      "Only internal users can update audits. This includes editing audit details and adding audits to batches. Note: Non-super-admin internal users can only set amount_confirmed fields once per OTA type. Once an OTA type's amount_confirmed has been set, only super admins can update it."
   })
   @ApiResponse({ status: 200, description: 'Audit updated successfully' })
   @ApiResponse({ status: 404, description: 'Audit not found' })

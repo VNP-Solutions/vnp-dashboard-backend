@@ -38,6 +38,16 @@ async function bootstrap() {
       },
       'JWT-auth'
     )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'x-api-key',
+        in: 'header',
+        description:
+          'API key for external integrations. Keys are portfolio-scoped and managed by Super Admins via the API Key module.'
+      },
+      'x-api-key'
+    )
     .build()
 
   const document = SwaggerModule.createDocument(app, config)

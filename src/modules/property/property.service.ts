@@ -11,6 +11,7 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { BankSubType, BankType, Prisma } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
+import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../common/constants/external-api-user.context'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -59,6 +60,7 @@ import {
   CompleteCreatePropertyDto,
   CompleteUpdatePropertyDto,
   CreatePropertyDto,
+  ExternalPropertyQueryDto,
   GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
   PropertyFileExportQueryDto,
@@ -976,6 +978,56 @@ export class PropertyService implements IPropertyService {
       query.page || 1,
       query.limit || 10
     )
+  }
+
+  async findAllForApiKeyPortfolio(
+    portfolioId: string,
+    query: ExternalPropertyQueryDto
+  ) {
+    const { send_all, ...queryFilters } = query
+
+    const findAllQuery: PropertyQueryDto = {
+      ...queryFilters,
+      portfolio_id: portfolioId
+    }
+
+    if (send_all) {
+      const countResult = await this.findAll(
+        { ...findAllQuery, page: 1, limit: 1 },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
+
+      const total = countResult.metadata.totalDocuments
+
+      if (total === 0) {
+        return countResult
+      }
+
+      return this.findAll(
+        { ...findAllQuery, page: 1, limit: total },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
+    }
+
+    return this.findAll(findAllQuery, EXTERNAL_API_SUPER_ADMIN_CONTEXT)
+  }
+
+  async findOneForApiKey(propertyId: string, portfolioId: string) {
+    const property = await this.propertyRepository.findById(propertyId)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    const belongsToPortfolio =
+      property.portfolio_id === portfolioId ||
+      property.show_in_portfolio?.includes(portfolioId)
+
+    if (!belongsToPortfolio) {
+      throw new NotFoundException('Property not found')
+    }
+
+    return this.findOne(propertyId, EXTERNAL_API_SUPER_ADMIN_CONTEXT)
   }
 
   async findAllForExport(query: PropertyQueryDto, user: IUserWithPermissions) {

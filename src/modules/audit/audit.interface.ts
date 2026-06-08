@@ -11,6 +11,7 @@ import {
   BulkUploadReportDto,
   CreateAuditDto,
   DeleteAuditsByPortfolioDto,
+  ExternalAuditQueryDto,
   GlobalStatsResponseDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
@@ -150,6 +151,19 @@ export interface IAuditService {
     query: AuditQueryDto,
     user: IUserWithPermissions
   ): Promise<PaginatedResult<AuditWithRelations>>
+  findAllForApiKeyPortfolio(
+    portfolioId: string,
+    query: ExternalAuditQueryDto
+  ): Promise<PaginatedResult<AuditWithRelations>>
+  findAllForApiKeyProperty(
+    propertyId: string,
+    portfolioId: string,
+    query: ExternalAuditQueryDto
+  ): Promise<PaginatedResult<AuditWithRelations>>
+  findOneForApiKey(
+    auditId: string,
+    portfolioId: string
+  ): Promise<AuditWithFullDetails>
   findAllForExport(
     query: AuditQueryDto,
     user: IUserWithPermissions
