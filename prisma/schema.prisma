@@ -180,6 +180,7 @@ model Audit {
   batch_id                   String?      @db.ObjectId
   batch                      AuditBatch?  @relation(fields: [batch_id], references: [id])
   report_url                 String?
+  report_data                Json?
   review_collection_date     DateTime?
 
   notes          Note[]

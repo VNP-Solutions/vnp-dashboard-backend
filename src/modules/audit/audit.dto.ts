@@ -1,6 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { OtaType } from '@prisma/client'
+import { OtaType, Prisma } from '@prisma/client'
 import { Transform } from 'class-transformer'
 import {
   IsArray,
@@ -118,6 +118,15 @@ export class CreateAuditDto {
   @IsString()
   @IsOptional()
   report_url?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Report row data (array of objects with normalized snake_case keys). Known sheet columns map to schema keys (e.g. hotel_name, amount_collected); extra columns are converted to snake_case. Set automatically by auto-import.',
+    type: 'array',
+    items: { type: 'object' }
+  })
+  @IsOptional()
+  report_data?: Prisma.InputJsonValue
 
   @ApiPropertyOptional({
     example: '2024-01-15T00:00:00Z',

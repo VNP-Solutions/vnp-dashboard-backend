@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import { OtaType, PendingActionType, Property } from '@prisma/client'
+import { OtaType, PendingActionType, Prisma, Property } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
 import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../common/constants/external-api-user.context'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -57,6 +57,7 @@ import {
   UpdateReportUrlDto
 } from './audit.dto'
 import type { IAuditRepository, IAuditService } from './audit.interface'
+import { buildReportDataRow } from './report-data.util'
 
 @Injectable()
 export class AuditService implements IAuditService {
@@ -3394,6 +3395,10 @@ export class AuditService implements IAuditService {
           return markers.some(m => h.includes(m))
         }
 
+        const reportData = rows.map(row =>
+          buildReportDataRow(row, originalHeaders, parseDate)
+        )
+
         const cellValueForExport = (
           header: string,
           raw: unknown
@@ -3467,9 +3472,10 @@ export class AuditService implements IAuditService {
 
         const uploadResult = await this.fileUploadService.uploadFile(fakeFile)
 
-        // Persist report_url on the created audit
+        // Persist report_url and report_data on the created audit
         await this.auditRepository.update(audit.id, {
-          report_url: uploadResult.url
+          report_url: uploadResult.url,
+          report_data: reportData as unknown as Prisma.InputJsonValue
         })
 
         createdAudits.push({
