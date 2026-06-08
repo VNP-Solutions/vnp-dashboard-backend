@@ -3,6 +3,10 @@
  * Known sheet headers map to fixed schema keys; unknown headers become snake_case.
  */
 
+import { Prisma } from '@prisma/client'
+import * as XLSX from 'xlsx'
+import { filterWhollyEmptySpreadsheetRows } from '../../common/utils/spreadsheet.util'
+
 export const REPORT_DATA_SCHEMA_KEYS = [
   'ota',
   'hotel_id',
@@ -205,4 +209,53 @@ export const buildReportDataFromSheetRows = (
   if (rows.length === 0) return []
   const headers = Object.keys(rows[0])
   return rows.map(row => buildReportDataRow(row, headers))
+}
+
+export const isMissingReportData = (
+  value: Prisma.JsonValue | null | undefined
+): boolean => value === null || value === undefined
+
+export async function downloadReportFromUrl(url: string): Promise<Buffer> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Failed to download report (${response.status})`)
+  }
+
+  return Buffer.from(await response.arrayBuffer())
+}
+
+export function parseReportWorkbookFromBuffer(
+  buffer: Buffer,
+  reportUrl: string
+): Record<string, unknown>[] {
+  const isCsv = reportUrl.toLowerCase().split('?')[0].endsWith('.csv')
+  const workbook = isCsv
+    ? XLSX.read(buffer.toString('utf-8'), { type: 'string' })
+    : XLSX.read(buffer, { type: 'buffer' })
+
+  const sheetName = workbook.SheetNames[0]
+  if (!sheetName) {
+    throw new Error('Report file contains no worksheets')
+  }
+
+  const worksheet = workbook.Sheets[sheetName]
+  const rows = XLSX.utils.sheet_to_json(worksheet, {
+    raw: false,
+    defval: null
+  }) as Record<string, unknown>[]
+
+  const dataRows = filterWhollyEmptySpreadsheetRows(rows)
+  if (dataRows.length === 0) {
+    throw new Error('Report file contains no data rows')
+  }
+
+  return dataRows
+}
+
+export async function buildReportDataFromReportUrl(
+  reportUrl: string
+): Promise<Record<string, unknown>[]> {
+  const buffer = await downloadReportFromUrl(reportUrl)
+  const sheetRows = parseReportWorkbookFromBuffer(buffer, reportUrl)
+  return buildReportDataFromSheetRows(sheetRows)
 }

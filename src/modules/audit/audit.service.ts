@@ -57,7 +57,11 @@ import {
   UpdateReportUrlDto
 } from './audit.dto'
 import type { IAuditRepository, IAuditService } from './audit.interface'
-import { buildReportDataRow } from './report-data.util'
+import {
+  buildReportDataFromReportUrl,
+  buildReportDataRow,
+  isMissingReportData
+} from './report-data.util'
 
 @Injectable()
 export class AuditService implements IAuditService {
@@ -466,6 +470,52 @@ export class AuditService implements IAuditService {
     )
   }
 
+  private async resolveAuditReportData<
+    T extends {
+      id: string
+      report_url?: string | null
+      report_data?: Prisma.JsonValue | null
+    }
+  >(audit: T): Promise<T> {
+    if (!isMissingReportData(audit.report_data ?? null)) {
+      return audit
+    }
+
+    if (!audit.report_url) {
+      return audit
+    }
+
+    try {
+      const reportData = await buildReportDataFromReportUrl(audit.report_url)
+
+      await this.auditRepository.update(audit.id, {
+        report_data: reportData as unknown as Prisma.InputJsonValue
+      })
+
+      return {
+        ...audit,
+        report_data: reportData as unknown as Prisma.JsonValue
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to resolve report_data for audit ${audit.id}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      )
+      return audit
+    }
+  }
+
+  private async resolveAuditsReportData<
+    T extends {
+      id: string
+      report_url?: string | null
+      report_data?: Prisma.JsonValue | null
+    }
+  >(audits: T[]): Promise<T[]> {
+    return Promise.all(audits.map(audit => this.resolveAuditReportData(audit)))
+  }
+
   async findAllForApiKeyPortfolio(
     portfolioId: string,
     query: ExternalAuditQueryDto
@@ -489,13 +539,26 @@ export class AuditService implements IAuditService {
         return countResult
       }
 
-      return this.findAll(
+      const result = await this.findAll(
         { ...findAllQuery, page: 1, limit: total },
         EXTERNAL_API_SUPER_ADMIN_CONTEXT
       )
+
+      return {
+        ...result,
+        data: await this.resolveAuditsReportData(result.data)
+      }
     }
 
-    return this.findAll(findAllQuery, EXTERNAL_API_SUPER_ADMIN_CONTEXT)
+    const result = await this.findAll(
+      findAllQuery,
+      EXTERNAL_API_SUPER_ADMIN_CONTEXT
+    )
+
+    return {
+      ...result,
+      data: await this.resolveAuditsReportData(result.data)
+    }
   }
 
   async findAllForApiKeyProperty(
@@ -536,13 +599,26 @@ export class AuditService implements IAuditService {
         return countResult
       }
 
-      return this.findAll(
+      const result = await this.findAll(
         { ...findAllQuery, page: 1, limit: total },
         EXTERNAL_API_SUPER_ADMIN_CONTEXT
       )
+
+      return {
+        ...result,
+        data: await this.resolveAuditsReportData(result.data)
+      }
     }
 
-    return this.findAll(findAllQuery, EXTERNAL_API_SUPER_ADMIN_CONTEXT)
+    const result = await this.findAll(
+      findAllQuery,
+      EXTERNAL_API_SUPER_ADMIN_CONTEXT
+    )
+
+    return {
+      ...result,
+      data: await this.resolveAuditsReportData(result.data)
+    }
   }
 
   async findOneForApiKey(auditId: string, portfolioId: string) {
@@ -566,7 +642,11 @@ export class AuditService implements IAuditService {
       throw new NotFoundException('Audit not found')
     }
 
-    return this.findOne(auditId, EXTERNAL_API_SUPER_ADMIN_CONTEXT)
+    const fullAudit = await this.findOne(
+      auditId,
+      EXTERNAL_API_SUPER_ADMIN_CONTEXT
+    )
+    return this.resolveAuditReportData(fullAudit)
   }
 
   async findAllForExport(query: AuditQueryDto, user: IUserWithPermissions) {

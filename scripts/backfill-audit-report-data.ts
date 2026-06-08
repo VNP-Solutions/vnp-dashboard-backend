@@ -1,56 +1,16 @@
 import { Prisma, PrismaClient } from '@prisma/client'
 import { config } from 'dotenv'
-import * as XLSX from 'xlsx'
 import { ColoredLogger } from '../src/common/utils/colored-logger.util'
-import { filterWhollyEmptySpreadsheetRows } from '../src/common/utils/spreadsheet.util'
-import { buildReportDataFromSheetRows } from '../src/modules/audit/report-data.util'
+import {
+  buildReportDataFromReportUrl,
+  isMissingReportData
+} from '../src/modules/audit/report-data.util'
 
 config()
 
 const prisma = new PrismaClient()
 const logger = new ColoredLogger('BackfillReportData')
 const dryRun = process.argv.includes('--dry-run')
-
-async function downloadReport(url: string): Promise<Buffer> {
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`Failed to download report (${response.status})`)
-  }
-
-  return Buffer.from(await response.arrayBuffer())
-}
-
-function parseReportWorkbook(
-  buffer: Buffer,
-  reportUrl: string
-): Record<string, unknown>[] {
-  const isCsv = reportUrl.toLowerCase().split('?')[0].endsWith('.csv')
-  const workbook = isCsv
-    ? XLSX.read(buffer.toString('utf-8'), { type: 'string' })
-    : XLSX.read(buffer, { type: 'buffer' })
-
-  const sheetName = workbook.SheetNames[0]
-  if (!sheetName) {
-    throw new Error('Report file contains no worksheets')
-  }
-
-  const worksheet = workbook.Sheets[sheetName]
-  const rows = XLSX.utils.sheet_to_json(worksheet, {
-    raw: false,
-    defval: null
-  }) as Record<string, unknown>[]
-
-  const dataRows = filterWhollyEmptySpreadsheetRows(rows)
-  if (dataRows.length === 0) {
-    throw new Error('Report file contains no data rows')
-  }
-
-  return dataRows
-}
-
-function isMissingReportData(value: Prisma.JsonValue | null): boolean {
-  return value === null || value === undefined
-}
 
 async function backfillAuditReportData() {
   logger.info(
@@ -90,9 +50,7 @@ async function backfillAuditReportData() {
     try {
       logger.info(`Processing audit ${audit.id}...`)
 
-      const buffer = await downloadReport(reportUrl)
-      const sheetRows = parseReportWorkbook(buffer, reportUrl)
-      const reportData = buildReportDataFromSheetRows(sheetRows)
+      const reportData = await buildReportDataFromReportUrl(reportUrl)
 
       if (dryRun) {
         logger.warn(
