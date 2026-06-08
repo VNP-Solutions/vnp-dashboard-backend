@@ -47,6 +47,13 @@ export class ApiKeyRepository implements IApiKeyRepository {
     })
   }
 
+  async findByKeyHash(key_hash: string): Promise<ApiKeyWithPortfolio | null> {
+    return this.prisma.apiKey.findUnique({
+      where: { key_hash },
+      include: portfolioInclude
+    })
+  }
+
   async updateActive(
     id: string,
     is_active: boolean

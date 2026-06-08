@@ -14,6 +14,17 @@ export type ApiKeyWithPortfolio = Prisma.ApiKeyGetPayload<{
   }
 }>
 
+export interface ApiKeyAuthContext {
+  id: string
+  portfolio_id: string
+  is_active: boolean
+  portfolio: {
+    id: string
+    name: string
+    is_active: boolean
+  }
+}
+
 export interface ApiKeyResponse {
   id: string
   api_key: string
@@ -37,6 +48,7 @@ export interface IApiKeyRepository {
   }): Promise<ApiKeyWithPortfolio>
   findAll(): Promise<ApiKeyWithPortfolio[]>
   findById(id: string): Promise<ApiKeyWithPortfolio | null>
+  findByKeyHash(key_hash: string): Promise<ApiKeyWithPortfolio | null>
   updateActive(id: string, is_active: boolean): Promise<ApiKeyWithPortfolio>
   delete(id: string): Promise<ApiKeyWithPortfolio>
 }

@@ -11,6 +11,7 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { BankSubType, BankType, Prisma } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
+import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../common/constants/external-api-user.context'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -976,6 +977,34 @@ export class PropertyService implements IPropertyService {
       query.page || 1,
       query.limit || 10
     )
+  }
+
+  async findAllForApiKeyPortfolio(portfolioId: string) {
+    const portfolioWhere = {
+      OR: [
+        { portfolio_id: portfolioId },
+        { show_in_portfolio: { has: portfolioId } }
+      ]
+    }
+
+    const total = await this.propertyRepository.count(portfolioWhere)
+
+    if (total === 0) {
+      return []
+    }
+
+    const result = await this.findAll(
+      {
+        portfolio_id: portfolioId,
+        sortBy: 'name',
+        sortOrder: 'asc',
+        page: 1,
+        limit: total
+      },
+      EXTERNAL_API_SUPER_ADMIN_CONTEXT
+    )
+
+    return result.data
   }
 
   async findAllForExport(query: PropertyQueryDto, user: IUserWithPermissions) {
