@@ -179,6 +179,53 @@ export class ExternalApiController {
     )
   }
 
+  @Get('audits/:auditId')
+  @ApiOperation({
+    summary: 'Get a single audit by ID',
+    description:
+      'Returns full audit details for an audit within the portfolio bound to the x-api-key header. Matches the regular GET /audit/:id response. The API key must be valid and active.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Audit retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Operation successful',
+        data: {
+          id: '507f1f77bcf86cd799439011',
+          property_id: '507f1f77bcf86cd799439012',
+          type_of_ota: ['expedia'],
+          is_archived: false,
+          expedia_amount_collectable: 1500,
+          expedia_amount_confirmed: 1200,
+          auditStatus: {
+            id: '507f1f77bcf86cd799439013',
+            status: 'OTA POST Completed'
+          },
+          property: {
+            id: '507f1f77bcf86cd799439012',
+            name: 'Grand Hotel'
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing, invalid, or inactive API key'
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Audit not found or not in API key portfolio'
+  })
+  getAudit(
+    @Param('auditId') auditId: string,
+    @CurrentApiKey() apiKey: ApiKeyAuthContext
+  ) {
+    return this.externalApiService.getAudit(auditId, apiKey)
+  }
+
   @Get('audits')
   @ApiOperation({
     summary: 'Get audits for the API key portfolio',

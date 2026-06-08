@@ -46,4 +46,8 @@ export class ExternalApiService {
       query
     )
   }
+
+  getAudit(auditId: string, apiKey: ApiKeyAuthContext) {
+    return this.auditService.findOneForApiKey(auditId, apiKey.portfolio_id)
+  }
 }
