@@ -34,4 +34,16 @@ export class ExternalApiService {
       query
     )
   }
+
+  getAuditsByProperty(
+    propertyId: string,
+    query: ExternalAuditQueryDto,
+    apiKey: ApiKeyAuthContext
+  ) {
+    return this.auditService.findAllForApiKeyProperty(
+      propertyId,
+      apiKey.portfolio_id,
+      query
+    )
+  }
 }

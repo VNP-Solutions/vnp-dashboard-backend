@@ -128,6 +128,57 @@ export class ExternalApiController {
     return this.externalApiService.getProperty(id, apiKey)
   }
 
+  @Get('audits/properties/:propertyId')
+  @ApiOperation({
+    summary: 'Get audits for a single property',
+    description:
+      'Returns audits for a property within the portfolio bound to the x-api-key header. Supports the same query params as GET /external/audits (page, limit, search, sortBy, sortOrder, type_of_ota, expedia_id, send_all). The API key must be valid and active.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Audits retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Request successful',
+        data: [
+          {
+            id: '507f1f77bcf86cd799439011',
+            property_id: '507f1f77bcf86cd799439012',
+            type_of_ota: ['expedia'],
+            is_archived: false,
+            amount_collectable: 1500,
+            amount_confirmed: 1200
+          }
+        ],
+        metadata: {
+          totalDocuments: 1,
+          currentPage: 1,
+          totalPages: 1
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing, invalid, or inactive API key'
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Property not found or not in API key portfolio'
+  })
+  getAuditsByProperty(
+    @Param('propertyId') propertyId: string,
+    @Query() query: ExternalAuditQueryDto,
+    @CurrentApiKey() apiKey: ApiKeyAuthContext
+  ) {
+    return this.externalApiService.getAuditsByProperty(
+      propertyId,
+      query,
+      apiKey
+    )
+  }
+
   @Get('audits')
   @ApiOperation({
     summary: 'Get audits for the API key portfolio',

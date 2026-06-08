@@ -474,6 +474,53 @@ export class AuditService implements IAuditService {
     return this.findAll(findAllQuery, EXTERNAL_API_SUPER_ADMIN_CONTEXT)
   }
 
+  async findAllForApiKeyProperty(
+    propertyId: string,
+    portfolioId: string,
+    query: ExternalAuditQueryDto
+  ) {
+    const property = await this.propertyRepository.findById(propertyId)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    const belongsToPortfolio =
+      property.portfolio_id === portfolioId ||
+      property.show_in_portfolio?.includes(portfolioId)
+
+    if (!belongsToPortfolio) {
+      throw new NotFoundException('Property not found')
+    }
+
+    const { send_all, ...queryFilters } = query
+
+    const findAllQuery: AuditQueryDto = {
+      ...queryFilters,
+      property_id: propertyId
+    }
+
+    if (send_all) {
+      const countResult = await this.findAll(
+        { ...findAllQuery, page: 1, limit: 1 },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
+
+      const total = countResult.metadata.totalDocuments
+
+      if (total === 0) {
+        return countResult
+      }
+
+      return this.findAll(
+        { ...findAllQuery, page: 1, limit: total },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
+    }
+
+    return this.findAll(findAllQuery, EXTERNAL_API_SUPER_ADMIN_CONTEXT)
+  }
+
   async findAllForExport(query: AuditQueryDto, user: IUserWithPermissions) {
     // Get audit access level to determine behavior
     const auditPermission = user.role.audit_permission

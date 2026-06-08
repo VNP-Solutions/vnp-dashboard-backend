@@ -155,6 +155,11 @@ export interface IAuditService {
     portfolioId: string,
     query: ExternalAuditQueryDto
   ): Promise<PaginatedResult<AuditWithRelations>>
+  findAllForApiKeyProperty(
+    propertyId: string,
+    portfolioId: string,
+    query: ExternalAuditQueryDto
+  ): Promise<PaginatedResult<AuditWithRelations>>
   findAllForExport(
     query: AuditQueryDto,
     user: IUserWithPermissions
