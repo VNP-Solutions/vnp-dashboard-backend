@@ -1,4 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { ExternalAuditQueryDto } from '../audit/audit.dto'
+import type { IAuditService } from '../audit/audit.interface'
 import { ExternalPropertyQueryDto } from '../property/property.dto'
 import type { IPropertyService } from '../property/property.interface'
 import type { ApiKeyAuthContext } from './api-key.interface'
@@ -7,7 +9,9 @@ import type { ApiKeyAuthContext } from './api-key.interface'
 export class ExternalApiService {
   constructor(
     @Inject('IPropertyService')
-    private readonly propertyService: IPropertyService
+    private readonly propertyService: IPropertyService,
+    @Inject('IAuditService')
+    private readonly auditService: IAuditService
   ) {}
 
   getProperties(query: ExternalPropertyQueryDto, apiKey: ApiKeyAuthContext) {
@@ -21,6 +25,13 @@ export class ExternalApiService {
     return this.propertyService.findOneForApiKey(
       propertyId,
       apiKey.portfolio_id
+    )
+  }
+
+  getAudits(query: ExternalAuditQueryDto, apiKey: ApiKeyAuthContext) {
+    return this.auditService.findAllForApiKeyPortfolio(
+      apiKey.portfolio_id,
+      query
     )
   }
 }

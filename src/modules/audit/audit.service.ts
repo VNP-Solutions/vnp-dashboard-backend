@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import { OtaType, PendingActionType, Property } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
+import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../common/constants/external-api-user.context'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -49,6 +50,7 @@ import {
   BulkUploadReportDto,
   CreateAuditDto,
   DeleteAuditsByPortfolioDto,
+  ExternalAuditQueryDto,
   GlobalStatsResponseDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
@@ -438,6 +440,38 @@ export class AuditService implements IAuditService {
       query.page || 1,
       query.limit || 10
     )
+  }
+
+  async findAllForApiKeyPortfolio(
+    portfolioId: string,
+    query: ExternalAuditQueryDto
+  ) {
+    const { send_all, ...queryFilters } = query
+
+    const findAllQuery: AuditQueryDto = {
+      ...queryFilters,
+      portfolio_id: portfolioId
+    }
+
+    if (send_all) {
+      const countResult = await this.findAll(
+        { ...findAllQuery, page: 1, limit: 1 },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
+
+      const total = countResult.metadata.totalDocuments
+
+      if (total === 0) {
+        return countResult
+      }
+
+      return this.findAll(
+        { ...findAllQuery, page: 1, limit: total },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
+    }
+
+    return this.findAll(findAllQuery, EXTERNAL_API_SUPER_ADMIN_CONTEXT)
   }
 
   async findAllForExport(query: AuditQueryDto, user: IUserWithPermissions) {
@@ -2495,7 +2529,9 @@ export class AuditService implements IAuditService {
   private async sendAuditStatusChangeNotification(
     audit: any,
     newStatusId: string
-  ): Promise<{ sent: string[]; failed: { email: string; message: string }[] } | undefined> {
+  ): Promise<
+    { sent: string[]; failed: { email: string; message: string }[] } | undefined
+  > {
     // Get old and new status details
     const oldStatus = await this.auditStatusRepository.findById(
       audit.audit_status_id

@@ -5,6 +5,7 @@ import {
   ApiSecurity,
   ApiTags
 } from '@nestjs/swagger'
+import { ExternalAuditQueryDto } from '../audit/audit.dto'
 import { Public } from '../auth/decorators/public.decorator'
 import { ExternalPropertyQueryDto } from '../property/property.dto'
 import type { ApiKeyAuthContext } from './api-key.interface'
@@ -125,5 +126,47 @@ export class ExternalApiController {
     @CurrentApiKey() apiKey: ApiKeyAuthContext
   ) {
     return this.externalApiService.getProperty(id, apiKey)
+  }
+
+  @Get('audits')
+  @ApiOperation({
+    summary: 'Get audits for the API key portfolio',
+    description:
+      'Returns audits for the portfolio bound to the x-api-key header. Supports the same filters as the regular GET /audit endpoint (page, limit, search, sortBy, sortOrder, type_of_ota, expedia_id). Set send_all=true to return all matching results and ignore page/limit. The API key must be valid and active.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Audits retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Request successful',
+        data: [
+          {
+            id: '507f1f77bcf86cd799439011',
+            property_id: '507f1f77bcf86cd799439012',
+            type_of_ota: ['expedia'],
+            is_archived: false,
+            amount_collectable: 1500,
+            amount_confirmed: 1200
+          }
+        ],
+        metadata: {
+          totalDocuments: 1,
+          currentPage: 1,
+          totalPages: 1
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing, invalid, or inactive API key'
+  })
+  getAudits(
+    @Query() query: ExternalAuditQueryDto,
+    @CurrentApiKey() apiKey: ApiKeyAuthContext
+  ) {
+    return this.externalApiService.getAudits(query, apiKey)
   }
 }

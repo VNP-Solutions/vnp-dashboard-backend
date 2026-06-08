@@ -4,6 +4,7 @@ import { OtaType } from '@prisma/client'
 import { Transform } from 'class-transformer'
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -17,7 +18,8 @@ export class CreateAuditDto {
   @ApiPropertyOptional({
     enum: OtaType,
     example: [OtaType.expedia, OtaType.agoda],
-    description: 'Array of OTA types (expedia, agoda, booking). No duplicates allowed.',
+    description:
+      'Array of OTA types (expedia, agoda, booking). No duplicates allowed.',
     isArray: true,
     type: [String]
   })
@@ -44,7 +46,7 @@ export class CreateAuditDto {
 
   // Expedia amounts
   @ApiPropertyOptional({
-    example: 5000.50,
+    example: 5000.5,
     description: 'Expedia amount collectable'
   })
   @IsNumber()
@@ -61,7 +63,7 @@ export class CreateAuditDto {
 
   // Agoda amounts
   @ApiPropertyOptional({
-    example: 3000.00,
+    example: 3000.0,
     description: 'Agoda amount collectable'
   })
   @IsNumber()
@@ -69,7 +71,7 @@ export class CreateAuditDto {
   agoda_amount_collectable?: number
 
   @ApiPropertyOptional({
-    example: 2800.50,
+    example: 2800.5,
     description: 'Agoda amount confirmed'
   })
   @IsNumber()
@@ -78,7 +80,7 @@ export class CreateAuditDto {
 
   // Booking amounts
   @ApiPropertyOptional({
-    example: 2000.00,
+    example: 2000.0,
     description: 'Booking amount collectable'
   })
   @IsNumber()
@@ -139,7 +141,8 @@ export class AuditQueryDto extends QueryDto {
 
   @ApiPropertyOptional({
     enum: OtaType,
-    description: 'Filter by OTA type (expedia, agoda, booking). Can filter by single value or use operators like "in" for multiple values.',
+    description:
+      'Filter by OTA type (expedia, agoda, booking). Can filter by single value or use operators like "in" for multiple values.',
     example: OtaType.expedia
   })
   @IsOptional()
@@ -199,6 +202,36 @@ export class AuditQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   portfolio_id?: string
+}
+
+export class ExternalAuditQueryDto extends QueryDto {
+  @ApiPropertyOptional({
+    enum: OtaType,
+    description: 'Filter by OTA type (expedia, agoda, booking)',
+    example: OtaType.expedia
+  })
+  @IsOptional()
+  @IsString()
+  type_of_ota?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by Expedia ID from property credentials',
+    example: 'EXP123456'
+  })
+  @IsOptional()
+  @IsString()
+  expedia_id?: string
+
+  @ApiPropertyOptional({
+    description:
+      'When true, returns all matching audits and ignores page and limit',
+    example: false,
+    default: false
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  send_all?: boolean
 }
 
 export class BulkArchiveAuditDto {
@@ -366,7 +399,7 @@ export class RequestUpdateAmountConfirmedDto {
 
   // At least one OTA amount confirmed must be provided
   @ApiPropertyOptional({
-    example: 5000.50,
+    example: 5000.5,
     description: 'New Expedia amount confirmed value'
   })
   @IsNumber()
@@ -374,7 +407,7 @@ export class RequestUpdateAmountConfirmedDto {
   expedia_amount_confirmed?: number
 
   @ApiPropertyOptional({
-    example: 3000.00,
+    example: 3000.0,
     description: 'New Agoda amount confirmed value'
   })
   @IsNumber()
@@ -382,7 +415,7 @@ export class RequestUpdateAmountConfirmedDto {
   agoda_amount_confirmed?: number
 
   @ApiPropertyOptional({
-    example: 2000.00,
+    example: 2000.0,
     description: 'New Booking amount confirmed value'
   })
   @IsNumber()
@@ -421,7 +454,10 @@ export class AutoImportAuditErrorDto {
   @ApiProperty({ example: 2, description: 'Sheet row number (header = row 1)' })
   row: number
 
-  @ApiProperty({ example: 'Hilton Garden Inn', description: 'Property / hotel name from sheet' })
+  @ApiProperty({
+    example: 'Hilton Garden Inn',
+    description: 'Property / hotel name from sheet'
+  })
   property: string
 
   @ApiProperty({
@@ -438,7 +474,10 @@ export class AutoImportAuditErrorDto {
   })
   hotel_id?: string
 
-  @ApiProperty({ example: 'Portfolio "ARP Hospitality" not found in database', description: 'Error description' })
+  @ApiProperty({
+    example: 'Portfolio "ARP Hospitality" not found in database',
+    description: 'Error description'
+  })
   error: string
 }
 
@@ -446,27 +485,40 @@ export class AutoImportAuditSuccessDto {
   @ApiProperty({ example: 'Hilton Garden Inn', description: 'Property name' })
   property: string
 
-  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Created audit ID' })
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'Created audit ID'
+  })
   audit_id: string
 
-  @ApiProperty({ example: 'https://s3.amazonaws.com/bucket/auto-imports/Hilton_Garden_Inn_1234567890.xlsx', description: 'S3 URL of uploaded report sheet' })
+  @ApiProperty({
+    example:
+      'https://s3.amazonaws.com/bucket/auto-imports/Hilton_Garden_Inn_1234567890.xlsx',
+    description: 'S3 URL of uploaded report sheet'
+  })
   report_url: string
 }
 
 export class AutoImportAuditResultDto {
-  @ApiProperty({ example: true, description: 'Whether import succeeded (false means validation errors were found)' })
+  @ApiProperty({
+    example: true,
+    description:
+      'Whether import succeeded (false means validation errors were found)'
+  })
   success: boolean
 
   @ApiProperty({
     type: [AutoImportAuditErrorDto],
-    description: 'Validation errors found before any audit was created. Present when success=false.',
+    description:
+      'Validation errors found before any audit was created. Present when success=false.',
     required: false
   })
   errors?: AutoImportAuditErrorDto[]
 
   @ApiProperty({
     type: [AutoImportAuditSuccessDto],
-    description: 'Successfully created audits with their report URLs. Present when success=true.',
+    description:
+      'Successfully created audits with their report URLs. Present when success=true.',
     required: false
   })
   created_audits?: AutoImportAuditSuccessDto[]
