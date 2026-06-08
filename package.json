@@ -27,6 +27,7 @@
     "migrate:bank-account-type-string": "ts-node scripts/migrate-bank-account-type-to-string.ts",
     "migrate:production": "ts-node scripts/migrate-production-direct.ts",
     "migrate:audit-ota": "ts-node scripts/migrate-audit-ota-to-array.ts",
+    "backfill:report-data": "ts-node scripts/backfill-audit-report-data.ts",
     "verify:audit-ota": "ts-node scripts/verify-audit-ota-migration.ts",
     "validate:migration": "ts-node scripts/validate-migration.ts",
     "cleanup:orphans": "ts-node scripts/cleanup-orphaned-records.ts",

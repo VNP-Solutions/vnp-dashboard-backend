@@ -121,6 +121,43 @@ export const toReportDataKey = (header: string): string => {
 export const isReportDataDateField = (key: string): boolean =>
   REPORT_DATA_DATE_FIELDS.has(key) || key.includes('date')
 
+export const parseReportDate = (raw: unknown): Date | null => {
+  if (!raw) return null
+
+  const isValidYear = (d: Date): boolean =>
+    !isNaN(d.getTime()) && d.getFullYear() >= 1900 && d.getFullYear() <= 2100
+
+  const fromExcelSerial = (serial: number): Date | null => {
+    const date = new Date(
+      new Date(1899, 11, 30).getTime() + serial * 24 * 60 * 60 * 1000
+    )
+    return isValidYear(date) ? date : null
+  }
+
+  if (raw instanceof Date) return isValidYear(raw) ? raw : null
+  if (typeof raw === 'number') return fromExcelSerial(raw)
+
+  const s = String(raw).trim()
+  const slashParts = s.split('/')
+  if (slashParts.length === 3) {
+    const [a, b, y] = slashParts.map(Number)
+    if (!isNaN(a) && !isNaN(b) && !isNaN(y) && y >= 1900 && y <= 2100) {
+      if (a > 12) return new Date(y, b - 1, a)
+      if (b > 12) return new Date(y, a - 1, b)
+      return new Date(y, a - 1, b)
+    }
+  }
+
+  const numericSerial = Number(s)
+  if (Number.isInteger(numericSerial) && numericSerial > 0) {
+    const result = fromExcelSerial(numericSerial)
+    if (result) return result
+  }
+
+  const dt = new Date(s)
+  return isValidYear(dt) ? dt : null
+}
+
 const parseCurrencyValue = (raw: string): number => {
   const cleaned = raw.replace(/[^\d.-]/g, '')
   const n = parseFloat(cleaned)
@@ -153,7 +190,7 @@ export const serializeReportDataValue = (
 export const buildReportDataRow = (
   row: Record<string, unknown>,
   headers: string[],
-  parseDate: (value: unknown) => Date | null
+  parseDate: (value: unknown) => Date | null = parseReportDate
 ): Record<string, unknown> =>
   Object.fromEntries(
     headers.map(header => {
@@ -161,3 +198,11 @@ export const buildReportDataRow = (
       return [key, serializeReportDataValue(key, row[header], parseDate)]
     })
   )
+
+export const buildReportDataFromSheetRows = (
+  rows: Record<string, unknown>[]
+): Record<string, unknown>[] => {
+  if (rows.length === 0) return []
+  const headers = Object.keys(rows[0])
+  return rows.map(row => buildReportDataRow(row, headers))
+}
