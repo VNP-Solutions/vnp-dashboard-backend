@@ -10,6 +10,7 @@ import {
   CompletePropertyCredentialsUpdateDto,
   CompleteUpdatePropertyDto,
   CreatePropertyDto,
+  ExternalPropertyQueryDto,
   GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
   PropertyFileExportQueryDto,
@@ -197,7 +198,11 @@ export interface IPropertyService {
     query: PropertyQueryDto,
     user: IUserWithPermissions
   ): Promise<PaginatedResult<PropertyWithPendingActions>>
-  findAllForApiKeyPortfolio(portfolioId: string): Promise<any[]>
+  findAllForApiKeyPortfolio(
+    portfolioId: string,
+    query: ExternalPropertyQueryDto
+  ): Promise<PaginatedResult<any>>
+  findOneForApiKey(propertyId: string, portfolioId: string): Promise<any>
   findAllForExport(
     query: PropertyQueryDto,
     user: IUserWithPermissions

@@ -60,6 +60,7 @@ import {
   CompleteCreatePropertyDto,
   CompleteUpdatePropertyDto,
   CreatePropertyDto,
+  ExternalPropertyQueryDto,
   GetPropertiesBankDetailsSecureDto,
   GetPropertiesByPortfoliosDto,
   PropertyFileExportQueryDto,
@@ -979,32 +980,54 @@ export class PropertyService implements IPropertyService {
     )
   }
 
-  async findAllForApiKeyPortfolio(portfolioId: string) {
-    const portfolioWhere = {
-      OR: [
-        { portfolio_id: portfolioId },
-        { show_in_portfolio: { has: portfolioId } }
-      ]
+  async findAllForApiKeyPortfolio(
+    portfolioId: string,
+    query: ExternalPropertyQueryDto
+  ) {
+    const { send_all, ...queryFilters } = query
+
+    const findAllQuery: PropertyQueryDto = {
+      ...queryFilters,
+      portfolio_id: portfolioId
     }
 
-    const total = await this.propertyRepository.count(portfolioWhere)
+    if (send_all) {
+      const countResult = await this.findAll(
+        { ...findAllQuery, page: 1, limit: 1 },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
 
-    if (total === 0) {
-      return []
+      const total = countResult.metadata.totalDocuments
+
+      if (total === 0) {
+        return countResult
+      }
+
+      return this.findAll(
+        { ...findAllQuery, page: 1, limit: total },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
     }
 
-    const result = await this.findAll(
-      {
-        portfolio_id: portfolioId,
-        sortBy: 'name',
-        sortOrder: 'asc',
-        page: 1,
-        limit: total
-      },
-      EXTERNAL_API_SUPER_ADMIN_CONTEXT
-    )
+    return this.findAll(findAllQuery, EXTERNAL_API_SUPER_ADMIN_CONTEXT)
+  }
 
-    return result.data
+  async findOneForApiKey(propertyId: string, portfolioId: string) {
+    const property = await this.propertyRepository.findById(propertyId)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    const belongsToPortfolio =
+      property.portfolio_id === portfolioId ||
+      property.show_in_portfolio?.includes(portfolioId)
+
+    if (!belongsToPortfolio) {
+      throw new NotFoundException('Property not found')
+    }
+
+    return this.findOne(propertyId, EXTERNAL_API_SUPER_ADMIN_CONTEXT)
   }
 
   async findAllForExport(query: PropertyQueryDto, user: IUserWithPermissions) {
