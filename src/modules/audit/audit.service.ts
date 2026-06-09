@@ -5,8 +5,9 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import { OtaType, PendingActionType, Property } from '@prisma/client'
+import { OtaType, PendingActionType, Prisma, Property } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
+import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../common/constants/external-api-user.context'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
@@ -49,12 +50,18 @@ import {
   BulkUploadReportDto,
   CreateAuditDto,
   DeleteAuditsByPortfolioDto,
+  ExternalAuditQueryDto,
   GlobalStatsResponseDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
   UpdateReportUrlDto
 } from './audit.dto'
 import type { IAuditRepository, IAuditService } from './audit.interface'
+import {
+  buildReportDataFromReportUrl,
+  buildReportDataRow,
+  isMissingReportData
+} from './report-data.util'
 
 @Injectable()
 export class AuditService implements IAuditService {
@@ -164,6 +171,59 @@ export class AuditService implements IAuditService {
     return this.auditRepository.create(createData)
   }
 
+  private async getPropertyIdsForPortfolioFilter(
+    portfolioId: string
+  ): Promise<string[]> {
+    const properties = await this.prisma.property.findMany({
+      where: {
+        OR: [
+          { portfolio_id: portfolioId },
+          { show_in_portfolio: { has: portfolioId } }
+        ]
+      },
+      select: { id: true }
+    })
+
+    return properties.map(property => property.id)
+  }
+
+  private applyAuditPortfolioPropertyFilter(
+    finalWhere: Record<string, any>,
+    portfolioPropertyIds: string[]
+  ): void {
+    // MongoDB does not support nested relation filters — strip if QueryBuilder added one
+    if (finalWhere.property?.portfolio_id !== undefined) {
+      const { portfolio_id: _portfolioId, ...restProperty } =
+        finalWhere.property
+      if (Object.keys(restProperty).length > 0) {
+        finalWhere.property = restProperty
+      } else {
+        delete finalWhere.property
+      }
+    }
+
+    if (portfolioPropertyIds.length === 0) {
+      finalWhere.property_id = { in: [] }
+      return
+    }
+
+    if (finalWhere.property_id?.in) {
+      finalWhere.property_id.in = finalWhere.property_id.in.filter(
+        (id: string) => portfolioPropertyIds.includes(id)
+      )
+      return
+    }
+
+    if (typeof finalWhere.property_id === 'string') {
+      if (!portfolioPropertyIds.includes(finalWhere.property_id)) {
+        finalWhere.property_id = { in: [] }
+      }
+      return
+    }
+
+    finalWhere.property_id = { in: portfolioPropertyIds }
+  }
+
   async findAll(query: AuditQueryDto, user: IUserWithPermissions) {
     // Get audit access level to determine behavior
     const auditPermission = user.role.audit_permission
@@ -221,9 +281,7 @@ export class AuditService implements IAuditService {
     if (query.property_id) {
       additionalFilters.property_id = query.property_id
     }
-    if (query.portfolio_id) {
-      additionalFilters.portfolio_id = query.portfolio_id
-    }
+    // portfolio_id is handled separately — nested relation filters are unsupported on MongoDB
     // Handle is_archived filter: true/false/All/empty
     if (
       query.is_archived !== undefined &&
@@ -301,7 +359,6 @@ export class AuditService implements IAuditService {
         'type_of_ota',
         'audit_status_id',
         'property_id',
-        'portfolio_id',
         'is_archived'
       ],
       sortableFields: [
@@ -377,37 +434,10 @@ export class AuditService implements IAuditService {
 
     // Add portfolio_id filter if provided
     if (query.portfolio_id) {
-      // Find all properties in the specified portfolio
-      const portfolioProperties = await this.prisma.property.findMany({
-        where: {
-          portfolio_id: query.portfolio_id
-        },
-        select: {
-          id: true
-        }
-      })
-
-      if (portfolioProperties.length > 0) {
-        const portfolioPropertyIds = portfolioProperties.map(p => p.id)
-
-        // Add property filter to intersect with existing property filters
-        if (finalWhere.property_id && finalWhere.property_id.in) {
-          // Intersect with existing property IDs
-          finalWhere.property_id.in = finalWhere.property_id.in.filter(
-            (id: string) => portfolioPropertyIds.includes(id)
-          )
-        } else {
-          // Set property ID filter to portfolio properties
-          finalWhere.property_id = {
-            in: portfolioPropertyIds
-          }
-        }
-      } else {
-        // If portfolio has no properties, return no results
-        finalWhere.property_id = {
-          in: []
-        }
-      }
+      const portfolioPropertyIds = await this.getPropertyIdsForPortfolioFilter(
+        query.portfolio_id
+      )
+      this.applyAuditPortfolioPropertyFilter(finalWhere, portfolioPropertyIds)
     }
 
     // Apply search OR conditions — must happen after all other filter mutations
@@ -438,6 +468,185 @@ export class AuditService implements IAuditService {
       query.page || 1,
       query.limit || 10
     )
+  }
+
+  private async resolveAuditReportData<
+    T extends {
+      id: string
+      report_url?: string | null
+      report_data?: Prisma.JsonValue | null
+    }
+  >(audit: T): Promise<T> {
+    if (!isMissingReportData(audit.report_data ?? null)) {
+      return audit
+    }
+
+    if (!audit.report_url) {
+      return audit
+    }
+
+    try {
+      const reportData = await buildReportDataFromReportUrl(audit.report_url)
+
+      await this.auditRepository.update(audit.id, {
+        report_data: reportData as unknown as Prisma.InputJsonValue
+      })
+
+      return {
+        ...audit,
+        report_data: reportData as unknown as Prisma.JsonValue
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to resolve report_data for audit ${audit.id}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      )
+      return audit
+    }
+  }
+
+  private async resolveAuditsReportData<
+    T extends {
+      id: string
+      report_url?: string | null
+      report_data?: Prisma.JsonValue | null
+    }
+  >(audits: T[]): Promise<T[]> {
+    return Promise.all(audits.map(audit => this.resolveAuditReportData(audit)))
+  }
+
+  async findAllForApiKeyPortfolio(
+    portfolioId: string,
+    query: ExternalAuditQueryDto
+  ) {
+    const { send_all, ...queryFilters } = query
+
+    const findAllQuery: AuditQueryDto = {
+      ...queryFilters,
+      portfolio_id: portfolioId
+    }
+
+    if (send_all) {
+      const countResult = await this.findAll(
+        { ...findAllQuery, page: 1, limit: 1 },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
+
+      const total = countResult.metadata.totalDocuments
+
+      if (total === 0) {
+        return countResult
+      }
+
+      const result = await this.findAll(
+        { ...findAllQuery, page: 1, limit: total },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
+
+      return {
+        ...result,
+        data: await this.resolveAuditsReportData(result.data)
+      }
+    }
+
+    const result = await this.findAll(
+      findAllQuery,
+      EXTERNAL_API_SUPER_ADMIN_CONTEXT
+    )
+
+    return {
+      ...result,
+      data: await this.resolveAuditsReportData(result.data)
+    }
+  }
+
+  async findAllForApiKeyProperty(
+    propertyId: string,
+    portfolioId: string,
+    query: ExternalAuditQueryDto
+  ) {
+    const property = await this.propertyRepository.findById(propertyId)
+
+    if (!property) {
+      throw new NotFoundException('Property not found')
+    }
+
+    const belongsToPortfolio =
+      property.portfolio_id === portfolioId ||
+      property.show_in_portfolio?.includes(portfolioId)
+
+    if (!belongsToPortfolio) {
+      throw new NotFoundException('Property not found')
+    }
+
+    const { send_all, ...queryFilters } = query
+
+    const findAllQuery: AuditQueryDto = {
+      ...queryFilters,
+      property_id: propertyId
+    }
+
+    if (send_all) {
+      const countResult = await this.findAll(
+        { ...findAllQuery, page: 1, limit: 1 },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
+
+      const total = countResult.metadata.totalDocuments
+
+      if (total === 0) {
+        return countResult
+      }
+
+      const result = await this.findAll(
+        { ...findAllQuery, page: 1, limit: total },
+        EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      )
+
+      return {
+        ...result,
+        data: await this.resolveAuditsReportData(result.data)
+      }
+    }
+
+    const result = await this.findAll(
+      findAllQuery,
+      EXTERNAL_API_SUPER_ADMIN_CONTEXT
+    )
+
+    return {
+      ...result,
+      data: await this.resolveAuditsReportData(result.data)
+    }
+  }
+
+  async findOneForApiKey(auditId: string, portfolioId: string) {
+    const audit = await this.auditRepository.findById(auditId)
+
+    if (!audit) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    const property = await this.propertyRepository.findById(audit.property_id)
+
+    if (!property) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    const belongsToPortfolio =
+      property.portfolio_id === portfolioId ||
+      property.show_in_portfolio?.includes(portfolioId)
+
+    if (!belongsToPortfolio) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    const fullAudit = await this.findOne(
+      auditId,
+      EXTERNAL_API_SUPER_ADMIN_CONTEXT
+    )
+    return this.resolveAuditReportData(fullAudit)
   }
 
   async findAllForExport(query: AuditQueryDto, user: IUserWithPermissions) {
@@ -487,9 +696,7 @@ export class AuditService implements IAuditService {
     if (query.property_id) {
       additionalFilters.property_id = query.property_id
     }
-    if (query.portfolio_id) {
-      additionalFilters.portfolio_id = query.portfolio_id
-    }
+    // portfolio_id is handled separately — nested relation filters are unsupported on MongoDB
     // Handle is_archived filter: true/false/All/empty
     if (
       query.is_archived !== undefined &&
@@ -567,7 +774,6 @@ export class AuditService implements IAuditService {
         'type_of_ota',
         'audit_status_id',
         'property_id',
-        'portfolio_id',
         'is_archived'
       ],
       sortableFields: [
@@ -643,37 +849,10 @@ export class AuditService implements IAuditService {
 
     // Add portfolio_id filter if provided
     if (query.portfolio_id) {
-      // Find all properties in the specified portfolio
-      const portfolioProperties = await this.prisma.property.findMany({
-        where: {
-          portfolio_id: query.portfolio_id
-        },
-        select: {
-          id: true
-        }
-      })
-
-      if (portfolioProperties.length > 0) {
-        const portfolioPropertyIds = portfolioProperties.map(p => p.id)
-
-        // Add property filter to intersect with existing property filters
-        if (finalWhere.property_id && finalWhere.property_id.in) {
-          // Intersect with existing property IDs
-          finalWhere.property_id.in = finalWhere.property_id.in.filter(
-            (id: string) => portfolioPropertyIds.includes(id)
-          )
-        } else {
-          // Set property ID filter to portfolio properties
-          finalWhere.property_id = {
-            in: portfolioPropertyIds
-          }
-        }
-      } else {
-        // If portfolio has no properties, return no results
-        finalWhere.property_id = {
-          in: []
-        }
-      }
+      const portfolioPropertyIds = await this.getPropertyIdsForPortfolioFilter(
+        query.portfolio_id
+      )
+      this.applyAuditPortfolioPropertyFilter(finalWhere, portfolioPropertyIds)
     }
 
     // Apply search OR conditions — must happen after all other filter mutations
@@ -2495,7 +2674,9 @@ export class AuditService implements IAuditService {
   private async sendAuditStatusChangeNotification(
     audit: any,
     newStatusId: string
-  ): Promise<{ sent: string[]; failed: { email: string; message: string }[] } | undefined> {
+  ): Promise<
+    { sent: string[]; failed: { email: string; message: string }[] } | undefined
+  > {
     // Get old and new status details
     const oldStatus = await this.auditStatusRepository.findById(
       audit.audit_status_id
@@ -3294,6 +3475,10 @@ export class AuditService implements IAuditService {
           return markers.some(m => h.includes(m))
         }
 
+        const reportData = rows.map(row =>
+          buildReportDataRow(row, originalHeaders, parseDate)
+        )
+
         const cellValueForExport = (
           header: string,
           raw: unknown
@@ -3367,9 +3552,10 @@ export class AuditService implements IAuditService {
 
         const uploadResult = await this.fileUploadService.uploadFile(fakeFile)
 
-        // Persist report_url on the created audit
+        // Persist report_url and report_data on the created audit
         await this.auditRepository.update(audit.id, {
-          report_url: uploadResult.url
+          report_url: uploadResult.url,
+          report_data: reportData as unknown as Prisma.InputJsonValue
         })
 
         createdAudits.push({

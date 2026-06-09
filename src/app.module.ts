@@ -13,8 +13,9 @@ import { PermissionService } from './common/services/permission.service'
 import { ConfigService } from './config/config.service'
 import configuration from './config/configuration'
 import { validate } from './config/validation'
-import { AuditStatusModule } from './modules/audit-status/audit-status.module'
+import { ApiKeyModule } from './modules/api-key/api-key.module'
 import { AuditBatchModule } from './modules/audit-batch/audit-batch.module'
+import { AuditStatusModule } from './modules/audit-status/audit-status.module'
 import { AuditModule } from './modules/audit/audit.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
@@ -25,13 +26,13 @@ import { EmailModule } from './modules/email/email.module'
 import { FileUploadModule } from './modules/file-upload/file-upload.module'
 import { GlobalReportModule } from './modules/global-report/global-report.module'
 import { NoteModule } from './modules/note/note.module'
-import { PortfolioModule } from './modules/portfolio/portfolio.module'
+import { PendingActionModule } from './modules/pending-action/pending-action.module'
 import { PortfolioBankDetailsModule } from './modules/portfolio-bank-details/portfolio-bank-details.module'
+import { PortfolioModule } from './modules/portfolio/portfolio.module'
 import { PrismaService } from './modules/prisma/prisma.service'
 import { PropertyBankDetailsModule } from './modules/property-bank-details/property-bank-details.module'
-import { PropertyCredentialsModule } from './modules/property-credentials/property-credentials.module'
-import { PendingActionModule } from './modules/pending-action/pending-action.module'
 import { PropertyContractUrlModule } from './modules/property-contract-url/property-contract-url.module'
+import { PropertyCredentialsModule } from './modules/property-credentials/property-credentials.module'
 import { PropertyModule } from './modules/property/property.module'
 import { SalesAgentModule } from './modules/sales-agent/sales-agent.module'
 import { SchedulerModule } from './modules/scheduler/scheduler.module'
@@ -50,6 +51,7 @@ import { UserModule } from './modules/user/user.module'
       cache: true
     }),
     AuthModule,
+    ApiKeyModule,
     AuditModule,
     AuditBatchModule,
     AuditStatusModule,

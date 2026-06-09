@@ -45,26 +45,27 @@ model User {
 }
 
 model Portfolio {
-  id                String                  @id @default(auto()) @map("_id") @db.ObjectId
-  name              String                  @unique
-  service_type_id   String                  @db.ObjectId
-  serviceType       ServiceType             @relation(fields: [service_type_id], references: [id])
-  currency          String                  @default("USD")
+  id                String      @id @default(auto()) @map("_id") @db.ObjectId
+  name              String      @unique
+  service_type_id   String      @db.ObjectId
+  serviceType       ServiceType @relation(fields: [service_type_id], references: [id])
+  currency          String      @default("USD")
   is_active         Boolean
   contact_email     String?
   is_commissionable Boolean
   access_email      String?
   access_phone      String?
-  sales_agent_id    String?                 @db.ObjectId
-  salesAgent        SalesAgent?             @relation(fields: [sales_agent_id], references: [id])
+  sales_agent_id    String?     @db.ObjectId
+  salesAgent        SalesAgent? @relation(fields: [sales_agent_id], references: [id])
 
-  properties           Property[]
-  notes                Note[]
-  tasks                Task[]
-  contractUrls         ContractUrl[]
-  consolidatedReports  ConsolidatedReport[]
-  pendingActions       PendingAction[]
-  bankDetails          PortfolioBankDetails?
+  properties          Property[]
+  notes               Note[]
+  tasks               Task[]
+  contractUrls        ContractUrl[]
+  consolidatedReports ConsolidatedReport[]
+  pendingActions      PendingAction[]
+  bankDetails         PortfolioBankDetails?
+  apiKeys             ApiKey[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -75,14 +76,29 @@ model Portfolio {
   @@index([sales_agent_id])
 }
 
+model ApiKey {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  api_key      String
+  key_hash     String    @unique
+  portfolio_id String    @db.ObjectId
+  portfolio    Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  is_active    Boolean   @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([portfolio_id])
+  @@index([is_active])
+}
+
 model SalesAgent {
-  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
   full_name  String
   address    String
   phone      String
-  email      String      @unique
+  email      String   @unique
   commission Float
-  documents  String[]    @default([])
+  documents  String[] @default([])
 
   portfolios Portfolio[]
 
@@ -147,24 +163,25 @@ model Otp {
 }
 
 model Audit {
-  id                      String       @id @default(auto()) @map("_id") @db.ObjectId
-  type_of_ota             OtaType[]    @default([])
-  billing_type            BillingType?
-  audit_status_id         String       @db.ObjectId
-  auditStatus             AuditStatus  @relation(fields: [audit_status_id], references: [id])
+  id                         String       @id @default(auto()) @map("_id") @db.ObjectId
+  type_of_ota                OtaType[]    @default([])
+  billing_type               BillingType?
+  audit_status_id            String       @db.ObjectId
+  auditStatus                AuditStatus  @relation(fields: [audit_status_id], references: [id])
   expedia_amount_collectable Float?
-  expedia_amount_confirmed  Float?
-  agoda_amount_collectable  Float?
-  agoda_amount_confirmed    Float?
+  expedia_amount_confirmed   Float?
+  agoda_amount_collectable   Float?
+  agoda_amount_confirmed     Float?
   booking_amount_collectable Float?
-  booking_amount_confirmed  Float?
-  is_archived             Boolean      @default(false)
-  property_id             String       @db.ObjectId
-  property                Property     @relation(fields: [property_id], references: [id], onDelete: Cascade)
-  batch_id                String?      @db.ObjectId
-  batch                   AuditBatch?  @relation(fields: [batch_id], references: [id])
-  report_url              String?
-  review_collection_date DateTime?
+  booking_amount_confirmed   Float?
+  is_archived                Boolean      @default(false)
+  property_id                String       @db.ObjectId
+  property                   Property     @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  batch_id                   String?      @db.ObjectId
+  batch                      AuditBatch?  @relation(fields: [batch_id], references: [id])
+  report_url                 String?
+  report_data                Json?
+  review_collection_date     DateTime?
 
   notes          Note[]
   tasks          Task[]
@@ -201,8 +218,8 @@ model PropertyCredentials {
 }
 
 model PropertyBankDetails {
-  id                         String           @id @default(auto()) @map("_id") @db.ObjectId
-  bank_type                  BankType         @default(bank)
+  id                         String       @id @default(auto()) @map("_id") @db.ObjectId
+  bank_type                  BankType     @default(bank)
   bank_sub_type              BankSubType?
   hotel_portfolio_name       String?
   beneficiary_name           String?
@@ -222,17 +239,17 @@ model PropertyBankDetails {
   email_address              String?
   bank_address               String?
   comments                   String?
-  associated_user_id         String?          @db.ObjectId
-  property_id                String           @unique @db.ObjectId
-  property                   Property         @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  associated_user_id         String?      @db.ObjectId
+  property_id                String       @unique @db.ObjectId
+  property                   Property     @relation(fields: [property_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }
 
 model PortfolioBankDetails {
-  id                         String           @id @default(auto()) @map("_id") @db.ObjectId
-  bank_type                  BankType         @default(bank)
+  id                         String       @id @default(auto()) @map("_id") @db.ObjectId
+  bank_type                  BankType     @default(bank)
   bank_sub_type              BankSubType?
   hotel_portfolio_name       String?
   beneficiary_name           String?
@@ -252,9 +269,9 @@ model PortfolioBankDetails {
   email_address              String?
   bank_address               String?
   comments                   String?
-  associated_user_id         String?          @db.ObjectId
-  portfolio_id               String           @unique @db.ObjectId
-  portfolio                  Portfolio        @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
+  associated_user_id         String?      @db.ObjectId
+  portfolio_id               String       @unique @db.ObjectId
+  portfolio                  Portfolio    @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -560,7 +577,7 @@ type PortfolioInfo {
 
 type AuditUpdateData {
   expedia_amount_confirmed Float?
-  agoda_amount_confirmed Float?
+  agoda_amount_confirmed   Float?
   booking_amount_confirmed Float?
 }
 

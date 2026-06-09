@@ -4,7 +4,7 @@ import {
   OmitType,
   PartialType
 } from '@nestjs/swagger'
-import { Type } from 'class-transformer'
+import { Transform, Type } from 'class-transformer'
 import {
   IsArray,
   IsBoolean,
@@ -205,6 +205,44 @@ export class PropertyQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   credential_type?: string
+}
+
+export class ExternalPropertyQueryDto extends QueryDto {
+  @ApiPropertyOptional({
+    description:
+      'Filter by bank sub type (ach/domestic_wire/international_wire/all)',
+    example: 'ach'
+  })
+  @IsOptional()
+  @IsString()
+  bank_sub_type?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by active status (true/false/all)',
+    example: 'true'
+  })
+  @IsOptional()
+  @IsString()
+  is_active?: string
+
+  @ApiPropertyOptional({
+    description: 'Filter by credential type (full/expedia/booking/agoda/all)',
+    example: 'full'
+  })
+  @IsOptional()
+  @IsString()
+  credential_type?: string
+
+  @ApiPropertyOptional({
+    description:
+      'When true, returns all matching properties and ignores page and limit',
+    example: false,
+    default: false
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  send_all?: boolean
 }
 
 /**
