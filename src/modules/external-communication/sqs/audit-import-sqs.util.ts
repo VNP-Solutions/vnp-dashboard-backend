@@ -1,15 +1,15 @@
 import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  S3Client
+} from '@aws-sdk/client-s3'
+import {
   DeleteMessageCommand,
   Message,
   ReceiveMessageCommand,
   SendMessageCommand,
   SQSClient
 } from '@aws-sdk/client-sqs'
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  S3Client
-} from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { Readable } from 'stream'
 
@@ -18,6 +18,7 @@ export interface AuditImportSqsMessage {
   s3Key: string
   originalName: string
   requestedAt: string
+  qaPanelId: string
 }
 
 export interface S3ClientConfig {
@@ -140,7 +141,5 @@ export async function deleteFileFromS3(
   bucketName: string,
   key: string
 ): Promise<void> {
-  await s3Client.send(
-    new DeleteObjectCommand({ Bucket: bucketName, Key: key })
-  )
+  await s3Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }))
 }

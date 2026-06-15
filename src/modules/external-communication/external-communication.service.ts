@@ -1,14 +1,14 @@
+import { S3Client } from '@aws-sdk/client-s3'
+import { SQSClient } from '@aws-sdk/client-sqs'
 import {
   BadRequestException,
   Injectable,
   InternalServerErrorException
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
-import { S3Client } from '@aws-sdk/client-s3'
-import { SQSClient } from '@aws-sdk/client-sqs'
 import { randomUUID } from 'crypto'
-import { ConfigService } from '../../config/config.service'
 import { validateSpreadsheetFile } from '../../common/utils/spreadsheet.util'
+import { ConfigService } from '../../config/config.service'
 import {
   BulkAuditImportAcceptedDto,
   GenerateTokenResponseDto
@@ -54,7 +54,8 @@ export class ExternalCommunicationService {
   }
 
   async enqueueBulkAuditImport(
-    file: Express.Multer.File
+    file: Express.Multer.File,
+    qaPanelId: string
   ): Promise<BulkAuditImportAcceptedDto> {
     if (!file) {
       throw new BadRequestException('No file provided')
@@ -85,7 +86,8 @@ export class ExternalCommunicationService {
       jobId,
       s3Key,
       originalName: file.originalname,
-      requestedAt: new Date().toISOString()
+      requestedAt: new Date().toISOString(),
+      qaPanelId
     }
 
     const messageId = await enqueueAuditImport(
@@ -95,7 +97,7 @@ export class ExternalCommunicationService {
     )
 
     console.log(
-      `[ExternalCommunicationService] Enqueued audit import job ${jobId} (SQS MessageId: ${messageId})`
+      `[ExternalCommunicationService] Enqueued audit import job ${jobId} qa_panel_id=${qaPanelId} (SQS MessageId: ${messageId})`
     )
 
     return { jobId, message: 'Import is on Processing' }

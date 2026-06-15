@@ -1,4 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { IsNotEmpty, IsString } from 'class-validator'
+
+export class BulkAuditImportBodyDto {
+  @ApiProperty({
+    description:
+      'QA Panel ID to associate with this import job. Passed through to the callback API when the import completes.',
+    example: '6a2fbcbd4e6bed36e9c31654'
+  })
+  @IsString()
+  @IsNotEmpty()
+  qa_panel_id: string
+}
 
 export class GenerateTokenResponseDto {
   @ApiProperty({
@@ -59,6 +71,12 @@ export class AuditImportReport {
     example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
   })
   jobId: string
+
+  @ApiProperty({
+    description: 'QA Panel ID that was provided in the original import request',
+    example: '6a2fbcbd4e6bed36e9c31654'
+  })
+  qaPanelId: string
 
   @ApiProperty({
     description: 'Total number of data rows found in the spreadsheet',

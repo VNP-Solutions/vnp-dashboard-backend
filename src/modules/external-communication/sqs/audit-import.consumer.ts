@@ -1,22 +1,26 @@
+import { S3Client } from '@aws-sdk/client-s3'
+import { Message, SQSClient } from '@aws-sdk/client-sqs'
 import {
   Inject,
   Injectable,
   OnApplicationBootstrap,
   OnApplicationShutdown
 } from '@nestjs/common'
-import { SQSClient, Message } from '@aws-sdk/client-sqs'
-import { S3Client } from '@aws-sdk/client-s3'
 import { OtaType } from '@prisma/client'
-import { ConfigService } from '../../../config/config.service'
-import type { IAuditRepository } from '../../audit/audit.interface'
-import type { IAuditStatusRepository } from '../../audit-status/audit-status.interface'
-import type { IPropertyRepository } from '../../property/property.interface'
-import { PrismaService } from '../../prisma/prisma.service'
 import { ParallelProcessor } from '../../../common/utils/parallel-processor.util'
 import {
   parseSpreadsheetToJson,
   validateSpreadsheetFile
 } from '../../../common/utils/spreadsheet.util'
+import { ConfigService } from '../../../config/config.service'
+import type { IAuditStatusRepository } from '../../audit-status/audit-status.interface'
+import type { IAuditRepository } from '../../audit/audit.interface'
+import { PrismaService } from '../../prisma/prisma.service'
+import type { IPropertyRepository } from '../../property/property.interface'
+import {
+  AuditImportReport,
+  AuditImportRowError
+} from '../external-communication.dto'
 import {
   AuditImportSqsMessage,
   createS3Client,
@@ -26,7 +30,6 @@ import {
   downloadFileFromS3,
   receiveAuditImportMessages
 } from './audit-import-sqs.util'
-import { AuditImportReport, AuditImportRowError } from '../external-communication.dto'
 
 @Injectable()
 export class AuditImportConsumer
@@ -193,6 +196,7 @@ export class AuditImportConsumer
 
     const report: AuditImportReport = {
       jobId: msg.jobId,
+      qaPanelId: msg.qaPanelId,
       totalRows: rows.length,
       successCount: 0,
       failureCount: 0,
@@ -285,7 +289,10 @@ export class AuditImportConsumer
 
       const typeOfOtaArray: OtaType[] = []
       if (otaTypeValue) {
-        for (const otaStr of otaTypeValue.split(',').map(s => s.trim()).filter(Boolean)) {
+        for (const otaStr of otaTypeValue
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)) {
           const parsed = this.parseOtaType(otaStr)
           if (parsed && !typeOfOtaArray.includes(parsed)) {
             typeOfOtaArray.push(parsed)
@@ -308,37 +315,70 @@ export class AuditImportConsumer
         }
       }
 
-      let auditStatus = await this.auditStatusRepository.findByStatus(auditStatusValue)
+      let auditStatus =
+        await this.auditStatusRepository.findByStatus(auditStatusValue)
       if (!auditStatus) {
-        auditStatus = await this.auditStatusRepository.create({ status: auditStatusValue })
+        auditStatus = await this.auditStatusRepository.create({
+          status: auditStatusValue
+        })
       }
 
       const expediaAmountCollectable = this.parseAmount(
-        this.findHeaderValue(row, ['Expedia Amount Collectable', 'Expedia Collectable', 'expedia_amount_collectable'])
+        this.findHeaderValue(row, [
+          'Expedia Amount Collectable',
+          'Expedia Collectable',
+          'expedia_amount_collectable'
+        ])
       )
       const expediaAmountConfirmed = this.parseAmount(
-        this.findHeaderValue(row, ['Expedia Amount Confirmed', 'Expedia Confirmed', 'expedia_amount_confirmed'])
+        this.findHeaderValue(row, [
+          'Expedia Amount Confirmed',
+          'Expedia Confirmed',
+          'expedia_amount_confirmed'
+        ])
       )
       const agodaAmountCollectable = this.parseAmount(
-        this.findHeaderValue(row, ['Agoda Amount Collectable', 'Agoda Collectable', 'agoda_amount_collectable'])
+        this.findHeaderValue(row, [
+          'Agoda Amount Collectable',
+          'Agoda Collectable',
+          'agoda_amount_collectable'
+        ])
       )
       const agodaAmountConfirmed = this.parseAmount(
-        this.findHeaderValue(row, ['Agoda Amount Confirmed', 'Agoda Confirmed', 'agoda_amount_confirmed'])
+        this.findHeaderValue(row, [
+          'Agoda Amount Confirmed',
+          'Agoda Confirmed',
+          'agoda_amount_confirmed'
+        ])
       )
       const bookingAmountCollectable = this.parseAmount(
-        this.findHeaderValue(row, ['Booking Amount Collectable', 'Booking Collectable', 'booking_amount_collectable'])
+        this.findHeaderValue(row, [
+          'Booking Amount Collectable',
+          'Booking Collectable',
+          'booking_amount_collectable'
+        ])
       )
       const bookingAmountConfirmed = this.parseAmount(
-        this.findHeaderValue(row, ['Booking Amount Confirmed', 'Booking Confirmed', 'booking_amount_confirmed'])
+        this.findHeaderValue(row, [
+          'Booking Amount Confirmed',
+          'Booking Confirmed',
+          'booking_amount_confirmed'
+        ])
       )
 
       const reportUrl = this.findHeaderValue(row, [
-        'Report URL', 'Report url', 'report_url', 'Report', 'URL'
+        'Report URL',
+        'Report url',
+        'report_url',
+        'Report',
+        'URL'
       ])
 
       const reviewCollectionDateRaw = this.getRawValue(row, [
-        'Review/Collection Date', 'Review/collection date',
-        'Review Collection Date', 'Review collection date',
+        'Review/Collection Date',
+        'Review/collection date',
+        'Review Collection Date',
+        'Review collection date',
         'review_collection_date'
       ])
       let reviewCollectionDate: Date | null = null
@@ -401,7 +441,7 @@ export class AuditImportConsumer
    * Stub — will be implemented once the callback API contract is defined.
    * Called after every import job completes (success or partial failure).
    */
-   
+
   private async onImportComplete(
     _jobId: string,
     _report: AuditImportReport
@@ -409,7 +449,10 @@ export class AuditImportConsumer
     // TODO: call external API with the completed report
   }
 
-  private findHeaderValue(row: any, possibleNames: string[]): string | undefined {
+  private findHeaderValue(
+    row: any,
+    possibleNames: string[]
+  ): string | undefined {
     for (const name of possibleNames) {
       const value = row[name]
       if (value !== undefined && value !== null && value !== '') {
@@ -445,7 +488,8 @@ export class AuditImportConsumer
         const cleanKey = key.split('*')[0].trim()
         if (cleanKey.toLowerCase() === name.toLowerCase()) {
           const value = row[key]
-          if (value !== undefined && value !== null && value !== '') return value
+          if (value !== undefined && value !== null && value !== '')
+            return value
         }
       }
     }
@@ -468,8 +512,14 @@ export class AuditImportConsumer
       }
       if (typeof dateValue === 'number') {
         const excelEpoch = new Date(1899, 11, 30)
-        const date = new Date(excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000)
-        if (!isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() <= 2100) {
+        const date = new Date(
+          excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000
+        )
+        if (
+          !isNaN(date.getTime()) &&
+          date.getFullYear() >= 1900 &&
+          date.getFullYear() <= 2100
+        ) {
           return date
         }
         return null
@@ -480,12 +530,22 @@ export class AuditImportConsumer
         const month = parseInt(parts[0], 10)
         const day = parseInt(parts[1], 10)
         const year = parseInt(parts[2], 10)
-        if (!isNaN(month) && !isNaN(day) && !isNaN(year) && year >= 1900 && year <= 2100) {
+        if (
+          !isNaN(month) &&
+          !isNaN(day) &&
+          !isNaN(year) &&
+          year >= 1900 &&
+          year <= 2100
+        ) {
           return new Date(year, month - 1, day)
         }
       }
       const date = new Date(dateString)
-      if (!isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() <= 2100) {
+      if (
+        !isNaN(date.getTime()) &&
+        date.getFullYear() >= 1900 &&
+        date.getFullYear() <= 2100
+      ) {
         return date
       }
       return null
@@ -513,7 +573,10 @@ export class AuditImportConsumer
   }
 
   private logSummary(report: AuditImportReport): void {
-    console.log('\n\x1b[36m%s\x1b[0m', '========================================')
+    console.log(
+      '\n\x1b[36m%s\x1b[0m',
+      '========================================'
+    )
     console.log('\x1b[36m%s\x1b[0m', `📊 IMPORT SUMMARY — Job ${report.jobId}`)
     console.log('\x1b[36m%s\x1b[0m', '========================================')
     console.log('\x1b[33m%s\x1b[0m', `📝 Total Rows: ${report.totalRows}`)
@@ -523,7 +586,10 @@ export class AuditImportConsumer
       console.log('\n\x1b[31m%s\x1b[0m', '❌ Errors:')
       console.table(report.errors)
     }
-    console.log('\x1b[36m%s\x1b[0m', '========================================\n')
+    console.log(
+      '\x1b[36m%s\x1b[0m',
+      '========================================\n'
+    )
   }
 }
 

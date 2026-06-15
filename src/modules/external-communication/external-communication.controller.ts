@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   HttpCode,
   HttpStatus,
@@ -19,6 +20,7 @@ import {
 import { Public } from '../auth/decorators/public.decorator'
 import {
   BulkAuditImportAcceptedDto,
+  BulkAuditImportBodyDto,
   GenerateTokenResponseDto
 } from './external-communication.dto'
 import { ExternalCommunicationService } from './external-communication.service'
@@ -37,15 +39,22 @@ export class ExternalCommunicationController {
   /**
    * @route POST /api/external/generate-token
    * @auth Bearer <JWT_COMMUNICATION_SECRET>  (raw secret string, not a JWT)
+   *
+   * This endpoint is for OUTBOUND communication — our system calls this first to obtain
+   * a signed JWT, then attaches that JWT as a Bearer token when calling the external backend's API.
    */
   @Post('generate-token')
   @UseGuards(ExternalRawSecretGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Generate a communication JWT token',
+    summary: 'Generate an outbound communication JWT token',
     description:
-      'Authenticate by passing the raw `JWT_COMMUNICATION_SECRET` value as the Bearer token.\n\n' +
-      'On success, returns a signed JWT that the external backend can use as a Bearer token for all other `/external/*` endpoints.\n\n' +
+      '**Purpose — outbound calls only.**\n\n' +
+      "This endpoint is used by *our* system when it needs to call the external backend's API " +
+      '(e.g. the post-import callback). Pass the raw `JWT_COMMUNICATION_SECRET` as the Bearer token; ' +
+      'the response contains a signed JWT that can then be attached as the Bearer token on the outbound request.\n\n' +
+      '> The external backend does **not** need to call this endpoint before calling our APIs. ' +
+      'Their inbound calls are authenticated with the raw `JWT_COMMUNICATION_SECRET` directly.\n\n' +
       '**Token TTL:** 24 hours.'
   })
   @ApiResponse({
@@ -69,7 +78,7 @@ export class ExternalCommunicationController {
 
   /**
    * @route POST /api/external/bulk-audit-import
-   * @auth Bearer <communication_jwt>  (JWT obtained from /external/generate-token)
+   * @auth Bearer <signed-JWT>  (JWT signed with JWT_COMMUNICATION_SECRET, obtained from /generate-token)
    */
   @Post('bulk-audit-import')
   @UseGuards(ExternalJwtGuard)
@@ -80,7 +89,9 @@ export class ExternalCommunicationController {
     summary: 'Bulk import audits from a spreadsheet (async via SQS)',
     description:
       'Upload an Excel (.xlsx, .xls) or CSV spreadsheet to bulk-import audits.\n\n' +
-      '**Authentication:** Bearer token must be a valid communication JWT obtained from `POST /external/generate-token`.\n\n' +
+      '**Authentication:** Pass a signed JWT as the Bearer token. ' +
+      'The JWT must be signed with `JWT_COMMUNICATION_SECRET` and must not be expired. ' +
+      'Obtain the token first from `POST /external/generate-token`.\n\n' +
       '**Response:** Returns **HTTP 202** immediately once the file has been uploaded to S3 and the job has been enqueued. ' +
       'The `jobId` in the response identifies the background job. ' +
       'The actual import (row parsing, property lookup, audit creation) runs asynchronously. ' +
@@ -104,12 +115,18 @@ export class ExternalCommunicationController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['file'],
+      required: ['file', 'qa_panel_id'],
       properties: {
         file: {
           type: 'string',
           format: 'binary',
           description: 'Excel (.xlsx, .xls) or CSV spreadsheet file'
+        },
+        qa_panel_id: {
+          type: 'string',
+          description:
+            'QA Panel ID to associate with this import job. Forwarded to the callback API when the import completes.',
+          example: '6a2fbcbd4e6bed36e9c31654'
         }
       }
     }
@@ -134,8 +151,12 @@ export class ExternalCommunicationController {
       'Internal Server Error — SQS queue URL (AUDIT_IMPORT_QUEUE_URL) is not configured'
   })
   async bulkAuditImport(
-    @UploadedFile() file: Express.Multer.File
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: BulkAuditImportBodyDto
   ): Promise<BulkAuditImportAcceptedDto> {
-    return this.externalCommunicationService.enqueueBulkAuditImport(file)
+    return this.externalCommunicationService.enqueueBulkAuditImport(
+      file,
+      body.qa_panel_id
+    )
   }
 }
