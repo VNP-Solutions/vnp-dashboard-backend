@@ -55,7 +55,8 @@ export class ExternalCommunicationService {
 
   async enqueueBulkAuditImport(
     file: Express.Multer.File,
-    qaPanelId: string
+    qaPanelId: string,
+    email: string
   ): Promise<BulkAuditImportAcceptedDto> {
     if (!file) {
       throw new BadRequestException('No file provided')
@@ -87,7 +88,8 @@ export class ExternalCommunicationService {
       s3Key,
       originalName: file.originalname,
       requestedAt: new Date().toISOString(),
-      qaPanelId
+      qaPanelId,
+      email
     }
 
     const messageId = await enqueueAuditImport(
@@ -97,7 +99,7 @@ export class ExternalCommunicationService {
     )
 
     console.log(
-      `[ExternalCommunicationService] Enqueued audit import job ${jobId} qa_panel_id=${qaPanelId} (SQS MessageId: ${messageId})`
+      `[ExternalCommunicationService] Enqueued audit import job ${jobId} qa_panel_id=${qaPanelId} email=${email} (SQS MessageId: ${messageId})`
     )
 
     return { jobId, message: 'Import is on Processing' }

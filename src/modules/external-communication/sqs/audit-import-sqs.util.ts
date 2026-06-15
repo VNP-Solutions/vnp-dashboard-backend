@@ -19,6 +19,7 @@ export interface AuditImportSqsMessage {
   originalName: string
   requestedAt: string
   qaPanelId: string
+  email: string
 }
 
 export interface S3ClientConfig {

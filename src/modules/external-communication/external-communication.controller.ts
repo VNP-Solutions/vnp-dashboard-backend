@@ -115,7 +115,7 @@ export class ExternalCommunicationController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['file', 'qa_panel_id'],
+      required: ['file', 'qa_panel_id', 'email'],
       properties: {
         file: {
           type: 'string',
@@ -127,6 +127,13 @@ export class ExternalCommunicationController {
           description:
             'QA Panel ID to associate with this import job. Forwarded to the callback API when the import completes.',
           example: '6a2fbcbd4e6bed36e9c31654'
+        },
+        email: {
+          type: 'string',
+          format: 'email',
+          description:
+            'Email address to associate with this import job. Carried through the SQS message and included in the import report.',
+          example: 'user@example.com'
         }
       }
     }
@@ -156,7 +163,8 @@ export class ExternalCommunicationController {
   ): Promise<BulkAuditImportAcceptedDto> {
     return this.externalCommunicationService.enqueueBulkAuditImport(
       file,
-      body.qa_panel_id
+      body.qa_panel_id,
+      body.email
     )
   }
 }

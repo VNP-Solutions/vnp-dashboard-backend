@@ -197,6 +197,7 @@ export class AuditImportConsumer
     const report: AuditImportReport = {
       jobId: msg.jobId,
       qaPanelId: msg.qaPanelId,
+      email: msg.email,
       totalRows: rows.length,
       successCount: 0,
       failureCount: 0,

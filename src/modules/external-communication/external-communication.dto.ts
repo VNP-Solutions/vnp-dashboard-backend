@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsNotEmpty, IsString } from 'class-validator'
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator'
 
 export class BulkAuditImportBodyDto {
   @ApiProperty({
@@ -10,6 +10,15 @@ export class BulkAuditImportBodyDto {
   @IsString()
   @IsNotEmpty()
   qa_panel_id: string
+
+  @ApiProperty({
+    description:
+      'Email address to associate with this import job. Carried through the SQS message and included in the import report.',
+    example: 'user@example.com'
+  })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string
 }
 
 export class GenerateTokenResponseDto {
@@ -77,6 +86,13 @@ export class AuditImportReport {
     example: '6a2fbcbd4e6bed36e9c31654'
   })
   qaPanelId: string
+
+  @ApiProperty({
+    description:
+      'Email address that was provided in the original import request',
+    example: 'user@example.com'
+  })
+  email: string
 
   @ApiProperty({
     description: 'Total number of data rows found in the spreadsheet',
