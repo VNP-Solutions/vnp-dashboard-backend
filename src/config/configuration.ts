@@ -16,6 +16,10 @@ export interface Configuration {
     refreshSecret: string
     accessExpiresIn: string
     refreshExpiresIn: string
+    communicationSecret: string | undefined
+  }
+  sqs: {
+    auditImportQueueUrl: string | undefined
   }
   s3: {
     bucketName: string
@@ -61,7 +65,11 @@ export default (): Configuration => ({
     refreshSecret: process.env.JWT_REFRESH_SECRET!,
     accessSecret: process.env.JWT_ACCESS_SECRET!,
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '7d',
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '14d'
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '14d',
+    communicationSecret: process.env.JWT_COMMUNICATION_SECRET
+  },
+  sqs: {
+    auditImportQueueUrl: process.env.AUDIT_IMPORT_QUEUE_URL
   },
   s3: {
     bucketName: process.env.S3_BUCKET_NAME!,

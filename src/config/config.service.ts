@@ -45,7 +45,18 @@ export class ConfigService {
       })!,
       refreshExpiresIn: this.configService.get('jwt.refreshExpiresIn', {
         infer: true
-      })!
+      })!,
+      communicationSecret: this.configService.get('jwt.communicationSecret', {
+        infer: true
+      })
+    }
+  }
+
+  get sqs() {
+    return {
+      auditImportQueueUrl: this.configService.get('sqs.auditImportQueueUrl', {
+        infer: true
+      })
     }
   }
 
