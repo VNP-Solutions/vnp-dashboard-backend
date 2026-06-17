@@ -47,7 +47,8 @@ export class BulkAuditImportAcceptedDto {
 
   @ApiProperty({
     description: 'Human-readable confirmation that the import is queued',
-    example: 'Import is on Processing'
+    example:
+      "Import is on processing, you'll get an email once the import is done"
   })
   message: string
 }

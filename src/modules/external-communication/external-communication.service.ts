@@ -102,6 +102,10 @@ export class ExternalCommunicationService {
       `[ExternalCommunicationService] Enqueued audit import job ${jobId} qa_panel_id=${qaPanelId} email=${email} (SQS MessageId: ${messageId})`
     )
 
-    return { jobId, message: 'Import is on Processing' }
+    return {
+      jobId,
+      message:
+        "Import is on processing, you'll get an email once the import is done"
+    }
   }
 }
