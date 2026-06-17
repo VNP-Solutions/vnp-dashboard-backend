@@ -102,16 +102,15 @@ export class AuditImportReport {
   totalRows: number
 
   @ApiProperty({
-    description:
-      'Number of audits successfully created (one per property + status group)',
-    example: 12
+    description: 'Number of spreadsheet rows that passed validation',
+    example: 70
   })
   successCount: number
 
   @ApiProperty({
     description:
-      'Number of spreadsheet rows that failed validation (when validation fails, no audits are created)',
-    example: 5
+      'Number of spreadsheet rows that failed validation (when any row fails, no audits are created)',
+    example: 30
   })
   failureCount: number
 

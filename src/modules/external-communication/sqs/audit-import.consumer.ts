@@ -267,7 +267,10 @@ export class AuditImportConsumer
     )
 
     if (!result.success && result.errors?.length) {
-      report.failureCount = result.errors.length
+      const failedRows = new Set(result.errors.map(e => e.row))
+
+      report.failureCount = failedRows.size
+      report.successCount = report.totalRows - failedRows.size
 
       report.errors = result.errors.map(
         (e): AuditImportRowError => ({
@@ -278,12 +281,15 @@ export class AuditImportConsumer
           reason: e.error
         })
       )
-    } else if (result.created_audits?.length) {
-      report.successCount = result.created_audits.length
+    } else if (result.success) {
+      report.successCount = report.totalRows
+      report.failureCount = 0
 
-      report.successfulImports = result.created_audits.map(
-        a => `${a.property} - Audit created (${a.audit_id})`
-      )
+      if (result.created_audits?.length) {
+        report.successfulImports = result.created_audits.map(
+          a => `${a.property} - Audit created (${a.audit_id})`
+        )
+      }
     }
 
     this.logSummary(report)
@@ -342,7 +348,7 @@ export class AuditImportConsumer
       { secret: communicationSecret, expiresIn: '24h' }
     )
 
-    const status = report.failureCount === 0 ? 'success' : 'failed'
+    const status = report.failureCount === 0 ? 'Success' : 'Failed'
 
     const body = {
       qa_panel_id: report.qaPanelId,
