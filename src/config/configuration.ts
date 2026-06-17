@@ -16,6 +16,10 @@ export interface Configuration {
     refreshSecret: string
     accessExpiresIn: string
     refreshExpiresIn: string
+    communicationSecret: string | undefined
+  }
+  sqs: {
+    auditImportQueueUrl: string | undefined
   }
   s3: {
     bucketName: string
@@ -30,6 +34,7 @@ export interface Configuration {
   }
   invitationRedirectUrl?: string
   dashboardUrl?: string
+  externalBaseUrl?: string
   auth: {
     passwordRegex: RegExp
     otpExpiryMinutes: number
@@ -61,7 +66,11 @@ export default (): Configuration => ({
     refreshSecret: process.env.JWT_REFRESH_SECRET!,
     accessSecret: process.env.JWT_ACCESS_SECRET!,
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '7d',
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '14d'
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '14d',
+    communicationSecret: process.env.JWT_COMMUNICATION_SECRET
+  },
+  sqs: {
+    auditImportQueueUrl: process.env.AUDIT_IMPORT_QUEUE_URL
   },
   s3: {
     bucketName: process.env.S3_BUCKET_NAME!,
@@ -75,8 +84,8 @@ export default (): Configuration => ({
     password: process.env.SMTP_PASSWORD!
   },
   invitationRedirectUrl: process.env.INVITATION_REDIRECT_URL,
-  dashboardUrl:
-    process.env.DASHBOARD_URL || 'https://new.dashboardvnps.com/',
+  externalBaseUrl: process.env.EXTERNAL_BASE_URL,
+  dashboardUrl: process.env.DASHBOARD_URL || 'https://new.dashboardvnps.com/',
   auth: {
     passwordRegex:
       /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,32}$/,

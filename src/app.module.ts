@@ -40,6 +40,7 @@ import { ServiceTypeModule } from './modules/service-type/service-type.module'
 import { TaskModule } from './modules/task/task.module'
 import { UserRoleModule } from './modules/user-role/user-role.module'
 import { UserModule } from './modules/user/user.module'
+import { ExternalCommunicationModule } from './modules/external-communication/external-communication.module'
 
 @Module({
   imports: [
@@ -74,7 +75,8 @@ import { UserModule } from './modules/user/user.module'
     SchedulerModule,
     ServiceTypeModule,
     UserModule,
-    UserRoleModule
+    UserRoleModule,
+    ExternalCommunicationModule
   ],
   controllers: [AppController],
   providers: [
