@@ -86,31 +86,30 @@ export class ExternalCommunicationController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk import audits from a spreadsheet (async via SQS)',
+    summary: 'Auto-import audits from an OTA reservation sheet (async via SQS)',
     description:
-      'Upload an Excel (.xlsx, .xls) or CSV spreadsheet to bulk-import audits.\n\n' +
+      'Upload an Excel (.xlsx, .xls) or CSV spreadsheet containing OTA reservation rows. ' +
+      'Processing follows the same rules as `POST /audit/auto-import`.\n\n' +
       '**Authentication:** Pass a signed JWT as the Bearer token. ' +
       'The JWT must be signed with `JWT_COMMUNICATION_SECRET` and must not be expired. ' +
       'Obtain the token first from `POST /external/generate-token`.\n\n' +
       '**Response:** Returns **HTTP 202** immediately once the file has been uploaded to S3 and the job has been enqueued. ' +
       'The `jobId` in the response identifies the background job. ' +
-      'The actual import (row parsing, property lookup, audit creation) runs asynchronously. ' +
-      'Once complete, a callback is triggered (endpoint TBD) with the full import report.\n\n' +
-      '**Spreadsheet columns:**\n' +
-      '| Column | Required | Notes |\n' +
-      '|---|---|---|\n' +
-      '| Expedia ID | ✅ | Must match a property in the system |\n' +
-      '| Audit Status | ✅ | Created automatically if not found |\n' +
-      '| OTA / OTA Type | — | `expedia`, `agoda`, `booking` (comma-separated for multiple) |\n' +
-      '| Expedia Amount Collectable | — | Numeric |\n' +
-      '| Expedia Amount Confirmed | — | Numeric |\n' +
-      '| Agoda Amount Collectable | — | Numeric |\n' +
-      '| Agoda Amount Confirmed | — | Numeric |\n' +
-      '| Booking Amount Collectable | — | Numeric |\n' +
-      '| Booking Amount Confirmed | — | Numeric |\n' +
-      '| Report URL | — | URL string |\n' +
-      '| Review/Collection Date | — | `mm/dd/yyyy` format |\n' +
-      '| Batch / Batch No | — | Auto-created if not found |'
+      'The actual import (validation, property lookup, grouped audit creation, per-property report upload) runs asynchronously. ' +
+      'Once complete, a callback is sent to the external system with the full import report.\n\n' +
+      '**Required columns:**\n' +
+      '- **OTA** — `expedia`, `agoda`, or `booking`\n' +
+      '- **Status / Audit Status** — matched case-insensitively to an existing status, or created if not found\n' +
+      '- **Property lookup** (either):\n' +
+      '  - **Hotel ID** + OTA — must match the property credential ID for that OTA, or\n' +
+      '  - **Hotel Name** — must match an existing property when Hotel ID is not used\n' +
+      '- **Amount Collected** — numeric amount for the reservation row\n\n' +
+      '**Optional columns:** Check In, Check Out, Batch, Review/Collection Date, Portfolio (carried into generated report sheets).\n\n' +
+      '**Behaviour:**\n' +
+      '- Rows are grouped by resolved property + status — one audit is created per unique combination.\n' +
+      '- OTA types are collected from all rows in the group; amounts are summed per OTA (collectable and confirmed set to the same sum).\n' +
+      '- A per-property Excel report is generated and uploaded to S3; its URL is stored as `report_url` on the audit.\n' +
+      '- If any row fails validation, no audits are created and all errors are returned in the callback.'
   })
   @ApiBody({
     schema: {

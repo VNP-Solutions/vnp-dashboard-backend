@@ -62,7 +62,7 @@ export class AuditImportRowError {
 
   @ApiProperty({
     description:
-      'Expedia ID extracted from the row (or "Unknown" if the column was missing)',
+      'Property identifier from the row — Hotel ID when present, otherwise hotel/property name (or "Unknown")',
     example: '12345678'
   })
   expediaId: string
@@ -101,13 +101,15 @@ export class AuditImportReport {
   totalRows: number
 
   @ApiProperty({
-    description: 'Number of rows successfully imported as audits',
-    example: 95
+    description:
+      'Number of audits successfully created (one per property + status group)',
+    example: 12
   })
   successCount: number
 
   @ApiProperty({
-    description: 'Number of rows that failed to import',
+    description:
+      'Number of spreadsheet rows that failed validation (when validation fails, no audits are created)',
     example: 5
   })
   failureCount: number

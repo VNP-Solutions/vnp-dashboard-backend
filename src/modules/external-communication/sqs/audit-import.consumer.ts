@@ -1,27 +1,32 @@
 import { S3Client } from '@aws-sdk/client-s3'
+
 import { Message, SQSClient } from '@aws-sdk/client-sqs'
+
 import {
   Inject,
   Injectable,
   OnApplicationBootstrap,
   OnApplicationShutdown
 } from '@nestjs/common'
+
 import { JwtService } from '@nestjs/jwt'
-import { OtaType } from '@prisma/client'
-import { ParallelProcessor } from '../../../common/utils/parallel-processor.util'
+
+import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../../common/constants/external-api-user.context'
+
 import {
   parseSpreadsheetToJson,
   validateSpreadsheetFile
 } from '../../../common/utils/spreadsheet.util'
+
 import { ConfigService } from '../../../config/config.service'
-import type { IAuditStatusRepository } from '../../audit-status/audit-status.interface'
-import type { IAuditRepository } from '../../audit/audit.interface'
-import { PrismaService } from '../../prisma/prisma.service'
-import type { IPropertyRepository } from '../../property/property.interface'
+
+import type { IAuditService } from '../../audit/audit.interface'
+
 import {
   AuditImportReport,
   AuditImportRowError
 } from '../external-communication.dto'
+
 import {
   AuditImportSqsMessage,
   createS3Client,
@@ -37,58 +42,73 @@ export class AuditImportConsumer
   implements OnApplicationBootstrap, OnApplicationShutdown
 {
   private sqsClient!: SQSClient
+
   private s3Client!: S3Client
+
   private queueUrl!: string
+
   private bucketName!: string
+
   private isRunning = false
+
   private shutdownSignal = false
 
   constructor(
     private readonly configService: ConfigService,
+
     private readonly jwtService: JwtService,
-    @Inject('IAuditRepository')
-    private readonly auditRepository: IAuditRepository,
-    @Inject('IAuditStatusRepository')
-    private readonly auditStatusRepository: IAuditStatusRepository,
-    @Inject('IPropertyRepository')
-    private readonly propertyRepository: IPropertyRepository,
-    private readonly prisma: PrismaService
+
+    @Inject('IAuditService')
+    private readonly auditService: IAuditService
   ) {}
 
   onApplicationBootstrap(): void {
     const queueUrl = this.configService.sqs.auditImportQueueUrl
+
     if (!queueUrl) {
       console.log(
         '[AuditImportConsumer] AUDIT_IMPORT_QUEUE_URL is not set — consumer will not start'
       )
+
       return
     }
 
     this.queueUrl = queueUrl
+
     this.bucketName = this.configService.s3.bucketName
 
     const s3Config = this.configService.s3
+
     this.sqsClient = createSqsClient({
       region: s3Config.region,
+
       accessKeyId: s3Config.accessKey,
+
       secretAccessKey: s3Config.secretKey
     })
+
     this.s3Client = createS3Client({
       region: s3Config.region,
+
       accessKeyId: s3Config.accessKey,
+
       secretAccessKey: s3Config.secretKey
     })
 
     console.log('[AuditImportConsumer] Starting long-poll loop...')
+
     void this.startPolling()
   }
 
   async onApplicationShutdown(): Promise<void> {
     this.shutdownSignal = true
+
     const timeout = Date.now() + 30_000
+
     while (this.isRunning && Date.now() < timeout) {
       await new Promise(resolve => setTimeout(resolve, 500))
     }
+
     console.log('[AuditImportConsumer] Shutdown complete')
   }
 
@@ -97,19 +117,23 @@ export class AuditImportConsumer
       try {
         const messages = await receiveAuditImportMessages(
           this.sqsClient,
+
           this.queueUrl
         )
 
         for (const message of messages) {
           if (this.shutdownSignal) break
+
           await this.processMessage(message)
         }
       } catch (error) {
         if (!this.shutdownSignal) {
           console.error(
             '[AuditImportConsumer] Poll error:',
+
             (error as Error).message
           )
+
           await new Promise(resolve => setTimeout(resolve, 5_000))
         }
       }
@@ -120,35 +144,47 @@ export class AuditImportConsumer
     if (!message.Body || !message.ReceiptHandle) return
 
     let parsedMessage: AuditImportSqsMessage
+
     try {
       parsedMessage = JSON.parse(message.Body) as AuditImportSqsMessage
     } catch {
       console.error(
         '[AuditImportConsumer] Invalid JSON in message — dropping:',
+
         message.MessageId
       )
+
       await deleteAuditImportMessage(
         this.sqsClient,
+
         this.queueUrl,
+
         message.ReceiptHandle
       )
+
       return
     }
 
     if (!parsedMessage.jobId || !parsedMessage.s3Key) {
       console.error(
         '[AuditImportConsumer] Missing required fields — dropping:',
+
         message.MessageId
       )
+
       await deleteAuditImportMessage(
         this.sqsClient,
+
         this.queueUrl,
+
         message.ReceiptHandle
       )
+
       return
     }
 
     this.isRunning = true
+
     console.log(
       `[AuditImportConsumer] Processing job ${parsedMessage.jobId} (${parsedMessage.originalName})`
     )
@@ -162,14 +198,18 @@ export class AuditImportConsumer
       )
 
       await this.onImportComplete(parsedMessage.jobId, report)
+
       await deleteAuditImportMessage(
         this.sqsClient,
+
         this.queueUrl,
+
         message.ReceiptHandle
       )
     } catch (error) {
       console.error(
         `[AuditImportConsumer] Job ${parsedMessage.jobId} failed:`,
+
         (error as Error).message
       )
     } finally {
@@ -182,52 +222,68 @@ export class AuditImportConsumer
   ): Promise<AuditImportReport> {
     const fileBuffer = await downloadFileFromS3(
       this.s3Client,
+
       this.bucketName,
+
       msg.s3Key
     )
 
     const fakeFile = {
       buffer: fileBuffer,
+
       originalname: msg.originalName,
+
       mimetype: 'application/octet-stream',
+
       size: fileBuffer.length
     } as Express.Multer.File
 
     validateSpreadsheetFile(fakeFile)
+
     const rows = parseSpreadsheetToJson(fakeFile)
 
     const report: AuditImportReport = {
       jobId: msg.jobId,
+
       qaPanelId: msg.qaPanelId,
+
       email: msg.email,
+
       totalRows: rows.length,
+
       successCount: 0,
+
       failureCount: 0,
+
       errors: [],
+
       successfulImports: []
     }
 
-    const batchSize = ParallelProcessor.getWorkerCount()
+    const result = await this.auditService.autoImport(
+      fakeFile,
 
-    for (let i = 0; i < rows.length; i += batchSize) {
-      const batch = rows.slice(i, i + batchSize)
-      const batchResults = await Promise.all(
-        batch.map((row, idx) => this.processRow(row, i + idx + 2))
+      EXTERNAL_API_SUPER_ADMIN_CONTEXT
+    )
+
+    if (!result.success && result.errors?.length) {
+      report.failureCount = result.errors.length
+
+      report.errors = result.errors.map(
+        (e): AuditImportRowError => ({
+          row: e.row,
+
+          expediaId: e.hotel_id ?? e.property ?? 'Unknown',
+
+          reason: e.error
+        })
       )
+    } else if (result.created_audits?.length) {
+      report.successCount = result.created_audits.length
 
-      for (const result of batchResults) {
-        if (result.success) {
-          report.successCount++
-          report.successfulImports.push(result.description!)
-        } else {
-          report.failureCount++
-          report.errors.push({
-            row: result.rowNumber,
-            expediaId: result.expediaId ?? 'Unknown',
-            reason: result.error!
-          })
-        }
-      }
+      report.successfulImports = result.created_audits.map(
+        a => `${a.property} - Audit created (${a.audit_id})`
+      )
     }
 
     this.logSummary(report)
@@ -237,6 +293,7 @@ export class AuditImportConsumer
     } catch (err) {
       console.warn(
         `[AuditImportConsumer] Could not delete temp S3 file ${msg.s3Key}:`,
+
         (err as Error).message
       )
     }
@@ -244,229 +301,44 @@ export class AuditImportConsumer
     return report
   }
 
-  private async processRow(
-    row: any,
-    rowNumber: number
-  ): Promise<{
-    success: boolean
-    rowNumber: number
-    expediaId?: string
-    description?: string
-    error?: string
-  }> {
-    try {
-      const expediaId = this.findHeaderValue(row, [
-        'Expedia ID',
-        'Expedia Id',
-        'Expedia id',
-        'expedia_id'
-      ])
-
-      if (!expediaId) {
-        return {
-          success: false,
-          rowNumber,
-          error:
-            'Expedia ID is required. Available columns: ' +
-            Object.keys(row).join(', ')
-        }
-      }
-
-      const property = await this.propertyRepository.findByExpediaId(expediaId)
-      if (!property) {
-        return {
-          success: false,
-          rowNumber,
-          expediaId,
-          error: 'Property not found with this Expedia ID'
-        }
-      }
-
-      const otaTypeValue = this.findHeaderValue(row, [
-        'OTA',
-        'OTA Type',
-        'Ota Type',
-        'Ota type',
-        'type_of_ota'
-      ])
-
-      const typeOfOtaArray: OtaType[] = []
-      if (otaTypeValue) {
-        for (const otaStr of otaTypeValue
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean)) {
-          const parsed = this.parseOtaType(otaStr)
-          if (parsed && !typeOfOtaArray.includes(parsed)) {
-            typeOfOtaArray.push(parsed)
-          }
-        }
-      }
-
-      const auditStatusValue = this.findHeaderValue(row, [
-        'Audit Status',
-        'Audit status',
-        'Status',
-        'audit_status_id'
-      ])
-      if (!auditStatusValue) {
-        return {
-          success: false,
-          rowNumber,
-          expediaId,
-          error: 'Audit status is required'
-        }
-      }
-
-      let auditStatus =
-        await this.auditStatusRepository.findByStatus(auditStatusValue)
-      if (!auditStatus) {
-        auditStatus = await this.auditStatusRepository.create({
-          status: auditStatusValue
-        })
-      }
-
-      const expediaAmountCollectable = this.parseAmount(
-        this.findHeaderValue(row, [
-          'Expedia Amount Collectable',
-          'Expedia Collectable',
-          'expedia_amount_collectable'
-        ])
-      )
-      const expediaAmountConfirmed = this.parseAmount(
-        this.findHeaderValue(row, [
-          'Expedia Amount Confirmed',
-          'Expedia Confirmed',
-          'expedia_amount_confirmed'
-        ])
-      )
-      const agodaAmountCollectable = this.parseAmount(
-        this.findHeaderValue(row, [
-          'Agoda Amount Collectable',
-          'Agoda Collectable',
-          'agoda_amount_collectable'
-        ])
-      )
-      const agodaAmountConfirmed = this.parseAmount(
-        this.findHeaderValue(row, [
-          'Agoda Amount Confirmed',
-          'Agoda Confirmed',
-          'agoda_amount_confirmed'
-        ])
-      )
-      const bookingAmountCollectable = this.parseAmount(
-        this.findHeaderValue(row, [
-          'Booking Amount Collectable',
-          'Booking Collectable',
-          'booking_amount_collectable'
-        ])
-      )
-      const bookingAmountConfirmed = this.parseAmount(
-        this.findHeaderValue(row, [
-          'Booking Amount Confirmed',
-          'Booking Confirmed',
-          'booking_amount_confirmed'
-        ])
-      )
-
-      const reportUrl = this.findHeaderValue(row, [
-        'Report URL',
-        'Report url',
-        'report_url',
-        'Report',
-        'URL'
-      ])
-
-      const reviewCollectionDateRaw = this.getRawValue(row, [
-        'Review/Collection Date',
-        'Review/collection date',
-        'Review Collection Date',
-        'Review collection date',
-        'review_collection_date'
-      ])
-      let reviewCollectionDate: Date | null = null
-      if (reviewCollectionDateRaw) {
-        reviewCollectionDate = this.parseDate(reviewCollectionDateRaw)
-        if (!reviewCollectionDate) {
-          return {
-            success: false,
-            rowNumber,
-            expediaId,
-            error: 'Invalid review collection date format (expected mm/dd/yyyy)'
-          }
-        }
-      }
-
-      const batchValue = this.findHeaderValue(row, ['Batch', 'Batch No'])
-      let batchId: string | undefined
-
-      if (batchValue) {
-        let batch = await this.prisma.auditBatch.findFirst({
-          where: { batch_no: batchValue }
-        })
-        if (!batch) {
-          batch = await this.prisma.auditBatch.create({
-            data: { batch_no: batchValue }
-          })
-        }
-        batchId = batch.id
-      }
-
-      await this.auditRepository.create({
-        property_id: property.id,
-        audit_status_id: auditStatus.id,
-        type_of_ota: typeOfOtaArray.length > 0 ? typeOfOtaArray : undefined,
-        expedia_amount_collectable: expediaAmountCollectable,
-        expedia_amount_confirmed: expediaAmountConfirmed,
-        agoda_amount_collectable: agodaAmountCollectable,
-        agoda_amount_confirmed: agodaAmountConfirmed,
-        booking_amount_collectable: bookingAmountCollectable,
-        booking_amount_confirmed: bookingAmountConfirmed,
-        report_url: reportUrl,
-        review_collection_date: reviewCollectionDate
-          ? reviewCollectionDate.toISOString()
-          : undefined,
-        batch_id: batchId
-      })
-
-      const description = `${expediaId} - ${typeOfOtaArray.length > 0 ? typeOfOtaArray.join(', ') : 'Unknown OTA'} Audit`
-      return { success: true, rowNumber, expediaId, description }
-    } catch (error) {
-      return {
-        success: false,
-        rowNumber,
-        error: (error as Error).message || 'Unknown error occurred'
-      }
-    }
-  }
-
   /**
+
    * Called after every import job completes.
+
    * Fires POST {EXTERNAL_BASE_URL}/qa-panel/import-callback with a communication JWT
+
    * and the full import report so the external system knows the job outcome.
+
    */
+
   private async onImportComplete(
     _jobId: string,
+
     report: AuditImportReport
   ): Promise<void> {
     const baseUrl = this.configService.externalBaseUrl
+
     if (!baseUrl) {
       console.warn(
         '[AuditImportConsumer] EXTERNAL_BASE_URL is not set — skipping import callback'
       )
+
       return
     }
 
     const communicationSecret = this.configService.jwt.communicationSecret
+
     if (!communicationSecret) {
       console.warn(
         '[AuditImportConsumer] JWT_COMMUNICATION_SECRET is not set — skipping import callback'
       )
+
       return
     }
 
     const token = this.jwtService.sign(
       { type: 'external-communication' },
+
       { secret: communicationSecret, expiresIn: '24h' }
     )
 
@@ -474,15 +346,22 @@ export class AuditImportConsumer
 
     const body = {
       qa_panel_id: report.qaPanelId,
+
       email: report.email,
+
       status,
+
       report: {
         total: report.totalRows,
+
         success: report.successCount,
+
         failed: report.failureCount
       },
+
       errors: report.errors.map(e => ({
         row: e.row,
+
         failed_reason: e.reason
       }))
     }
@@ -493,17 +372,22 @@ export class AuditImportConsumer
       console.log(
         `[AuditImportConsumer] Sending import callback to ${url} (status=${status})`
       )
+
       const response = await fetch(url, {
         method: 'POST',
+
         headers: {
           'Content-Type': 'application/json',
+
           Authorization: `Bearer ${token}`
         },
+
         body: JSON.stringify(body)
       })
 
       if (!response.ok) {
         const text = await response.text().catch(() => '')
+
         console.error(
           `[AuditImportConsumer] Callback responded with ${response.status}: ${text}`
         )
@@ -515,150 +399,38 @@ export class AuditImportConsumer
     } catch (err) {
       console.error(
         '[AuditImportConsumer] Failed to send import callback:',
+
         (err as Error).message
       )
-    }
-  }
-
-  private findHeaderValue(
-    row: any,
-    possibleNames: string[]
-  ): string | undefined {
-    for (const name of possibleNames) {
-      const value = row[name]
-      if (value !== undefined && value !== null && value !== '') {
-        return String(value).trim()
-      }
-    }
-
-    const rowKeys = Object.keys(row)
-    for (const name of possibleNames) {
-      for (const key of rowKeys) {
-        const cleanKey = key.split('*')[0].trim()
-        if (cleanKey.toLowerCase() === name.toLowerCase()) {
-          const value = row[key]
-          if (value !== undefined && value !== null && value !== '') {
-            return String(value).trim()
-          }
-        }
-      }
-    }
-
-    return undefined
-  }
-
-  private getRawValue(row: any, possibleNames: string[]): any {
-    for (const name of possibleNames) {
-      const value = row[name]
-      if (value !== undefined && value !== null && value !== '') return value
-    }
-
-    const rowKeys = Object.keys(row)
-    for (const name of possibleNames) {
-      for (const key of rowKeys) {
-        const cleanKey = key.split('*')[0].trim()
-        if (cleanKey.toLowerCase() === name.toLowerCase()) {
-          const value = row[key]
-          if (value !== undefined && value !== null && value !== '')
-            return value
-        }
-      }
-    }
-
-    return undefined
-  }
-
-  private parseAmount(value: string | undefined): number | undefined {
-    if (!value) return undefined
-    const parsed = parseFloat(value)
-    if (isNaN(parsed)) return undefined
-    return Math.round(parsed * 100) / 100
-  }
-
-  private parseDate(dateValue: any): Date | null {
-    if (!dateValue) return null
-    try {
-      if (dateValue instanceof Date) {
-        return isNaN(dateValue.getTime()) ? null : dateValue
-      }
-      if (typeof dateValue === 'number') {
-        const excelEpoch = new Date(1899, 11, 30)
-        const date = new Date(
-          excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000
-        )
-        if (
-          !isNaN(date.getTime()) &&
-          date.getFullYear() >= 1900 &&
-          date.getFullYear() <= 2100
-        ) {
-          return date
-        }
-        return null
-      }
-      const dateString = String(dateValue)
-      const parts = dateString.trim().split('/')
-      if (parts.length === 3) {
-        const month = parseInt(parts[0], 10)
-        const day = parseInt(parts[1], 10)
-        const year = parseInt(parts[2], 10)
-        if (
-          !isNaN(month) &&
-          !isNaN(day) &&
-          !isNaN(year) &&
-          year >= 1900 &&
-          year <= 2100
-        ) {
-          return new Date(year, month - 1, day)
-        }
-      }
-      const date = new Date(dateString)
-      if (
-        !isNaN(date.getTime()) &&
-        date.getFullYear() >= 1900 &&
-        date.getFullYear() <= 2100
-      ) {
-        return date
-      }
-      return null
-    } catch {
-      return null
-    }
-  }
-
-  private parseOtaType(otaString: string): OtaType | null {
-    const normalized = otaString.toLowerCase().trim()
-    switch (normalized) {
-      case 'expedia':
-      case 'exp':
-        return OtaType.expedia
-      case 'agoda':
-      case 'ago':
-        return OtaType.agoda
-      case 'booking':
-      case 'booking.com':
-      case 'book':
-        return OtaType.booking
-      default:
-        return null
     }
   }
 
   private logSummary(report: AuditImportReport): void {
     console.log(
       '\n\x1b[36m%s\x1b[0m',
+
       '========================================'
     )
+
     console.log('\x1b[36m%s\x1b[0m', `📊 IMPORT SUMMARY — Job ${report.jobId}`)
+
     console.log('\x1b[36m%s\x1b[0m', '========================================')
+
     console.log('\x1b[33m%s\x1b[0m', `📝 Total Rows: ${report.totalRows}`)
+
     console.log('\x1b[32m%s\x1b[0m', `✅ Successful: ${report.successCount}`)
+
     console.log('\x1b[31m%s\x1b[0m', `❌ Failed: ${report.failureCount}`)
+
     if (report.failureCount > 0) {
       console.log('\n\x1b[31m%s\x1b[0m', '❌ Errors:')
+
       console.table(report.errors)
     }
+
     console.log(
       '\x1b[36m%s\x1b[0m',
+
       '========================================\n'
     )
   }

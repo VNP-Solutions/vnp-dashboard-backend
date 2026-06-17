@@ -1,12 +1,9 @@
 import { Module } from '@nestjs/common'
-import { JwtModule } from '@nestjs/jwt'
 import { ConfigService as NestConfigService } from '@nestjs/config'
-import { Configuration } from '../../config/configuration'
+import { JwtModule } from '@nestjs/jwt'
 import { ConfigService } from '../../config/config.service'
-import { AuditRepository } from '../audit/audit.repository'
-import { AuditStatusRepository } from '../audit-status/audit-status.repository'
-import { PropertyRepository } from '../property/property.repository'
-import { PrismaService } from '../prisma/prisma.service'
+import { Configuration } from '../../config/configuration'
+import { AuditModule } from '../audit/audit.module'
 import { ExternalCommunicationController } from './external-communication.controller'
 import { ExternalCommunicationService } from './external-communication.service'
 import { ExternalJwtGuard } from './guards/external-jwt.guard'
@@ -15,6 +12,7 @@ import { AuditImportConsumer } from './sqs/audit-import.consumer'
 
 @Module({
   imports: [
+    AuditModule,
     JwtModule.registerAsync({
       inject: [NestConfigService],
       useFactory: (configService: NestConfigService<Configuration>) => ({
@@ -30,10 +28,6 @@ import { AuditImportConsumer } from './sqs/audit-import.consumer'
     ExternalRawSecretGuard,
     ExternalJwtGuard,
     AuditImportConsumer,
-    { provide: 'IAuditRepository', useClass: AuditRepository },
-    { provide: 'IAuditStatusRepository', useClass: AuditStatusRepository },
-    { provide: 'IPropertyRepository', useClass: PropertyRepository },
-    PrismaService,
     ConfigService
   ]
 })
