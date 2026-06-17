@@ -6,6 +6,7 @@ import {
   OnApplicationBootstrap,
   OnApplicationShutdown
 } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import { OtaType } from '@prisma/client'
 import { ParallelProcessor } from '../../../common/utils/parallel-processor.util'
 import {
@@ -44,6 +45,7 @@ export class AuditImportConsumer
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
     @Inject('IAuditRepository')
     private readonly auditRepository: IAuditRepository,
     @Inject('IAuditStatusRepository')
@@ -439,15 +441,83 @@ export class AuditImportConsumer
   }
 
   /**
-   * Stub — will be implemented once the callback API contract is defined.
-   * Called after every import job completes (success or partial failure).
+   * Called after every import job completes.
+   * Fires POST {EXTERNAL_BASE_URL}/qa-panel/import-callback with a communication JWT
+   * and the full import report so the external system knows the job outcome.
    */
-
   private async onImportComplete(
     _jobId: string,
-    _report: AuditImportReport
+    report: AuditImportReport
   ): Promise<void> {
-    // TODO: call external API with the completed report
+    const baseUrl = this.configService.externalBaseUrl
+    if (!baseUrl) {
+      console.warn(
+        '[AuditImportConsumer] EXTERNAL_BASE_URL is not set — skipping import callback'
+      )
+      return
+    }
+
+    const communicationSecret = this.configService.jwt.communicationSecret
+    if (!communicationSecret) {
+      console.warn(
+        '[AuditImportConsumer] JWT_COMMUNICATION_SECRET is not set — skipping import callback'
+      )
+      return
+    }
+
+    const token = this.jwtService.sign(
+      { type: 'external-communication' },
+      { secret: communicationSecret, expiresIn: '24h' }
+    )
+
+    const status = report.failureCount === 0 ? 'success' : 'failed'
+
+    const body = {
+      qa_panel_id: report.qaPanelId,
+      email: report.email,
+      status,
+      report: {
+        total: report.totalRows,
+        success: report.successCount,
+        failed: report.failureCount
+      },
+      errors: report.errors.map(e => ({
+        row: e.row,
+        failed_reason: e.reason
+      }))
+    }
+
+    const url = `${baseUrl.replace(/\/$/, '')}/qa-panel/import-callback`
+
+    try {
+      console.log(
+        `[AuditImportConsumer] Sending import callback to ${url} (status=${status})`
+      )
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      })
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        console.error(
+          `[AuditImportConsumer] Callback responded with ${response.status}: ${text}`
+        )
+      } else {
+        console.log(
+          `[AuditImportConsumer] Callback acknowledged (${response.status})`
+        )
+      }
+    } catch (err) {
+      console.error(
+        '[AuditImportConsumer] Failed to send import callback:',
+        (err as Error).message
+      )
+    }
   }
 
   private findHeaderValue(

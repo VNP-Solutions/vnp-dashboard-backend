@@ -34,6 +34,7 @@ export interface Configuration {
   }
   invitationRedirectUrl?: string
   dashboardUrl?: string
+  externalBaseUrl?: string
   auth: {
     passwordRegex: RegExp
     otpExpiryMinutes: number
@@ -83,8 +84,8 @@ export default (): Configuration => ({
     password: process.env.SMTP_PASSWORD!
   },
   invitationRedirectUrl: process.env.INVITATION_REDIRECT_URL,
-  dashboardUrl:
-    process.env.DASHBOARD_URL || 'https://new.dashboardvnps.com/',
+  externalBaseUrl: process.env.EXTERNAL_BASE_URL,
+  dashboardUrl: process.env.DASHBOARD_URL || 'https://new.dashboardvnps.com/',
   auth: {
     passwordRegex:
       /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,32}$/,

@@ -102,4 +102,8 @@ export class ConfigurationSchema {
   @IsOptional()
   @IsUrl()
   AUDIT_IMPORT_QUEUE_URL?: string
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  EXTERNAL_BASE_URL?: string
 }

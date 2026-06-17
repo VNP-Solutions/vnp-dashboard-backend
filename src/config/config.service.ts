@@ -80,4 +80,8 @@ export class ConfigService {
   get invitationRedirectUrl(): string | undefined {
     return this.configService.get('invitationRedirectUrl', { infer: true })
   }
+
+  get externalBaseUrl(): string | undefined {
+    return this.configService.get('externalBaseUrl', { infer: true })
+  }
 }
