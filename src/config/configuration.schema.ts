@@ -93,4 +93,17 @@ export class ConfigurationSchema {
   @IsString()
   @IsNotEmpty()
   INVITATION_REDIRECT_URL?: string
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  JWT_COMMUNICATION_SECRET?: string
+
+  @IsOptional()
+  @IsUrl()
+  AUDIT_IMPORT_QUEUE_URL?: string
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  EXTERNAL_BASE_URL?: string
 }
