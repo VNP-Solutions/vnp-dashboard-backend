@@ -89,7 +89,7 @@ export class ExternalCommunicationController {
     summary: 'Auto-import audits from an OTA reservation sheet (async via SQS)',
     description:
       'Upload an Excel (.xlsx, .xls) or CSV spreadsheet containing OTA reservation rows. ' +
-      'Processing follows the same rules as `POST /audit/auto-import`.\n\n' +
+      'Processing follows the same rules as `POST /audit/auto-import`, except audit status is always set to **Reported to Property**.\n\n' +
       '**Authentication:** Pass a signed JWT as the Bearer token. ' +
       'The JWT must be signed with `JWT_COMMUNICATION_SECRET` and must not be expired. ' +
       'Obtain the token first from `POST /external/generate-token`.\n\n' +
@@ -99,14 +99,14 @@ export class ExternalCommunicationController {
       'Once complete, a callback is sent to the external system with the full import report.\n\n' +
       '**Required columns:**\n' +
       '- **OTA** — `expedia`, `agoda`, or `booking`\n' +
-      '- **Status / Audit Status** — matched case-insensitively to an existing status, or created if not found\n' +
       '- **Property lookup** (either):\n' +
       '  - **Hotel ID** + OTA — must match the property credential ID for that OTA, or\n' +
       '  - **Hotel Name** — must match an existing property when Hotel ID is not used\n' +
       '- **Amount Collected** — numeric amount for the reservation row\n\n' +
-      '**Optional columns:** Check In, Check Out, Batch, Review/Collection Date, Portfolio (carried into generated report sheets).\n\n' +
+      '**Optional columns:** Check In, Check Out, Batch, Review/Collection Date, Portfolio (carried into generated report sheets). Any Status column in the file is ignored.\n\n' +
       '**Behaviour:**\n' +
-      '- Rows are grouped by resolved property + status — one audit is created per unique combination.\n' +
+      '- All created audits are assigned status **Reported to Property** (must exist in Audit Status settings).\n' +
+      '- Rows are grouped by resolved property — one audit is created per property.\n' +
       '- OTA types are collected from all rows in the group; amounts are summed per OTA (collectable and confirmed set to the same sum).\n' +
       '- A per-property Excel report is generated and uploaded to S3; its URL is stored as `report_url` on the audit.\n' +
       '- If any row fails validation, no audits are created and all errors are returned in the callback.'

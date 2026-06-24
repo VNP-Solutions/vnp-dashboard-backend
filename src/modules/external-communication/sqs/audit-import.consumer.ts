@@ -27,6 +27,8 @@ import {
   AuditImportRowError
 } from '../external-communication.dto'
 
+import { EXTERNAL_BULK_IMPORT_AUDIT_STATUS } from '../external-communication.constants'
+
 import {
   AuditImportSqsMessage,
   createS3Client,
@@ -263,7 +265,9 @@ export class AuditImportConsumer
     const result = await this.auditService.autoImport(
       fakeFile,
 
-      EXTERNAL_API_SUPER_ADMIN_CONTEXT
+      EXTERNAL_API_SUPER_ADMIN_CONTEXT,
+
+      { fixedAuditStatusLabel: EXTERNAL_BULK_IMPORT_AUDIT_STATUS }
     )
 
     if (!result.success && result.errors?.length) {

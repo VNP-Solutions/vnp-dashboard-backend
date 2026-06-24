@@ -43,6 +43,7 @@ import {
   AuditQueryDto,
   AutoImportAuditErrorDto,
   AutoImportAuditResultDto,
+  AutoImportOptions,
   BulkArchiveAuditDto,
   BulkDeleteAuditDto,
   BulkImportResultDto,
@@ -2894,8 +2895,10 @@ export class AuditService implements IAuditService {
 
   async autoImport(
     file: Express.Multer.File,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    options?: AutoImportOptions
   ): Promise<AutoImportAuditResultDto> {
+    const fixedAuditStatusLabel = options?.fixedAuditStatusLabel?.trim()
     this.logger.info(
       `Starting auto-import for user: ${user.email} (${user.role.name})`
     )
@@ -3127,7 +3130,9 @@ export class AuditService implements IAuditService {
       const amountRaw = findCol(row, AMOUNT_COLS)
       const batchRaw = findCol(row, BATCH_COLS)
       const reviewCollectionDateRaw = findCol(row, REVIEW_COLLECTION_DATE_COLS)
-      const statusRaw = findCol(row, STATUS_COLS)
+      const statusRaw = fixedAuditStatusLabel
+        ? undefined
+        : findCol(row, STATUS_COLS)
       const statusTrimmed = statusRaw ? String(statusRaw).trim() : ''
 
       const hotelIdStr =
@@ -3152,7 +3157,7 @@ export class AuditService implements IAuditService {
           `Amount="${amountRaw || 'N/A'}", ` +
           `Batch="${batchRaw || 'N/A'}", ` +
           `ReviewCollectionDate="${reviewCollectionDateRaw || 'N/A'}", ` +
-          `Status="${statusTrimmed || 'N/A'}"`
+          `Status="${(fixedAuditStatusLabel ?? statusTrimmed) || 'N/A'}"`
       )
 
       // --- Required field presence ---
@@ -3168,7 +3173,7 @@ export class AuditService implements IAuditService {
       }
 
       // --- Status (audit status name) ---
-      if (!statusTrimmed) {
+      if (!fixedAuditStatusLabel && !statusTrimmed) {
         rowErrors.push('Status is missing')
       }
 
@@ -3259,9 +3264,11 @@ export class AuditService implements IAuditService {
       }
 
       // Build valid group only if this row has zero errors so far
-      // Groups are keyed by property + status (case-insensitive) so one property can yield multiple audits.
+      // Groups are keyed by property (+ status when status comes from the sheet).
       if (rowErrors.length === 0 && propertyId) {
-        const groupKey = `${propertyId}::${statusTrimmed.toLowerCase()}`
+        const groupKey = fixedAuditStatusLabel
+          ? propertyId
+          : `${propertyId}::${statusTrimmed.toLowerCase()}`
         if (!validGroups.has(groupKey)) {
           const displayName =
             hotelName ??
@@ -3274,7 +3281,7 @@ export class AuditService implements IAuditService {
             displayName,
             batch: batchRaw,
             reviewCollectionDate: reviewCollectionDateRaw,
-            statusLabel: statusTrimmed
+            statusLabel: fixedAuditStatusLabel ?? statusTrimmed
           })
         }
         validGroups.get(groupKey)!.rows.push(row)
@@ -3299,25 +3306,45 @@ export class AuditService implements IAuditService {
       `✓ Validation successful. ${validGroups.size} property group(s) ready for audit creation`
     )
 
-    // --- Resolve audit status IDs: find by name (case-insensitive), else create ---
-    const uniqueStatusLabels = Array.from(
-      new Set(Array.from(validGroups.values()).map(g => g.statusLabel.trim()))
-    ).filter(Boolean)
-
+    // --- Resolve audit status IDs ---
+    let fixedAuditStatusId: string | undefined
     const statusIdByNormalized = new Map<string, string>()
-    let allStatusesForImport = await this.auditStatusRepository.findAll()
 
-    for (const label of uniqueStatusLabels) {
-      const norm = label.toLowerCase()
-      if (statusIdByNormalized.has(norm)) continue
-
-      let matched =
-        allStatusesForImport.find(s => s.status.toLowerCase() === norm) ?? null
+    if (fixedAuditStatusLabel) {
+      const allStatusesForImport = await this.auditStatusRepository.findAll()
+      const matched =
+        allStatusesForImport.find(
+          s => s.status.toLowerCase() === fixedAuditStatusLabel.toLowerCase()
+        ) ?? null
       if (!matched) {
-        matched = await this.auditStatusRepository.create({ status: label })
-        allStatusesForImport = [...allStatusesForImport, matched]
+        throw new BadRequestException(
+          `Audit status "${fixedAuditStatusLabel}" not found. Ensure it exists in Audit Status settings.`
+        )
       }
-      statusIdByNormalized.set(norm, matched.id)
+      fixedAuditStatusId = matched.id
+      this.logger.info(
+        `Using fixed audit status "${fixedAuditStatusLabel}" (ID=${fixedAuditStatusId}) for all imported audits`
+      )
+    } else {
+      const uniqueStatusLabels = Array.from(
+        new Set(Array.from(validGroups.values()).map(g => g.statusLabel.trim()))
+      ).filter(Boolean)
+
+      let allStatusesForImport = await this.auditStatusRepository.findAll()
+
+      for (const label of uniqueStatusLabels) {
+        const norm = label.toLowerCase()
+        if (statusIdByNormalized.has(norm)) continue
+
+        let matched =
+          allStatusesForImport.find(s => s.status.toLowerCase() === norm) ??
+          null
+        if (!matched) {
+          matched = await this.auditStatusRepository.create({ status: label })
+          allStatusesForImport = [...allStatusesForImport, matched]
+        }
+        statusIdByNormalized.set(norm, matched.id)
+      }
     }
 
     this.logger.info('Starting audit creation process...')
@@ -3340,7 +3367,9 @@ export class AuditService implements IAuditService {
         statusLabel
       }
     ] of validGroups) {
-      const auditStatusId = statusIdByNormalized.get(statusLabel.toLowerCase())
+      const auditStatusId =
+        fixedAuditStatusId ??
+        statusIdByNormalized.get(statusLabel.toLowerCase())
       if (!auditStatusId) {
         throw new BadRequestException(
           `Failed to resolve audit status for "${statusLabel}"`
