@@ -4,6 +4,7 @@ import { IUserWithPermissions } from '../../common/interfaces/permission.interfa
 import {
   AuditQueryDto,
   AutoImportAuditResultDto,
+  AutoImportOptions,
   BulkArchiveAuditDto,
   BulkDeleteAuditDto,
   BulkImportResultDto,
@@ -227,7 +228,8 @@ export interface IAuditService {
   ): Promise<AuditWithFullDetails>
   autoImport(
     file: Express.Multer.File,
-    user: IUserWithPermissions
+    user: IUserWithPermissions,
+    options?: AutoImportOptions
   ): Promise<AutoImportAuditResultDto>
   deleteAllByPortfolio(
     portfolioId: string,

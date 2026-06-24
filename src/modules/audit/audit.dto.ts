@@ -459,6 +459,11 @@ export class UpdateReportUrlDto {
   report_url: string
 }
 
+export interface AutoImportOptions {
+  /** When set, ignore Status column and assign this label to all created audits */
+  fixedAuditStatusLabel?: string
+}
+
 export class AutoImportAuditErrorDto {
   @ApiProperty({ example: 2, description: 'Sheet row number (header = row 1)' })
   row: number
