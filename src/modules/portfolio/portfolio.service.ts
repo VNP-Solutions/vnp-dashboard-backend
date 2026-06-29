@@ -40,7 +40,9 @@ import {
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
   PortfolioStatsResponseDto,
-  UpdatePortfolioDto
+  UpdatePortfolioDto,
+  SyncCreatePortfolioDto,
+  SyncUpdatePortfolioDto,
 } from './portfolio.dto'
 import type {
   IPortfolioRepository,
@@ -185,6 +187,20 @@ export class PortfolioService implements IPortfolioService {
     )
 
     return portfolioWithContractUrls || portfolio
+  }
+
+  async syncCreate(dto: SyncCreatePortfolioDto): Promise<{ status: string; id?: string }> {
+    const existing = await this.portfolioRepository.findByName(dto.name)
+    if (existing) return { status: 'already_exists', id: existing.id }
+    const service_type_id = await this.portfolioRepository.resolveServiceTypeIdByType(dto.service_type)
+    const created = await this.portfolioRepository.create({
+      name: dto.name,
+      service_type_id,
+      is_active: dto.is_active ?? true,
+      is_commissionable: dto.is_commissionable ?? false,
+      ...(dto.contact_email ? { contact_email: dto.contact_email } : {})
+    } as any)
+    return { status: 'created', id: created.id }
   }
 
   async findAll(query: PortfolioQueryDto, user: IUserWithPermissions) {
@@ -789,6 +805,23 @@ export class PortfolioService implements IPortfolioService {
     return this.portfolioRepository.update(id, data, user.id, isSuperAdmin)
   }
 
+  async syncUpdate(dto: SyncUpdatePortfolioDto): Promise<{ status: string; id?: string }> {
+    const existing = await this.portfolioRepository.findByName(dto.oldName)
+    if (!existing) return this.syncCreate({ name: dto.name ?? dto.oldName, service_type: dto.service_type, is_active: dto.is_active, is_commissionable: dto.is_commissionable, contact_email: dto.contact_email })
+    if (dto.name && dto.name !== existing.name) {
+      const clash = await this.portfolioRepository.findByName(dto.name)
+      if (clash && clash.id !== existing.id) return { status: 'conflict', id: clash.id }
+    }
+    const data: any = {}
+    if (dto.name) data.name = dto.name
+    if (dto.is_active !== undefined) data.is_active = dto.is_active
+    if (dto.is_commissionable !== undefined) data.is_commissionable = dto.is_commissionable
+    if (dto.contact_email !== undefined) data.contact_email = dto.contact_email
+    if (dto.service_type) data.service_type_id = await this.portfolioRepository.resolveServiceTypeIdByType(dto.service_type)
+    const updated = await this.portfolioRepository.update(existing.id, data)
+    return { status: 'updated', id: updated.id }
+  }
+
   async remove(id: string, password: string, user: IUserWithPermissions) {
     const isSuperAdmin = isUserSuperAdmin(user)
 
@@ -838,6 +871,16 @@ export class PortfolioService implements IPortfolioService {
     await this.portfolioRepository.delete(id)
 
     return { message: 'Portfolio deleted successfully' }
+  }
+
+  async syncDelete(name: string): Promise<{ status: string; id?: string; movedProperties?: number }> {
+    const existing = await this.portfolioRepository.findByName(name)
+    if (!existing) return { status: 'not_found' }
+    if (name.trim().toLowerCase() === 'internal portfolio') return { status: 'skipped_internal', id: existing.id }
+    const internal = await this.portfolioRepository.ensureInternalPortfolio()
+    const moved = await this.portfolioRepository.reassignPropertiesToPortfolio(existing.id, internal.id)
+    await this.portfolioRepository.delete(existing.id)
+    return { status: 'deleted', id: existing.id, movedProperties: moved }
   }
 
   async bulkDelete(

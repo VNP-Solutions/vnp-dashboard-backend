@@ -24,7 +24,7 @@ import {
   OtaCredentialsDto,
   PatchExpediaCredentialsDto
 } from '../property-credentials/property-credentials.dto'
-
+import { IsObject } from 'class-validator'
 export type AccessType = 'owned' | 'shared'
 
 export class CreatePropertyDto {
@@ -847,4 +847,52 @@ export class CompleteUpdatePropertyDto {
   @Type(() => CompleteBankDetailsDto)
   @IsOptional()
   bank_details?: CompleteBankDetailsDto
+}
+
+export class SyncCreatePropertyDto {
+  @ApiProperty()
+  @IsString()
+  name: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  portfolio_name?: string | null
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sub_portfolio_name?: string | null
+
+  @ApiPropertyOptional() @IsOptional() expedia_id?: number | string | null
+  @ApiPropertyOptional() @IsOptional() booking_id?: number | string | null
+  @ApiPropertyOptional() @IsOptional() agoda_id?: number | string | null
+
+  @ApiPropertyOptional() @IsOptional() @IsString() expedia_status?: string | null
+  @ApiPropertyOptional() @IsOptional() @IsString() booking_status?: string | null
+  @ApiPropertyOptional() @IsOptional() @IsString() agoda_status?: string | null
+}
+
+export class SyncByOtaPropertyDto {
+  @ApiPropertyOptional() @IsOptional() expedia_id?: number | string | null
+  @ApiPropertyOptional() @IsOptional() booking_id?: number | string | null
+  @ApiPropertyOptional() @IsOptional() agoda_id?: number | string | null
+
+  @ApiProperty({ type: Object })
+  @IsObject()
+  data: Record<string, any>
+}
+
+export class SyncDeletePropertyDto {
+  @ApiPropertyOptional() @IsOptional() expedia_id?: number | string | null
+  @ApiPropertyOptional() @IsOptional() booking_id?: number | string | null
+  @ApiPropertyOptional() @IsOptional() agoda_id?: number | string | null
+}
+
+export class SyncBulkCreatePropertyDto {
+  @ApiProperty({ type: [SyncCreatePropertyDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SyncCreatePropertyDto)
+  items: SyncCreatePropertyDto[]
 }

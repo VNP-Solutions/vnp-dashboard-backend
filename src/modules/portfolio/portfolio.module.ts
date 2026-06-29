@@ -7,6 +7,7 @@ import { ServiceTypeRepository } from '../service-type/service-type.repository'
 import { PortfolioController } from './portfolio.controller'
 import { PortfolioRepository } from './portfolio.repository'
 import { PortfolioService } from './portfolio.service'
+import { ServiceTokenGuard } from '../../common/guards/service-token.guard'
 
 @Module({
   controllers: [PortfolioController],
@@ -27,6 +28,7 @@ import { PortfolioService } from './portfolio.service'
       provide: 'IContractUrlRepository',
       useClass: ContractUrlRepository
     },
+    ServiceTokenGuard,
     PermissionService,
     PrismaService,
     EmailUtil

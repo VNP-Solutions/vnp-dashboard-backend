@@ -58,9 +58,15 @@ import {
   SharePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
-  UpdatePropertyDto
+  UpdatePropertyDto,
+  SyncCreatePropertyDto,
+  SyncByOtaPropertyDto,
+  SyncDeletePropertyDto,
+  SyncBulkCreatePropertyDto
 } from './property.dto'
 import type { IPropertyService } from './property.interface'
+import { Public } from '../auth/decorators/public.decorator'
+import { ServiceTokenGuard } from '../../common/guards/service-token.guard'
 
 @ApiTags('Property')
 @ApiBearerAuth('JWT-auth')
@@ -74,6 +80,30 @@ export class PropertyController {
     private readonly authRepository: IAuthRepository
   ) {}
 
+  @Public()
+  @UseGuards(ServiceTokenGuard)
+  @Post('sync-create')
+  syncCreate(@Body() dto: SyncCreatePropertyDto) {
+    return this.propertyService.syncCreate(dto)
+  }
+  @Public()
+  @UseGuards(ServiceTokenGuard)
+  @Patch('sync-by-ota')
+  syncByOta(@Body() dto: SyncByOtaPropertyDto) {
+    return this.propertyService.syncByOta(dto)
+  }
+  @Public()
+  @UseGuards(ServiceTokenGuard)
+  @Post('sync-delete')
+  syncDelete(@Body() dto: SyncDeletePropertyDto) {
+    return this.propertyService.syncDelete(dto)
+  }
+  @Public()
+  @UseGuards(ServiceTokenGuard)
+  @Post('sync-bulk-create')
+  syncBulkCreate(@Body() dto: SyncBulkCreatePropertyDto) {
+    return this.propertyService.syncBulkCreate(dto.items ?? [])
+  }
   @Post()
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({ summary: 'Create a new property (Internal users only)' })

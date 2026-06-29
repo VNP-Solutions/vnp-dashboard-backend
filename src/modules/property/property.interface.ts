@@ -17,6 +17,9 @@ import {
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
+  SyncByOtaPropertyDto,
+  SyncCreatePropertyDto,
+  SyncDeletePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
   UpdatePropertyDto
@@ -188,6 +191,15 @@ export interface IPropertyService {
     user: IUserWithPermissions,
     location?: string | null
   ): Promise<PropertyWithFullDetails>
+  syncCreate(
+    dto: SyncCreatePropertyDto
+  ): Promise<{ status: string; id?: string }>
+  syncByOta(
+    dto: SyncByOtaPropertyDto
+  ): Promise<{ status: string; id?: string }>
+  syncBulkCreate(
+    items: SyncCreatePropertyDto[]
+  ): Promise<{ created: number; alreadyExists: number; failed: number }>
   completeUpdate(
     id: string,
     data: CompleteUpdatePropertyDto,
@@ -298,6 +310,9 @@ export interface IPropertyService {
       message?: string
     }>
   }>
+  syncDelete(
+    dto: SyncDeletePropertyDto
+  ): Promise<{ status: string; id?: string }>
   deactivate(
     id: string,
     user: IUserWithPermissions,
