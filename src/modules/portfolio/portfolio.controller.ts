@@ -43,6 +43,7 @@ import {
   PortfolioStatsQueryDto,
   SecurePortfolioDto,
   SecurePortfolioListDto,
+  SendPortfolioEmailDto,
   SyncCreatePortfolioDto,
   SyncDeletePortfolioDto,
   SyncUpdatePortfolioDto,
