@@ -45,7 +45,8 @@ export interface Configuration {
   }
   parallel: {
     workers: number
-  }
+  },
+  serviceToken?: string
 }
 
 export default (): Configuration => ({
@@ -97,5 +98,6 @@ export default (): Configuration => ({
   },
   parallel: {
     workers: parseInt(process.env.PARALLEL_WORKERS || '8', 10)
-  }
+  },
+  serviceToken: process.env.SERVICE_TOKEN,
 })

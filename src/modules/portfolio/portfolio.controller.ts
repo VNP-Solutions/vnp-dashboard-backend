@@ -46,9 +46,14 @@ import {
   SecurePortfolioDto,
   SecurePortfolioListDto,
   SendPortfolioEmailDto,
+  SyncCreatePortfolioDto,
+  SyncDeletePortfolioDto,
+  SyncUpdatePortfolioDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 import type { IPortfolioService } from './portfolio.interface'
+import { Public } from '../auth/decorators/public.decorator'
+import { ServiceTokenGuard } from 'src/common/guards/service-token.guard'
 
 @ApiTags('Portfolio')
 @ApiBearerAuth('JWT-auth')
@@ -671,5 +676,26 @@ export class PortfolioController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.portfolioService.getStats(id, query, user)
+  }
+  
+  @Post('sync-create')
+  @Public()
+  @UseGuards(ServiceTokenGuard)
+  syncCreate(@Body() dto: SyncCreatePortfolioDto) {
+    return this.portfolioService.syncCreate(dto)
+  }
+
+  @Post('sync-update')
+  @Public()
+  @UseGuards(ServiceTokenGuard)
+  syncUpdate(@Body() dto: SyncUpdatePortfolioDto) {
+    return this.portfolioService.syncUpdate(dto)
+  }
+
+  @Post('sync-delete')
+  @Public()
+  @UseGuards(ServiceTokenGuard)
+  syncDelete(@Body() dto: SyncDeletePortfolioDto) {
+    return this.portfolioService.syncDelete(dto.name)
   }
 }

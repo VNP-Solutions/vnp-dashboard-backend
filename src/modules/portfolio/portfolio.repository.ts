@@ -447,4 +447,32 @@ export class PortfolioRepository implements IPortfolioRepository {
       where: { portfolio_id: portfolioId }
     })
   }
+
+  async resolveServiceTypeIdByType(type?: string): Promise<string> {
+    const wanted = (type && type.trim()) || 'OTA'
+    let st = await this.prisma.serviceType.findFirst({
+      where: { type: { equals: wanted, mode: 'insensitive' } }
+    })
+    if (!st) {
+      const max = await this.prisma.serviceType.findFirst({ orderBy: { order: 'desc' }, select: { order: true } })
+      st = await this.prisma.serviceType.create({ data: { type: wanted, is_active: true, order: (max?.order ?? 0) + 1 } })
+    }
+    return st.id
+  }
+  
+  async ensureInternalPortfolio(): Promise<{ id: string; name: string }> {
+    const existing = await this.prisma.portfolio.findUnique({ where: { name: 'Internal Portfolio' } })
+    if (existing) return existing
+    const service_type_id = await this.resolveServiceTypeIdByType('OTA')
+    return this.prisma.portfolio.create({
+      data: { name: 'Internal Portfolio', service_type_id, is_active: true, is_commissionable: false, currency: 'USD' }
+    })
+  }
+  
+  async reassignPropertiesToPortfolio(fromId: string, toId: string): Promise<number> {
+    const r = await this.prisma.property.updateMany({ where: { portfolio_id: fromId }, data: { portfolio_id: toId } })
+    return r.count
+  }
 }
+
+
