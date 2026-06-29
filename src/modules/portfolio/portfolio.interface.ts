@@ -8,6 +8,8 @@ import {
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
   PortfolioStatsResponseDto,
+  SyncCreatePortfolioDto,
+  SyncUpdatePortfolioDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 
@@ -86,9 +88,17 @@ export interface IPortfolioRepository {
   ): Promise<PortfolioWithServiceType>
   delete(id: string): Promise<Portfolio>
   countProperties(portfolioId: string): Promise<number>
+  ensureInternalPortfolio(): Promise<{ id: string; name: string }>
+  reassignPropertiesToPortfolio(fromId: string, toId: string): Promise<number>
+  resolveServiceTypeIdByType(type?: string): Promise<string>
 }
 
 export interface IPortfolioService {
+  syncCreate(dto: SyncCreatePortfolioDto): Promise<{ status: string; id?: string }>
+  syncUpdate(dto: SyncUpdatePortfolioDto): Promise<{ status: string; id?: string }>
+  syncDelete(
+    name: string
+  ): Promise<{ status: string; id?: string; movedProperties?: number }>
   create(
     data: CreatePortfolioDto,
     user: IUserWithPermissions
@@ -173,4 +183,7 @@ export interface IPortfolioService {
     query: PortfolioStatsQueryDto,
     user: IUserWithPermissions
   ): Promise<PortfolioStatsResponseDto>
+  syncCreate(dto: SyncCreatePortfolioDto): Promise<{ status: string; id?: string }>
+  syncUpdate(dto: SyncUpdatePortfolioDto): Promise<{ status: string; id?: string }>
+  syncDelete(name: string): Promise<{ status: string; id?: string; movedProperties?: number }>
 }

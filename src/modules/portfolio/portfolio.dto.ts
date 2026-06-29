@@ -484,3 +484,56 @@ export class ActivatePortfolioDto {
   @IsOptional()
   reason?: string
 }
+
+export class SyncCreatePortfolioDto {
+  @IsString() 
+  @IsNotEmpty() 
+  name: string
+  
+  @IsOptional() 
+  @IsString() 
+  service_type?: string
+  
+  @IsOptional() 
+  @IsBoolean() 
+  is_active?: boolean
+  
+  @IsOptional() 
+  @IsBoolean() 
+  is_commissionable?: boolean
+  
+  @IsOptional() 
+  @IsString() 
+  contact_email?: string
+}
+export class SyncUpdatePortfolioDto {
+  @IsString() 
+  @IsNotEmpty() 
+  oldName: string
+  
+  @IsOptional() 
+  @IsString() 
+  name?: string
+  
+  @IsOptional() 
+  @IsString() 
+  service_type?: string
+  
+  @IsOptional() 
+  @IsBoolean() 
+  is_active?: boolean
+  
+  @IsOptional() 
+  @IsBoolean() 
+  is_commissionable?: boolean
+  
+  @IsOptional() 
+  @IsString() 
+  contact_email?: string
+}
+
+export class SyncDeletePortfolioDto {
+  @IsString() 
+  @IsNotEmpty() 
+  name: string
+}

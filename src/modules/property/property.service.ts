@@ -9,7 +9,7 @@ import {
   forwardRef
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { BankSubType, BankType, Prisma } from '@prisma/client'
+import { BankSubType, BankType, Prisma, Property } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
 import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../common/constants/external-api-user.context'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -67,6 +67,9 @@ import {
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
+  SyncByOtaPropertyDto,
+  SyncCreatePropertyDto,
+  SyncDeletePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
   UpdatePropertyDto
@@ -4654,5 +4657,104 @@ export class PropertyService implements IPropertyService {
       console.log(`========================================\n`)
       // Don't throw - email notifications are non-critical
     }
+  }
+  private async resolveDefaultCurrencyId(): Promise<string> {
+    const usd = await this.currencyRepository.findByCode('USD')
+    if (usd) return usd.id
+    const all = await this.currencyRepository.findAll()
+    if (all?.length) return all[0].id
+    throw new BadRequestException('No currency configured on dashboard')
+  }
+  private async resolvePortfolioIdByName(name?: string | null): Promise<string> {
+    if (name) {
+      const existing = await this.portfolioRepository.findByName(name)
+      if (existing) return existing.id
+      const service_type_id =
+        await this.portfolioRepository.resolveServiceTypeIdByType(undefined)
+      const created = await this.portfolioRepository.create({
+        name,
+        service_type_id,
+        is_active: true,
+        is_commissionable: false
+      } as any)
+      return created.id
+    }
+    const internal = await this.portfolioRepository.ensureInternalPortfolio()
+    return internal.id
+  }
+  private async findByAnyOta(
+    expediaId: string | null,
+    bookingId: string | null,
+    agodaId: string | null
+  ): Promise<Property | null> {
+    let p: Property | null = null
+    if (expediaId) p = await this.propertyRepository.findByExpediaId(expediaId)
+    if (!p && bookingId) p = await this.propertyRepository.findByBookingId(bookingId)
+    if (!p && agodaId) p = await this.propertyRepository.findByAgodaId(agodaId)
+    return p
+  }
+  async syncCreate(dto: SyncCreatePropertyDto): Promise<{ status: string; id?: string }> {
+    const expediaId = dto.expedia_id != null ? String(dto.expedia_id) : null
+    const bookingId = dto.booking_id != null ? String(dto.booking_id) : null
+    const agodaId   = dto.agoda_id   != null ? String(dto.agoda_id)   : null
+    let existing = await this.findByAnyOta(expediaId, bookingId, agodaId)
+    if (!existing) existing = await this.propertyRepository.findByName(dto.name)
+    if (existing) return { status: 'already_exists', id: existing.id }
+    const portfolio_id = await this.resolvePortfolioIdByName(dto.portfolio_name)
+    const currency_id = await this.resolveDefaultCurrencyId()
+    const created = await this.propertyRepository.create({
+      name: dto.name,
+      address: '',
+      currency_id,
+      portfolio_id,
+      is_active: true
+    } as any)
+    if (expediaId) {
+      await this.credentialsRepository.create({
+        property_id: created.id,
+        expedia_id: expediaId,
+        ...(agodaId ? { agoda_id: agodaId } : {}),
+        ...(bookingId ? { booking_id: bookingId } : {})
+      })
+    }
+    return { status: 'created', id: created.id }
+  } 
+  async syncByOta(dto: SyncByOtaPropertyDto): Promise<{ status: string; id?: string }> {
+    const expediaId = dto.expedia_id != null ? String(dto.expedia_id) : null
+    const bookingId = dto.booking_id != null ? String(dto.booking_id) : null
+    const agodaId   = dto.agoda_id   != null ? String(dto.agoda_id)   : null
+    if (!expediaId && !bookingId && !agodaId) return { status: 'no_ota_ids' }
+    const property = await this.findByAnyOta(expediaId, bookingId, agodaId)
+    if (!property) return { status: 'not_found' }
+    const allowed = ['name', 'card_descriptor', 'is_active', 'next_due_date']
+    const patch: any = {}
+    for (const k of allowed) if (dto.data?.[k] !== undefined) patch[k] = dto.data[k]
+    if (!Object.keys(patch).length) return { status: 'no_op', id: property.id }
+    const updated = await this.propertyRepository.update(property.id, patch)
+    return { status: 'updated', id: updated.id }
+  }
+  async syncDelete(dto: SyncDeletePropertyDto): Promise<{ status: string; id?: string }> {
+    const expediaId = dto.expedia_id != null ? String(dto.expedia_id) : null
+    const bookingId = dto.booking_id != null ? String(dto.booking_id) : null
+    const agodaId   = dto.agoda_id   != null ? String(dto.agoda_id)   : null
+    if (!expediaId && !bookingId && !agodaId) return { status: 'no_ota_ids' }
+    const property = await this.findByAnyOta(expediaId, bookingId, agodaId)
+    if (!property) return { status: 'not_found' }
+    await this.propertyRepository.delete(property.id)
+    return { status: 'deleted', id: property.id }
+  }
+  async syncBulkCreate(items: SyncCreatePropertyDto[]) {
+    let created = 0, alreadyExists = 0, failed = 0
+    for (const item of items) {
+      try {
+        const r = await this.syncCreate(item)
+        if (r.status === 'created') created++
+        else if (r.status === 'already_exists') alreadyExists++
+      } catch (e: any) {
+        failed++
+        this.logger.error(`[sync] bulk create failed for "${item.name}": ${e?.message ?? e}`)
+      }
+    }
+    return { created, alreadyExists, failed }
   }
 }

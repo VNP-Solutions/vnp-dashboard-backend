@@ -11,6 +11,7 @@ import { PendingActionModule } from '../pending-action/pending-action.module'
 import { PropertyController } from './property.controller'
 import { PropertyRepository } from './property.repository'
 import { PropertyService } from './property.service'
+import { ServiceTokenGuard } from '../../common/guards/service-token.guard'
 
 @Module({
   imports: [AuthModule, forwardRef(() => PendingActionModule)],
@@ -42,7 +43,8 @@ import { PropertyService } from './property.service'
     },
     PermissionService,
     PrismaService,
-    EmailUtil
+    EmailUtil,
+    ServiceTokenGuard
   ],
   exports: ['IPropertyService', 'IPropertyRepository']
 })
