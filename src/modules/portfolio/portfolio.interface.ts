@@ -179,4 +179,16 @@ export interface IPortfolioService {
     query: PortfolioStatsQueryDto,
     user: IUserWithPermissions
   ): Promise<PortfolioStatsResponseDto>
+<<<<<<< HEAD
+=======
+  syncCreate(
+    dto: SyncCreatePortfolioDto
+  ): Promise<{ status: string; id?: string }>
+  syncUpdate(
+    dto: SyncUpdatePortfolioDto
+  ): Promise<{ status: string; id?: string }>
+  syncDelete(
+    dto: SyncDeletePortfolioDto
+  ): Promise<{ status: string; id?: string; movedProperties?: number }>
+>>>>>>> fadab09 (refactor: enhance syncDelete logic and DTO structure)
 }
