@@ -54,6 +54,7 @@ import {
 import type { IPortfolioService } from './portfolio.interface'
 import { Public } from '../auth/decorators/public.decorator'
 import { ServiceTokenGuard } from 'src/common/guards/service-token.guard'
+import { ExternalJwtGuard } from './guards/external-jwt.guard'
 
 @ApiTags('Portfolio')
 @ApiBearerAuth('JWT-auth')
@@ -146,7 +147,10 @@ export class PortfolioController {
     description: 'Paginated list of portfolios with full bank details'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
   async findAllSecure(
     @Query() query: PortfolioQueryDto,
     @Body() body: SecurePortfolioListDto,
@@ -168,7 +172,8 @@ export class PortfolioController {
   @Post('by-ids/secure')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
   @ApiOperation({
-    summary: 'Get specific portfolios by IDs with full bank details (password required)',
+    summary:
+      'Get specific portfolios by IDs with full bank details (password required)',
     description:
       'Returns full details including unmasked bank details for the specified portfolio IDs. ' +
       'IDs the user has no access to are silently excluded from the results. ' +
@@ -180,7 +185,10 @@ export class PortfolioController {
     description: 'List of portfolios with full bank details'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
   async findManyByIdsSecure(
     @Body() body: GetPortfoliosByIdsSecureDto,
     @CurrentUser() user: IUserWithPermissions
@@ -224,7 +232,10 @@ export class PortfolioController {
     description: 'Portfolio with full bank details retrieved successfully'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 403, description: 'Forbidden - No access to this portfolio' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - No access to this portfolio'
+  })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   async findOneSecure(
     @Param('id') id: string,
@@ -256,7 +267,6 @@ export class PortfolioController {
   findOne(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.portfolioService.findOne(id, user)
   }
-
 
   @Patch(':id')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
@@ -554,7 +564,8 @@ export class PortfolioController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Excel (.xlsx/.xls) or CSV file containing portfolio data'
+          description:
+            'Excel (.xlsx/.xls) or CSV file containing portfolio data'
         }
       }
     }
@@ -606,7 +617,8 @@ export class PortfolioController {
     `
   })
   @ApiBody({
-    description: 'Excel (.xlsx/.xls) or CSV file containing portfolio update data',
+    description:
+      'Excel (.xlsx/.xls) or CSV file containing portfolio update data',
     schema: {
       type: 'object',
       properties: {
@@ -677,10 +689,10 @@ export class PortfolioController {
   ) {
     return this.portfolioService.getStats(id, query, user)
   }
-  
+
   @Post('sync-create')
   @Public()
-  @UseGuards(ServiceTokenGuard)
+  @UseGuards(ExternalJwtGuard)
   syncCreate(@Body() dto: SyncCreatePortfolioDto) {
     return this.portfolioService.syncCreate(dto)
   }
