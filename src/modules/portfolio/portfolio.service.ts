@@ -191,9 +191,9 @@ export class PortfolioService implements IPortfolioService {
   async syncCreate(
     dto: SyncCreatePortfolioDto
   ): Promise<{ status: string; id?: string }> {
-    if (dto.id) {
+    if (dto._id) {
       const byId = await this.prisma.portfolio.findUnique({
-        where: { id: dto.id }
+        where: { id: dto._id }
       })
       if (byId) return { status: 'already_exists', id: byId.id }
     }
@@ -207,7 +207,7 @@ export class PortfolioService implements IPortfolioService {
       )
     const created = await this.prisma.portfolio.create({
       data: {
-        ...(dto.id ? { id: dto.id } : {}),
+        id: dto._id,
         name: dto.name,
         service_type_id,
         is_active: dto.is_active ?? true,
@@ -823,31 +823,48 @@ export class PortfolioService implements IPortfolioService {
   async syncUpdate(
     dto: SyncUpdatePortfolioDto
   ): Promise<{ status: string; id?: string }> {
-    const existing = await this.portfolioRepository.findByName(dto.oldName)
-    if (!existing)
+    let existing = await this.prisma.portfolio.findUnique({
+      where: { id: dto._id }
+    })
+
+    if (!existing && dto.oldName) {
+      existing = await this.portfolioRepository.findByName(dto.oldName)
+    }
+
+    if (!existing) {
       return this.syncCreate({
+        _id: dto._id,
         name: dto.name ?? dto.oldName,
         service_type: dto.service_type,
         is_active: dto.is_active,
         is_commissionable: dto.is_commissionable,
         contact_email: dto.contact_email
       })
+    }
+
     if (dto.name && dto.name !== existing.name) {
       const clash = await this.portfolioRepository.findByName(dto.name)
       if (clash && clash.id !== existing.id)
         return { status: 'conflict', id: clash.id }
     }
+
     const data: any = {}
     if (dto.name) data.name = dto.name
     if (dto.is_active !== undefined) data.is_active = dto.is_active
     if (dto.is_commissionable !== undefined)
       data.is_commissionable = dto.is_commissionable
     if (dto.contact_email !== undefined) data.contact_email = dto.contact_email
-    if (dto.service_type)
+    if (dto.service_type) {
       data.service_type_id =
         await this.portfolioRepository.resolveServiceTypeIdByType(
           dto.service_type
         )
+    }
+
+    if (!Object.keys(data).length) {
+      return { status: 'no_op', id: existing.id }
+    }
+
     const updated = await this.portfolioRepository.update(existing.id, data)
     return { status: 'updated', id: updated.id }
   }
