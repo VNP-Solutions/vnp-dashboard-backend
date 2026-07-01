@@ -42,7 +42,7 @@ import {
   PortfolioStatsResponseDto,
   UpdatePortfolioDto,
   SyncCreatePortfolioDto,
-  SyncUpdatePortfolioDto,
+  SyncUpdatePortfolioDto
 } from './portfolio.dto'
 import type {
   IPortfolioRepository,
@@ -69,10 +69,9 @@ export class PortfolioService implements IPortfolioService {
   /**
    * External users must not receive commission or sales-agent fields on portfolio reads.
    */
-  private omitCommissionableAndSalesAgentForExternal<T extends Record<string, unknown>>(
-    user: IUserWithPermissions,
-    portfolio: T
-  ): T {
+  private omitCommissionableAndSalesAgentForExternal<
+    T extends Record<string, unknown>
+  >(user: IUserWithPermissions, portfolio: T): T {
     if (!isExternalUser(user)) {
       return portfolio
     }
@@ -189,17 +188,33 @@ export class PortfolioService implements IPortfolioService {
     return portfolioWithContractUrls || portfolio
   }
 
-  async syncCreate(dto: SyncCreatePortfolioDto): Promise<{ status: string; id?: string }> {
+  async syncCreate(
+    dto: SyncCreatePortfolioDto
+  ): Promise<{ status: string; id?: string }> {
+    if (dto.id) {
+      const byId = await this.prisma.portfolio.findUnique({
+        where: { id: dto.id }
+      })
+      if (byId) return { status: 'already_exists', id: byId.id }
+    }
+
     const existing = await this.portfolioRepository.findByName(dto.name)
     if (existing) return { status: 'already_exists', id: existing.id }
-    const service_type_id = await this.portfolioRepository.resolveServiceTypeIdByType(dto.service_type)
-    const created = await this.portfolioRepository.create({
-      name: dto.name,
-      service_type_id,
-      is_active: dto.is_active ?? true,
-      is_commissionable: dto.is_commissionable ?? false,
-      ...(dto.contact_email ? { contact_email: dto.contact_email } : {})
-    } as any)
+
+    const service_type_id =
+      await this.portfolioRepository.resolveServiceTypeIdByType(
+        dto.service_type
+      )
+    const created = await this.prisma.portfolio.create({
+      data: {
+        ...(dto.id ? { id: dto.id } : {}),
+        name: dto.name,
+        service_type_id,
+        is_active: dto.is_active ?? true,
+        is_commissionable: dto.is_commissionable ?? false,
+        ...(dto.contact_email ? { contact_email: dto.contact_email } : {})
+      }
+    })
     return { status: 'created', id: created.id }
   }
 
@@ -805,19 +820,34 @@ export class PortfolioService implements IPortfolioService {
     return this.portfolioRepository.update(id, data, user.id, isSuperAdmin)
   }
 
-  async syncUpdate(dto: SyncUpdatePortfolioDto): Promise<{ status: string; id?: string }> {
+  async syncUpdate(
+    dto: SyncUpdatePortfolioDto
+  ): Promise<{ status: string; id?: string }> {
     const existing = await this.portfolioRepository.findByName(dto.oldName)
-    if (!existing) return this.syncCreate({ name: dto.name ?? dto.oldName, service_type: dto.service_type, is_active: dto.is_active, is_commissionable: dto.is_commissionable, contact_email: dto.contact_email })
+    if (!existing)
+      return this.syncCreate({
+        name: dto.name ?? dto.oldName,
+        service_type: dto.service_type,
+        is_active: dto.is_active,
+        is_commissionable: dto.is_commissionable,
+        contact_email: dto.contact_email
+      })
     if (dto.name && dto.name !== existing.name) {
       const clash = await this.portfolioRepository.findByName(dto.name)
-      if (clash && clash.id !== existing.id) return { status: 'conflict', id: clash.id }
+      if (clash && clash.id !== existing.id)
+        return { status: 'conflict', id: clash.id }
     }
     const data: any = {}
     if (dto.name) data.name = dto.name
     if (dto.is_active !== undefined) data.is_active = dto.is_active
-    if (dto.is_commissionable !== undefined) data.is_commissionable = dto.is_commissionable
+    if (dto.is_commissionable !== undefined)
+      data.is_commissionable = dto.is_commissionable
     if (dto.contact_email !== undefined) data.contact_email = dto.contact_email
-    if (dto.service_type) data.service_type_id = await this.portfolioRepository.resolveServiceTypeIdByType(dto.service_type)
+    if (dto.service_type)
+      data.service_type_id =
+        await this.portfolioRepository.resolveServiceTypeIdByType(
+          dto.service_type
+        )
     const updated = await this.portfolioRepository.update(existing.id, data)
     return { status: 'updated', id: updated.id }
   }
@@ -873,12 +903,18 @@ export class PortfolioService implements IPortfolioService {
     return { message: 'Portfolio deleted successfully' }
   }
 
-  async syncDelete(name: string): Promise<{ status: string; id?: string; movedProperties?: number }> {
+  async syncDelete(
+    name: string
+  ): Promise<{ status: string; id?: string; movedProperties?: number }> {
     const existing = await this.portfolioRepository.findByName(name)
     if (!existing) return { status: 'not_found' }
-    if (name.trim().toLowerCase() === 'internal portfolio') return { status: 'skipped_internal', id: existing.id }
+    if (name.trim().toLowerCase() === 'internal portfolio')
+      return { status: 'skipped_internal', id: existing.id }
     const internal = await this.portfolioRepository.ensureInternalPortfolio()
-    const moved = await this.portfolioRepository.reassignPropertiesToPortfolio(existing.id, internal.id)
+    const moved = await this.portfolioRepository.reassignPropertiesToPortfolio(
+      existing.id,
+      internal.id
+    )
     await this.portfolioRepository.delete(existing.id)
     return { status: 'deleted', id: existing.id, movedProperties: moved }
   }
@@ -2210,10 +2246,7 @@ export class PortfolioService implements IPortfolioService {
     // Recent audits in the same window as the amounts (and ordered by business date)
     const recentAudits = await this.prisma.audit.findMany({
       where: auditInDurationWhere,
-      orderBy: [
-        { review_collection_date: 'desc' },
-        { created_at: 'desc' }
-      ],
+      orderBy: [{ review_collection_date: 'desc' }, { created_at: 'desc' }],
       take: 10,
       include: {
         property: {

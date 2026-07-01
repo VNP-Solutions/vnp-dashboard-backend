@@ -282,7 +282,10 @@ export class PortfolioStatsAuditDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Audit ID' })
   id: string
 
-  @ApiProperty({ example: '507f1f77bcf86cd799439012', description: 'Property ID' })
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439012',
+    description: 'Property ID'
+  })
   property_id: string
 
   @ApiProperty({
@@ -327,22 +330,37 @@ export class PortfolioStatsAuditDto {
   })
   type_of_ota: string[]
 
-  @ApiPropertyOptional({ example: 10000, description: 'Expedia amount collectable' })
+  @ApiPropertyOptional({
+    example: 10000,
+    description: 'Expedia amount collectable'
+  })
   expedia_amount_collectable: number | null
 
-  @ApiPropertyOptional({ example: 8000, description: 'Expedia amount confirmed' })
+  @ApiPropertyOptional({
+    example: 8000,
+    description: 'Expedia amount confirmed'
+  })
   expedia_amount_confirmed: number | null
 
-  @ApiPropertyOptional({ example: 8000, description: 'Agoda amount collectable' })
+  @ApiPropertyOptional({
+    example: 8000,
+    description: 'Agoda amount collectable'
+  })
   agoda_amount_collectable: number | null
 
   @ApiPropertyOptional({ example: 7000, description: 'Agoda amount confirmed' })
   agoda_amount_confirmed: number | null
 
-  @ApiPropertyOptional({ example: 7000, description: 'Booking amount collectable' })
+  @ApiPropertyOptional({
+    example: 7000,
+    description: 'Booking amount collectable'
+  })
   booking_amount_collectable: number | null
 
-  @ApiPropertyOptional({ example: 5000, description: 'Booking amount confirmed' })
+  @ApiPropertyOptional({
+    example: 5000,
+    description: 'Booking amount confirmed'
+  })
   booking_amount_confirmed: number | null
 
   @ApiProperty({ example: 'Hotel ABC', description: 'Property name' })
@@ -486,54 +504,58 @@ export class ActivatePortfolioDto {
 }
 
 export class SyncCreatePortfolioDto {
-  @IsString() 
-  @IsNotEmpty() 
+  @IsOptional()
+  @IsString()
+  id?: string
+
+  @IsString()
+  @IsNotEmpty()
   name: string
-  
-  @IsOptional() 
-  @IsString() 
+
+  @IsOptional()
+  @IsString()
   service_type?: string
-  
-  @IsOptional() 
-  @IsBoolean() 
+
+  @IsOptional()
+  @IsBoolean()
   is_active?: boolean
-  
-  @IsOptional() 
-  @IsBoolean() 
+
+  @IsOptional()
+  @IsBoolean()
   is_commissionable?: boolean
-  
-  @IsOptional() 
-  @IsString() 
+
+  @IsOptional()
+  @IsString()
   contact_email?: string
 }
 export class SyncUpdatePortfolioDto {
-  @IsString() 
-  @IsNotEmpty() 
+  @IsString()
+  @IsNotEmpty()
   oldName: string
-  
-  @IsOptional() 
-  @IsString() 
+
+  @IsOptional()
+  @IsString()
   name?: string
-  
-  @IsOptional() 
-  @IsString() 
+
+  @IsOptional()
+  @IsString()
   service_type?: string
-  
-  @IsOptional() 
-  @IsBoolean() 
+
+  @IsOptional()
+  @IsBoolean()
   is_active?: boolean
-  
-  @IsOptional() 
-  @IsBoolean() 
+
+  @IsOptional()
+  @IsBoolean()
   is_commissionable?: boolean
-  
-  @IsOptional() 
-  @IsString() 
+
+  @IsOptional()
+  @IsString()
   contact_email?: string
 }
 
 export class SyncDeletePortfolioDto {
-  @IsString() 
-  @IsNotEmpty() 
+  @IsString()
+  @IsNotEmpty()
   name: string
 }
