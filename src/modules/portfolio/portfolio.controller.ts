@@ -699,7 +699,7 @@ export class PortfolioController {
 
   @Post('sync-update')
   @Public()
-  @UseGuards(ServiceTokenGuard)
+  @UseGuards(ExternalJwtGuard)
   syncUpdate(@Body() dto: SyncUpdatePortfolioDto) {
     return this.portfolioService.syncUpdate(dto)
   }
