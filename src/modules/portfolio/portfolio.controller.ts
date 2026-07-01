@@ -706,8 +706,8 @@ export class PortfolioController {
 
   @Post('sync-delete')
   @Public()
-  @UseGuards(ServiceTokenGuard)
+  @UseGuards(ExternalJwtGuard)
   syncDelete(@Body() dto: SyncDeletePortfolioDto) {
-    return this.portfolioService.syncDelete(dto.name)
+    return this.portfolioService.syncDelete(dto)
   }
 }

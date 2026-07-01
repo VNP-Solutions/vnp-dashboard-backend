@@ -561,5 +561,9 @@ export class SyncUpdatePortfolioDto {
 export class SyncDeletePortfolioDto {
   @IsString()
   @IsNotEmpty()
+  _id: string
+
+  @IsString()
+  @IsNotEmpty()
   name: string
 }

@@ -10,6 +10,7 @@ import {
   PortfolioStatsResponseDto,
   SyncCreatePortfolioDto,
   SyncUpdatePortfolioDto,
+  SyncDeletePortfolioDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 
@@ -94,10 +95,14 @@ export interface IPortfolioRepository {
 }
 
 export interface IPortfolioService {
-  syncCreate(dto: SyncCreatePortfolioDto): Promise<{ status: string; id?: string }>
-  syncUpdate(dto: SyncUpdatePortfolioDto): Promise<{ status: string; id?: string }>
+  syncCreate(
+    dto: SyncCreatePortfolioDto
+  ): Promise<{ status: string; id?: string }>
+  syncUpdate(
+    dto: SyncUpdatePortfolioDto
+  ): Promise<{ status: string; id?: string }>
   syncDelete(
-    name: string
+    dto: SyncDeletePortfolioDto
   ): Promise<{ status: string; id?: string; movedProperties?: number }>
   create(
     data: CreatePortfolioDto,
@@ -183,7 +188,13 @@ export interface IPortfolioService {
     query: PortfolioStatsQueryDto,
     user: IUserWithPermissions
   ): Promise<PortfolioStatsResponseDto>
-  syncCreate(dto: SyncCreatePortfolioDto): Promise<{ status: string; id?: string }>
-  syncUpdate(dto: SyncUpdatePortfolioDto): Promise<{ status: string; id?: string }>
-  syncDelete(name: string): Promise<{ status: string; id?: string; movedProperties?: number }>
+  syncCreate(
+    dto: SyncCreatePortfolioDto
+  ): Promise<{ status: string; id?: string }>
+  syncUpdate(
+    dto: SyncUpdatePortfolioDto
+  ): Promise<{ status: string; id?: string }>
+  syncDelete(
+    dto: SyncDeletePortfolioDto
+  ): Promise<{ status: string; id?: string; movedProperties?: number }>
 }

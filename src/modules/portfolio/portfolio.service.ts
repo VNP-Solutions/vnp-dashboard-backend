@@ -42,7 +42,8 @@ import {
   PortfolioStatsResponseDto,
   UpdatePortfolioDto,
   SyncCreatePortfolioDto,
-  SyncUpdatePortfolioDto
+  SyncUpdatePortfolioDto,
+  SyncDeletePortfolioDto
 } from './portfolio.dto'
 import type {
   IPortfolioRepository,
@@ -921,12 +922,26 @@ export class PortfolioService implements IPortfolioService {
   }
 
   async syncDelete(
-    name: string
+    dto: SyncDeletePortfolioDto
   ): Promise<{ status: string; id?: string; movedProperties?: number }> {
-    const existing = await this.portfolioRepository.findByName(name)
+    let existing = await this.prisma.portfolio.findUnique({
+      where: { id: dto._id }
+    })
+
+    if (!existing && dto.name) {
+      existing = await this.portfolioRepository.findByName(dto.name)
+    }
+
     if (!existing) return { status: 'not_found' }
-    if (name.trim().toLowerCase() === 'internal portfolio')
+
+    const portfolioName = existing.name
+    if (
+      portfolioName.trim().toLowerCase() === 'internal portfolio' ||
+      dto.name.trim().toLowerCase() === 'internal portfolio'
+    ) {
       return { status: 'skipped_internal', id: existing.id }
+    }
+
     const internal = await this.portfolioRepository.ensureInternalPortfolio()
     const moved = await this.portfolioRepository.reassignPropertiesToPortfolio(
       existing.id,
