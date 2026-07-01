@@ -504,9 +504,9 @@ export class ActivatePortfolioDto {
 }
 
 export class SyncCreatePortfolioDto {
-  @IsOptional()
   @IsString()
-  id?: string
+  @IsNotEmpty()
+  _id: string
 
   @IsString()
   @IsNotEmpty()
@@ -529,6 +529,10 @@ export class SyncCreatePortfolioDto {
   contact_email?: string
 }
 export class SyncUpdatePortfolioDto {
+  @IsString()
+  @IsNotEmpty()
+  _id: string
+
   @IsString()
   @IsNotEmpty()
   oldName: string
