@@ -263,7 +263,6 @@ async function main() {
         currency_id: currencies[config.currencyIndex].id,
         portfolio_id: portfolios[config.portfolioIndex].id,
         is_active: true,
-        next_due_date: getRandomFutureDate(),
         show_in_portfolio: []
       }
     })
@@ -406,12 +405,6 @@ async function getOrCreateAuditStatusId(status: string): Promise<string> {
     data: { status, order: 0 }
   })
   return created.id
-}
-
-function getRandomFutureDate(maxDays = 90): Date {
-  const date = new Date()
-  date.setDate(date.getDate() + Math.floor(Math.random() * maxDays) + 1)
-  return date
 }
 
 function getRandomPastDate(maxDays = 365): Date {

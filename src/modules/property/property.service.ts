@@ -746,7 +746,6 @@ export class PropertyService implements IPropertyService {
         'name',
         'address',
         'card_descriptor',
-        'next_due_date',
         'created_at',
         'updated_at',
         'is_active',
@@ -1121,7 +1120,6 @@ export class PropertyService implements IPropertyService {
         'name',
         'address',
         'card_descriptor',
-        'next_due_date',
         'created_at',
         'updated_at',
         'is_active',
@@ -1933,7 +1931,6 @@ export class PropertyService implements IPropertyService {
         'name',
         'address',
         'card_descriptor',
-        'next_due_date',
         'created_at',
         'updated_at',
         'is_active',
@@ -2831,26 +2828,6 @@ export class PropertyService implements IPropertyService {
             'Descriptor'
           ])
 
-          // Extract next due date (optional) - use raw value to preserve Excel date format
-          const nextDueDateValue = getRawValue(row, [
-            'Next Due Date',
-            'Next due date',
-            'Due Date'
-          ])
-          let nextDueDate: Date | null = null
-
-          if (nextDueDateValue) {
-            nextDueDate = parseDate(nextDueDateValue)
-            if (!nextDueDate) {
-              addError(
-                rowNumber,
-                propertyName,
-                'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
-              )
-              continue
-            }
-          }
-
           // Extract portfolio name (REQUIRED)
           const portfolioName = findHeaderValue(row, [
             'Portfolio',
@@ -2899,9 +2876,6 @@ export class PropertyService implements IPropertyService {
               currency_id: currency.id,
               card_descriptor: cardDescriptor || undefined,
               is_active: true,
-              next_due_date: nextDueDate
-                ? nextDueDate.toISOString()
-                : undefined,
               portfolio_id: portfolio.id
             }
 
@@ -3757,27 +3731,6 @@ export class PropertyService implements IPropertyService {
             updateData.card_descriptor = cardDescriptor || undefined
           }
 
-          // Extract next due date (if provided)
-          const nextDueDateValue = getRawValue(row, [
-            'Next Due Date',
-            'Next due date',
-            'Due Date'
-          ])
-          if (nextDueDateValue) {
-            const nextDueDate = parseDate(nextDueDateValue)
-            if (!nextDueDate) {
-              result.errors.push({
-                row: rowNumber,
-                expediaId: expediaIdValue,
-                error:
-                  'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
-              continue
-            }
-            updateData.next_due_date = nextDueDate.toISOString()
-          }
-
           // Extract portfolio name (if provided)
           const portfolioName = findHeaderValue(row, [
             'Portfolio',
@@ -4265,7 +4218,6 @@ export class PropertyService implements IPropertyService {
         address: property.address,
         card_descriptor: property.card_descriptor,
         is_active: property.is_active,
-        next_due_date: property.next_due_date,
         portfolio_id: property.portfolio_id,
         currency_id: property.currency_id,
         currency: property.currency,
@@ -4651,7 +4603,9 @@ export class PropertyService implements IPropertyService {
     if (all?.length) return all[0].id
     throw new BadRequestException('No currency configured on dashboard')
   }
-  private async resolvePortfolioIdByName(name?: string | null): Promise<string> {
+  private async resolvePortfolioIdByName(
+    name?: string | null
+  ): Promise<string> {
     if (name) {
       const existing = await this.portfolioRepository.findByName(name)
       if (existing) return existing.id
@@ -4675,14 +4629,17 @@ export class PropertyService implements IPropertyService {
   ): Promise<Property | null> {
     let p: Property | null = null
     if (expediaId) p = await this.propertyRepository.findByExpediaId(expediaId)
-    if (!p && bookingId) p = await this.propertyRepository.findByBookingId(bookingId)
+    if (!p && bookingId)
+      p = await this.propertyRepository.findByBookingId(bookingId)
     if (!p && agodaId) p = await this.propertyRepository.findByAgodaId(agodaId)
     return p
   }
-  async syncCreate(dto: SyncCreatePropertyDto): Promise<{ status: string; id?: string }> {
+  async syncCreate(
+    dto: SyncCreatePropertyDto
+  ): Promise<{ status: string; id?: string }> {
     const expediaId = dto.expedia_id != null ? String(dto.expedia_id) : null
     const bookingId = dto.booking_id != null ? String(dto.booking_id) : null
-    const agodaId   = dto.agoda_id   != null ? String(dto.agoda_id)   : null
+    const agodaId = dto.agoda_id != null ? String(dto.agoda_id) : null
     let existing = await this.findByAnyOta(expediaId, bookingId, agodaId)
     if (!existing) existing = await this.propertyRepository.findByName(dto.name)
     if (existing) return { status: 'already_exists', id: existing.id }
@@ -4704,25 +4661,30 @@ export class PropertyService implements IPropertyService {
       })
     }
     return { status: 'created', id: created.id }
-  } 
-  async syncByOta(dto: SyncByOtaPropertyDto): Promise<{ status: string; id?: string }> {
+  }
+  async syncByOta(
+    dto: SyncByOtaPropertyDto
+  ): Promise<{ status: string; id?: string }> {
     const expediaId = dto.expedia_id != null ? String(dto.expedia_id) : null
     const bookingId = dto.booking_id != null ? String(dto.booking_id) : null
-    const agodaId   = dto.agoda_id   != null ? String(dto.agoda_id)   : null
+    const agodaId = dto.agoda_id != null ? String(dto.agoda_id) : null
     if (!expediaId && !bookingId && !agodaId) return { status: 'no_ota_ids' }
     const property = await this.findByAnyOta(expediaId, bookingId, agodaId)
     if (!property) return { status: 'not_found' }
-    const allowed = ['name', 'card_descriptor', 'is_active', 'next_due_date']
+    const allowed = ['name', 'card_descriptor', 'is_active']
     const patch: any = {}
-    for (const k of allowed) if (dto.data?.[k] !== undefined) patch[k] = dto.data[k]
+    for (const k of allowed)
+      if (dto.data?.[k] !== undefined) patch[k] = dto.data[k]
     if (!Object.keys(patch).length) return { status: 'no_op', id: property.id }
     const updated = await this.propertyRepository.update(property.id, patch)
     return { status: 'updated', id: updated.id }
   }
-  async syncDelete(dto: SyncDeletePropertyDto): Promise<{ status: string; id?: string }> {
+  async syncDelete(
+    dto: SyncDeletePropertyDto
+  ): Promise<{ status: string; id?: string }> {
     const expediaId = dto.expedia_id != null ? String(dto.expedia_id) : null
     const bookingId = dto.booking_id != null ? String(dto.booking_id) : null
-    const agodaId   = dto.agoda_id   != null ? String(dto.agoda_id)   : null
+    const agodaId = dto.agoda_id != null ? String(dto.agoda_id) : null
     if (!expediaId && !bookingId && !agodaId) return { status: 'no_ota_ids' }
     const property = await this.findByAnyOta(expediaId, bookingId, agodaId)
     if (!property) return { status: 'not_found' }
@@ -4730,7 +4692,9 @@ export class PropertyService implements IPropertyService {
     return { status: 'deleted', id: property.id }
   }
   async syncBulkCreate(items: SyncCreatePropertyDto[]) {
-    let created = 0, alreadyExists = 0, failed = 0
+    let created = 0,
+      alreadyExists = 0,
+      failed = 0
     for (const item of items) {
       try {
         const r = await this.syncCreate(item)
@@ -4738,7 +4702,9 @@ export class PropertyService implements IPropertyService {
         else if (r.status === 'already_exists') alreadyExists++
       } catch (e: any) {
         failed++
-        this.logger.error(`[sync] bulk create failed for "${item.name}": ${e?.message ?? e}`)
+        this.logger.error(
+          `[sync] bulk create failed for "${item.name}": ${e?.message ?? e}`
+        )
       }
     }
     return { created, alreadyExists, failed }

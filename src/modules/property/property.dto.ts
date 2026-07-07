@@ -8,7 +8,6 @@ import { Transform, Type } from 'class-transformer'
 import {
   IsArray,
   IsBoolean,
-  IsDateString,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -67,14 +66,6 @@ export class CreatePropertyDto {
   @IsBoolean()
   @IsOptional()
   is_active: boolean
-
-  @ApiPropertyOptional({
-    example: '2025-12-31T23:59:59.000Z',
-    description: 'Next due date for payment or audit (optional)'
-  })
-  @IsDateString()
-  @IsOptional()
-  next_due_date?: string
 
   @ApiProperty({
     example: '507f1f77bcf86cd799439012',
@@ -374,7 +365,6 @@ export class PropertyStatsResponseDto {
     address: string
     card_descriptor: string | null
     is_active: boolean
-    next_due_date: Date | null
     portfolio_id: string
     currency_id: string
     currency: {
@@ -868,8 +858,12 @@ export class SyncCreatePropertyDto {
   @ApiPropertyOptional() @IsOptional() booking_id?: number | string | null
   @ApiPropertyOptional() @IsOptional() agoda_id?: number | string | null
 
-  @ApiPropertyOptional() @IsOptional() @IsString() expedia_status?: string | null
-  @ApiPropertyOptional() @IsOptional() @IsString() booking_status?: string | null
+  @ApiPropertyOptional() @IsOptional() @IsString() expedia_status?:
+    | string
+    | null
+  @ApiPropertyOptional() @IsOptional() @IsString() booking_status?:
+    | string
+    | null
   @ApiPropertyOptional() @IsOptional() @IsString() agoda_status?: string | null
 }
 

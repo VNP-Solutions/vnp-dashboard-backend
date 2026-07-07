@@ -117,8 +117,7 @@ export class AggregationBuilder {
       'portfolioName',
       'currency',
       'auditStatus',
-      'serviceType',
-      'nextDueDate'
+      'serviceType'
     )
 
     // Always need credentials for OTA ID/Username/Password
@@ -723,7 +722,6 @@ export class AggregationBuilder {
 
       // Property
       'property.name': 1,
-      'property.next_due_date': 1,
 
       // Credentials - OTA IDs, usernames, and passwords
       'credentials.expedia_id': 1,
