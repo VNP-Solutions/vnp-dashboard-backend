@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import type { IPendingActionRepository, PendingActionWithRelations } from './pending-action.interface'
+import type {
+  IPendingActionRepository,
+  PendingActionWithRelations
+} from './pending-action.interface'
 
 @Injectable()
 export class PendingActionRepository implements IPendingActionRepository {
@@ -48,9 +51,12 @@ export class PendingActionRepository implements IPendingActionRepository {
           : undefined,
         audit_update_data: data.audit_update_data
           ? {
-              expedia_amount_confirmed: data.audit_update_data.expedia_amount_confirmed,
-              agoda_amount_confirmed: data.audit_update_data.agoda_amount_confirmed,
-              booking_amount_confirmed: data.audit_update_data.booking_amount_confirmed
+              expedia_amount_confirmed:
+                data.audit_update_data.expedia_amount_confirmed,
+              agoda_amount_confirmed:
+                data.audit_update_data.agoda_amount_confirmed,
+              booking_amount_confirmed:
+                data.audit_update_data.booking_amount_confirmed
             }
           : undefined,
         reason: data.reason,
@@ -94,7 +100,7 @@ export class PendingActionRepository implements IPendingActionRepository {
                   select: {
                     id: true,
                     name: true,
-                    contact_email: true
+                    parent_id: true
                   }
                 }
               }
@@ -168,7 +174,7 @@ export class PendingActionRepository implements IPendingActionRepository {
                   select: {
                     id: true,
                     name: true,
-                    contact_email: true
+                    parent_id: true
                   }
                 }
               }
@@ -244,7 +250,7 @@ export class PendingActionRepository implements IPendingActionRepository {
                   select: {
                     id: true,
                     name: true,
-                    contact_email: true
+                    parent_id: true
                   }
                 }
               }
@@ -326,7 +332,7 @@ export class PendingActionRepository implements IPendingActionRepository {
                   select: {
                     id: true,
                     name: true,
-                    contact_email: true
+                    parent_id: true
                   }
                 }
               }
@@ -399,7 +405,7 @@ export class PendingActionRepository implements IPendingActionRepository {
                   select: {
                     id: true,
                     name: true,
-                    contact_email: true
+                    parent_id: true
                   }
                 }
               }
@@ -473,7 +479,7 @@ export class PendingActionRepository implements IPendingActionRepository {
                   select: {
                     id: true,
                     name: true,
-                    contact_email: true
+                    parent_id: true
                   }
                 }
               }
@@ -545,7 +551,7 @@ export class PendingActionRepository implements IPendingActionRepository {
                   select: {
                     id: true,
                     name: true,
-                    contact_email: true
+                    parent_id: true
                   }
                 }
               }
@@ -616,7 +622,7 @@ export class PendingActionRepository implements IPendingActionRepository {
                   select: {
                     id: true,
                     name: true,
-                    contact_email: true
+                    parent_id: true
                   }
                 }
               }

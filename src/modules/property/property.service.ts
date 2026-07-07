@@ -130,10 +130,7 @@ const ACCESS_LEVELS_SHEET_HEADERS = [
   'Property',
   'Expedia ID',
   'Access Levels',
-  'Date of Export',
-  'Portfolio Contact Email',
-  'Portfolio Access Email',
-  'Portfolio Contact Number'
+  'Date of Export'
 ] as const
 
 /**
@@ -1442,13 +1439,10 @@ export class PropertyService implements IPropertyService {
         p.name ?? '',
         cred?.expedia_id ?? '',
         formatPropertyOtaAccessLevels(cred),
-        exportDateStr,
-        port?.contact_email ?? '',
-        port?.access_email ?? '',
-        port?.access_phone ?? ''
+        exportDateStr
       ])
     }
-    const widths = [24, 28, 16, 24, 16, 28, 28, 26]
+    const widths = [24, 28, 16, 24, 16]
     widths.forEach((w, i) => {
       sheet.getColumn(i + 1).width = w
     })
@@ -2124,14 +2118,6 @@ export class PropertyService implements IPropertyService {
       )
 
       const recipientEmails: string[] = []
-
-      if (currentPortfolio?.contact_email) {
-        recipientEmails.push(currentPortfolio.contact_email)
-      }
-
-      if (newPortfolio.contact_email) {
-        recipientEmails.push(newPortfolio.contact_email)
-      }
 
       const emailDelivery = await this.emailUtil.sendPropertyTransferEmail(
         recipientEmails,

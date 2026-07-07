@@ -13,7 +13,7 @@ export class SearchConfig {
 
   @ApiPropertyOptional({
     description: 'Fields to search in (comma-separated or array)',
-    example: 'name,contact_email',
+    example: 'name,parent_id',
     type: [String]
   })
   @IsOptional()

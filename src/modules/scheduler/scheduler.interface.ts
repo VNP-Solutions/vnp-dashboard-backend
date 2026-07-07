@@ -3,7 +3,7 @@ export interface PropertyAuditSummary {
   propertyName: string
   portfolioId: string
   portfolioName: string
-  portfolioContactEmail?: string
+  portfolioParentId?: string
   auditCounts: Record<string, number> // Key: OTA type (expedia, agoda, booking), Value: count
   totalAudits: number
 }

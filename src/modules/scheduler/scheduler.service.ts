@@ -131,7 +131,7 @@ export class SchedulerService {
               select: {
                 id: true,
                 name: true,
-                contact_email: true
+                parent_id: true
               }
             }
           }
@@ -151,9 +151,7 @@ export class SchedulerService {
   /**
    * Group audits by property and count by OTA type
    */
-  private groupAuditsByProperty(
-    audits: any[]
-  ): PropertyAuditSummary[] {
+  private groupAuditsByProperty(audits: any[]): PropertyAuditSummary[] {
     const propertyMap = new Map<string, PropertyAuditSummary>()
 
     for (const audit of audits) {
@@ -165,7 +163,7 @@ export class SchedulerService {
           propertyName: audit.property.name,
           portfolioId: audit.property.portfolio.id,
           portfolioName: audit.property.portfolio.name,
-          portfolioContactEmail: audit.property.portfolio.contact_email,
+          portfolioParentId: audit.property.portfolio.parent_id,
           auditCounts: {},
           totalAudits: 0
         })
@@ -200,12 +198,7 @@ export class SchedulerService {
   ): Promise<string[]> {
     const recipients: string[] = []
 
-    // DISABLED: Stop sending alerts to portfolio contact emails automatically
-    // if (summary.portfolioContactEmail) {
-    //   recipients.push(summary.portfolioContactEmail)
-    // }
-
-    // Find users with partial access to this property (no user join — avoids Prisma
+    // Find users with partial access to this property
     // throwing on orphan UserAccessedProperty rows whose user_id has no User)
     const userAccesses = await this.prisma.userAccessedProperty.findMany({
       where: {
@@ -264,10 +257,7 @@ export class SchedulerService {
       // Check if user has property permission with partial access
       const propertyPermission = user.role.property_permission
 
-      if (
-        propertyPermission &&
-        propertyPermission.access_level === 'partial'
-      ) {
+      if (propertyPermission && propertyPermission.access_level === 'partial') {
         // Check if user has access to this specific property
         const hasPropertyAccess =
           userAccess.property_id.includes(summary.propertyId) ||
@@ -338,7 +328,13 @@ export class SchedulerService {
         </div>
       `,
       text: `
-Hi,\n\nPlease find below the audit status report for ${summary.propertyName} in ${summary.portfolioName}.\n\n📊 Audit Summary:\n🏢 Property: ${summary.propertyName}\n🏢 Portfolio: ${summary.portfolioName}\n📅 Total Reported Audits: ${summary.totalAudits}\n\n📋 Audit Breakdown by Type:\n${Object.entries(summary.auditCounts).map(([type, count]) => `- ${type}: ${count} audit(s)`).join('\n')}\n\nThis report is automatically generated every Monday for audits with "Reported" status.\n\nPlease log in to your dashboard for more details and to take any necessary actions.\n\nWarm regards,\nVNP Solutions Team
+Hi,\n\nPlease find below the audit status report for ${summary.propertyName} in ${summary.portfolioName}.\n\n📊 Audit Summary:\n🏢 Property: ${summary.propertyName}\n🏢 Portfolio: ${summary.portfolioName}\n📅 Total Reported Audits: ${summary.totalAudits}\n\n📋 Audit Breakdown by Type:\n${Object.entries(
+        summary.auditCounts
+      )
+        .map(([type, count]) => `- ${type}: ${count} audit(s)`)
+        .join(
+          '\n'
+        )}\n\nThis report is automatically generated every Monday for audits with "Reported" status.\n\nPlease log in to your dashboard for more details and to take any necessary actions.\n\nWarm regards,\nVNP Solutions Team
       `
     }
 

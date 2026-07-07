@@ -124,31 +124,26 @@ async function main() {
     {
       name: 'Marriott Hotels Group',
       serviceTypeIndex: 0,
-      contact_email: 'contact@marriott.com',
       is_commissionable: true
     },
     {
       name: 'Hilton Worldwide',
       serviceTypeIndex: 1,
-      contact_email: 'contact@hilton.com',
       is_commissionable: true
     },
     {
       name: 'Hyatt Hotels',
       serviceTypeIndex: 0,
-      contact_email: 'contact@hyatt.com',
       is_commissionable: false
     },
     {
       name: 'IHG Hotels & Resorts',
       serviceTypeIndex: 2,
-      contact_email: 'contact@ihg.com',
       is_commissionable: true
     },
     {
       name: 'Wyndham Hotels',
       serviceTypeIndex: 1,
-      contact_email: 'contact@wyndham.com',
       is_commissionable: false
     }
   ]
@@ -163,10 +158,7 @@ async function main() {
         service_type_id: serviceTypes[data.serviceTypeIndex].id,
         currency: 'USD',
         is_active: true,
-        contact_email: data.contact_email,
-        is_commissionable: data.is_commissionable,
-        access_email: data.contact_email,
-        access_phone: '+1-555-0100'
+        is_commissionable: data.is_commissionable
       }
     })
     portfolios.push(portfolio)
@@ -337,12 +329,18 @@ async function main() {
           : Math.floor(amountCollectable * Math.random())
 
       // Set amounts based on OTA type
-      const expediaAmountCollectable = otaType === OtaType.expedia ? amountCollectable : null
-      const expediaAmountConfirmed = otaType === OtaType.expedia ? amountConfirmed : null
-      const agodaAmountCollectable = otaType === OtaType.agoda ? amountCollectable : null
-      const agodaAmountConfirmed = otaType === OtaType.agoda ? amountConfirmed : null
-      const bookingAmountCollectable = otaType === OtaType.booking ? amountCollectable : null
-      const bookingAmountConfirmed = otaType === OtaType.booking ? amountConfirmed : null
+      const expediaAmountCollectable =
+        otaType === OtaType.expedia ? amountCollectable : null
+      const expediaAmountConfirmed =
+        otaType === OtaType.expedia ? amountConfirmed : null
+      const agodaAmountCollectable =
+        otaType === OtaType.agoda ? amountCollectable : null
+      const agodaAmountConfirmed =
+        otaType === OtaType.agoda ? amountConfirmed : null
+      const bookingAmountCollectable =
+        otaType === OtaType.booking ? amountCollectable : null
+      const bookingAmountConfirmed =
+        otaType === OtaType.booking ? amountConfirmed : null
 
       await prisma.audit.create({
         data: {
