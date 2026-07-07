@@ -607,10 +607,6 @@ export class PendingActionService implements IPendingActionService {
       property.portfolio_id
     )
 
-    if (currentPortfolio?.contact_email) {
-      recipientEmails.push(currentPortfolio.contact_email)
-    }
-
     // Get new portfolio details
     const newPortfolio = await this.portfolioRepository.findById(
       pendingAction.transfer_data.new_portfolio_id
@@ -619,10 +615,6 @@ export class PendingActionService implements IPendingActionService {
     if (!newPortfolio) {
       console.error('New portfolio not found for email notification')
       return undefined
-    }
-
-    if (newPortfolio.contact_email) {
-      recipientEmails.push(newPortfolio.contact_email)
     }
 
     // Send the email to all recipients (duplicates will be removed by the email utility)
@@ -662,10 +654,6 @@ export class PendingActionService implements IPendingActionService {
       return undefined
     }
 
-    if (portfolio.contact_email) {
-      recipientEmails.push(portfolio.contact_email)
-    }
-
     // Send the email to all recipients
     return this.emailUtil.sendPortfolioDeactivateEmail(
       recipientEmails,
@@ -700,10 +688,6 @@ export class PendingActionService implements IPendingActionService {
     if (!portfolio) {
       console.error('Portfolio not found for activation email notification')
       return undefined
-    }
-
-    if (portfolio.contact_email) {
-      recipientEmails.push(portfolio.contact_email)
     }
 
     // Send the email to all recipients
@@ -758,10 +742,6 @@ export class PendingActionService implements IPendingActionService {
           return undefined
         }
 
-        if (currentPortfolio.contact_email) {
-          recipientEmails.push(currentPortfolio.contact_email)
-        }
-
         // Get target portfolio details and contact email
         const targetPortfolio = await this.portfolioRepository.findById(
           pendingAction.transfer_data.new_portfolio_id
@@ -772,10 +752,6 @@ export class PendingActionService implements IPendingActionService {
             'Target portfolio not found for rejection email notification'
           )
           return undefined
-        }
-
-        if (targetPortfolio.contact_email) {
-          recipientEmails.push(targetPortfolio.contact_email)
         }
 
         // Send rejection email
@@ -811,10 +787,6 @@ export class PendingActionService implements IPendingActionService {
           return undefined
         }
 
-        if (portfolio.contact_email) {
-          recipientEmails.push(portfolio.contact_email)
-        }
-
         // Send rejection email
         return this.emailUtil.sendPropertyDeactivateRejectionEmail(
           recipientEmails,
@@ -847,10 +819,6 @@ export class PendingActionService implements IPendingActionService {
           return undefined
         }
 
-        if (portfolio.contact_email) {
-          recipientEmails.push(portfolio.contact_email)
-        }
-
         // Send rejection email
         return this.emailUtil.sendPropertyActivateRejectionEmail(
           recipientEmails,
@@ -872,10 +840,6 @@ export class PendingActionService implements IPendingActionService {
           return undefined
         }
 
-        if (portfolio.contact_email) {
-          recipientEmails.push(portfolio.contact_email)
-        }
-
         // Send rejection email
         return this.emailUtil.sendPortfolioDeactivateRejectionEmail(
           recipientEmails,
@@ -894,10 +858,6 @@ export class PendingActionService implements IPendingActionService {
         if (!portfolio) {
           console.error('Portfolio not found for rejection email notification')
           return undefined
-        }
-
-        if (portfolio.contact_email) {
-          recipientEmails.push(portfolio.contact_email)
         }
 
         // Send rejection email

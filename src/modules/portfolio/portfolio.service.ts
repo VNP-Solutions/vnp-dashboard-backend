@@ -27,9 +27,7 @@ import {
   spreadsheetCellValueToPlainString,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
-import { splitEmails } from '../../common/validators/comma-separated-emails.validator'
 import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
-import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IServiceTypeRepository } from '../service-type/service-type.interface'
 import { Prisma } from '@prisma/client'
@@ -1320,97 +1318,6 @@ export class PortfolioService implements IPortfolioService {
     }
   }
 
-  async sendEmail(
-    id: string,
-    subject: string,
-    body: string,
-    user: IUserWithPermissions,
-    uploadedAttachments?: EmailAttachment[],
-    attachmentUrls?: AttachmentUrlDto[]
-  ) {
-    const isSuperAdmin = isUserSuperAdmin(user)
-
-    // CRITICAL: Explicit permission check to ensure user has access to this portfolio
-    // This prevents partial access users from sending emails to portfolios they cannot access
-    if (!isSuperAdmin) {
-      await this.permissionService.requirePermission(
-        user,
-        ModuleType.PORTFOLIO,
-        PermissionAction.READ,
-        id
-      )
-    }
-
-    const portfolio = await this.portfolioRepository.findById(
-      id,
-      user.id,
-      isSuperAdmin
-    )
-
-    if (!portfolio) {
-      throw new NotFoundException('Portfolio not found')
-    }
-
-    if (!portfolio.contact_email) {
-      throw new BadRequestException(
-        'Portfolio does not have a contact email configured'
-      )
-    }
-
-    // Split comma-separated emails
-    const emailAddresses = splitEmails(portfolio.contact_email)
-
-    if (emailAddresses.length === 0) {
-      throw new BadRequestException(
-        'Portfolio does not have valid contact email addresses configured'
-      )
-    }
-
-    // Log email details for debugging
-    console.log('📧 Sending email to portfolio contact(s):', {
-      requestedPortfolioId: id,
-      portfolioId: portfolio.id,
-      portfolioName: portfolio.name,
-      contact_email: portfolio.contact_email,
-      email_addresses: emailAddresses,
-      recipient_count: emailAddresses.length,
-      access_email: portfolio.access_email,
-      subject,
-      hasAttachments:
-        (uploadedAttachments?.length || 0) + (attachmentUrls?.length || 0) > 0
-    })
-
-    // Combine attachments from file uploads and URLs
-    let allAttachments: EmailAttachment[] = []
-
-    // Add uploaded file attachments if provided
-    if (uploadedAttachments && uploadedAttachments.length > 0) {
-      allAttachments = [...uploadedAttachments]
-    }
-
-    // Fetch and add URL-based attachments if provided
-    if (attachmentUrls && attachmentUrls.length > 0) {
-      const urlAttachments =
-        await this.emailUtil.fetchAttachmentsFromUrls(attachmentUrls)
-      allAttachments = [...allAttachments, ...urlAttachments]
-    }
-
-    // Send email to each recipient
-    for (const emailAddress of emailAddresses) {
-      await this.emailUtil.sendEmail(
-        emailAddress,
-        subject,
-        body,
-        allAttachments.length > 0 ? allAttachments : undefined
-      )
-    }
-
-    return {
-      message: `Email sent successfully to ${emailAddresses.length} recipient(s)`,
-      recipients: emailAddresses
-    }
-  }
-
   async bulkImport(
     file: Express.Multer.File,
     _user: IUserWithPermissions
@@ -1586,29 +1493,12 @@ export class PortfolioService implements IPortfolioService {
               'currency_code'
             ]) || 'USD'
 
-          // Extract contact email (OPTIONAL)
-          const contactEmail = findHeaderValue(row, [
-            'Contact Email',
-            'Contact email',
-            'Contact'
-          ])
-
-          // Extract access email (OPTIONAL)
-          const accessEmail = findHeaderValue(row, [
-            'Access Email',
-            'Access email'
-          ])
-
-          // Extract access phone (OPTIONAL)
-          const accessPhone = findHeaderValue(row, [
-            'Access Phone',
-            'Access phone',
-            'Access Phone NO',
-            'Access Phone No',
-            'Access Phone no',
-            'Access phone no',
-            'Access Contact',
-            'Access contact'
+          // Extract parent ID (OPTIONAL)
+          const parentId = findHeaderValue(row, [
+            'Parent ID',
+            'Parent Id',
+            'Parent id',
+            'parent_id'
           ])
 
           // Extract contract URL/Documents (OPTIONAL)
@@ -1652,10 +1542,8 @@ export class PortfolioService implements IPortfolioService {
             service_type_id: serviceType.id,
             currency: currency,
             is_active: isActive,
-            contact_email: contactEmail || undefined,
             is_commissionable: isCommissionable,
-            access_email: accessEmail || undefined,
-            access_phone: accessPhone || undefined
+            parent_id: parentId || undefined
           }
 
           const newPortfolio = await this.portfolioRepository.create(
@@ -1963,38 +1851,15 @@ export class PortfolioService implements IPortfolioService {
             updateData.currency = currency
           }
 
-          // Extract contact email (if provided)
-          const contactEmail = findHeaderValue(row, [
-            'Contact Email',
-            'Contact email',
-            'Contact'
+          // Extract parent ID (if provided)
+          const parentId = findHeaderValue(row, [
+            'Parent ID',
+            'Parent Id',
+            'Parent id',
+            'parent_id'
           ])
-          if (contactEmail !== undefined) {
-            updateData.contact_email = contactEmail || undefined
-          }
-
-          // Extract access email (if provided)
-          const accessEmail = findHeaderValue(row, [
-            'Access Email',
-            'Access email'
-          ])
-          if (accessEmail !== undefined) {
-            updateData.access_email = accessEmail || undefined
-          }
-
-          // Extract access phone (if provided)
-          const accessPhone = findHeaderValue(row, [
-            'Access Phone',
-            'Access phone',
-            'Access Phone NO',
-            'Access Phone No',
-            'Access Phone no',
-            'Access phone no',
-            'Access Contact',
-            'Access contact'
-          ])
-          if (accessPhone !== undefined) {
-            updateData.access_phone = accessPhone || undefined
+          if (parentId !== undefined) {
+            updateData.parent_id = parentId || undefined
           }
 
           // Extract contract URL/Documents (if provided)

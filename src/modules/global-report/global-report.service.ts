@@ -21,7 +21,7 @@ import {
   OtaIdsResponseDto,
   OtaPasswordsResponseDto,
   OtaUsernamesResponseDto,
-  PortfolioContactEmailsResponseDto,
+  PortfolioParentIdsResponseDto,
   PortfoliosListResponseDto,
   PropertiesListResponseDto,
   ReportRowDto,
@@ -221,22 +221,20 @@ export class GlobalReportService implements IGlobalReportService {
   }
 
   /**
-   * Get all portfolio contact emails for filtering
+   * Get all portfolio parent IDs for filtering
    */
-  async getPortfolioContactEmails(
+  async getPortfolioParentIds(
     user: IUserWithPermissions
-  ): Promise<PortfolioContactEmailsResponseDto> {
-    // Super admin only
-    // Check access permissions
+  ): Promise<PortfolioParentIdsResponseDto> {
     if (!canAccessGlobalReport(user)) {
       throw new ForbiddenException(
-        'You do not have permission to access portfolio contact emails'
+        'You do not have permission to access portfolio parent IDs'
       )
     }
 
-    const emails =
-      await this.globalReportRepository.findAllPortfolioContactEmails()
-    return { data: emails }
+    const parentIds =
+      await this.globalReportRepository.findAllPortfolioParentIds()
+    return { data: parentIds }
   }
 
   /**
@@ -315,14 +313,16 @@ export class GlobalReportService implements IGlobalReportService {
    */
   async getExpediaIds(user: IUserWithPermissions): Promise<{ data: string[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access Expedia IDs')
+      throw new ForbiddenException(
+        'You do not have permission to access Expedia IDs'
+      )
     }
 
     const allOtaIds = await this.globalReportRepository.findAllOtaIds()
     const expediaIds = allOtaIds
       .filter(item => item.otaType === 'expedia')
       .map(item => item.otaId)
-    
+
     return { data: expediaIds }
   }
 
@@ -331,14 +331,16 @@ export class GlobalReportService implements IGlobalReportService {
    */
   async getAgodaIds(user: IUserWithPermissions): Promise<{ data: string[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access Agoda IDs')
+      throw new ForbiddenException(
+        'You do not have permission to access Agoda IDs'
+      )
     }
 
     const allOtaIds = await this.globalReportRepository.findAllOtaIds()
     const agodaIds = allOtaIds
       .filter(item => item.otaType === 'agoda')
       .map(item => item.otaId)
-    
+
     return { data: agodaIds }
   }
 
@@ -347,110 +349,136 @@ export class GlobalReportService implements IGlobalReportService {
    */
   async getBookingIds(user: IUserWithPermissions): Promise<{ data: string[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access Booking IDs')
+      throw new ForbiddenException(
+        'You do not have permission to access Booking IDs'
+      )
     }
 
     const allOtaIds = await this.globalReportRepository.findAllOtaIds()
     const bookingIds = allOtaIds
       .filter(item => item.otaType === 'booking')
       .map(item => item.otaId)
-    
+
     return { data: bookingIds }
   }
 
   /**
    * Get Expedia usernames only
    */
-  async getExpediaUsernames(user: IUserWithPermissions): Promise<{ data: string[] }> {
+  async getExpediaUsernames(
+    user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access Expedia usernames')
+      throw new ForbiddenException(
+        'You do not have permission to access Expedia usernames'
+      )
     }
 
     const allUsernames = await this.globalReportRepository.findAllOtaUsernames()
     const expediaUsernames = allUsernames
       .filter(item => item.otaType === 'expedia')
       .map(item => item.username)
-    
+
     return { data: expediaUsernames }
   }
 
   /**
    * Get Agoda usernames only
    */
-  async getAgodaUsernames(user: IUserWithPermissions): Promise<{ data: string[] }> {
+  async getAgodaUsernames(
+    user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access Agoda usernames')
+      throw new ForbiddenException(
+        'You do not have permission to access Agoda usernames'
+      )
     }
 
     const allUsernames = await this.globalReportRepository.findAllOtaUsernames()
     const agodaUsernames = allUsernames
       .filter(item => item.otaType === 'agoda')
       .map(item => item.username)
-    
+
     return { data: agodaUsernames }
   }
 
   /**
    * Get Booking usernames only
    */
-  async getBookingUsernames(user: IUserWithPermissions): Promise<{ data: string[] }> {
+  async getBookingUsernames(
+    user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access Booking usernames')
+      throw new ForbiddenException(
+        'You do not have permission to access Booking usernames'
+      )
     }
 
     const allUsernames = await this.globalReportRepository.findAllOtaUsernames()
     const bookingUsernames = allUsernames
       .filter(item => item.otaType === 'booking')
       .map(item => item.username)
-    
+
     return { data: bookingUsernames }
   }
 
   /**
    * Get Expedia passwords only (decrypted)
    */
-  async getExpediaPasswords(user: IUserWithPermissions): Promise<{ data: string[] }> {
+  async getExpediaPasswords(
+    user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access Expedia passwords')
+      throw new ForbiddenException(
+        'You do not have permission to access Expedia passwords'
+      )
     }
 
     const allPasswords = await this.getOtaPasswords(user)
     const expediaPasswords = allPasswords.data
       .filter(item => item.otaType === 'expedia')
       .map(item => item.password)
-    
+
     return { data: expediaPasswords }
   }
 
   /**
    * Get Agoda passwords only (decrypted)
    */
-  async getAgodaPasswords(user: IUserWithPermissions): Promise<{ data: string[] }> {
+  async getAgodaPasswords(
+    user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access Agoda passwords')
+      throw new ForbiddenException(
+        'You do not have permission to access Agoda passwords'
+      )
     }
 
     const allPasswords = await this.getOtaPasswords(user)
     const agodaPasswords = allPasswords.data
       .filter(item => item.otaType === 'agoda')
       .map(item => item.password)
-    
+
     return { data: agodaPasswords }
   }
 
   /**
    * Get Booking passwords only (decrypted)
    */
-  async getBookingPasswords(user: IUserWithPermissions): Promise<{ data: string[] }> {
+  async getBookingPasswords(
+    user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access Booking passwords')
+      throw new ForbiddenException(
+        'You do not have permission to access Booking passwords'
+      )
     }
 
     const allPasswords = await this.getOtaPasswords(user)
     const bookingPasswords = allPasswords.data
       .filter(item => item.otaType === 'booking')
       .map(item => item.password)
-    
+
     return { data: bookingPasswords }
   }
 
@@ -495,72 +523,102 @@ export class GlobalReportService implements IGlobalReportService {
   /**
    * Get Expedia amount collectable list
    */
-  async getExpediaAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }> {
+  async getExpediaAmountCollectable(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access amount data')
+      throw new ForbiddenException(
+        'You do not have permission to access amount data'
+      )
     }
 
-    const amounts = await this.globalReportRepository.findAllExpediaAmountCollectable()
+    const amounts =
+      await this.globalReportRepository.findAllExpediaAmountCollectable()
     return { data: amounts }
   }
 
   /**
    * Get Expedia amount confirmed list
    */
-  async getExpediaAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }> {
+  async getExpediaAmountConfirmed(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access amount data')
+      throw new ForbiddenException(
+        'You do not have permission to access amount data'
+      )
     }
 
-    const amounts = await this.globalReportRepository.findAllExpediaAmountConfirmed()
+    const amounts =
+      await this.globalReportRepository.findAllExpediaAmountConfirmed()
     return { data: amounts }
   }
 
   /**
    * Get Agoda amount collectable list
    */
-  async getAgodaAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }> {
+  async getAgodaAmountCollectable(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access amount data')
+      throw new ForbiddenException(
+        'You do not have permission to access amount data'
+      )
     }
 
-    const amounts = await this.globalReportRepository.findAllAgodaAmountCollectable()
+    const amounts =
+      await this.globalReportRepository.findAllAgodaAmountCollectable()
     return { data: amounts }
   }
 
   /**
    * Get Agoda amount confirmed list
    */
-  async getAgodaAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }> {
+  async getAgodaAmountConfirmed(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access amount data')
+      throw new ForbiddenException(
+        'You do not have permission to access amount data'
+      )
     }
 
-    const amounts = await this.globalReportRepository.findAllAgodaAmountConfirmed()
+    const amounts =
+      await this.globalReportRepository.findAllAgodaAmountConfirmed()
     return { data: amounts }
   }
 
   /**
    * Get Booking amount collectable list
    */
-  async getBookingAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }> {
+  async getBookingAmountCollectable(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access amount data')
+      throw new ForbiddenException(
+        'You do not have permission to access amount data'
+      )
     }
 
-    const amounts = await this.globalReportRepository.findAllBookingAmountCollectable()
+    const amounts =
+      await this.globalReportRepository.findAllBookingAmountCollectable()
     return { data: amounts }
   }
 
   /**
    * Get Booking amount confirmed list
    */
-  async getBookingAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }> {
+  async getBookingAmountConfirmed(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     if (!canAccessGlobalReport(user)) {
-      throw new ForbiddenException('You do not have permission to access amount data')
+      throw new ForbiddenException(
+        'You do not have permission to access amount data'
+      )
     }
 
-    const amounts = await this.globalReportRepository.findAllBookingAmountConfirmed()
+    const amounts =
+      await this.globalReportRepository.findAllBookingAmountConfirmed()
     return { data: amounts }
   }
 
@@ -672,26 +730,26 @@ export class GlobalReportService implements IGlobalReportService {
     // type_of_ota is now an array
     const otaTypeArray =
       doc.type_of_ota && Array.isArray(doc.type_of_ota) ? doc.type_of_ota : []
-    
+
     const credentials = doc.credentials || {}
 
     // Extract individual OTA credentials
     const expediaId = credentials.expedia_id || null
     const expediaUsername = credentials.expedia_username || null
     const expediaPassword = credentials.expedia_password
-      ? (passwordMap.get(credentials.expedia_password) || null)
+      ? passwordMap.get(credentials.expedia_password) || null
       : null
 
     const agodaId = credentials.agoda_id || null
     const agodaUsername = credentials.agoda_username || null
     const agodaPassword = credentials.agoda_password
-      ? (passwordMap.get(credentials.agoda_password) || null)
+      ? passwordMap.get(credentials.agoda_password) || null
       : null
 
     const bookingId = credentials.booking_id || null
     const bookingUsername = credentials.booking_username || null
     const bookingPassword = credentials.booking_password
-      ? (passwordMap.get(credentials.booking_password) || null)
+      ? passwordMap.get(credentials.booking_password) || null
       : null
 
     // Extract audit ID from MongoDB document
@@ -717,13 +775,17 @@ export class GlobalReportService implements IGlobalReportService {
       auditStatus: doc.auditStatus?.status || null,
       nextDueDate: this.extractDate(doc.property?.next_due_date),
       currency: doc.currency?.code || '',
-      expediaAmountCollectable: roundToDecimals(doc.expedia_amount_collectable) ?? null,
-      expediaAmountConfirmed: roundToDecimals(doc.expedia_amount_confirmed) ?? null,
-      agodaAmountCollectable: roundToDecimals(doc.agoda_amount_collectable) ?? null,
+      expediaAmountCollectable:
+        roundToDecimals(doc.expedia_amount_collectable) ?? null,
+      expediaAmountConfirmed:
+        roundToDecimals(doc.expedia_amount_confirmed) ?? null,
+      agodaAmountCollectable:
+        roundToDecimals(doc.agoda_amount_collectable) ?? null,
       agodaAmountConfirmed: roundToDecimals(doc.agoda_amount_confirmed) ?? null,
-      bookingAmountCollectable: roundToDecimals(doc.booking_amount_collectable) ?? null,
-      bookingAmountConfirmed: roundToDecimals(doc.booking_amount_confirmed) ?? null,
-      portfolioContactEmail: doc.portfolio?.contact_email || null
+      bookingAmountCollectable:
+        roundToDecimals(doc.booking_amount_collectable) ?? null,
+      bookingAmountConfirmed:
+        roundToDecimals(doc.booking_amount_confirmed) ?? null
     }
 
     return result

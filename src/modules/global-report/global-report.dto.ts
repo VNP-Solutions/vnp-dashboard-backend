@@ -138,7 +138,8 @@ export class GlobalReportQueryDto {
  */
 export class GlobalReportExportFormatQueryDto {
   @ApiPropertyOptional({
-    description: 'Export format. Pass as query param: ?format=xlsx or ?format=csv',
+    description:
+      'Export format. Pass as query param: ?format=xlsx or ?format=csv',
     enum: ['csv', 'xlsx'],
     example: 'xlsx',
     default: 'xlsx'
@@ -154,7 +155,8 @@ export class GlobalReportExportFormatQueryDto {
  */
 export class GlobalReportExportDto extends GlobalReportQueryDto {
   @ApiPropertyOptional({
-    description: 'Export format (also accepted as query param ?format=xlsx|csv)',
+    description:
+      'Export format (also accepted as query param ?format=xlsx|csv)',
     enum: ['csv', 'xlsx'],
     default: 'xlsx'
   })
@@ -211,7 +213,7 @@ export class ReportRowDto {
   @ApiPropertyOptional({ description: 'Billing Type (VCC, DB, EBS)' })
   billingType: string | null
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Array of OTA Types',
     example: ['expedia', 'agoda'],
     isArray: true,
@@ -275,9 +277,6 @@ export class ReportRowDto {
 
   @ApiPropertyOptional({ description: 'Booking Amount Confirmed' })
   bookingAmountConfirmed: number | null
-
-  @ApiPropertyOptional({ description: 'Portfolio Contact Email' })
-  portfolioContactEmail: string | null
 }
 
 /**
@@ -330,7 +329,10 @@ export class ColumnMetadataDto {
   @ApiProperty({ type: [String], example: ['eq', 'contains', 'in'] })
   allowedOperators: string[]
 
-  @ApiPropertyOptional({ type: [String], example: ['expedia', 'agoda', 'booking'] })
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['expedia', 'agoda', 'booking']
+  })
   enumValues?: string[]
 }
 
@@ -366,29 +368,38 @@ export class OtaIdsResponseDto {
 }
 
 /**
- * Single portfolio contact email item
+ * Single portfolio parent ID item
  */
-export class PortfolioContactEmailItemDto {
-  @ApiProperty({ description: 'Contact email address', example: 'contact@marriott.com' })
-  email: string
+export class PortfolioParentIdItemDto {
+  @ApiProperty({
+    description: 'Parent portfolio identifier',
+    example: '507f1f77bcf86cd799439011'
+  })
+  parentId: string
 
-  @ApiProperty({ description: 'Portfolio name', example: 'Marriott Hotels Group' })
+  @ApiProperty({
+    description: 'Portfolio name',
+    example: 'Marriott Hotels Group'
+  })
   portfolioName: string
 }
 
 /**
- * Response for portfolio contact emails endpoint
+ * Response for portfolio parent IDs endpoint
  */
-export class PortfolioContactEmailsResponseDto {
-  @ApiProperty({ type: [PortfolioContactEmailItemDto] })
-  data: PortfolioContactEmailItemDto[]
+export class PortfolioParentIdsResponseDto {
+  @ApiProperty({ type: [PortfolioParentIdItemDto] })
+  data: PortfolioParentIdItemDto[]
 }
 
 /**
  * Single OTA username item
  */
 export class OtaUsernameItemDto {
-  @ApiProperty({ description: 'OTA username', example: 'marriott_expedia_user' })
+  @ApiProperty({
+    description: 'OTA username',
+    example: 'marriott_expedia_user'
+  })
   username: string
 
   @ApiProperty({
@@ -411,7 +422,10 @@ export class OtaUsernamesResponseDto {
  * Single OTA password item
  */
 export class OtaPasswordItemDto {
-  @ApiProperty({ description: 'OTA password (decrypted)', example: 'SecureP@ss123' })
+  @ApiProperty({
+    description: 'OTA password (decrypted)',
+    example: 'SecureP@ss123'
+  })
   password: string
 
   @ApiProperty({
@@ -434,7 +448,7 @@ export class OtaPasswordsResponseDto {
  * Response for specific OTA credentials (Expedia IDs only)
  */
 export class ExpediaIdsResponseDto {
-  @ApiProperty({ 
+  @ApiProperty({
     type: [String],
     description: 'List of unique Expedia IDs',
     example: ['EXP-12345', 'EXP-67890']
@@ -446,7 +460,7 @@ export class ExpediaIdsResponseDto {
  * Response for specific OTA credentials (Agoda IDs only)
  */
 export class AgodaIdsResponseDto {
-  @ApiProperty({ 
+  @ApiProperty({
     type: [String],
     description: 'List of unique Agoda IDs',
     example: ['AGO-12345', 'AGO-67890']
@@ -458,7 +472,7 @@ export class AgodaIdsResponseDto {
  * Response for specific OTA credentials (Booking IDs only)
  */
 export class BookingIdsResponseDto {
-  @ApiProperty({ 
+  @ApiProperty({
     type: [String],
     description: 'List of unique Booking IDs',
     example: ['BOOK-12345', 'BOOK-67890']
@@ -470,7 +484,7 @@ export class BookingIdsResponseDto {
  * Response for specific OTA usernames (Expedia)
  */
 export class ExpediaUsernamesResponseDto {
-  @ApiProperty({ 
+  @ApiProperty({
     type: [String],
     description: 'List of unique Expedia usernames',
     example: ['user1@expedia.com', 'user2@expedia.com']
@@ -482,7 +496,7 @@ export class ExpediaUsernamesResponseDto {
  * Response for specific OTA usernames (Agoda)
  */
 export class AgodaUsernamesResponseDto {
-  @ApiProperty({ 
+  @ApiProperty({
     type: [String],
     description: 'List of unique Agoda usernames',
     example: ['user1@agoda.com', 'user2@agoda.com']
@@ -494,7 +508,7 @@ export class AgodaUsernamesResponseDto {
  * Response for specific OTA usernames (Booking)
  */
 export class BookingUsernamesResponseDto {
-  @ApiProperty({ 
+  @ApiProperty({
     type: [String],
     description: 'List of unique Booking usernames',
     example: ['user1@booking.com', 'user2@booking.com']
@@ -506,7 +520,7 @@ export class BookingUsernamesResponseDto {
  * Response for specific OTA passwords (Expedia)
  */
 export class ExpediaPasswordsResponseDto {
-  @ApiProperty({ 
+  @ApiProperty({
     type: [String],
     description: 'List of unique Expedia passwords (decrypted)',
     example: ['Pass123!', 'SecurePass456!']
@@ -518,7 +532,7 @@ export class ExpediaPasswordsResponseDto {
  * Response for specific OTA passwords (Agoda)
  */
 export class AgodaPasswordsResponseDto {
-  @ApiProperty({ 
+  @ApiProperty({
     type: [String],
     description: 'List of unique Agoda passwords (decrypted)',
     example: ['Pass123!', 'SecurePass456!']
@@ -530,7 +544,7 @@ export class AgodaPasswordsResponseDto {
  * Response for specific OTA passwords (Booking)
  */
 export class BookingPasswordsResponseDto {
-  @ApiProperty({ 
+  @ApiProperty({
     type: [String],
     description: 'List of unique Booking passwords (decrypted)',
     example: ['Pass123!', 'SecurePass456!']
@@ -542,10 +556,16 @@ export class BookingPasswordsResponseDto {
  * Single portfolio item (id and name only)
  */
 export class PortfolioListItemDto {
-  @ApiProperty({ description: 'Portfolio ID', example: '507f1f77bcf86cd799439011' })
+  @ApiProperty({
+    description: 'Portfolio ID',
+    example: '507f1f77bcf86cd799439011'
+  })
   id: string
 
-  @ApiProperty({ description: 'Portfolio name', example: 'Marriott Hotels Group' })
+  @ApiProperty({
+    description: 'Portfolio name',
+    example: 'Marriott Hotels Group'
+  })
   name: string
 }
 
@@ -561,10 +581,16 @@ export class PortfoliosListResponseDto {
  * Single property item (id and name only)
  */
 export class PropertyListItemDto {
-  @ApiProperty({ description: 'Property ID', example: '507f1f77bcf86cd799439012' })
+  @ApiProperty({
+    description: 'Property ID',
+    example: '507f1f77bcf86cd799439012'
+  })
   id: string
 
-  @ApiProperty({ description: 'Property name', example: 'Marriott Downtown NYC' })
+  @ApiProperty({
+    description: 'Property name',
+    example: 'Marriott Downtown NYC'
+  })
   name: string
 }
 

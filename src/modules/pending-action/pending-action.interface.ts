@@ -43,7 +43,7 @@ export type PendingActionWithRelations = Prisma.PendingActionGetPayload<{
               select: {
                 id: true
                 name: true
-                contact_email: true
+                parent_id: true
               }
             }
           }
@@ -128,7 +128,10 @@ export interface IPendingActionService {
     query: PendingActionQueryDto,
     user: IUserWithPermissions
   ): Promise<PaginatedResult<PendingActionWithRelations>>
-  findOne(id: string, user: IUserWithPermissions): Promise<PendingActionWithRelations>
+  findOne(
+    id: string,
+    user: IUserWithPermissions
+  ): Promise<PendingActionWithRelations>
   approve(
     id: string,
     data: ApprovePendingActionDto,
@@ -139,11 +142,7 @@ export interface IPendingActionService {
     data: ApprovePendingActionDto,
     user: IUserWithPermissions
   ): Promise<PendingActionWithRelations>
-  findByPropertyId(
-    propertyId: string
-  ): Promise<PendingActionWithRelations[]>
-  findByPortfolioId(
-    portfolioId: string
-  ): Promise<PendingActionWithRelations[]>
+  findByPropertyId(propertyId: string): Promise<PendingActionWithRelations[]>
+  findByPortfolioId(portfolioId: string): Promise<PendingActionWithRelations[]>
   findByAuditId(auditId: string): Promise<PendingActionWithRelations[]>
 }

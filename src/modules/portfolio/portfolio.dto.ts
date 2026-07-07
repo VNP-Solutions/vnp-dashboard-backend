@@ -1,18 +1,13 @@
 import { OmitType, PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { Type } from 'class-transformer'
 import {
   IsArray,
   IsBoolean,
-  IsEmail,
   IsNotEmpty,
   IsOptional,
-  IsString,
-  ValidateNested
+  IsString
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
-import { IsCommaSeparatedEmails } from '../../common/validators/comma-separated-emails.validator'
-import { AttachmentUrlDto } from '../email/email.dto'
 
 export class CreatePortfolioDto {
   @ApiProperty({
@@ -54,16 +49,6 @@ export class CreatePortfolioDto {
   @IsNotEmpty()
   is_active: boolean
 
-  @ApiPropertyOptional({
-    example: 'contact@example.com, contact2@example.com',
-    description:
-      'Contact email(s) for portfolio - can be a single email or comma-separated emails for multiple recipients'
-  })
-  @IsString()
-  @IsCommaSeparatedEmails()
-  @IsOptional()
-  contact_email?: string
-
   @ApiProperty({
     example: true,
     description: 'Whether portfolio is commissionable'
@@ -73,21 +58,12 @@ export class CreatePortfolioDto {
   is_commissionable: boolean
 
   @ApiPropertyOptional({
-    example: 'access@example.com',
-    description: 'Access email for portfolio'
-  })
-  @IsString()
-  @IsEmail()
-  @IsOptional()
-  access_email?: string
-
-  @ApiPropertyOptional({
-    example: '+1234567890',
-    description: 'Access phone number for portfolio'
+    example: '507f1f77bcf86cd799439011',
+    description: 'Optional parent portfolio identifier'
   })
   @IsString()
   @IsOptional()
-  access_phone?: string
+  parent_id?: string
 
   @ApiPropertyOptional({
     example: '507f1f77bcf86cd799439011',
@@ -137,41 +113,6 @@ export class PortfolioQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   is_active?: string
-}
-
-export class SendPortfolioEmailDto {
-  @ApiProperty({
-    example: 'Quarterly Review Meeting',
-    description: 'Email subject'
-  })
-  @IsString()
-  @IsNotEmpty()
-  subject: string
-
-  @ApiProperty({
-    example:
-      'Dear Team,\n\nWe would like to schedule a quarterly review meeting...',
-    description: 'Email body (plain text)'
-  })
-  @IsString()
-  @IsNotEmpty()
-  body: string
-
-  @ApiPropertyOptional({
-    type: [AttachmentUrlDto],
-    example: [
-      {
-        url: 'https://s3.amazonaws.com/bucket/report.pdf',
-        filename: 'quarterly-report.pdf'
-      }
-    ],
-    description: 'Optional array of file URLs to attach to the email'
-  })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AttachmentUrlDto)
-  @IsOptional()
-  attachment_urls?: AttachmentUrlDto[]
 }
 
 export class BulkImportResultDto {

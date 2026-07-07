@@ -25,7 +25,7 @@ import {
   GlobalReportResponseDto,
   ColumnsMetadataResponseDto,
   OtaIdsResponseDto,
-  PortfolioContactEmailsResponseDto,
+  PortfolioParentIdsResponseDto,
   OtaUsernamesResponseDto,
   OtaPasswordsResponseDto,
   PortfoliosListResponseDto,
@@ -79,25 +79,25 @@ export class GlobalReportController {
     return this.globalReportService.getOtaIds(user)
   }
 
-  @Get('portfolio-contact-emails')
+  @Get('portfolio-parent-ids')
   @ApiOperation({
-    summary: 'Get all portfolio contact emails for filtering (Super Admin only)',
+    summary: 'Get all portfolio parent IDs for filtering (Super Admin only)',
     description:
-      'Returns all unique portfolio contact emails. Use this to populate contact email filter dropdowns.'
+      'Returns all unique portfolio parent IDs. Use this to populate parent ID filter dropdowns.'
   })
   @ApiResponse({
     status: 200,
-    description: 'Portfolio contact emails retrieved successfully',
-    type: PortfolioContactEmailsResponseDto
+    description: 'Portfolio parent IDs retrieved successfully',
+    type: PortfolioParentIdsResponseDto
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Super admin access required'
   })
-  async getPortfolioContactEmails(
+  async getPortfolioParentIds(
     @CurrentUser() user: IUserWithPermissions
-  ): Promise<PortfolioContactEmailsResponseDto> {
-    return this.globalReportService.getPortfolioContactEmails(user)
+  ): Promise<PortfolioParentIdsResponseDto> {
+    return this.globalReportService.getPortfolioParentIds(user)
   }
 
   @Get('ota-usernames')
@@ -147,9 +147,17 @@ export class GlobalReportController {
     summary: 'Get Expedia IDs only (Super Admin only)',
     description: 'Returns all unique Expedia IDs from property credentials.'
   })
-  @ApiResponse({ status: 200, description: 'Expedia IDs retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getExpediaIds(@CurrentUser() user: IUserWithPermissions): Promise<{ data: string[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Expedia IDs retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getExpediaIds(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     return this.globalReportService.getExpediaIds(user)
   }
 
@@ -159,8 +167,13 @@ export class GlobalReportController {
     description: 'Returns all unique Agoda IDs from property credentials.'
   })
   @ApiResponse({ status: 200, description: 'Agoda IDs retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getAgodaIds(@CurrentUser() user: IUserWithPermissions): Promise<{ data: string[] }> {
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getAgodaIds(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     return this.globalReportService.getAgodaIds(user)
   }
 
@@ -169,20 +182,37 @@ export class GlobalReportController {
     summary: 'Get Booking IDs only (Super Admin only)',
     description: 'Returns all unique Booking IDs from property credentials.'
   })
-  @ApiResponse({ status: 200, description: 'Booking IDs retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getBookingIds(@CurrentUser() user: IUserWithPermissions): Promise<{ data: string[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Booking IDs retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getBookingIds(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     return this.globalReportService.getBookingIds(user)
   }
 
   @Get('expedia-usernames')
   @ApiOperation({
     summary: 'Get Expedia usernames only (Super Admin only)',
-    description: 'Returns all unique Expedia usernames from property credentials.'
+    description:
+      'Returns all unique Expedia usernames from property credentials.'
   })
-  @ApiResponse({ status: 200, description: 'Expedia usernames retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getExpediaUsernames(@CurrentUser() user: IUserWithPermissions): Promise<{ data: string[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Expedia usernames retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getExpediaUsernames(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     return this.globalReportService.getExpediaUsernames(user)
   }
 
@@ -191,59 +221,104 @@ export class GlobalReportController {
     summary: 'Get Agoda usernames only (Super Admin only)',
     description: 'Returns all unique Agoda usernames from property credentials.'
   })
-  @ApiResponse({ status: 200, description: 'Agoda usernames retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getAgodaUsernames(@CurrentUser() user: IUserWithPermissions): Promise<{ data: string[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Agoda usernames retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getAgodaUsernames(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     return this.globalReportService.getAgodaUsernames(user)
   }
 
   @Get('booking-usernames')
   @ApiOperation({
     summary: 'Get Booking usernames only (Super Admin only)',
-    description: 'Returns all unique Booking usernames from property credentials.'
+    description:
+      'Returns all unique Booking usernames from property credentials.'
   })
-  @ApiResponse({ status: 200, description: 'Booking usernames retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getBookingUsernames(@CurrentUser() user: IUserWithPermissions): Promise<{ data: string[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Booking usernames retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getBookingUsernames(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     return this.globalReportService.getBookingUsernames(user)
   }
 
   @Get('expedia-passwords')
   @ApiOperation({
     summary: 'Get Expedia passwords only (Super Admin only)',
-    description: 'Returns all unique Expedia passwords from property credentials (decrypted).'
+    description:
+      'Returns all unique Expedia passwords from property credentials (decrypted).'
   })
-  @ApiResponse({ status: 200, description: 'Expedia passwords retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getExpediaPasswords(@CurrentUser() user: IUserWithPermissions): Promise<{ data: string[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Expedia passwords retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getExpediaPasswords(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     return this.globalReportService.getExpediaPasswords(user)
   }
 
   @Get('agoda-passwords')
   @ApiOperation({
     summary: 'Get Agoda passwords only (Super Admin only)',
-    description: 'Returns all unique Agoda passwords from property credentials (decrypted).'
+    description:
+      'Returns all unique Agoda passwords from property credentials (decrypted).'
   })
-  @ApiResponse({ status: 200, description: 'Agoda passwords retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getAgodaPasswords(@CurrentUser() user: IUserWithPermissions): Promise<{ data: string[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Agoda passwords retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getAgodaPasswords(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     return this.globalReportService.getAgodaPasswords(user)
   }
 
   @Get('booking-passwords')
   @ApiOperation({
     summary: 'Get Booking passwords only (Super Admin only)',
-    description: 'Returns all unique Booking passwords from property credentials (decrypted).'
+    description:
+      'Returns all unique Booking passwords from property credentials (decrypted).'
   })
-  @ApiResponse({ status: 200, description: 'Booking passwords retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getBookingPasswords(@CurrentUser() user: IUserWithPermissions): Promise<{ data: string[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Booking passwords retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getBookingPasswords(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: string[] }> {
     return this.globalReportService.getBookingPasswords(user)
   }
 
   @Get('portfolios')
   @ApiOperation({
-    summary: 'Get all portfolios (id and name only) for filtering (Super Admin only)',
+    summary:
+      'Get all portfolios (id and name only) for filtering (Super Admin only)',
     description:
       'Returns all portfolios with only id and name fields. Optimized for fast loading with in-memory caching. Use this to populate portfolio filter dropdowns.'
   })
@@ -264,7 +339,8 @@ export class GlobalReportController {
 
   @Get('properties')
   @ApiOperation({
-    summary: 'Get all properties (id and name only) for filtering (Super Admin only)',
+    summary:
+      'Get all properties (id and name only) for filtering (Super Admin only)',
     description:
       'Returns all properties with only id and name fields. Optimized for fast loading with in-memory caching. Use this to populate property filter dropdowns.'
   })
@@ -286,33 +362,60 @@ export class GlobalReportController {
   @Get('expedia-amount-collectable')
   @ApiOperation({
     summary: 'Get Expedia amount collectable list (Super Admin only)',
-    description: 'Returns all unique Expedia amount collectable values from audits.'
+    description:
+      'Returns all unique Expedia amount collectable values from audits.'
   })
-  @ApiResponse({ status: 200, description: 'Expedia amount collectable retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getExpediaAmountCollectable(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Expedia amount collectable retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getExpediaAmountCollectable(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     return this.globalReportService.getExpediaAmountCollectable(user)
   }
 
   @Get('expedia-amount-confirmed')
   @ApiOperation({
     summary: 'Get Expedia amount confirmed list (Super Admin only)',
-    description: 'Returns all unique Expedia amount confirmed values from audits.'
+    description:
+      'Returns all unique Expedia amount confirmed values from audits.'
   })
-  @ApiResponse({ status: 200, description: 'Expedia amount confirmed retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getExpediaAmountConfirmed(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Expedia amount confirmed retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getExpediaAmountConfirmed(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     return this.globalReportService.getExpediaAmountConfirmed(user)
   }
 
   @Get('agoda-amount-collectable')
   @ApiOperation({
     summary: 'Get Agoda amount collectable list (Super Admin only)',
-    description: 'Returns all unique Agoda amount collectable values from audits.'
+    description:
+      'Returns all unique Agoda amount collectable values from audits.'
   })
-  @ApiResponse({ status: 200, description: 'Agoda amount collectable retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getAgodaAmountCollectable(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Agoda amount collectable retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getAgodaAmountCollectable(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     return this.globalReportService.getAgodaAmountCollectable(user)
   }
 
@@ -321,31 +424,57 @@ export class GlobalReportController {
     summary: 'Get Agoda amount confirmed list (Super Admin only)',
     description: 'Returns all unique Agoda amount confirmed values from audits.'
   })
-  @ApiResponse({ status: 200, description: 'Agoda amount confirmed retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getAgodaAmountConfirmed(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Agoda amount confirmed retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getAgodaAmountConfirmed(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     return this.globalReportService.getAgodaAmountConfirmed(user)
   }
 
   @Get('booking-amount-collectable')
   @ApiOperation({
     summary: 'Get Booking amount collectable list (Super Admin only)',
-    description: 'Returns all unique Booking amount collectable values from audits.'
+    description:
+      'Returns all unique Booking amount collectable values from audits.'
   })
-  @ApiResponse({ status: 200, description: 'Booking amount collectable retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getBookingAmountCollectable(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Booking amount collectable retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getBookingAmountCollectable(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     return this.globalReportService.getBookingAmountCollectable(user)
   }
 
   @Get('booking-amount-confirmed')
   @ApiOperation({
     summary: 'Get Booking amount confirmed list (Super Admin only)',
-    description: 'Returns all unique Booking amount confirmed values from audits.'
+    description:
+      'Returns all unique Booking amount confirmed values from audits.'
   })
-  @ApiResponse({ status: 200, description: 'Booking amount confirmed retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Super admin access required' })
-  async getBookingAmountConfirmed(@CurrentUser() user: IUserWithPermissions): Promise<{ data: number[] }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Booking amount confirmed retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Super admin access required'
+  })
+  async getBookingAmountConfirmed(
+    @CurrentUser() user: IUserWithPermissions
+  ): Promise<{ data: number[] }> {
     return this.globalReportService.getBookingAmountConfirmed(user)
   }
 

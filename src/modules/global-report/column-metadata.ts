@@ -276,7 +276,11 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     sortable: true,
     source: 'serviceType',
     fieldPath: 'serviceType.type',
-    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.NEQ],
+    allowedOperators: [
+      FilterOperator.EQ,
+      FilterOperator.IN,
+      FilterOperator.NEQ
+    ],
     requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP, SERVICE_TYPE_LOOKUP]
   },
 
@@ -344,7 +348,11 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     sortable: false,
     source: 'credentials',
     fieldPath: 'credentials.expedia_password',
-    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    allowedOperators: [
+      FilterOperator.EQ,
+      FilterOperator.IN,
+      FilterOperator.CONTAINS
+    ],
     requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
   },
 
@@ -381,7 +389,11 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     sortable: false,
     source: 'credentials',
     fieldPath: 'credentials.agoda_password',
-    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    allowedOperators: [
+      FilterOperator.EQ,
+      FilterOperator.IN,
+      FilterOperator.CONTAINS
+    ],
     requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
   },
 
@@ -418,7 +430,11 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     sortable: false,
     source: 'credentials',
     fieldPath: 'credentials.booking_password',
-    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    allowedOperators: [
+      FilterOperator.EQ,
+      FilterOperator.IN,
+      FilterOperator.CONTAINS
+    ],
     requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP]
   },
 
@@ -431,7 +447,11 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     sortable: false,
     source: 'credentials',
     fieldPath: 'credentials', // Special case - handled in aggregation builder
-    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    allowedOperators: [
+      FilterOperator.EQ,
+      FilterOperator.IN,
+      FilterOperator.CONTAINS
+    ],
     requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP],
     filterOnly: true
   },
@@ -498,7 +518,11 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     sortable: true,
     source: 'currency',
     fieldPath: 'currency.code',
-    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.NEQ],
+    allowedOperators: [
+      FilterOperator.EQ,
+      FilterOperator.IN,
+      FilterOperator.NEQ
+    ],
     requiresLookup: [PROPERTY_LOOKUP, CURRENCY_LOOKUP]
   },
 
@@ -574,19 +598,6 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     allowedOperators: NUMBER_OPERATORS
   },
 
-  // Portfolio Contact Email
-  portfolioContactEmail: {
-    key: 'portfolioContactEmail',
-    label: 'Portfolio Contact Email',
-    dataType: ColumnDataType.STRING,
-    filterable: true,
-    sortable: true,
-    source: 'portfolio',
-    fieldPath: 'portfolio.contact_email',
-    allowedOperators: STRING_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP, PORTFOLIO_LOOKUP]
-  },
-
   // OTA Username (filterable across all OTA types - DEPRECATED, kept for backward compatibility)
   otaUsername: {
     key: 'otaUsername',
@@ -596,7 +607,11 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     sortable: false,
     source: 'credentials',
     fieldPath: 'credentials', // Special case - handled in aggregation builder
-    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    allowedOperators: [
+      FilterOperator.EQ,
+      FilterOperator.IN,
+      FilterOperator.CONTAINS
+    ],
     requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP],
     filterOnly: true
   },
@@ -610,7 +625,11 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     sortable: false,
     source: 'credentials',
     fieldPath: 'credentials', // Special case - handled in aggregation builder
-    allowedOperators: [FilterOperator.EQ, FilterOperator.IN, FilterOperator.CONTAINS],
+    allowedOperators: [
+      FilterOperator.EQ,
+      FilterOperator.IN,
+      FilterOperator.CONTAINS
+    ],
     requiresLookup: [PROPERTY_LOOKUP, CREDENTIALS_LOOKUP],
     filterOnly: true
   }

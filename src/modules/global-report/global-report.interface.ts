@@ -5,7 +5,7 @@ import {
   GlobalReportResponseDto,
   ColumnsMetadataResponseDto,
   OtaIdsResponseDto,
-  PortfolioContactEmailsResponseDto,
+  PortfolioParentIdsResponseDto,
   OtaUsernamesResponseDto,
   OtaPasswordsResponseDto,
   PortfoliosListResponseDto,
@@ -41,10 +41,10 @@ export interface OtaIdItem {
 }
 
 /**
- * Portfolio contact email item from database
+ * Portfolio parent ID item from database
  */
-export interface PortfolioContactEmailItem {
-  email: string
+export interface PortfolioParentIdItem {
+  parentId: string
   portfolioName: string
 }
 
@@ -102,9 +102,9 @@ export interface IGlobalReportRepository {
   findAllOtaIds(): Promise<OtaIdItem[]>
 
   /**
-   * Get all unique portfolio contact emails
+   * Get all unique portfolio parent IDs
    */
-  findAllPortfolioContactEmails(): Promise<PortfolioContactEmailItem[]>
+  findAllPortfolioParentIds(): Promise<PortfolioParentIdItem[]>
 
   /**
    * Get all unique OTA usernames from PropertyCredentials
@@ -162,7 +162,6 @@ export interface IGlobalReportRepository {
   findAllBookingAmountConfirmed(): Promise<number[]>
 }
 
-
 /**
  * Global Report Service Interface
  */
@@ -194,9 +193,11 @@ export interface IGlobalReportService {
   getOtaIds(user: IUserWithPermissions): Promise<OtaIdsResponseDto>
 
   /**
-   * Get all portfolio contact emails for filtering
+   * Get all portfolio parent IDs for filtering
    */
-  getPortfolioContactEmails(user: IUserWithPermissions): Promise<PortfolioContactEmailsResponseDto>
+  getPortfolioParentIds(
+    user: IUserWithPermissions
+  ): Promise<PortfolioParentIdsResponseDto>
 
   /**
    * Get all OTA usernames for filtering
@@ -266,30 +267,42 @@ export interface IGlobalReportService {
   /**
    * Get Expedia amount collectable list
    */
-  getExpediaAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }>
+  getExpediaAmountCollectable(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }>
 
   /**
    * Get Expedia amount confirmed list
    */
-  getExpediaAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }>
+  getExpediaAmountConfirmed(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }>
 
   /**
    * Get Agoda amount collectable list
    */
-  getAgodaAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }>
+  getAgodaAmountCollectable(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }>
 
   /**
    * Get Agoda amount confirmed list
    */
-  getAgodaAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }>
+  getAgodaAmountConfirmed(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }>
 
   /**
    * Get Booking amount collectable list
    */
-  getBookingAmountCollectable(user: IUserWithPermissions): Promise<{ data: number[] }>
+  getBookingAmountCollectable(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }>
 
   /**
    * Get Booking amount confirmed list
    */
-  getBookingAmountConfirmed(user: IUserWithPermissions): Promise<{ data: number[] }>
+  getBookingAmountConfirmed(
+    user: IUserWithPermissions
+  ): Promise<{ data: number[] }>
 }
