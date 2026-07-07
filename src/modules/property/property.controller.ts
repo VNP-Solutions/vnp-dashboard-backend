@@ -1223,7 +1223,6 @@ export class PropertyController {
     - Address/Property Address: Property address
     - Property Currency/Currency/Currency Code: Currency code (will be created if doesn't exist)
     - Card Descriptor/Card descriptor/Descriptor: Card descriptor
-    - Next Due Date/Next due date/Due Date: Next due date (mm/dd/yyyy)
     - Portfolio/Portfolio Name/Portfolio name: Portfolio name (will be created if doesn't exist)
     - Expedia Username/Expedia username/Expedia User: Expedia username
     - Expedia Password/Expedia password/Expedia Pass: Expedia password

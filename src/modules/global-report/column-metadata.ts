@@ -482,19 +482,6 @@ export const REPORT_COLUMNS: Record<string, ColumnMetadata> = {
     requiresLookup: [AUDIT_STATUS_LOOKUP]
   },
 
-  // Next Due Date
-  nextDueDate: {
-    key: 'nextDueDate',
-    label: 'Next Due Date',
-    dataType: ColumnDataType.DATE,
-    filterable: true,
-    sortable: true,
-    source: 'property',
-    fieldPath: 'property.next_due_date',
-    allowedOperators: DATE_OPERATORS,
-    requiresLookup: [PROPERTY_LOOKUP]
-  },
-
   // Currency ID (for filtering only)
   currencyId: {
     key: 'currencyId',

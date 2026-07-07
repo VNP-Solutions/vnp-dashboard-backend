@@ -328,12 +328,6 @@ function getRandomNumber(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-function getRandomFutureDate(maxDays = 90): Date {
-  const date = new Date()
-  date.setDate(date.getDate() + getRandomNumber(1, maxDays))
-  return date
-}
-
 function generatePropertyName(index: number): string {
   const prefix = getRandomElement(propertyPrefixes)
   const type = getRandomElement(propertyTypes)
@@ -509,7 +503,6 @@ async function main() {
             portfolio_id: portfolio.id,
             is_active: isActive,
             card_descriptor: `${propertyName.substring(0, 22)}*`,
-            next_due_date: isActive ? getRandomFutureDate() : null,
             show_in_portfolio: []
           }
         })

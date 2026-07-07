@@ -25,13 +25,8 @@ export class PropertyRepository implements IPropertyRepository {
   ) {}
 
   async create(data: CreatePropertyDto) {
-    const createData: any = { ...data }
-    if (data.next_due_date) {
-      createData.next_due_date = new Date(data.next_due_date)
-    }
-
     return this.prisma.property.create({
-      data: createData,
+      data,
       include: {
         currency: {
           select: {
@@ -66,9 +61,6 @@ export class PropertyRepository implements IPropertyRepository {
         async tx => {
           // Create property data
           const createData: any = { ...propertyData }
-          if (propertyData.next_due_date) {
-            createData.next_due_date = new Date(propertyData.next_due_date)
-          }
 
           // Create property
           const property = await tx.property.create({
@@ -266,9 +258,6 @@ export class PropertyRepository implements IPropertyRepository {
           // Update property data if provided
           if (propertyData && Object.keys(propertyData).length > 0) {
             const updateData: any = { ...propertyData }
-            if (propertyData.next_due_date) {
-              updateData.next_due_date = new Date(propertyData.next_due_date)
-            }
 
             await tx.property.update({
               where: { id: propertyId },
@@ -829,14 +818,9 @@ export class PropertyRepository implements IPropertyRepository {
   }
 
   async update(id: string, data: UpdatePropertyDto) {
-    const updateData: any = { ...data }
-    if (data.next_due_date) {
-      updateData.next_due_date = new Date(data.next_due_date)
-    }
-
     return this.prisma.property.update({
       where: { id },
-      data: updateData,
+      data,
       include: {
         currency: {
           select: {

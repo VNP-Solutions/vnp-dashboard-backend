@@ -69,7 +69,16 @@ GET /api/global-report/columns
         "dataType": "string",
         "filterable": true,
         "sortable": true,
-        "allowedOperators": ["eq", "neq", "in", "nin", "contains", "startsWith", "isNull", "isNotNull"],
+        "allowedOperators": [
+          "eq",
+          "neq",
+          "in",
+          "nin",
+          "contains",
+          "startsWith",
+          "isNull",
+          "isNotNull"
+        ],
         "enumValues": null
       },
       {
@@ -87,7 +96,14 @@ GET /api/global-report/columns
         "dataType": "date",
         "filterable": true,
         "sortable": true,
-        "allowedOperators": ["eq", "before", "after", "between", "isNull", "isNotNull"]
+        "allowedOperators": [
+          "eq",
+          "before",
+          "after",
+          "between",
+          "isNull",
+          "isNotNull"
+        ]
       },
       {
         "key": "amountCollectable",
@@ -95,7 +111,17 @@ GET /api/global-report/columns
         "dataType": "number",
         "filterable": true,
         "sortable": true,
-        "allowedOperators": ["eq", "neq", "gt", "gte", "lt", "lte", "between", "isNull", "isNotNull"]
+        "allowedOperators": [
+          "eq",
+          "neq",
+          "gt",
+          "gte",
+          "lt",
+          "lte",
+          "between",
+          "isNull",
+          "isNotNull"
+        ]
       }
       // ... more columns
     ]
@@ -121,7 +147,11 @@ Content-Type: application/json
   "filters": [
     { "column": "portfolioName", "operator": "contains", "value": "Marriott" },
     { "column": "amountCollectable", "operator": "gte", "value": 1000 },
-    { "column": "startDate", "operator": "between", "value": { "from": "2024-01-01", "to": "2024-12-31" } },
+    {
+      "column": "startDate",
+      "operator": "between",
+      "value": { "from": "2024-01-01", "to": "2024-12-31" }
+    },
     { "column": "otaType", "operator": "in", "value": ["expedia", "booking"] }
   ],
   "sort": [
@@ -148,7 +178,6 @@ Content-Type: application/json
         "auditStatus": "Reported to Property",
         "startDate": "2024-06-01T00:00:00.000Z",
         "endDate": "2024-06-30T00:00:00.000Z",
-        "nextDueDate": "2024-07-15T00:00:00.000Z",
         "currency": "USD",
         "currencySymbol": "$",
         "amountCollectable": 5000,
@@ -197,10 +226,14 @@ Content-Type: application/json
   "filters": [
     { "column": "portfolioName", "operator": "contains", "value": "Marriott" }
   ],
-  "sort": [
-    { "column": "startDate", "order": "desc" }
+  "sort": [{ "column": "startDate", "order": "desc" }],
+  "columns": [
+    "portfolioName",
+    "propertyName",
+    "otaType",
+    "amountCollectable",
+    "startDate"
   ],
-  "columns": ["portfolioName", "propertyName", "otaType", "amountCollectable", "startDate"],
   "includeArchived": false
 }
 ```
@@ -220,24 +253,30 @@ Create these interfaces in your frontend codebase:
 
 // ============== Column Metadata ==============
 
-export type ColumnDataType = 'string' | 'number' | 'date' | 'boolean' | 'enum' | 'objectId'
+export type ColumnDataType =
+  | 'string'
+  | 'number'
+  | 'date'
+  | 'boolean'
+  | 'enum'
+  | 'objectId'
 
 export type FilterOperator =
-  | 'eq'        // Equals
-  | 'neq'       // Not equals
-  | 'in'        // In array
-  | 'nin'       // Not in array
-  | 'contains'  // String contains (case-insensitive)
-  | 'startsWith'// String starts with
-  | 'endsWith'  // String ends with
-  | 'gt'        // Greater than
-  | 'gte'       // Greater than or equal
-  | 'lt'        // Less than
-  | 'lte'       // Less than or equal
-  | 'before'    // Date before
-  | 'after'     // Date after
-  | 'between'   // Range (date or number)
-  | 'isNull'    // Is null/undefined
+  | 'eq' // Equals
+  | 'neq' // Not equals
+  | 'in' // In array
+  | 'nin' // Not in array
+  | 'contains' // String contains (case-insensitive)
+  | 'startsWith' // String starts with
+  | 'endsWith' // String ends with
+  | 'gt' // Greater than
+  | 'gte' // Greater than or equal
+  | 'lt' // Less than
+  | 'lte' // Less than or equal
+  | 'before' // Date before
+  | 'after' // Date after
+  | 'between' // Range (date or number)
+  | 'isNull' // Is null/undefined
   | 'isNotNull' // Is not null/undefined
 
 export interface ColumnMetadata {
@@ -299,7 +338,6 @@ export interface ReportRow {
   propertyName: string
   propertyAddress: string | null
   propertyIsActive: boolean
-  nextDueDate: string | null
   currency: string
   currencySymbol: string | null
   portfolioId: string
@@ -384,7 +422,9 @@ export const globalReportService = {
   /**
    * Query report data with filters, sort, and pagination
    */
-  async getReport(request: GlobalReportQueryRequest): Promise<GlobalReportResponse> {
+  async getReport(
+    request: GlobalReportQueryRequest
+  ): Promise<GlobalReportResponse> {
     const response = await axios.post(API_BASE, request)
     return response.data.data
   },
@@ -419,7 +459,10 @@ export function downloadFile(blob: Blob, filename: string) {
 // hooks/use-global-report.ts
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { globalReportService, downloadFile } from '@/services/global-report.service'
+import {
+  globalReportService,
+  downloadFile
+} from '@/services/global-report.service'
 import type {
   GlobalReportQueryRequest,
   GlobalReportExportRequest
@@ -429,7 +472,8 @@ import type {
 export const globalReportKeys = {
   all: ['global-report'] as const,
   columns: () => [...globalReportKeys.all, 'columns'] as const,
-  report: (params: GlobalReportQueryRequest) => [...globalReportKeys.all, 'report', params] as const
+  report: (params: GlobalReportQueryRequest) =>
+    [...globalReportKeys.all, 'report', params] as const
 }
 
 /**
@@ -451,7 +495,7 @@ export function useGlobalReportData(params: GlobalReportQueryRequest) {
   return useQuery({
     queryKey: globalReportKeys.report(params),
     queryFn: () => globalReportService.getReport(params),
-    placeholderData: (previousData) => previousData, // Keep previous data while fetching
+    placeholderData: previousData => previousData // Keep previous data while fetching
   })
 }
 
@@ -837,18 +881,18 @@ npx shadcn-ui@latest add separator
 
 ### Component Usage Map
 
-| Feature | shadcn Components |
-|---------|-------------------|
-| **Data Table** | `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableCell`, `TableHead` |
-| **Column Filters** | `Popover`, `Command`, `Select`, `Input`, `Calendar` |
-| **Filter Chips** | `Badge` with close button |
-| **Sort Dropdown** | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem` |
-| **Pagination** | `Button` group with page numbers |
-| **Export Dialog** | `Dialog`, `DialogTrigger`, `DialogContent`, `Select`, `Button` |
-| **Loading States** | `Skeleton` |
-| **Tooltips** | `Tooltip`, `TooltipTrigger`, `TooltipContent` |
-| **Column Visibility** | `DropdownMenu` with checkboxes |
-| **Filter Builder** | `Card`, `Popover`, `Button`, `Select` |
+| Feature               | shadcn Components                                                                |
+| --------------------- | -------------------------------------------------------------------------------- |
+| **Data Table**        | `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableCell`, `TableHead`        |
+| **Column Filters**    | `Popover`, `Command`, `Select`, `Input`, `Calendar`                              |
+| **Filter Chips**      | `Badge` with close button                                                        |
+| **Sort Dropdown**     | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem` |
+| **Pagination**        | `Button` group with page numbers                                                 |
+| **Export Dialog**     | `Dialog`, `DialogTrigger`, `DialogContent`, `Select`, `Button`                   |
+| **Loading States**    | `Skeleton`                                                                       |
+| **Tooltips**          | `Tooltip`, `TooltipTrigger`, `TooltipContent`                                    |
+| **Column Visibility** | `DropdownMenu` with checkboxes                                                   |
+| **Filter Builder**    | `Card`, `Popover`, `Button`, `Select`                                            |
 
 ---
 
@@ -871,20 +915,64 @@ export interface OperatorInfo {
 export const OPERATOR_INFO: Record<FilterOperator, OperatorInfo> = {
   eq: { value: 'eq', label: 'Equals', description: 'Exact match' },
   neq: { value: 'neq', label: 'Not equals', description: 'Does not equal' },
-  in: { value: 'in', label: 'Is one of', description: 'Matches any value in list' },
-  nin: { value: 'nin', label: 'Is not one of', description: 'Does not match any value in list' },
-  contains: { value: 'contains', label: 'Contains', description: 'Text contains (case-insensitive)' },
-  startsWith: { value: 'startsWith', label: 'Starts with', description: 'Text starts with' },
-  endsWith: { value: 'endsWith', label: 'Ends with', description: 'Text ends with' },
-  gt: { value: 'gt', label: 'Greater than', description: 'Value is greater than' },
-  gte: { value: 'gte', label: 'Greater or equal', description: 'Value is greater than or equal' },
+  in: {
+    value: 'in',
+    label: 'Is one of',
+    description: 'Matches any value in list'
+  },
+  nin: {
+    value: 'nin',
+    label: 'Is not one of',
+    description: 'Does not match any value in list'
+  },
+  contains: {
+    value: 'contains',
+    label: 'Contains',
+    description: 'Text contains (case-insensitive)'
+  },
+  startsWith: {
+    value: 'startsWith',
+    label: 'Starts with',
+    description: 'Text starts with'
+  },
+  endsWith: {
+    value: 'endsWith',
+    label: 'Ends with',
+    description: 'Text ends with'
+  },
+  gt: {
+    value: 'gt',
+    label: 'Greater than',
+    description: 'Value is greater than'
+  },
+  gte: {
+    value: 'gte',
+    label: 'Greater or equal',
+    description: 'Value is greater than or equal'
+  },
   lt: { value: 'lt', label: 'Less than', description: 'Value is less than' },
-  lte: { value: 'lte', label: 'Less or equal', description: 'Value is less than or equal' },
+  lte: {
+    value: 'lte',
+    label: 'Less or equal',
+    description: 'Value is less than or equal'
+  },
   before: { value: 'before', label: 'Before', description: 'Date is before' },
   after: { value: 'after', label: 'After', description: 'Date is after' },
-  between: { value: 'between', label: 'Between', description: 'Value is in range' },
-  isNull: { value: 'isNull', label: 'Is empty', description: 'Value is null or empty' },
-  isNotNull: { value: 'isNotNull', label: 'Is not empty', description: 'Value exists' }
+  between: {
+    value: 'between',
+    label: 'Between',
+    description: 'Value is in range'
+  },
+  isNull: {
+    value: 'isNull',
+    label: 'Is empty',
+    description: 'Value is null or empty'
+  },
+  isNotNull: {
+    value: 'isNotNull',
+    label: 'Is not empty',
+    description: 'Value exists'
+  }
 }
 
 // Get operators for a specific column
@@ -1704,15 +1792,15 @@ export const useGlobalReportStore = create<GlobalReportState>()(
     (set, get) => ({
       ...initialState,
 
-      setColumns: (columns) => set({ columns }),
+      setColumns: columns => set({ columns }),
 
       setData: (data, metadata) => set({ data, metadata, error: null }),
 
-      setLoading: (isLoading) => set({ isLoading }),
+      setLoading: isLoading => set({ isLoading }),
 
-      setExporting: (isExporting) => set({ isExporting }),
+      setExporting: isExporting => set({ isExporting }),
 
-      setError: (error) => set({ error }),
+      setError: error => set({ error }),
 
       addFilter: () => {
         const { columns, filters } = get()
@@ -1731,19 +1819,19 @@ export const useGlobalReportStore = create<GlobalReportState>()(
       updateFilter: (id, filter) => {
         const { filters } = get()
         set({
-          filters: filters.map(f => f.id === id ? filter : f),
+          filters: filters.map(f => (f.id === id ? filter : f)),
           page: 1
         })
       },
 
-      removeFilter: (id) => {
+      removeFilter: id => {
         const { filters } = get()
         set({ filters: filters.filter(f => f.id !== id), page: 1 })
       },
 
       clearFilters: () => set({ filters: [], page: 1 }),
 
-      toggleSort: (columnKey) => {
+      toggleSort: columnKey => {
         const { sort } = get()
         const existingIndex = sort.findIndex(s => s.column === columnKey)
 
@@ -1763,11 +1851,11 @@ export const useGlobalReportStore = create<GlobalReportState>()(
 
       clearSort: () => set({ sort: [] }),
 
-      setPage: (page) => set({ page }),
+      setPage: page => set({ page }),
 
-      setLimit: (limit) => set({ limit, page: 1 }),
+      setLimit: limit => set({ limit, page: 1 }),
 
-      setIncludeArchived: (includeArchived) => set({ includeArchived, page: 1 }),
+      setIncludeArchived: includeArchived => set({ includeArchived, page: 1 }),
 
       reset: () => set(initialState)
     }),
@@ -2187,22 +2275,22 @@ npx shadcn-ui@latest add button input select popover calendar table badge comman
 
 ## API Quick Reference
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/global-report/columns` | GET | Get column metadata for UI |
-| `/api/global-report` | POST | Query paginated data with filters/sort |
-| `/api/global-report/export` | POST | Export filtered data to CSV/XLSX |
+| Endpoint                     | Method | Purpose                                |
+| ---------------------------- | ------ | -------------------------------------- |
+| `/api/global-report/columns` | GET    | Get column metadata for UI             |
+| `/api/global-report`         | POST   | Query paginated data with filters/sort |
+| `/api/global-report/export`  | POST   | Export filtered data to CSV/XLSX       |
 
 ### Filter Operators by Data Type
 
-| Data Type | Operators |
-|-----------|-----------|
-| `string` | eq, neq, in, nin, contains, startsWith, isNull, isNotNull |
-| `number` | eq, neq, gt, gte, lt, lte, between, isNull, isNotNull |
-| `date` | eq, before, after, between, isNull, isNotNull |
-| `boolean` | eq |
-| `enum` | eq, neq, in, nin, isNull, isNotNull |
-| `objectId` | eq, in |
+| Data Type  | Operators                                                 |
+| ---------- | --------------------------------------------------------- |
+| `string`   | eq, neq, in, nin, contains, startsWith, isNull, isNotNull |
+| `number`   | eq, neq, gt, gte, lt, lte, between, isNull, isNotNull     |
+| `date`     | eq, before, after, between, isNull, isNotNull             |
+| `boolean`  | eq                                                        |
+| `enum`     | eq, neq, in, nin, isNull, isNotNull                       |
+| `objectId` | eq, in                                                    |
 
 ---
 

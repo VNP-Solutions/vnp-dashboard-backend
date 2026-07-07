@@ -113,7 +113,6 @@ model Property {
   currency              Currency  @relation(fields: [currency_id], references: [id])
   card_descriptor       String?
   is_active             Boolean   @default(true)
-  next_due_date         DateTime?
   portfolio_id          String    @db.ObjectId
   portfolio             Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
   previous_portfolio_id String?   @db.ObjectId
@@ -133,7 +132,6 @@ model Property {
   @@index([portfolio_id])
   @@index([currency_id])
   @@index([is_active])
-  @@index([next_due_date])
   @@index([portfolio_id, is_active])
 }
 
