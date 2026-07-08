@@ -914,6 +914,8 @@ export class PortfolioService implements IPortfolioService {
 
     return { status: 'updated', id: updated.id, file_count: updated.file_count }
   }
+
+  async bulkDelete(
     portfolio_ids: string[],
     password: string,
     user: IUserWithPermissions
