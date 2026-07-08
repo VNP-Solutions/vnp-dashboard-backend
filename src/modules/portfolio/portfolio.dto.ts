@@ -159,6 +159,7 @@ export class BulkUpdateResultDto {
       {
         row: 3,
         portfolioId: '507f1f77bcf86cd799439011',
+        portfolioName: 'My Portfolio',
         error: 'Portfolio not found'
       }
     ],
@@ -167,6 +168,7 @@ export class BulkUpdateResultDto {
   errors: Array<{
     row: number
     portfolioId: string
+    portfolioName?: string
     error: string
   }>
 
