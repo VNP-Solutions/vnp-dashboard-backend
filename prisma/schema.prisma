@@ -56,6 +56,8 @@ model Portfolio {
   sales_agent_id    String?     @db.ObjectId
   salesAgent        SalesAgent? @relation(fields: [sales_agent_id], references: [id])
 
+  file_count Int @default(0)
+
   properties          Property[]
   notes               Note[]
   tasks               Task[]

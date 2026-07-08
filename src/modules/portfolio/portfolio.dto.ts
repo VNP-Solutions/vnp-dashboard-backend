@@ -35,15 +35,6 @@ export class CreatePortfolioDto {
   @IsOptional()
   currency?: string
 
-  @ApiPropertyOptional({
-    example: 'https://example.com/contract.pdf',
-    description:
-      'Contract document URL (will be saved as user-specific contract URL)'
-  })
-  @IsString()
-  @IsOptional()
-  contract_url?: string
-
   @ApiProperty({ example: true, description: 'Whether portfolio is active' })
   @IsBoolean()
   @IsNotEmpty()

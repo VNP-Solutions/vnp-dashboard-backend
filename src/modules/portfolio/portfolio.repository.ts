@@ -164,59 +164,43 @@ export class PortfolioRepository implements IPortfolioRepository {
     // Get unique portfolio IDs from the results
     const portfolioIds = portfolios.map(p => p.id)
 
-    // Get property counts, contract URL counts, and notes counts for each portfolio
-    const [portfolioCounts, contractUrlCounts, notesCounts] = await Promise.all(
-      [
-        Promise.all(
-          portfolioIds.map(async portfolioId => {
-            // Build property where clause based on user's property access
-            const propertyWhere: any = { portfolio_id: portfolioId }
+    // Get property counts and notes counts for each portfolio
+    const [portfolioCounts, notesCounts] = await Promise.all([
+      Promise.all(
+        portfolioIds.map(async portfolioId => {
+          // Build property where clause based on user's property access
+          const propertyWhere: any = { portfolio_id: portfolioId }
 
-            // Apply property access filter if user has partial access
-            if (
-              accessiblePropertyIds &&
-              accessiblePropertyIds !== 'all' &&
-              Array.isArray(accessiblePropertyIds)
-            ) {
-              propertyWhere.id = { in: accessiblePropertyIds }
-            }
+          // Apply property access filter if user has partial access
+          if (
+            accessiblePropertyIds &&
+            accessiblePropertyIds !== 'all' &&
+            Array.isArray(accessiblePropertyIds)
+          ) {
+            propertyWhere.id = { in: accessiblePropertyIds }
+          }
 
-            return {
-              portfolioId,
-              count: await this.prisma.property.count({
-                where: propertyWhere
-              })
-            }
+          return {
+            portfolioId,
+            count: await this.prisma.property.count({
+              where: propertyWhere
+            })
+          }
+        })
+      ),
+      Promise.all(
+        portfolioIds.map(async portfolioId => ({
+          portfolioId,
+          count: await this.prisma.note.count({
+            where: { portfolio_id: portfolioId }
           })
-        ),
-        Promise.all(
-          portfolioIds.map(async portfolioId => ({
-            portfolioId,
-            count: await this.prisma.contractUrl.count({
-              where: {
-                portfolio_id: portfolioId,
-                ...(userId && !isSuperAdmin ? { user_id: userId } : {})
-              }
-            })
-          }))
-        ),
-        Promise.all(
-          portfolioIds.map(async portfolioId => ({
-            portfolioId,
-            count: await this.prisma.note.count({
-              where: { portfolio_id: portfolioId }
-            })
-          }))
-        )
-      ]
-    )
+        }))
+      )
+    ])
 
     // Create maps for quick lookup
     const propertyCountMap = new Map(
       portfolioCounts.map(pc => [pc.portfolioId, pc.count])
-    )
-    const contractUrlCountMap = new Map(
-      contractUrlCounts.map(cc => [cc.portfolioId, cc.count])
     )
     const notesCountMap = new Map(
       notesCounts.map(nc => [nc.portfolioId, nc.count])
@@ -226,7 +210,6 @@ export class PortfolioRepository implements IPortfolioRepository {
     return portfolios.map(portfolio => ({
       ...portfolio,
       total_properties: propertyCountMap.get(portfolio.id) || 0,
-      total_contract_urls: contractUrlCountMap.get(portfolio.id) || 0,
       total_notes: notesCountMap.get(portfolio.id) || 0
     }))
   }
@@ -309,16 +292,10 @@ export class PortfolioRepository implements IPortfolioRepository {
       propertyWhere.id = { in: accessiblePropertyIds }
     }
 
-    // Get property count, contract URL count, and notes count for this portfolio
-    const [propertyCount, contractUrlCount, notesCount] = await Promise.all([
+    // Get property count and notes count for this portfolio
+    const [propertyCount, notesCount] = await Promise.all([
       this.prisma.property.count({
         where: propertyWhere
-      }),
-      this.prisma.contractUrl.count({
-        where: {
-          portfolio_id: id,
-          ...(userId && !isSuperAdmin ? { user_id: userId } : {})
-        }
       }),
       this.prisma.note.count({
         where: { portfolio_id: id }
@@ -328,7 +305,6 @@ export class PortfolioRepository implements IPortfolioRepository {
     return {
       ...portfolio,
       total_properties: propertyCount,
-      total_contract_urls: contractUrlCount,
       total_notes: notesCount
     }
   }
@@ -414,24 +390,7 @@ export class PortfolioRepository implements IPortfolioRepository {
             comments: true,
             associated_user_id: true
           }
-        },
-        contractUrls: userId
-          ? {
-              where: isSuperAdmin
-                ? undefined
-                : {
-                    user_id: userId
-                  },
-              select: {
-                id: true,
-                url: true,
-                description: true,
-                is_active: true,
-                created_at: true,
-                updated_at: true
-              }
-            }
-          : false
+        }
       }
     })
   }
@@ -454,25 +413,42 @@ export class PortfolioRepository implements IPortfolioRepository {
       where: { type: { equals: wanted, mode: 'insensitive' } }
     })
     if (!st) {
-      const max = await this.prisma.serviceType.findFirst({ orderBy: { order: 'desc' }, select: { order: true } })
-      st = await this.prisma.serviceType.create({ data: { type: wanted, is_active: true, order: (max?.order ?? 0) + 1 } })
+      const max = await this.prisma.serviceType.findFirst({
+        orderBy: { order: 'desc' },
+        select: { order: true }
+      })
+      st = await this.prisma.serviceType.create({
+        data: { type: wanted, is_active: true, order: (max?.order ?? 0) + 1 }
+      })
     }
     return st.id
   }
-  
+
   async ensureInternalPortfolio(): Promise<{ id: string; name: string }> {
-    const existing = await this.prisma.portfolio.findUnique({ where: { name: 'Internal Portfolio' } })
+    const existing = await this.prisma.portfolio.findUnique({
+      where: { name: 'Internal Portfolio' }
+    })
     if (existing) return existing
     const service_type_id = await this.resolveServiceTypeIdByType('OTA')
     return this.prisma.portfolio.create({
-      data: { name: 'Internal Portfolio', service_type_id, is_active: true, is_commissionable: false, currency: 'USD' }
+      data: {
+        name: 'Internal Portfolio',
+        service_type_id,
+        is_active: true,
+        is_commissionable: false,
+        currency: 'USD'
+      }
     })
   }
-  
-  async reassignPropertiesToPortfolio(fromId: string, toId: string): Promise<number> {
-    const r = await this.prisma.property.updateMany({ where: { portfolio_id: fromId }, data: { portfolio_id: toId } })
+
+  async reassignPropertiesToPortfolio(
+    fromId: string,
+    toId: string
+  ): Promise<number> {
+    const r = await this.prisma.property.updateMany({
+      where: { portfolio_id: fromId },
+      data: { portfolio_id: toId }
+    })
     return r.count
   }
 }
-
-

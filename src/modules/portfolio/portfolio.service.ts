@@ -27,7 +27,6 @@ import {
   spreadsheetCellValueToPlainString,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
-import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IServiceTypeRepository } from '../service-type/service-type.interface'
 import { Prisma } from '@prisma/client'
@@ -55,8 +54,6 @@ export class PortfolioService implements IPortfolioService {
     private portfolioRepository: IPortfolioRepository,
     @Inject('IServiceTypeRepository')
     private serviceTypeRepository: IServiceTypeRepository,
-    @Inject('IContractUrlRepository')
-    private contractUrlRepository: IContractUrlRepository,
     @Inject(PermissionService)
     private permissionService: PermissionService,
     @Inject(EmailUtil)
@@ -83,41 +80,6 @@ export class PortfolioService implements IPortfolioService {
     return rest as T
   }
 
-  /**
-   * Check if user can upload contract documents to a portfolio
-   * User can upload if they are Super Admin OR
-   * Internal user with at least 'update' permission level and 'partial' access level
-   */
-  private canUploadContractDocuments(user: IUserWithPermissions): boolean {
-    // Super Admin can always upload
-    if (isUserSuperAdmin(user)) {
-      return true
-    }
-
-    // Must be internal user
-    if (!isInternalUser(user)) {
-      return false
-    }
-
-    // Check portfolio permissions
-    const portfolioPermission = user.role.portfolio_permission
-    if (!portfolioPermission) {
-      return false
-    }
-
-    // Must have at least 'update' permission level
-    const hasUpdatePermission =
-      portfolioPermission.permission_level === 'all' ||
-      portfolioPermission.permission_level === 'update'
-
-    // Must have at least 'partial' access level
-    const hasAccess =
-      portfolioPermission.access_level === 'all' ||
-      portfolioPermission.access_level === 'partial'
-
-    return hasUpdatePermission && hasAccess
-  }
-
   async create(data: CreatePortfolioDto, user: IUserWithPermissions) {
     // Only internal users can create portfolios
     if (!isInternalUser(user)) {
@@ -132,32 +94,12 @@ export class PortfolioService implements IPortfolioService {
       throw new ConflictException('Portfolio with this name already exists')
     }
 
-    // Extract contract_url from data before creating portfolio
-    const { contract_url, ...portfolioData } = data
-
-    // Check if user can upload contract URLs
-    if (contract_url && !this.canUploadContractDocuments(user)) {
-      throw new BadRequestException(
-        'Only Super Admin or internal users with at least update permission and partial access can upload contract URLs.'
-      )
-    }
-
     const isSuperAdmin = isUserSuperAdmin(user)
     const portfolio = await this.portfolioRepository.create(
-      portfolioData,
+      data,
       user.id,
       isSuperAdmin
     )
-
-    // If contract_url is provided and user has permission, create a contract URL entry
-    if (contract_url && this.canUploadContractDocuments(user)) {
-      await this.contractUrlRepository.create({
-        url: contract_url,
-        portfolio_id: portfolio.id,
-        user_id: user.id,
-        is_active: true
-      })
-    }
 
     // If user has partial access, grant them access to the created portfolio
     const permission = user.role.portfolio_permission
@@ -176,15 +118,15 @@ export class PortfolioService implements IPortfolioService {
         ModuleType.PROPERTY
       )
 
-    // Re-fetch the portfolio to include the newly created contract URL
-    const portfolioWithContractUrls = await this.portfolioRepository.findById(
+    // Re-fetch the portfolio to include all relations
+    const portfolioWithDetails = await this.portfolioRepository.findById(
       portfolio.id,
       user.id,
       isSuperAdmin,
       accessiblePropertyIds
     )
 
-    return portfolioWithContractUrls || portfolio
+    return portfolioWithDetails || portfolio
   }
 
   async syncCreate(
@@ -1501,14 +1443,6 @@ export class PortfolioService implements IPortfolioService {
             'parent_id'
           ])
 
-          // Extract contract URL/Documents (OPTIONAL)
-          const contractUrl = findHeaderValue(row, [
-            'Documents',
-            'Contract URL',
-            'Contract Url',
-            'Contract url'
-          ])
-
           // Extract commissionable (OPTIONAL) - map "Yes"/"No" to true/false
           const commissionableRaw = findHeaderValue(row, [
             'Commissionable',
@@ -1537,7 +1471,7 @@ export class PortfolioService implements IPortfolioService {
           }
 
           // Create portfolio
-          const portfolioData: Omit<CreatePortfolioDto, 'contract_url'> = {
+          const portfolioData: CreatePortfolioDto = {
             name: portfolioName,
             service_type_id: serviceType.id,
             currency: currency,
@@ -1559,23 +1493,6 @@ export class PortfolioService implements IPortfolioService {
               ModuleType.PORTFOLIO,
               newPortfolio.id
             )
-          }
-
-          // If contract URL is provided and user has permission, create contract URL entries for the user
-          // Handle comma-separated values
-          if (contractUrl && this.canUploadContractDocuments(_user)) {
-            const urls = contractUrl
-              .split(',')
-              .map(url => url.trim())
-              .filter(url => url)
-            for (const url of urls) {
-              await this.contractUrlRepository.create({
-                url,
-                portfolio_id: newPortfolio.id,
-                user_id: _user.id,
-                is_active: true
-              })
-            }
           }
 
           result.successCount++
@@ -1862,14 +1779,6 @@ export class PortfolioService implements IPortfolioService {
             updateData.parent_id = parentId || undefined
           }
 
-          // Extract contract URL/Documents (if provided)
-          const contractUrl = findHeaderValue(row, [
-            'Documents',
-            'Contract URL',
-            'Contract Url',
-            'Contract url'
-          ])
-
           // Extract commissionable (if provided) - map "Yes"/"No" to true/false
           const commissionableRaw = findHeaderValue(row, [
             'Commissionable',
@@ -1913,22 +1822,6 @@ export class PortfolioService implements IPortfolioService {
             user.id,
             isSuperAdmin
           )
-
-          // If contract URL is provided and user has permission, create contract URL entries
-          if (contractUrl && this.canUploadContractDocuments(user)) {
-            const urls = contractUrl
-              .split(',')
-              .map(url => url.trim())
-              .filter(url => url)
-            for (const url of urls) {
-              await this.contractUrlRepository.create({
-                url,
-                portfolio_id: portfolioIdValue,
-                user_id: user.id,
-                is_active: true
-              })
-            }
-          }
 
           result.successCount++
           result.successfulUpdates.push(portfolioIdValue)
