@@ -38,6 +38,7 @@ type PortfolioWithRelations = Prisma.PortfolioGetPayload<{
 }> & {
   bankDetails: any
   total_properties: number
+  total_contract_urls: number
   total_notes: number
 }
 
@@ -54,6 +55,7 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
 }> & {
   bankDetails: any
   total_properties: number
+  total_contract_urls: number
   total_notes: number
 }
 
@@ -177,16 +179,9 @@ export interface IPortfolioService {
     query: PortfolioStatsQueryDto,
     user: IUserWithPermissions
   ): Promise<PortfolioStatsResponseDto>
-<<<<<<< HEAD
-=======
-  syncCreate(
-    dto: SyncCreatePortfolioDto
-  ): Promise<{ status: string; id?: string }>
-  syncUpdate(
-    dto: SyncUpdatePortfolioDto
-  ): Promise<{ status: string; id?: string }>
-  syncDelete(
-    dto: SyncDeletePortfolioDto
-  ): Promise<{ status: string; id?: string; movedProperties?: number }>
->>>>>>> fadab09 (refactor: enhance syncDelete logic and DTO structure)
+  updateFileCount(
+    parentId: string,
+    type: 'increment' | 'decrement',
+    count: number
+  ): Promise<{ status: string; id: string; file_count: number }>
 }

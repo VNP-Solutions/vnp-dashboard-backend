@@ -3,9 +3,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
   IsArray,
   IsBoolean,
+  IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
-  IsString
+  IsString,
+  Min
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
 
@@ -498,4 +501,16 @@ export class SyncDeletePortfolioDto {
   @IsString()
   @IsNotEmpty()
   name: string
+}
+
+export class UpdateFileCountDto {
+  @IsString()
+  @IsIn(['increment', 'decrement'])
+  @IsNotEmpty()
+  type: 'increment' | 'decrement'
+
+  @IsInt()
+  @Min(1)
+  @IsNotEmpty()
+  count: number
 }

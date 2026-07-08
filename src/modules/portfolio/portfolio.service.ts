@@ -891,7 +891,29 @@ export class PortfolioService implements IPortfolioService {
     return { status: 'deleted', id: existing.id, movedProperties: moved }
   }
 
-  async bulkDelete(
+  async updateFileCount(
+    parentId: string,
+    type: 'increment' | 'decrement',
+    count: number
+  ): Promise<{ status: string; id: string; file_count: number }> {
+    const portfolio = await this.prisma.portfolio.findFirst({
+      where: { parent_id: parentId }
+    })
+
+    if (!portfolio) {
+      return { status: 'not_found', id: parentId, file_count: 0 }
+    }
+
+    const delta = type === 'increment' ? count : -count
+    const newCount = Math.max(0, portfolio.file_count + delta)
+
+    const updated = await this.prisma.portfolio.update({
+      where: { id: portfolio.id },
+      data: { file_count: newCount }
+    })
+
+    return { status: 'updated', id: updated.id, file_count: updated.file_count }
+  }
     portfolio_ids: string[],
     password: string,
     user: IUserWithPermissions
