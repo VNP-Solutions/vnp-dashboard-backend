@@ -1828,6 +1828,43 @@ export class PortfolioService implements IPortfolioService {
             }
           }
 
+          // Extract sales agent name (if provided)
+          const salesAgentName = findHeaderValue(row, [
+            'Sales Agent',
+            'Sales agent',
+            'sales agent',
+            'SalesAgent',
+            'salesAgent',
+            'sales_agent'
+          ])
+          if (salesAgentName) {
+            const nameParts = salesAgentName.trim().split(/\s+/)
+            const firstName = nameParts[0] || ''
+            const lastName = nameParts.slice(1).join(' ') || ''
+
+            const matchedAgent = await this.prisma.user.findFirst({
+              where: {
+                first_name: { equals: firstName, mode: 'insensitive' },
+                ...(lastName && {
+                  last_name: { equals: lastName, mode: 'insensitive' }
+                })
+              },
+              select: { id: true, first_name: true, last_name: true }
+            })
+
+            if (!matchedAgent) {
+              result.errors.push({
+                row: rowNumber,
+                portfolioId: portfolioIdValue,
+                error: `Sales agent not found: "${salesAgentName}"`
+              })
+              result.failureCount++
+              continue
+            }
+
+            updateData.sales_agent_id = matchedAgent.id
+          }
+
           // Only update if there's something to update
           if (Object.keys(updateData).length === 0) {
             result.errors.push({
