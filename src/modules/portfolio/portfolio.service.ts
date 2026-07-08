@@ -1689,6 +1689,8 @@ export class PortfolioService implements IPortfolioService {
             continue
           }
 
+          const existingPortfolioName = existingPortfolio.name
+
           // Check if user has permission to update this portfolio
           try {
             await this.permissionService.requirePermission(
@@ -1701,6 +1703,7 @@ export class PortfolioService implements IPortfolioService {
             result.errors.push({
               row: rowNumber,
               portfolioId: portfolioIdValue,
+              portfolioName: existingPortfolioName,
               error:
                 error.message ||
                 'You do not have permission to update this portfolio'
@@ -1728,6 +1731,7 @@ export class PortfolioService implements IPortfolioService {
                 result.errors.push({
                   row: rowNumber,
                   portfolioId: portfolioIdValue,
+                  portfolioName: existingPortfolioName,
                   error: 'Portfolio with this name already exists'
                 })
                 result.failureCount++
@@ -1774,6 +1778,7 @@ export class PortfolioService implements IPortfolioService {
               result.errors.push({
                 row: rowNumber,
                 portfolioId: portfolioIdValue,
+                portfolioName: existingPortfolioName,
                 error: `Invalid Active status value: "${activeStatusRaw}". Expected "Active" or "Inactive"`
               })
               result.failureCount++
@@ -1821,6 +1826,7 @@ export class PortfolioService implements IPortfolioService {
               result.errors.push({
                 row: rowNumber,
                 portfolioId: portfolioIdValue,
+                portfolioName: existingPortfolioName,
                 error: `Invalid Commissionable value: "${commissionableRaw}". Expected "Yes" or "No"`
               })
               result.failureCount++
@@ -1838,24 +1844,21 @@ export class PortfolioService implements IPortfolioService {
             'sales_agent'
           ])
           if (salesAgentName) {
-            const nameParts = salesAgentName.trim().split(/\s+/)
-            const firstName = nameParts[0] || ''
-            const lastName = nameParts.slice(1).join(' ') || ''
-
-            const matchedAgent = await this.prisma.user.findFirst({
+            const matchedAgent = await this.prisma.salesAgent.findFirst({
               where: {
-                first_name: { equals: firstName, mode: 'insensitive' },
-                ...(lastName && {
-                  last_name: { equals: lastName, mode: 'insensitive' }
-                })
+                full_name: {
+                  equals: salesAgentName.trim(),
+                  mode: 'insensitive'
+                }
               },
-              select: { id: true, first_name: true, last_name: true }
+              select: { id: true, full_name: true }
             })
 
             if (!matchedAgent) {
               result.errors.push({
                 row: rowNumber,
                 portfolioId: portfolioIdValue,
+                portfolioName: existingPortfolioName,
                 error: `Sales agent not found: "${salesAgentName}"`
               })
               result.failureCount++
@@ -1870,6 +1873,7 @@ export class PortfolioService implements IPortfolioService {
             result.errors.push({
               row: rowNumber,
               portfolioId: portfolioIdValue,
+              portfolioName: existingPortfolioName,
               error: 'No fields to update (all fields are empty)'
             })
             result.failureCount++
