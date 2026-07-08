@@ -5,7 +5,6 @@ import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
 import { Configuration } from '../../config/configuration'
 import { ConfigService } from '../../config/config.service'
-import { ContractUrlRepository } from '../contract-url/contract-url.repository'
 import { ExternalJwtGuard } from './guards/external-jwt.guard'
 import { PrismaService } from '../prisma/prisma.service'
 import { ServiceTypeRepository } from '../service-type/service-type.repository'
@@ -37,10 +36,6 @@ import { ServiceTokenGuard } from '../../common/guards/service-token.guard'
     {
       provide: 'IServiceTypeRepository',
       useClass: ServiceTypeRepository
-    },
-    {
-      provide: 'IContractUrlRepository',
-      useClass: ContractUrlRepository
     },
     ServiceTokenGuard,
     ExternalJwtGuard,
