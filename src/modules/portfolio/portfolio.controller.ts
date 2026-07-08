@@ -46,6 +46,7 @@ import {
   SyncCreatePortfolioDto,
   SyncDeletePortfolioDto,
   SyncUpdatePortfolioDto,
+  UpdateFileCountDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 import type { IPortfolioService } from './portfolio.interface'
@@ -596,5 +597,15 @@ export class PortfolioController {
   @UseGuards(ExternalJwtGuard)
   syncDelete(@Body() dto: SyncDeletePortfolioDto) {
     return this.portfolioService.syncDelete(dto)
+  }
+
+  @Post('sync-file-count/:parent_id')
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  updateFileCount(
+    @Param('parent_id') parentId: string,
+    @Body() dto: UpdateFileCountDto
+  ) {
+    return this.portfolioService.updateFileCount(parentId, dto.type, dto.count)
   }
 }

@@ -186,4 +186,9 @@ export interface IPortfolioService {
   syncDelete(
     dto: SyncDeletePortfolioDto
   ): Promise<{ status: string; id?: string; movedProperties?: number }>
+  updateFileCount(
+    parentId: string,
+    type: 'increment' | 'decrement',
+    count: number
+  ): Promise<{ status: string; id: string; file_count: number }>
 }
