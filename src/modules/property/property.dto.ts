@@ -955,6 +955,11 @@ export class SyncUpsertPropertyDto {
   @IsNotEmpty()
   portfolio_parent_id: string
 
+  @ApiProperty({ example: true, description: 'Whether property is active' })
+  @IsBoolean()
+  @IsNotEmpty()
+  is_active: boolean
+
   @ApiProperty({
     type: SyncUpsertPropertyCredentialsDto,
     description: 'OTA credentials for the property'

@@ -4815,13 +4815,17 @@ export class PropertyService implements IPropertyService {
         }
       }
 
-      await this.propertyRepository.update(existing.id, {
-        name: dto.name,
-        address: dto.address,
-        currency_id,
-        card_descriptor: dto.card_descriptor || undefined,
-        portfolio_id,
-        parent_id: parentId
+      await this.prisma.property.update({
+        where: { id: existing.id },
+        data: {
+          name: dto.name,
+          address: dto.address,
+          currency_id,
+          card_descriptor: dto.card_descriptor || undefined,
+          portfolio_id,
+          parent_id: parentId,
+          is_active: dto.is_active
+        }
       })
       await this.upsertSyncCredentials(existing.id, dto.credentials, false)
       return this.fetchSyncUpsertProperty(existing.id)
@@ -4837,7 +4841,7 @@ export class PropertyService implements IPropertyService {
       address: dto.address,
       currency_id,
       card_descriptor: dto.card_descriptor || undefined,
-      is_active: true,
+      is_active: dto.is_active,
       portfolio_id,
       parent_id: parentId
     })
