@@ -787,6 +787,12 @@ export class PropertyRepository implements IPropertyRepository {
     })
   }
 
+  async findByParentId(parentId: string) {
+    return this.prisma.property.findFirst({
+      where: { parent_id: parentId }
+    })
+  }
+
   async findByExpediaId(expediaId: string) {
     return this.prisma.property.findFirst({
       where: {

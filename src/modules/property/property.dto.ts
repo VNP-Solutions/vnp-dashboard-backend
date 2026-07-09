@@ -76,6 +76,14 @@ export class CreatePropertyDto {
   portfolio_id: string
 
   @ApiPropertyOptional({
+    example: 'external-property-123',
+    description: 'Optional external parent property identifier'
+  })
+  @IsString()
+  @IsOptional()
+  parent_id?: string
+
+  @ApiPropertyOptional({
     example: ['507f1f77bcf86cd799439014', '507f1f77bcf86cd799439015'],
     description:
       'Array of Portfolio IDs where this property should be visible (optional)',
@@ -837,6 +845,123 @@ export class CompleteUpdatePropertyDto {
   @Type(() => CompleteBankDetailsDto)
   @IsOptional()
   bank_details?: CompleteBankDetailsDto
+}
+
+export class SyncUpsertPropertyCurrencyDto {
+  @ApiProperty({ example: 'USD', description: 'Currency code (ISO 4217)' })
+  @IsString()
+  @IsNotEmpty()
+  code: string
+
+  @ApiProperty({
+    example: 'United States Dollar',
+    description: 'Currency name'
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string
+
+  @ApiProperty({ example: '$', description: 'Currency symbol' })
+  @IsString()
+  @IsNotEmpty()
+  symbol: string
+}
+
+export class SyncUpsertPropertyCredentialsDto {
+  @ApiProperty({
+    example: 'EXP123456',
+    description: 'Expedia property ID (required for property creation)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  expedia_id: string
+
+  @ApiPropertyOptional({ example: 'hotel@expedia.com' })
+  @IsOptional()
+  @IsString()
+  expedia_username?: string | null
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  expedia_password?: string | null
+
+  @ApiPropertyOptional({ example: 'AGD123456' })
+  @IsOptional()
+  @IsString()
+  agoda_id?: string | null
+
+  @ApiPropertyOptional({ example: 'hotel@agoda.com' })
+  @IsOptional()
+  @IsString()
+  agoda_username?: string | null
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  agoda_password?: string | null
+
+  @ApiPropertyOptional({ example: 'BKG123456' })
+  @IsOptional()
+  @IsString()
+  booking_id?: string | null
+
+  @ApiPropertyOptional({ example: 'hotel@booking.com' })
+  @IsOptional()
+  @IsString()
+  booking_username?: string | null
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  booking_password?: string | null
+}
+
+export class SyncUpsertPropertyDto {
+  @ApiProperty({ example: 'Grand Hotel', description: 'Property name' })
+  @IsString()
+  @IsNotEmpty()
+  name: string
+
+  @ApiProperty({
+    example: '123 Main Street, New York, NY 10001',
+    description: 'Property address'
+  })
+  @IsString()
+  @IsNotEmpty()
+  address: string
+
+  @ApiProperty({
+    type: SyncUpsertPropertyCurrencyDto,
+    description: 'Currency details (matched by code, created if missing)'
+  })
+  @ValidateNested()
+  @Type(() => SyncUpsertPropertyCurrencyDto)
+  currency: SyncUpsertPropertyCurrencyDto
+
+  @ApiPropertyOptional({
+    example: 'GRAND HOTEL NY',
+    description: 'Card descriptor for payment processing'
+  })
+  @IsString()
+  @IsOptional()
+  card_descriptor?: string
+
+  @ApiProperty({
+    example: 'portfolio-parent-123',
+    description: 'External portfolio parent ID used to resolve portfolio_id'
+  })
+  @IsString()
+  @IsNotEmpty()
+  portfolio_parent_id: string
+
+  @ApiProperty({
+    type: SyncUpsertPropertyCredentialsDto,
+    description: 'OTA credentials for the property'
+  })
+  @ValidateNested()
+  @Type(() => SyncUpsertPropertyCredentialsDto)
+  credentials: SyncUpsertPropertyCredentialsDto
 }
 
 export class SyncCreatePropertyDto {

@@ -68,6 +68,7 @@ import {
   PropertyStatsResponseDto,
   SharePropertyDto,
   SyncByOtaPropertyDto,
+  SyncUpsertPropertyDto,
   SyncCreatePropertyDto,
   SyncDeletePropertyDto,
   TransferPropertyDto,
@@ -4634,6 +4635,221 @@ export class PropertyService implements IPropertyService {
     if (!p && agodaId) p = await this.propertyRepository.findByAgodaId(agodaId)
     return p
   }
+  private async resolveCurrencyId(
+    currency: SyncUpsertPropertyDto['currency']
+  ): Promise<string> {
+    const existing = await this.currencyRepository.findByCode(currency.code)
+    if (existing) return existing.id
+
+    const created = await this.currencyRepository.create({
+      code: currency.code,
+      name: currency.name,
+      symbol: currency.symbol,
+      is_active: true
+    })
+    return created.id
+  }
+
+  private async resolvePortfolioIdByParentId(
+    portfolioParentId: string
+  ): Promise<string> {
+    const portfolio =
+      await this.portfolioRepository.findByParentId(portfolioParentId)
+    if (!portfolio) {
+      throw new NotFoundException(
+        `Portfolio not found with parent_id: ${portfolioParentId}`
+      )
+    }
+    return portfolio.id
+  }
+
+  private validateSyncUpsertCredentials(
+    credentials: SyncUpsertPropertyDto['credentials']
+  ): void {
+    const hasExpediaUsername = !!credentials.expedia_username?.trim()
+    const hasExpediaPassword = !!credentials.expedia_password?.trim()
+    if (hasExpediaUsername !== hasExpediaPassword) {
+      throw new BadRequestException(
+        'Expedia username and password must be provided together'
+      )
+    }
+
+    const hasAgodaUsername = !!credentials.agoda_username?.trim()
+    const hasAgodaPassword = !!credentials.agoda_password?.trim()
+    if (hasAgodaPassword && !hasAgodaUsername) {
+      throw new BadRequestException(
+        'Agoda username is required when Agoda password is provided'
+      )
+    }
+
+    const hasBookingUsername = !!credentials.booking_username?.trim()
+    const hasBookingPassword = !!credentials.booking_password?.trim()
+    if (hasBookingUsername !== hasBookingPassword) {
+      throw new BadRequestException(
+        'Booking username and password must be provided together'
+      )
+    }
+  }
+
+  private async upsertSyncCredentials(
+    propertyId: string,
+    credentials: SyncUpsertPropertyDto['credentials'],
+    isCreate: boolean
+  ): Promise<void> {
+    if (isCreate && !credentials.expedia_id?.trim()) {
+      throw new BadRequestException(
+        'credentials.expedia_id is required to create a property'
+      )
+    }
+
+    const encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+
+    const existingCredentials =
+      await this.credentialsRepository.findByPropertyId(propertyId)
+    const credentialsData: Record<string, string | null> = {
+      expedia_id: String(credentials.expedia_id)
+    }
+
+    if (credentials.expedia_username !== undefined) {
+      credentialsData.expedia_username =
+        credentials.expedia_username?.trim() || null
+    }
+    if (credentials.expedia_password?.trim()) {
+      credentialsData.expedia_password = EncryptionUtil.encrypt(
+        credentials.expedia_password.trim(),
+        encryptionSecret
+      )
+    }
+
+    if (credentials.agoda_id !== undefined) {
+      credentialsData.agoda_id = credentials.agoda_id
+        ? String(credentials.agoda_id)
+        : null
+    }
+    if (credentials.agoda_username !== undefined) {
+      credentialsData.agoda_username =
+        credentials.agoda_username?.trim() || null
+    }
+    if (credentials.agoda_password?.trim()) {
+      credentialsData.agoda_password = EncryptionUtil.encrypt(
+        credentials.agoda_password.trim(),
+        encryptionSecret
+      )
+    }
+
+    if (credentials.booking_id !== undefined) {
+      credentialsData.booking_id = credentials.booking_id
+        ? String(credentials.booking_id)
+        : null
+    }
+    if (credentials.booking_username !== undefined) {
+      credentialsData.booking_username =
+        credentials.booking_username?.trim() || null
+    }
+    if (credentials.booking_password?.trim()) {
+      credentialsData.booking_password = EncryptionUtil.encrypt(
+        credentials.booking_password.trim(),
+        encryptionSecret
+      )
+    }
+
+    if (existingCredentials) {
+      await this.credentialsRepository.update(propertyId, credentialsData)
+    } else {
+      await this.credentialsRepository.create({
+        property_id: propertyId,
+        ...credentialsData
+      })
+    }
+
+    this.otaPasswordPlaintextCache.invalidate()
+  }
+
+  private async fetchSyncUpsertProperty(propertyId: string) {
+    const property = await this.prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        currency: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            symbol: true
+          }
+        },
+        portfolio: {
+          select: {
+            id: true,
+            name: true,
+            is_active: true
+          }
+        },
+        credentials: true
+      }
+    })
+
+    if (!property) {
+      throw new NotFoundException('Property not found after sync upsert')
+    }
+
+    return property
+  }
+
+  async syncUpsert(parentId: string, dto: SyncUpsertPropertyDto) {
+    this.validateSyncUpsertCredentials(dto.credentials)
+
+    const [currency_id, portfolio_id] = await Promise.all([
+      this.resolveCurrencyId(dto.currency),
+      this.resolvePortfolioIdByParentId(dto.portfolio_parent_id)
+    ])
+
+    const existing = await this.propertyRepository.findByParentId(parentId)
+
+    if (existing) {
+      if (dto.name !== existing.name) {
+        const clash = await this.propertyRepository.findByName(dto.name)
+        if (clash && clash.id !== existing.id) {
+          throw new ConflictException('Property with this name already exists')
+        }
+      }
+
+      await this.propertyRepository.update(existing.id, {
+        name: dto.name,
+        address: dto.address,
+        currency_id,
+        card_descriptor: dto.card_descriptor || undefined,
+        portfolio_id,
+        parent_id: parentId
+      })
+      await this.upsertSyncCredentials(existing.id, dto.credentials, false)
+      return this.fetchSyncUpsertProperty(existing.id)
+    }
+
+    const nameClash = await this.propertyRepository.findByName(dto.name)
+    if (nameClash) {
+      throw new ConflictException('Property with this name already exists')
+    }
+
+    const created = await this.propertyRepository.create({
+      name: dto.name,
+      address: dto.address,
+      currency_id,
+      card_descriptor: dto.card_descriptor || undefined,
+      is_active: true,
+      portfolio_id,
+      parent_id: parentId
+    })
+
+    await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
+      portfolio_id,
+      created.id
+    )
+    await this.upsertSyncCredentials(created.id, dto.credentials, true)
+    return this.fetchSyncUpsertProperty(created.id)
+  }
+
   async syncCreate(
     dto: SyncCreatePropertyDto
   ): Promise<{ status: string; id?: string }> {
