@@ -18,6 +18,7 @@ import {
   PropertyStatsResponseDto,
   SharePropertyDto,
   SyncUpsertPropertyDto,
+  SyncBulkUpsertPropertyResultDto,
   SyncByOtaPropertyDto,
   SyncCreatePropertyDto,
   TransferPropertyDto,
@@ -196,6 +197,9 @@ export interface IPropertyService {
     parentId: string,
     dto: SyncUpsertPropertyDto
   ): Promise<PropertyWithRelations & { credentials: any }>
+  syncBulkUpsert(
+    file: Express.Multer.File
+  ): Promise<SyncBulkUpsertPropertyResultDto>
   syncCreate(
     dto: SyncCreatePropertyDto
   ): Promise<{ status: string; id?: string }>
