@@ -99,6 +99,42 @@ export class PropertyController {
   }
 
   @Public()
+  @UseGuards(ExternalJwtGuard)
+  @Post('sync-bulk-upsert')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Bulk sync upsert properties from spreadsheet (DBMS sync)',
+    description: `
+    Upload an Excel (.xlsx, .xls) or CSV file to create or update properties by Parent ID.
+
+    Columns:
+    - Parent ID: External property identifier (upsert key)
+    - Property Name, Address, Currency (code only)
+    - Card Descriptor (optional)
+    - Portfolio Parent ID: External portfolio parent ID (must exist)
+    - Active status: Active or Inactive
+    - Expedia ID (required), plus optional OTA credential columns
+    `
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description:
+            'Excel (.xlsx/.xls) or CSV file containing property sync data'
+        }
+      }
+    }
+  })
+  syncBulkUpsert(@UploadedFile() file: Express.Multer.File) {
+    return this.propertyService.syncBulkUpsert(file)
+  }
+
+  @Public()
   @UseGuards(ServiceTokenGuard)
   @Post('sync-create')
   syncCreate(@Body() dto: SyncCreatePropertyDto) {

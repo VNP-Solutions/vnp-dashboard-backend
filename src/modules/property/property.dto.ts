@@ -315,6 +315,48 @@ export class BulkImportResultDto {
   successfulImports: string[]
 }
 
+export class SyncBulkUpsertPropertyResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  totalRows: number
+
+  @ApiProperty({ example: 4, description: 'Number of properties created' })
+  createdCount: number
+
+  @ApiProperty({ example: 4, description: 'Number of properties updated' })
+  updatedCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of rows that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      {
+        row: 3,
+        parent_id: 'property-parent-123',
+        error: 'Expedia ID is required'
+      }
+    ],
+    description: 'List of errors encountered during sync bulk upsert'
+  })
+  errors: Array<{
+    row: number
+    parent_id: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: [
+      { parent_id: 'property-parent-123', action: 'created' },
+      { parent_id: 'property-parent-456', action: 'updated' }
+    ],
+    description: 'List of successfully upserted properties'
+  })
+  successfulUpserts: Array<{
+    parent_id: string
+    action: 'created' | 'updated'
+  }>
+}
+
 export class BulkUpdateResultDto {
   @ApiProperty({ example: 10, description: 'Total number of rows processed' })
   totalRows: number
