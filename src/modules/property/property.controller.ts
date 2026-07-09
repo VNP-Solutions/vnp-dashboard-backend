@@ -59,6 +59,7 @@ import {
   TransferPropertyDto,
   UnsharePropertyDto,
   UpdatePropertyDto,
+  SyncUpsertPropertyDto,
   SyncCreatePropertyDto,
   SyncByOtaPropertyDto,
   SyncDeletePropertyDto,
@@ -67,6 +68,7 @@ import {
 import type { IPropertyService } from './property.interface'
 import { Public } from '../auth/decorators/public.decorator'
 import { ServiceTokenGuard } from '../../common/guards/service-token.guard'
+import { ExternalJwtGuard } from '../portfolio/guards/external-jwt.guard'
 
 @ApiTags('Property')
 @ApiBearerAuth('JWT-auth')
@@ -79,6 +81,16 @@ export class PropertyController {
     @Inject('IAuthRepository')
     private readonly authRepository: IAuthRepository
   ) {}
+
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  @Post('sync-upsert/:parent_id')
+  syncUpsert(
+    @Param('parent_id') parentId: string,
+    @Body() dto: SyncUpsertPropertyDto
+  ) {
+    return this.propertyService.syncUpsert(parentId, dto)
+  }
 
   @Public()
   @UseGuards(ServiceTokenGuard)

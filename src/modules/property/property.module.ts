@@ -1,8 +1,13 @@
 import { Module, forwardRef } from '@nestjs/common'
+import { ConfigService as NestConfigService } from '@nestjs/config'
+import { JwtModule } from '@nestjs/jwt'
 import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
+import { Configuration } from '../../config/configuration'
+import { ConfigService } from '../../config/config.service'
 import { AuthModule } from '../auth/auth.module'
 import { CurrencyRepository } from '../currency/currency.repository'
+import { ExternalJwtGuard } from '../portfolio/guards/external-jwt.guard'
 import { PortfolioRepository } from '../portfolio/portfolio.repository'
 import { PrismaService } from '../prisma/prisma.service'
 import { PropertyBankDetailsRepository } from '../property-bank-details/property-bank-details.repository'
@@ -14,7 +19,17 @@ import { PropertyService } from './property.service'
 import { ServiceTokenGuard } from '../../common/guards/service-token.guard'
 
 @Module({
-  imports: [AuthModule, forwardRef(() => PendingActionModule)],
+  imports: [
+    AuthModule,
+    forwardRef(() => PendingActionModule),
+    JwtModule.registerAsync({
+      inject: [NestConfigService],
+      useFactory: (configService: NestConfigService<Configuration>) => ({
+        secret:
+          configService.get('jwt.communicationSecret', { infer: true }) ?? ''
+      })
+    })
+  ],
   controllers: [PropertyController],
   providers: [
     {
@@ -44,7 +59,9 @@ import { ServiceTokenGuard } from '../../common/guards/service-token.guard'
     PermissionService,
     PrismaService,
     EmailUtil,
-    ServiceTokenGuard
+    ServiceTokenGuard,
+    ExternalJwtGuard,
+    ConfigService
   ],
   exports: ['IPropertyService', 'IPropertyRepository']
 })
