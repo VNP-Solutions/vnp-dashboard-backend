@@ -315,6 +315,12 @@ export class PortfolioRepository implements IPortfolioRepository {
     })
   }
 
+  async findByParentId(parentId: string) {
+    return this.prisma.portfolio.findFirst({
+      where: { parent_id: parentId }
+    })
+  }
+
   async update(
     id: string,
     data: UpdatePortfolioDto,
