@@ -141,6 +141,48 @@ export class BulkImportResultDto {
   successfulImports: string[]
 }
 
+export class SyncBulkUpsertPortfolioResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  totalRows: number
+
+  @ApiProperty({ example: 4, description: 'Number of portfolios created' })
+  createdCount: number
+
+  @ApiProperty({ example: 4, description: 'Number of portfolios updated' })
+  updatedCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of rows that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      {
+        row: 3,
+        parent_id: 'portfolio-parent-123',
+        error: 'Portfolio with this name already exists'
+      }
+    ],
+    description: 'List of errors encountered during sync bulk upsert'
+  })
+  errors: Array<{
+    row: number
+    parent_id: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: [
+      { parent_id: 'portfolio-parent-123', action: 'created' },
+      { parent_id: 'portfolio-parent-456', action: 'updated' }
+    ],
+    description: 'List of successfully upserted portfolios'
+  })
+  successfulUpserts: Array<{
+    parent_id: string
+    action: 'created' | 'updated'
+  }>
+}
+
 export class BulkUpdateResultDto {
   @ApiProperty({ example: 10, description: 'Total number of rows processed' })
   totalRows: number

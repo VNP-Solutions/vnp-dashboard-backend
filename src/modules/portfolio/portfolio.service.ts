@@ -39,7 +39,8 @@ import {
   PortfolioStatsResponseDto,
   UpdatePortfolioDto,
   SyncUpsertPortfolioDto,
-  SyncUpdatePortfolioDto
+  SyncUpdatePortfolioDto,
+  SyncBulkUpsertPortfolioResultDto
 } from './portfolio.dto'
 import type {
   IPortfolioRepository,
@@ -179,6 +180,248 @@ export class PortfolioService implements IPortfolioService {
       is_commissionable: dto.is_commissionable,
       parent_id: parentId
     })
+  }
+
+  async syncBulkUpsert(
+    file: Express.Multer.File
+  ): Promise<SyncBulkUpsertPortfolioResultDto> {
+    if (!file) {
+      throw new BadRequestException('No file provided')
+    }
+
+    validateSpreadsheetFile(file)
+
+    const result: SyncBulkUpsertPortfolioResultDto = {
+      totalRows: 0,
+      createdCount: 0,
+      updatedCount: 0,
+      failureCount: 0,
+      errors: [],
+      successfulUpserts: []
+    }
+
+    try {
+      const data = parseSpreadsheetToJson(file)
+      result.totalRows = data.length
+
+      const cleanColumnName = (name: string): string =>
+        name
+          .replace(/[*＊✱✲⁎∗]/g, '')
+          .trim()
+          .toLowerCase()
+
+      const findHeaderValue = (
+        row: Record<string, unknown>,
+        possibleNames: string[]
+      ): string | undefined => {
+        const rowKeys = Object.keys(row)
+
+        for (const name of possibleNames) {
+          const cleanName = cleanColumnName(name)
+
+          for (const key of rowKeys) {
+            const cleanKey = cleanColumnName(key)
+
+            if (cleanKey === cleanName) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '') {
+                const plain = spreadsheetCellValueToPlainString(value)
+                if (plain !== '') return plain
+              }
+            }
+          }
+        }
+
+        return undefined
+      }
+
+      const parseActiveStatus = (
+        raw: string,
+        rowNumber: number,
+        parentId: string
+      ): boolean | null => {
+        const normalized = raw.toLowerCase().trim()
+        if (normalized === 'active') return true
+        if (normalized === 'inactive') return false
+
+        result.errors.push({
+          row: rowNumber,
+          parent_id: parentId,
+          error: `Invalid Active status value: "${raw}". Expected "Active" or "Inactive"`
+        })
+        result.failureCount++
+        return null
+      }
+
+      const parseCommissionable = (
+        raw: string,
+        rowNumber: number,
+        parentId: string
+      ): boolean | null => {
+        const normalized = raw.toLowerCase().trim()
+        if (normalized === 'yes') return true
+        if (normalized === 'no') return false
+
+        result.errors.push({
+          row: rowNumber,
+          parent_id: parentId,
+          error: `Invalid Commissionable value: "${raw}". Expected "Yes" or "No"`
+        })
+        result.failureCount++
+        return null
+      }
+
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i]
+        const rowNumber = i + 2
+
+        const parentId = findHeaderValue(row, [
+          'Parent ID',
+          'Parent Id',
+          'Parent id',
+          'parent_id'
+        ])
+
+        if (!parentId) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: 'Unknown',
+            error: 'Parent ID is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        try {
+          const name = findHeaderValue(row, [
+            'Portfolio Name',
+            'Portofolio',
+            'Portfolio name',
+            'Name'
+          ])
+          if (!name) {
+            result.errors.push({
+              row: rowNumber,
+              parent_id: parentId,
+              error: 'Portfolio Name is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          const service_type = findHeaderValue(row, [
+            'Service Type',
+            'Service type'
+          ])
+          if (!service_type) {
+            result.errors.push({
+              row: rowNumber,
+              parent_id: parentId,
+              error: 'Service Type is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          const currency = findHeaderValue(row, [
+            'Currency',
+            'currency',
+            'Currency Code',
+            'currency_code'
+          ])
+          if (!currency) {
+            result.errors.push({
+              row: rowNumber,
+              parent_id: parentId,
+              error: 'Currency is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          const activeStatusRaw = findHeaderValue(row, [
+            'Active status',
+            'Active Status',
+            'Status',
+            'Is Active'
+          ])
+          if (!activeStatusRaw) {
+            result.errors.push({
+              row: rowNumber,
+              parent_id: parentId,
+              error: 'Active status is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          const is_active = parseActiveStatus(
+            activeStatusRaw,
+            rowNumber,
+            parentId
+          )
+          if (is_active === null) continue
+
+          const commissionableRaw = findHeaderValue(row, [
+            'Commissionable',
+            'Is Commissionable',
+            'is_commissionable'
+          ])
+          if (!commissionableRaw) {
+            result.errors.push({
+              row: rowNumber,
+              parent_id: parentId,
+              error: 'Commissionable is required'
+            })
+            result.failureCount++
+            continue
+          }
+
+          const is_commissionable = parseCommissionable(
+            commissionableRaw,
+            rowNumber,
+            parentId
+          )
+          if (is_commissionable === null) continue
+
+          const existing =
+            await this.portfolioRepository.findByParentId(parentId)
+
+          await this.syncUpsert(parentId, {
+            name,
+            service_type,
+            currency,
+            is_active,
+            is_commissionable
+          })
+
+          const action = existing ? 'updated' : 'created'
+          if (existing) {
+            result.updatedCount++
+          } else {
+            result.createdCount++
+          }
+
+          result.successfulUpserts.push({ parent_id: parentId, action })
+        } catch (error) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error:
+              error instanceof Error ? error.message : 'Unknown error occurred'
+          })
+          result.failureCount++
+        }
+      }
+
+      return result
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to process spreadsheet file: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      )
+    }
   }
 
   async findAll(query: PortfolioQueryDto, user: IUserWithPermissions) {
