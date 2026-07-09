@@ -9,6 +9,7 @@ import {
   PortfolioStatsResponseDto,
   SyncUpsertPortfolioDto,
   SyncUpdatePortfolioDto,
+  SyncBulkUpsertPortfolioResultDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 
@@ -98,6 +99,9 @@ export interface IPortfolioService {
     parentId: string,
     dto: SyncUpsertPortfolioDto
   ): Promise<PortfolioWithServiceType>
+  syncBulkUpsert(
+    file: Express.Multer.File
+  ): Promise<SyncBulkUpsertPortfolioResultDto>
   syncUpdate(
     dto: SyncUpdatePortfolioDto
   ): Promise<{ status: string; id?: string }>
