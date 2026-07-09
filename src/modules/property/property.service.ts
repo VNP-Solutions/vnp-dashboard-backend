@@ -70,7 +70,6 @@ import {
   SyncByOtaPropertyDto,
   SyncUpsertPropertyDto,
   SyncCreatePropertyDto,
-  SyncDeletePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
   UpdatePropertyDto
@@ -4899,17 +4898,33 @@ export class PropertyService implements IPropertyService {
     const updated = await this.propertyRepository.update(property.id, patch)
     return { status: 'updated', id: updated.id }
   }
-  async syncDelete(
-    dto: SyncDeletePropertyDto
-  ): Promise<{ status: string; id?: string }> {
-    const expediaId = dto.expedia_id != null ? String(dto.expedia_id) : null
-    const bookingId = dto.booking_id != null ? String(dto.booking_id) : null
-    const agodaId = dto.agoda_id != null ? String(dto.agoda_id) : null
-    if (!expediaId && !bookingId && !agodaId) return { status: 'no_ota_ids' }
-    const property = await this.findByAnyOta(expediaId, bookingId, agodaId)
-    if (!property) return { status: 'not_found' }
+  async syncDelete(parentId: string): Promise<{ message: string }> {
+    const property = await this.propertyRepository.findByParentId(parentId)
+
+    if (!property) {
+      throw new NotFoundException(
+        `Property not found with parent_id: ${parentId}`
+      )
+    }
+
+    const unarchivedAuditCount = await this.prisma.audit.count({
+      where: {
+        property_id: property.id,
+        is_archived: false
+      }
+    })
+
+    if (unarchivedAuditCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete property. It has ${unarchivedAuditCount} unarchived audit${unarchivedAuditCount === 1 ? '' : 's'}. Please archive all audits before deleting the property.`
+      )
+    }
+
     await this.propertyRepository.delete(property.id)
-    return { status: 'deleted', id: property.id }
+    await this.permissionService.removePropertyFromAllUserAccessLists(
+      property.id
+    )
+    return { message: 'Property deleted successfully' }
   }
   async syncBulkCreate(items: SyncCreatePropertyDto[]) {
     let created = 0,

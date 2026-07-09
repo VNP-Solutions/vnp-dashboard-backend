@@ -20,7 +20,6 @@ import {
   SyncUpsertPropertyDto,
   SyncByOtaPropertyDto,
   SyncCreatePropertyDto,
-  SyncDeletePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
   UpdatePropertyDto
@@ -314,9 +313,7 @@ export interface IPropertyService {
       message?: string
     }>
   }>
-  syncDelete(
-    dto: SyncDeletePropertyDto
-  ): Promise<{ status: string; id?: string }>
+  syncDelete(parentId: string): Promise<{ message: string }>
   deactivate(
     id: string,
     user: IUserWithPermissions,

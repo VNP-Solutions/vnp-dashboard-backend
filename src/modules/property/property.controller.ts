@@ -62,7 +62,6 @@ import {
   SyncUpsertPropertyDto,
   SyncCreatePropertyDto,
   SyncByOtaPropertyDto,
-  SyncDeletePropertyDto,
   SyncBulkCreatePropertyDto
 } from './property.dto'
 import type { IPropertyService } from './property.interface'
@@ -93,6 +92,13 @@ export class PropertyController {
   }
 
   @Public()
+  @UseGuards(ExternalJwtGuard)
+  @Post('sync-delete/:parent_id')
+  syncDelete(@Param('parent_id') parentId: string) {
+    return this.propertyService.syncDelete(parentId)
+  }
+
+  @Public()
   @UseGuards(ServiceTokenGuard)
   @Post('sync-create')
   syncCreate(@Body() dto: SyncCreatePropertyDto) {
@@ -103,12 +109,6 @@ export class PropertyController {
   @Patch('sync-by-ota')
   syncByOta(@Body() dto: SyncByOtaPropertyDto) {
     return this.propertyService.syncByOta(dto)
-  }
-  @Public()
-  @UseGuards(ServiceTokenGuard)
-  @Post('sync-delete')
-  syncDelete(@Body() dto: SyncDeletePropertyDto) {
-    return this.propertyService.syncDelete(dto)
   }
   @Public()
   @UseGuards(ServiceTokenGuard)
