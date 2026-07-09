@@ -9,7 +9,6 @@ import {
   PortfolioStatsResponseDto,
   SyncUpsertPortfolioDto,
   SyncUpdatePortfolioDto,
-  SyncDeletePortfolioDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 
@@ -100,9 +99,7 @@ export interface IPortfolioService {
   syncUpdate(
     dto: SyncUpdatePortfolioDto
   ): Promise<{ status: string; id?: string }>
-  syncDelete(
-    dto: SyncDeletePortfolioDto
-  ): Promise<{ status: string; id?: string; movedProperties?: number }>
+  syncDelete(parentId: string): Promise<{ message: string }>
   create(
     data: CreatePortfolioDto,
     user: IUserWithPermissions

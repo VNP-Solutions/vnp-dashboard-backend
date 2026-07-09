@@ -505,16 +505,6 @@ export class SyncUpdatePortfolioDto {
   contact_email?: string
 }
 
-export class SyncDeletePortfolioDto {
-  @IsString()
-  @IsNotEmpty()
-  _id: string
-
-  @IsString()
-  @IsNotEmpty()
-  name: string
-}
-
 export class UpdateFileCountDto {
   @IsString()
   @IsIn(['increment', 'decrement'])

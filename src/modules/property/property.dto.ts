@@ -1007,12 +1007,6 @@ export class SyncByOtaPropertyDto {
   data: Record<string, any>
 }
 
-export class SyncDeletePropertyDto {
-  @ApiPropertyOptional() @IsOptional() expedia_id?: number | string | null
-  @ApiPropertyOptional() @IsOptional() booking_id?: number | string | null
-  @ApiPropertyOptional() @IsOptional() agoda_id?: number | string | null
-}
-
 export class SyncBulkCreatePropertyDto {
   @ApiProperty({ type: [SyncCreatePropertyDto] })
   @IsArray()
