@@ -7,7 +7,7 @@ import {
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
   PortfolioStatsResponseDto,
-  SyncCreatePortfolioDto,
+  SyncUpsertPortfolioDto,
   SyncUpdatePortfolioDto,
   SyncDeletePortfolioDto,
   UpdatePortfolioDto
@@ -78,6 +78,7 @@ export interface IPortfolioRepository {
     accessiblePropertyIds?: string[] | 'all'
   ): Promise<PortfolioWithFullDetails | null>
   findByName(name: string): Promise<Portfolio | null>
+  findByParentId(parentId: string): Promise<Portfolio | null>
   update(
     id: string,
     data: UpdatePortfolioDto,
@@ -92,9 +93,10 @@ export interface IPortfolioRepository {
 }
 
 export interface IPortfolioService {
-  syncCreate(
-    dto: SyncCreatePortfolioDto
-  ): Promise<{ status: string; id?: string }>
+  syncUpsert(
+    parentId: string,
+    dto: SyncUpsertPortfolioDto
+  ): Promise<PortfolioWithServiceType>
   syncUpdate(
     dto: SyncUpdatePortfolioDto
   ): Promise<{ status: string; id?: string }>
@@ -177,15 +179,6 @@ export interface IPortfolioService {
     query: PortfolioStatsQueryDto,
     user: IUserWithPermissions
   ): Promise<PortfolioStatsResponseDto>
-  syncCreate(
-    dto: SyncCreatePortfolioDto
-  ): Promise<{ status: string; id?: string }>
-  syncUpdate(
-    dto: SyncUpdatePortfolioDto
-  ): Promise<{ status: string; id?: string }>
-  syncDelete(
-    dto: SyncDeletePortfolioDto
-  ): Promise<{ status: string; id?: string; movedProperties?: number }>
   updateFileCount(
     parentId: string,
     type: 'increment' | 'decrement',

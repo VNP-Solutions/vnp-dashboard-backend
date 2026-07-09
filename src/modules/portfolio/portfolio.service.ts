@@ -38,7 +38,7 @@ import {
   PortfolioStatsQueryDto,
   PortfolioStatsResponseDto,
   UpdatePortfolioDto,
-  SyncCreatePortfolioDto,
+  SyncUpsertPortfolioDto,
   SyncUpdatePortfolioDto,
   SyncDeletePortfolioDto
 } from './portfolio.dto'
@@ -129,34 +129,57 @@ export class PortfolioService implements IPortfolioService {
     return portfolioWithDetails || portfolio
   }
 
-  async syncCreate(
-    dto: SyncCreatePortfolioDto
-  ): Promise<{ status: string; id?: string }> {
-    if (dto._id) {
-      const byId = await this.prisma.portfolio.findUnique({
-        where: { id: dto._id }
-      })
-      if (byId) return { status: 'already_exists', id: byId.id }
-    }
-
-    const existing = await this.portfolioRepository.findByName(dto.name)
-    if (existing) return { status: 'already_exists', id: existing.id }
-
+  async syncUpsert(parentId: string, dto: SyncUpsertPortfolioDto) {
     const service_type_id =
       await this.portfolioRepository.resolveServiceTypeIdByType(
         dto.service_type
       )
-    const created = await this.prisma.portfolio.create({
-      data: {
-        id: dto._id,
-        name: dto.name,
-        service_type_id,
-        is_active: dto.is_active ?? true,
-        is_commissionable: dto.is_commissionable ?? false,
-        ...(dto.contact_email ? { contact_email: dto.contact_email } : {})
+
+    const existing = await this.portfolioRepository.findByParentId(parentId)
+
+    if (existing) {
+      if (dto.name !== existing.name) {
+        const clash = await this.portfolioRepository.findByName(dto.name)
+        if (clash && clash.id !== existing.id) {
+          throw new ConflictException('Portfolio with this name already exists')
+        }
       }
+
+      return this.prisma.portfolio.update({
+        where: { id: existing.id },
+        data: {
+          name: dto.name,
+          service_type_id,
+          currency: dto.currency,
+          is_active: dto.is_active,
+          is_commissionable: dto.is_commissionable,
+          parent_id: parentId
+        },
+        include: {
+          serviceType: {
+            select: {
+              id: true,
+              type: true,
+              is_active: true
+            }
+          }
+        }
+      })
+    }
+
+    const nameClash = await this.portfolioRepository.findByName(dto.name)
+    if (nameClash) {
+      throw new ConflictException('Portfolio with this name already exists')
+    }
+
+    return this.portfolioRepository.create({
+      name: dto.name,
+      service_type_id,
+      currency: dto.currency,
+      is_active: dto.is_active,
+      is_commissionable: dto.is_commissionable,
+      parent_id: parentId
     })
-    return { status: 'created', id: created.id }
   }
 
   async findAll(query: PortfolioQueryDto, user: IUserWithPermissions) {
@@ -773,14 +796,7 @@ export class PortfolioService implements IPortfolioService {
     }
 
     if (!existing) {
-      return this.syncCreate({
-        _id: dto._id,
-        name: dto.name ?? dto.oldName,
-        service_type: dto.service_type,
-        is_active: dto.is_active,
-        is_commissionable: dto.is_commissionable,
-        contact_email: dto.contact_email
-      })
+      return { status: 'not_found' }
     }
 
     if (dto.name && dto.name !== existing.name) {

@@ -440,30 +440,40 @@ export class ActivatePortfolioDto {
   reason?: string
 }
 
-export class SyncCreatePortfolioDto {
-  @IsString()
-  @IsNotEmpty()
-  _id: string
-
+export class SyncUpsertPortfolioDto {
+  @ApiProperty({
+    example: 'Luxury Hotels Portfolio',
+    description: 'Portfolio name'
+  })
   @IsString()
   @IsNotEmpty()
   name: string
 
-  @IsOptional()
+  @ApiProperty({
+    example: 'OTA',
+    description: 'Service type name (created if missing)'
+  })
   @IsString()
-  service_type?: string
+  @IsNotEmpty()
+  service_type: string
 
-  @IsOptional()
-  @IsBoolean()
-  is_active?: boolean
-
-  @IsOptional()
-  @IsBoolean()
-  is_commissionable?: boolean
-
-  @IsOptional()
+  @ApiProperty({ example: 'USD', description: 'Currency code' })
   @IsString()
-  contact_email?: string
+  @IsNotEmpty()
+  currency: string
+
+  @ApiProperty({ example: true, description: 'Whether portfolio is active' })
+  @IsBoolean()
+  @IsNotEmpty()
+  is_active: boolean
+
+  @ApiProperty({
+    example: true,
+    description: 'Whether portfolio is commissionable'
+  })
+  @IsBoolean()
+  @IsNotEmpty()
+  is_commissionable: boolean
 }
 export class SyncUpdatePortfolioDto {
   @IsString()

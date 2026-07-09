@@ -43,7 +43,7 @@ import {
   PortfolioStatsQueryDto,
   SecurePortfolioDto,
   SecurePortfolioListDto,
-  SyncCreatePortfolioDto,
+  SyncUpsertPortfolioDto,
   SyncDeletePortfolioDto,
   SyncUpdatePortfolioDto,
   UpdateFileCountDto,
@@ -578,11 +578,14 @@ export class PortfolioController {
     return this.portfolioService.getStats(id, query, user)
   }
 
-  @Post('sync-create')
+  @Post('sync-upsert/:parent_id')
   @Public()
   @UseGuards(ExternalJwtGuard)
-  syncCreate(@Body() dto: SyncCreatePortfolioDto) {
-    return this.portfolioService.syncCreate(dto)
+  syncUpsert(
+    @Param('parent_id') parentId: string,
+    @Body() dto: SyncUpsertPortfolioDto
+  ) {
+    return this.portfolioService.syncUpsert(parentId, dto)
   }
 
   @Post('sync-update')
