@@ -77,6 +77,42 @@ export class ExternalCommunicationController {
   }
 
   /**
+   * @route POST /api/external/user-generate-token
+   * @auth Bearer <user access JWT>
+   *
+   * Dashboard frontend calls this with the logged-in user's access token to obtain
+   * a short-lived communication JWT, then uses that JWT as Bearer when calling DBMS APIs.
+   * The communication secret never leaves the backend.
+   */
+  @Post('user-generate-token')
+  @Public(false)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Generate an outbound communication JWT for the authenticated dashboard user',
+    description:
+      '**Purpose — frontend → DBMS calls.**\n\n' +
+      'Authenticated dashboard users call this with their regular access token. ' +
+      'The response contains a signed communication JWT to use as Bearer auth when ' +
+      'calling DBMS / external APIs from the browser.\n\n' +
+      'The raw `JWT_COMMUNICATION_SECRET` is never exposed to the frontend.\n\n' +
+      '**Token TTL:** 24 hours.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Token generated successfully',
+    type: GenerateTokenResponseDto
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized — missing or invalid user access token'
+  })
+  generateTokenForUser(): GenerateTokenResponseDto {
+    return this.externalCommunicationService.generateToken()
+  }
+
+  /**
    * @route POST /api/external/bulk-audit-import
    * @auth Bearer <signed-JWT>  (JWT signed with JWT_COMMUNICATION_SECRET, obtained from /generate-token)
    */
