@@ -68,6 +68,7 @@ import {
   PropertyStatsResponseDto,
   SharePropertyDto,
   SyncByOtaPropertyDto,
+  SyncBulkUpsertPropertyItemDto,
   SyncUpsertPropertyDto,
   SyncBulkUpsertPropertyResultDto,
   SyncCreatePropertyDto,
@@ -4855,16 +4856,14 @@ export class PropertyService implements IPropertyService {
   }
 
   async syncBulkUpsert(
-    file: Express.Multer.File
+    items: SyncBulkUpsertPropertyItemDto[]
   ): Promise<SyncBulkUpsertPropertyResultDto> {
-    if (!file) {
-      throw new BadRequestException('No file provided')
+    if (!Array.isArray(items) || !items.length) {
+      throw new BadRequestException('No items provided')
     }
 
-    validateSpreadsheetFile(file)
-
     const result: SyncBulkUpsertPropertyResultDto = {
-      totalRows: 0,
+      totalRows: items.length,
       createdCount: 0,
       updatedCount: 0,
       failureCount: 0,
@@ -4872,274 +4871,155 @@ export class PropertyService implements IPropertyService {
       successfulUpserts: []
     }
 
-    try {
-      const data = parseSpreadsheetToJson(file)
-      result.totalRows = data.length
+    const optionalString = (value: unknown): string | undefined => {
+      if (value === undefined || value === null) return undefined
+      if (typeof value !== 'string') return undefined
+      const trimmed = value.trim()
+      return trimmed || undefined
+    }
 
-      const cleanColumnName = (name: string): string =>
-        name
-          .replace(/[*＊✱✲⁎∗]/g, '')
-          .trim()
-          .toLowerCase()
+    for (const item of items) {
+      const rowNumber = item.row
+      const parentId =
+        typeof item.parent_id === 'string' ? item.parent_id.trim() : ''
 
-      const findHeaderValue = (
-        row: Record<string, unknown>,
-        possibleNames: string[]
-      ): string | undefined => {
-        const rowKeys = Object.keys(row)
-
-        for (const name of possibleNames) {
-          const cleanName = cleanColumnName(name)
-
-          for (const key of rowKeys) {
-            const cleanKey = cleanColumnName(key)
-
-            if (cleanKey === cleanName) {
-              const value = row[key]
-              if (value !== undefined && value !== null && value !== '') {
-                const plain = spreadsheetCellValueToPlainString(value)
-                if (plain !== '') return plain
-              }
-            }
-          }
-        }
-
-        return undefined
-      }
-
-      const parseActiveStatus = (
-        raw: string,
-        rowNumber: number,
-        parentId: string
-      ): boolean | null => {
-        const normalized = raw.toLowerCase().trim()
-        if (normalized === 'active') return true
-        if (normalized === 'inactive') return false
-
+      if (!Number.isInteger(rowNumber) || rowNumber < 1) {
         result.errors.push({
-          row: rowNumber,
-          parent_id: parentId,
-          error: `Invalid Active status value: "${raw}". Expected "Active" or "Inactive"`
+          row: Number.isInteger(rowNumber) ? rowNumber : 0,
+          parent_id: parentId || 'Unknown',
+          error: 'Row is required and must be a positive integer'
         })
         result.failureCount++
-        return null
+        continue
       }
 
-      for (let i = 0; i < data.length; i++) {
-        const row = data[i]
-        const rowNumber = i + 2
+      if (!parentId) {
+        result.errors.push({
+          row: rowNumber,
+          parent_id: 'Unknown',
+          error: 'Parent ID is required'
+        })
+        result.failureCount++
+        continue
+      }
 
-        const parentId = findHeaderValue(row, [
-          'Parent ID',
-          'Parent Id',
-          'Parent id',
-          'parent_id'
-        ])
-
-        if (!parentId) {
+      try {
+        const name = typeof item.name === 'string' ? item.name.trim() : ''
+        if (!name) {
           result.errors.push({
             row: rowNumber,
-            parent_id: 'Unknown',
-            error: 'Parent ID is required'
+            parent_id: parentId,
+            error: 'Property name is required'
           })
           result.failureCount++
           continue
         }
 
-        try {
-          const name = findHeaderValue(row, [
-            'Property Name',
-            'Property name',
-            'Name'
-          ])
-          if (!name) {
-            result.errors.push({
-              row: rowNumber,
-              parent_id: parentId,
-              error: 'Property Name is required'
-            })
-            result.failureCount++
-            continue
-          }
-
-          const address = findHeaderValue(row, ['Address', 'Property Address'])
-          if (!address) {
-            result.errors.push({
-              row: rowNumber,
-              parent_id: parentId,
-              error: 'Address is required'
-            })
-            result.failureCount++
-            continue
-          }
-
-          const currencyCode = findHeaderValue(row, [
-            'Currency',
-            'Property Currency',
-            'Currency Code',
-            'currency_code'
-          ])
-          if (!currencyCode) {
-            result.errors.push({
-              row: rowNumber,
-              parent_id: parentId,
-              error: 'Currency is required'
-            })
-            result.failureCount++
-            continue
-          }
-
-          const portfolioParentId = findHeaderValue(row, [
-            'Portfolio Parent ID',
-            'Portfolio Parent Id',
-            'portfolio_parent_id'
-          ])
-          if (!portfolioParentId) {
-            result.errors.push({
-              row: rowNumber,
-              parent_id: parentId,
-              error: 'Portfolio Parent ID is required'
-            })
-            result.failureCount++
-            continue
-          }
-
-          const activeStatusRaw = findHeaderValue(row, [
-            'Active status',
-            'Active Status',
-            'Status',
-            'Is Active'
-          ])
-          if (!activeStatusRaw) {
-            result.errors.push({
-              row: rowNumber,
-              parent_id: parentId,
-              error: 'Active status is required'
-            })
-            result.failureCount++
-            continue
-          }
-
-          const is_active = parseActiveStatus(
-            activeStatusRaw,
-            rowNumber,
-            parentId
-          )
-          if (is_active === null) continue
-
-          const expediaId = findHeaderValue(row, [
-            'Expedia ID',
-            'Expedia Id',
-            'Expedia id',
-            'ExpediaID',
-            'expedia_id'
-          ])
-          if (!expediaId) {
-            result.errors.push({
-              row: rowNumber,
-              parent_id: parentId,
-              error: 'Expedia ID is required'
-            })
-            result.failureCount++
-            continue
-          }
-
-          const cardDescriptor = findHeaderValue(row, [
-            'Card Descriptor',
-            'Card descriptor',
-            'Descriptor'
-          ])
-
-          const credentials: SyncUpsertPropertyDto['credentials'] = {
-            expedia_id: expediaId,
-            expedia_username: findHeaderValue(row, [
-              'Expedia Username',
-              'Expedia username',
-              'Expedia User'
-            ]),
-            expedia_password: findHeaderValue(row, [
-              'Expedia Password',
-              'Expedia password',
-              'Expedia Pass'
-            ]),
-            agoda_id: findHeaderValue(row, [
-              'Agoda ID',
-              'Agoda Id',
-              'Agoda id',
-              'AgodaID'
-            ]),
-            agoda_username: findHeaderValue(row, [
-              'Agoda Username',
-              'Agoda username',
-              'Agoda User'
-            ]),
-            agoda_password: findHeaderValue(row, [
-              'Agoda Password',
-              'Agoda password',
-              'Agoda Pass'
-            ]),
-            booking_id: findHeaderValue(row, [
-              'Booking ID',
-              'Booking Id',
-              'Booking id',
-              'BookingID'
-            ]),
-            booking_username: findHeaderValue(row, [
-              'Booking Username',
-              'Booking username',
-              'Booking User'
-            ]),
-            booking_password: findHeaderValue(row, [
-              'Booking Password',
-              'Booking password',
-              'Booking Pass'
-            ])
-          }
-
-          const existing =
-            await this.propertyRepository.findByParentId(parentId)
-
-          await this.syncUpsert(parentId, {
-            name,
-            address,
-            currency: {
-              code: currencyCode,
-              name: currencyCode,
-              symbol: ''
-            },
-            card_descriptor: cardDescriptor,
-            portfolio_parent_id: portfolioParentId,
-            is_active,
-            credentials
-          })
-
-          const action = existing ? 'updated' : 'created'
-          if (existing) {
-            result.updatedCount++
-          } else {
-            result.createdCount++
-          }
-
-          result.successfulUpserts.push({ parent_id: parentId, action })
-        } catch (error) {
+        const address =
+          typeof item.address === 'string' ? item.address.trim() : ''
+        if (!address) {
           result.errors.push({
             row: rowNumber,
             parent_id: parentId,
-            error:
-              error instanceof Error ? error.message : 'Unknown error occurred'
+            error: 'Address is required'
           })
           result.failureCount++
+          continue
         }
-      }
 
-      return result
-    } catch (error) {
-      throw new BadRequestException(
-        `Failed to process spreadsheet file: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`
-      )
+        const currencyCode =
+          typeof item.currency === 'string' ? item.currency.trim() : ''
+        if (!currencyCode) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'Currency is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const portfolioParentId =
+          typeof item.portfolio_parent_id === 'string'
+            ? item.portfolio_parent_id.trim()
+            : ''
+        if (!portfolioParentId) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'Portfolio Parent ID is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        if (typeof item.is_active !== 'boolean') {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'is_active is required and must be a boolean'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const expediaId = optionalString(item.expedia_id)
+        if (!expediaId) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'Expedia ID is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const existing = await this.propertyRepository.findByParentId(parentId)
+
+        await this.syncUpsert(parentId, {
+          name,
+          address,
+          currency: {
+            code: currencyCode,
+            name: currencyCode,
+            symbol: ''
+          },
+          card_descriptor: optionalString(item.card_descriptor),
+          portfolio_parent_id: portfolioParentId,
+          is_active: item.is_active,
+          credentials: {
+            expedia_id: expediaId,
+            expedia_username: optionalString(item.expedia_username),
+            expedia_password: optionalString(item.expedia_password),
+            agoda_id: optionalString(item.agoda_id),
+            agoda_username: optionalString(item.agoda_username),
+            agoda_password: optionalString(item.agoda_password),
+            booking_id: optionalString(item.booking_id),
+            booking_username: optionalString(item.booking_username),
+            booking_password: optionalString(item.booking_password)
+          }
+        })
+
+        const action = existing ? 'updated' : 'created'
+        if (existing) {
+          result.updatedCount++
+        } else {
+          result.createdCount++
+        }
+
+        result.successfulUpserts.push({ parent_id: parentId, action })
+      } catch (error) {
+        result.errors.push({
+          row: rowNumber,
+          parent_id: parentId,
+          error:
+            error instanceof Error ? error.message : 'Unknown error occurred'
+        })
+        result.failureCount++
+      }
     }
+
+    return result
   }
 
   async syncCreate(
