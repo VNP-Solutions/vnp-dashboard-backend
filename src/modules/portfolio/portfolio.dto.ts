@@ -1,6 +1,8 @@
 import { OmitType, PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { Type } from 'class-transformer'
 import {
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -480,6 +482,56 @@ export class ActivatePortfolioDto {
   @IsString()
   @IsOptional()
   reason?: string
+}
+
+export class SyncBulkUpsertPortfolioItemDto {
+  @ApiProperty({
+    example: 2,
+    description:
+      'Source row number used in the sync report (e.g. spreadsheet row)'
+  })
+  row: number
+
+  @ApiProperty({
+    example: 'portfolio-parent-123',
+    description: 'External portfolio identifier (upsert key)'
+  })
+  parent_id: string
+
+  @ApiProperty({
+    example: 'Luxury Hotels Portfolio',
+    description: 'Portfolio name'
+  })
+  name: string
+
+  @ApiProperty({
+    example: 'OTA',
+    description: 'Service type name (created if missing)'
+  })
+  service_type: string
+
+  @ApiProperty({ example: 'USD', description: 'Currency code' })
+  currency: string
+
+  @ApiProperty({ example: true, description: 'Whether portfolio is active' })
+  is_active: boolean
+
+  @ApiProperty({
+    example: true,
+    description: 'Whether portfolio is commissionable'
+  })
+  is_commissionable: boolean
+}
+
+export class SyncBulkUpsertPortfolioDto {
+  @ApiProperty({
+    type: [SyncBulkUpsertPortfolioItemDto],
+    description: 'Portfolio records to create or update by Parent ID'
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @Type(() => SyncBulkUpsertPortfolioItemDto)
+  items: SyncBulkUpsertPortfolioItemDto[]
 }
 
 export class SyncUpsertPortfolioDto {

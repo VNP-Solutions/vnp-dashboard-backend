@@ -43,6 +43,7 @@ import {
   PortfolioStatsQueryDto,
   SecurePortfolioDto,
   SecurePortfolioListDto,
+  SyncBulkUpsertPortfolioDto,
   SyncUpsertPortfolioDto,
   SyncUpdatePortfolioDto,
   UpdateFileCountDto,
@@ -590,37 +591,23 @@ export class PortfolioController {
   @Post('sync-bulk-upsert')
   @Public()
   @UseGuards(ExternalJwtGuard)
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk sync upsert portfolios from spreadsheet (DBMS sync)',
+    summary: 'Bulk sync upsert portfolios (DBMS sync)',
     description: `
-    Upload an Excel (.xlsx, .xls) or CSV file to create or update portfolios by Parent ID.
+    Create or update portfolios by Parent ID from a JSON array.
 
-    Columns:
-    - Parent ID: External portfolio identifier (upsert key)
-    - Portfolio Name: Portfolio name
-    - Service Type: Service type name (created if missing)
-    - Currency: Currency code
-    - Active status: Active or Inactive
-    - Commissionable: Yes or No
+    Each item must include:
+    - row: Source row number for the sync report
+    - parent_id: External portfolio identifier (upsert key)
+    - name: Portfolio name
+    - service_type: Service type name (created if missing)
+    - currency: Currency code
+    - is_active: Whether the portfolio is active
+    - is_commissionable: Whether the portfolio is commissionable
     `
   })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-          description:
-            'Excel (.xlsx/.xls) or CSV file containing portfolio sync data'
-        }
-      }
-    }
-  })
-  syncBulkUpsert(@UploadedFile() file: Express.Multer.File) {
-    return this.portfolioService.syncBulkUpsert(file)
+  syncBulkUpsert(@Body() dto: SyncBulkUpsertPortfolioDto) {
+    return this.portfolioService.syncBulkUpsert(dto)
   }
 
   @Post('sync-update')
