@@ -59,6 +59,7 @@ import {
   TransferPropertyDto,
   UnsharePropertyDto,
   UpdatePropertyDto,
+  SyncBulkUpsertPropertyItemDto,
   SyncUpsertPropertyDto,
   SyncCreatePropertyDto,
   SyncByOtaPropertyDto,
@@ -101,37 +102,31 @@ export class PropertyController {
   @Public()
   @UseGuards(ExternalJwtGuard)
   @Post('sync-bulk-upsert')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Bulk sync upsert properties from spreadsheet (DBMS sync)',
+    summary: 'Bulk sync upsert properties (DBMS sync)',
     description: `
-    Upload an Excel (.xlsx, .xls) or CSV file to create or update properties by Parent ID.
+    Create or update properties by Parent ID from a JSON array.
 
-    Columns:
-    - Parent ID: External property identifier (upsert key)
-    - Property Name, Address, Currency (code only)
-    - Card Descriptor (optional)
-    - Portfolio Parent ID: External portfolio parent ID (must exist)
-    - Active status: Active or Inactive
-    - Expedia ID (required), plus optional OTA credential columns
+    Each item must include:
+    - row: Source row number for the sync report
+    - parent_id: External property identifier (upsert key)
+    - name: Property name
+    - address: Property address
+    - currency: Currency code
+    - portfolio_parent_id: External portfolio parent ID (must exist)
+    - is_active: Whether the property is active
+    - expedia_id: Expedia property ID (required)
+
+    Optional fields:
+    - card_descriptor
+    - expedia_username, expedia_password
+    - agoda_id, agoda_username, agoda_password
+    - booking_id, booking_username, booking_password
     `
   })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-          description:
-            'Excel (.xlsx/.xls) or CSV file containing property sync data'
-        }
-      }
-    }
-  })
-  syncBulkUpsert(@UploadedFile() file: Express.Multer.File) {
-    return this.propertyService.syncBulkUpsert(file)
+  @ApiBody({ type: [SyncBulkUpsertPropertyItemDto] })
+  syncBulkUpsert(@Body() items: SyncBulkUpsertPropertyItemDto[]) {
+    return this.propertyService.syncBulkUpsert(items)
   }
 
   @Public()

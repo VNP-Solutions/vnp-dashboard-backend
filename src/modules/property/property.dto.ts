@@ -357,6 +357,78 @@ export class SyncBulkUpsertPropertyResultDto {
   }>
 }
 
+export class SyncBulkUpsertPropertyItemDto {
+  @ApiProperty({
+    example: 2,
+    description:
+      'Source row number used in the sync report (e.g. spreadsheet row)'
+  })
+  row: number
+
+  @ApiProperty({
+    example: 'property-parent-123',
+    description: 'External property identifier (upsert key)'
+  })
+  parent_id: string
+
+  @ApiProperty({ example: 'Grand Hotel', description: 'Property name' })
+  name: string
+
+  @ApiProperty({
+    example: '123 Main Street, New York, NY 10001',
+    description: 'Property address'
+  })
+  address: string
+
+  @ApiProperty({ example: 'USD', description: 'Currency code' })
+  currency: string
+
+  @ApiPropertyOptional({
+    example: 'GRAND HOTEL NY',
+    description: 'Card descriptor for payment processing'
+  })
+  card_descriptor?: string
+
+  @ApiProperty({
+    example: 'portfolio-parent-123',
+    description: 'External portfolio parent ID used to resolve portfolio_id'
+  })
+  portfolio_parent_id: string
+
+  @ApiProperty({ example: true, description: 'Whether property is active' })
+  is_active: boolean
+
+  @ApiProperty({
+    example: 'EXP123456',
+    description: 'Expedia property ID (required)'
+  })
+  expedia_id: string
+
+  @ApiPropertyOptional({ example: 'hotel@expedia.com' })
+  expedia_username?: string
+
+  @ApiPropertyOptional()
+  expedia_password?: string
+
+  @ApiPropertyOptional({ example: 'AGD123456' })
+  agoda_id?: string
+
+  @ApiPropertyOptional({ example: 'hotel@agoda.com' })
+  agoda_username?: string
+
+  @ApiPropertyOptional()
+  agoda_password?: string
+
+  @ApiPropertyOptional({ example: 'BKG123456' })
+  booking_id?: string
+
+  @ApiPropertyOptional({ example: 'hotel@booking.com' })
+  booking_username?: string
+
+  @ApiPropertyOptional()
+  booking_password?: string
+}
+
 export class BulkUpdateResultDto {
   @ApiProperty({ example: 10, description: 'Total number of rows processed' })
   totalRows: number
