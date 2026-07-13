@@ -71,6 +71,8 @@ import {
   SyncBulkUpsertPropertyItemDto,
   SyncUpsertPropertyDto,
   SyncBulkUpsertPropertyResultDto,
+  SyncBulkDeletePropertyDto,
+  SyncBulkDeletePropertyResultDto,
   SyncCreatePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
@@ -5068,6 +5070,61 @@ export class PropertyService implements IPropertyService {
     return { status: 'updated', id: updated.id }
   }
   async syncDelete(parentId: string): Promise<{ message: string }> {
+    await this.deleteSyncedPropertyByParentId(parentId)
+    return { message: 'Property deleted successfully' }
+  }
+
+  async syncBulkDelete(
+    dto: SyncBulkDeletePropertyDto
+  ): Promise<SyncBulkDeletePropertyResultDto> {
+    const items = dto.items ?? []
+    if (!items.length) {
+      throw new BadRequestException('No items provided')
+    }
+
+    this.logger.log(`[sync-bulk-delete] body=${JSON.stringify(dto)}`)
+
+    const result: SyncBulkDeletePropertyResultDto = {
+      totalCount: items.length,
+      deletedCount: 0,
+      failureCount: 0,
+      errors: [],
+      successfulDeletes: []
+    }
+
+    for (const item of items) {
+      const parentId =
+        typeof item.parent_id === 'string' ? item.parent_id.trim() : ''
+
+      if (!parentId) {
+        result.errors.push({
+          parent_id: 'Unknown',
+          error: 'Parent ID is required'
+        })
+        result.failureCount++
+        continue
+      }
+
+      try {
+        await this.deleteSyncedPropertyByParentId(parentId)
+        result.deletedCount++
+        result.successfulDeletes.push({ parent_id: parentId })
+      } catch (error) {
+        result.errors.push({
+          parent_id: parentId,
+          error:
+            error instanceof Error ? error.message : 'Unknown error occurred'
+        })
+        result.failureCount++
+      }
+    }
+
+    return result
+  }
+
+  private async deleteSyncedPropertyByParentId(
+    parentId: string
+  ): Promise<void> {
     const property = await this.propertyRepository.findByParentId(parentId)
 
     if (!property) {
@@ -5093,8 +5150,8 @@ export class PropertyService implements IPropertyService {
     await this.permissionService.removePropertyFromAllUserAccessLists(
       property.id
     )
-    return { message: 'Property deleted successfully' }
   }
+
   async syncBulkCreate(items: SyncCreatePropertyDto[]) {
     let created = 0,
       alreadyExists = 0,

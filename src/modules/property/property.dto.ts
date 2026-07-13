@@ -13,6 +13,7 @@ import {
   IsOptional,
   IsString,
   Length,
+  ArrayMinSize,
   ValidateNested
 } from 'class-validator'
 import { RejectNumericBankIdentifier } from '../../common/decorators/bank-identifier.decorator'
@@ -354,6 +355,61 @@ export class SyncBulkUpsertPropertyResultDto {
   successfulUpserts: Array<{
     parent_id: string
     action: 'created' | 'updated'
+  }>
+}
+
+export class SyncBulkDeletePropertyItemDto {
+  @ApiProperty({
+    example: 'property-parent-123',
+    description: 'External property identifier (DBMS property id)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  parent_id: string
+}
+
+export class SyncBulkDeletePropertyDto {
+  @ApiProperty({
+    type: [SyncBulkDeletePropertyItemDto],
+    description: 'Properties to delete by Parent ID'
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => SyncBulkDeletePropertyItemDto)
+  items: SyncBulkDeletePropertyItemDto[]
+}
+
+export class SyncBulkDeletePropertyResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of items processed' })
+  totalCount: number
+
+  @ApiProperty({ example: 8, description: 'Number of properties deleted' })
+  deletedCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of items that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      {
+        parent_id: 'property-parent-123',
+        error: 'Property not found with parent_id: property-parent-123'
+      }
+    ],
+    description: 'List of errors encountered during sync bulk delete'
+  })
+  errors: Array<{
+    parent_id: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: [{ parent_id: 'property-parent-123' }],
+    description: 'List of successfully deleted properties'
+  })
+  successfulDeletes: Array<{
+    parent_id: string
   }>
 }
 

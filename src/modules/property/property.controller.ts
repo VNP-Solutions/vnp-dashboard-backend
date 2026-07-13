@@ -63,7 +63,8 @@ import {
   SyncUpsertPropertyDto,
   SyncCreatePropertyDto,
   SyncByOtaPropertyDto,
-  SyncBulkCreatePropertyDto
+  SyncBulkCreatePropertyDto,
+  SyncBulkDeletePropertyDto
 } from './property.dto'
 import type { IPropertyService } from './property.interface'
 import { Public } from '../auth/decorators/public.decorator'
@@ -97,6 +98,24 @@ export class PropertyController {
   @Post('sync-delete/:parent_id')
   syncDelete(@Param('parent_id') parentId: string) {
     return this.propertyService.syncDelete(parentId)
+  }
+
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  @Post('sync-bulk-delete')
+  @ApiOperation({
+    summary: 'Bulk sync delete properties (DBMS sync)',
+    description: `
+    Delete multiple properties by Parent ID from a JSON array.
+
+    Each item must include:
+    - parent_id: External property identifier (DBMS property id)
+
+    Properties with unarchived audits are skipped and reported in errors.
+    `
+  })
+  syncBulkDelete(@Body() dto: SyncBulkDeletePropertyDto) {
+    return this.propertyService.syncBulkDelete(dto)
   }
 
   @Public()

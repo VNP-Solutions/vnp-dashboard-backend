@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -50,6 +51,8 @@ import type {
 
 @Injectable()
 export class PortfolioService implements IPortfolioService {
+  private readonly logger = new Logger(PortfolioService.name)
+
   constructor(
     @Inject('IPortfolioRepository')
     private portfolioRepository: IPortfolioRepository,
@@ -131,6 +134,13 @@ export class PortfolioService implements IPortfolioService {
   }
 
   async syncUpsert(parentId: string, dto: SyncUpsertPortfolioDto) {
+    this.logger.log(
+      `[sync-upsert] parent_id=${parentId} body=${JSON.stringify(dto)}`
+    )
+    this.logger.log(
+      `[sync-upsert] currency received=${JSON.stringify(dto.currency)} (type=${typeof dto.currency})`
+    )
+
     const service_type_id =
       await this.portfolioRepository.resolveServiceTypeIdByType(
         dto.service_type
@@ -146,7 +156,7 @@ export class PortfolioService implements IPortfolioService {
         }
       }
 
-      return this.prisma.portfolio.update({
+      const updated = await this.prisma.portfolio.update({
         where: { id: existing.id },
         data: {
           name: dto.name,
@@ -166,6 +176,10 @@ export class PortfolioService implements IPortfolioService {
           }
         }
       })
+      this.logger.log(
+        `[sync-upsert] updated portfolio id=${updated.id} currency saved=${updated.currency}`
+      )
+      return updated
     }
 
     const nameClash = await this.portfolioRepository.findByName(dto.name)
@@ -173,7 +187,7 @@ export class PortfolioService implements IPortfolioService {
       throw new ConflictException('Portfolio with this name already exists')
     }
 
-    return this.portfolioRepository.create({
+    const created = await this.portfolioRepository.create({
       name: dto.name,
       service_type_id,
       currency: dto.currency,
@@ -181,11 +195,17 @@ export class PortfolioService implements IPortfolioService {
       is_commissionable: dto.is_commissionable,
       parent_id: parentId
     })
+    this.logger.log(
+      `[sync-upsert] created portfolio id=${created.id} currency saved=${created.currency}`
+    )
+    return created
   }
 
   async syncBulkUpsert(
     dto: SyncBulkUpsertPortfolioDto
   ): Promise<SyncBulkUpsertPortfolioResultDto> {
+    this.logger.log(`[sync-bulk-upsert] body=${JSON.stringify(dto)}`)
+
     const items = dto.items ?? []
     if (!items.length) {
       throw new BadRequestException('No items provided')
