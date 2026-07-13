@@ -20,6 +20,8 @@ import {
   SyncBulkUpsertPropertyItemDto,
   SyncUpsertPropertyDto,
   SyncBulkUpsertPropertyResultDto,
+  SyncBulkDeletePropertyDto,
+  SyncBulkDeletePropertyResultDto,
   SyncByOtaPropertyDto,
   SyncCreatePropertyDto,
   TransferPropertyDto,
@@ -201,6 +203,9 @@ export interface IPropertyService {
   syncBulkUpsert(
     items: SyncBulkUpsertPropertyItemDto[]
   ): Promise<SyncBulkUpsertPropertyResultDto>
+  syncBulkDelete(
+    dto: SyncBulkDeletePropertyDto
+  ): Promise<SyncBulkDeletePropertyResultDto>
   syncCreate(
     dto: SyncCreatePropertyDto
   ): Promise<{ status: string; id?: string }>
