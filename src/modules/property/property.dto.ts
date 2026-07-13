@@ -1031,10 +1031,10 @@ export class SyncUpsertPropertyCurrencyDto {
   @IsNotEmpty()
   name: string
 
-  @ApiProperty({ example: '$', description: 'Currency symbol' })
+  @ApiPropertyOptional({ example: '$', description: 'Currency symbol' })
   @IsString()
-  @IsNotEmpty()
-  symbol: string
+  @IsOptional()
+  symbol?: string
 }
 
 export class SyncUpsertPropertyCredentialsDto {
