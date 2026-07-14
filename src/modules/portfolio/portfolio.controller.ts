@@ -604,6 +604,9 @@ export class PortfolioController {
     - currency: Currency code
     - is_active: Whether the portfolio is active
     - is_commissionable: Whether the portfolio is commissionable
+
+    Optional per item:
+    - file_count: Number of associated document files (preserves existing value on update when omitted)
     `
   })
   syncBulkUpsert(@Body() dto: SyncBulkUpsertPortfolioDto) {

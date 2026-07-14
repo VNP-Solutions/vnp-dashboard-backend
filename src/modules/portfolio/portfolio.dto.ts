@@ -521,6 +521,16 @@ export class SyncBulkUpsertPortfolioItemDto {
     description: 'Whether portfolio is commissionable'
   })
   is_commissionable: boolean
+
+  @ApiPropertyOptional({
+    example: 3,
+    description:
+      'Number of associated document files (optional; when omitted, existing value is preserved on update)'
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  file_count?: number
 }
 
 export class SyncBulkUpsertPortfolioDto {
@@ -568,6 +578,15 @@ export class SyncUpsertPortfolioDto {
   @IsBoolean()
   @IsNotEmpty()
   is_commissionable: boolean
+
+  @ApiPropertyOptional({
+    example: 3,
+    description: 'Number of associated document files'
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  file_count?: number
 }
 export class SyncUpdatePortfolioDto {
   @IsString()

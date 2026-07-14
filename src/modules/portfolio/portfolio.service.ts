@@ -164,7 +164,10 @@ export class PortfolioService implements IPortfolioService {
           currency: dto.currency,
           is_active: dto.is_active,
           is_commissionable: dto.is_commissionable,
-          parent_id: parentId
+          parent_id: parentId,
+          ...(dto.file_count !== undefined
+            ? { file_count: dto.file_count }
+            : {})
         },
         include: {
           serviceType: {
@@ -193,7 +196,8 @@ export class PortfolioService implements IPortfolioService {
       currency: dto.currency,
       is_active: dto.is_active,
       is_commissionable: dto.is_commissionable,
-      parent_id: parentId
+      parent_id: parentId,
+      ...(dto.file_count !== undefined ? { file_count: dto.file_count } : {})
     })
     this.logger.log(
       `[sync-upsert] created portfolio id=${created.id} currency saved=${created.currency}`
@@ -301,6 +305,20 @@ export class PortfolioService implements IPortfolioService {
           continue
         }
 
+        if (
+          item.file_count !== undefined &&
+          item.file_count !== null &&
+          (!Number.isInteger(item.file_count) || item.file_count < 0)
+        ) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'file_count must be a non-negative integer when provided'
+          })
+          result.failureCount++
+          continue
+        }
+
         const existing = await this.portfolioRepository.findByParentId(parentId)
 
         await this.syncUpsert(parentId, {
@@ -308,7 +326,10 @@ export class PortfolioService implements IPortfolioService {
           service_type,
           currency,
           is_active: item.is_active,
-          is_commissionable: item.is_commissionable
+          is_commissionable: item.is_commissionable,
+          ...(item.file_count !== undefined && item.file_count !== null
+            ? { file_count: item.file_count }
+            : {})
         })
 
         const action = existing ? 'updated' : 'created'
