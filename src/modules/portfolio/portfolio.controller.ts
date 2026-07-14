@@ -9,11 +9,10 @@ import {
   Post,
   Query,
   UploadedFile,
-  UploadedFiles,
   UseGuards,
   UseInterceptors
 } from '@nestjs/common'
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express'
+import { FileInterceptor } from '@nestjs/platform-express'
 import {
   ApiBearerAuth,
   ApiBody,
@@ -32,7 +31,6 @@ import {
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
-import { EmailAttachment } from '../email/email.dto'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   ActivatePortfolioDto,
@@ -45,10 +43,16 @@ import {
   PortfolioStatsQueryDto,
   SecurePortfolioDto,
   SecurePortfolioListDto,
-  SendPortfolioEmailDto,
+  SyncBulkUpsertPortfolioDto,
+  SyncUpsertPortfolioDto,
+  SyncUpdatePortfolioDto,
+  UpdateFileCountDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 import type { IPortfolioService } from './portfolio.interface'
+import { Public } from '../auth/decorators/public.decorator'
+import { ServiceTokenGuard } from 'src/common/guards/service-token.guard'
+import { ExternalJwtGuard } from './guards/external-jwt.guard'
 
 @ApiTags('Portfolio')
 @ApiBearerAuth('JWT-auth')
@@ -141,7 +145,10 @@ export class PortfolioController {
     description: 'Paginated list of portfolios with full bank details'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
   async findAllSecure(
     @Query() query: PortfolioQueryDto,
     @Body() body: SecurePortfolioListDto,
@@ -163,7 +170,8 @@ export class PortfolioController {
   @Post('by-ids/secure')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
   @ApiOperation({
-    summary: 'Get specific portfolios by IDs with full bank details (password required)',
+    summary:
+      'Get specific portfolios by IDs with full bank details (password required)',
     description:
       'Returns full details including unmasked bank details for the specified portfolio IDs. ' +
       'IDs the user has no access to are silently excluded from the results. ' +
@@ -175,7 +183,10 @@ export class PortfolioController {
     description: 'List of portfolios with full bank details'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions'
+  })
   async findManyByIdsSecure(
     @Body() body: GetPortfoliosByIdsSecureDto,
     @CurrentUser() user: IUserWithPermissions
@@ -219,7 +230,10 @@ export class PortfolioController {
     description: 'Portfolio with full bank details retrieved successfully'
   })
   @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 403, description: 'Forbidden - No access to this portfolio' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - No access to this portfolio'
+  })
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   async findOneSecure(
     @Param('id') id: string,
@@ -251,7 +265,6 @@ export class PortfolioController {
   findOne(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.portfolioService.findOne(id, user)
   }
-
 
   @Patch(':id')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
@@ -412,112 +425,6 @@ export class PortfolioController {
     )
   }
 
-  @Post(':id/send-email')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
-  @UseInterceptors(FilesInterceptor('attachments', 5)) // Allow up to 5 file attachments
-  @ApiConsumes('multipart/form-data', 'application/json')
-  @ApiOperation({
-    summary:
-      'Send email to portfolio contact email(s) with optional attachments',
-    description:
-      'Send an email to the portfolio contact email address(es) with optional attachments. ' +
-      'If the portfolio has multiple comma-separated contact emails, the email will be sent to all recipients. ' +
-      'Attachments can be provided as direct file uploads or URLs to files.'
-  })
-  @ApiBody({
-    description:
-      'Email data with optional file attachments (upload) or attachment URLs',
-    schema: {
-      type: 'object',
-      properties: {
-        subject: {
-          type: 'string',
-          example: 'Quarterly Review Meeting',
-          description: 'Email subject'
-        },
-        body: {
-          type: 'string',
-          example:
-            'Dear Team,\n\nWe would like to schedule a quarterly review meeting...',
-          description: 'Email body (plain text)'
-        },
-        attachment_urls: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              url: {
-                type: 'string',
-                example: 'https://s3.amazonaws.com/bucket/report.pdf',
-                description: 'URL of the file to attach'
-              },
-              filename: {
-                type: 'string',
-                example: 'quarterly-report.pdf',
-                description:
-                  'Optional custom filename (extracted from URL if not provided)'
-              }
-            },
-            required: ['url']
-          },
-          description:
-            'Optional array of file URLs to attach (downloaded and attached to email)'
-        },
-        attachments: {
-          type: 'array',
-          items: {
-            type: 'string',
-            format: 'binary'
-          },
-          description: 'Optional direct file uploads (max 5 files)'
-        }
-      },
-      required: ['subject', 'body']
-    }
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Email sent successfully to all contact email addresses',
-    schema: {
-      example: {
-        message: 'Email sent successfully to 2 recipient(s)',
-        recipients: ['contact1@example.com', 'contact2@example.com']
-      }
-    }
-  })
-  @ApiResponse({ status: 404, description: 'Portfolio not found' })
-  @ApiResponse({
-    status: 400,
-    description:
-      'Portfolio does not have valid contact email addresses configured or failed to fetch attachment from URL'
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - No access to this portfolio'
-  })
-  sendEmail(
-    @Param('id') id: string,
-    @Body() sendEmailDto: SendPortfolioEmailDto,
-    @CurrentUser() user: IUserWithPermissions,
-    @UploadedFiles() files?: Express.Multer.File[]
-  ) {
-    // Convert uploaded files to EmailAttachment format
-    const attachments: EmailAttachment[] | undefined = files?.map(file => ({
-      filename: file.originalname,
-      content: file.buffer,
-      contentType: file.mimetype
-    }))
-
-    return this.portfolioService.sendEmail(
-      id,
-      sendEmailDto.subject,
-      sendEmailDto.body,
-      user,
-      attachments,
-      sendEmailDto.attachment_urls
-    )
-  }
-
   @Post('bulk-import')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
@@ -534,9 +441,7 @@ export class PortfolioController {
     
     Optional columns:
     - Currency: Currency code (defaults to USD)
-    - Contact Email: Contact email(s) - can be comma-separated for multiple recipients (e.g., "email1@example.com, email2@example.com")
-    - Access Email: Access email
-    - Access Phone: Access phone
+    - Parent ID: Optional parent portfolio identifier
     - Documents/Contract URL: Contract URL(s) - comma-separated (Super Admin only)
     - Commissionable: Commissionable status (Yes/No)
     - Sales Agent: Sales agent name (required if commissionable is Yes)
@@ -549,7 +454,8 @@ export class PortfolioController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Excel (.xlsx/.xls) or CSV file containing portfolio data'
+          description:
+            'Excel (.xlsx/.xls) or CSV file containing portfolio data'
         }
       }
     }
@@ -590,9 +496,7 @@ export class PortfolioController {
     - Portfolio Name/Portfolio name/Name: Name of the portfolio
     - Service Type/Service type: Service type name (will be created if doesn't exist)
     - Active status/Active Status/Status/Is Active: Active status (Active/Inactive)
-    - Contact Email/Contact email/Contact: Contact email(s) - can be comma-separated for multiple recipients (e.g., "email1@example.com, email2@example.com")
-    - Access Email/Access email: Access email
-    - Access Phone/Access phone/Access Phone NO/Access Phone No/Access Contact: Access phone
+    - Parent ID/Parent Id/Parent id/parent_id: Optional parent portfolio identifier
     - Documents/Contract URL/Contract Url/Contract url: Contract URL(s) - comma-separated (Super Admin only)
     - Commissionable/Is Commissionable/is_commissionable: Commissionable status (Yes/No)
     - Sales Agent/Sales agent: Sales agent name (required if commissionable is Yes)
@@ -601,7 +505,8 @@ export class PortfolioController {
     `
   })
   @ApiBody({
-    description: 'Excel (.xlsx/.xls) or CSV file containing portfolio update data',
+    description:
+      'Excel (.xlsx/.xls) or CSV file containing portfolio update data',
     schema: {
       type: 'object',
       properties: {
@@ -671,5 +576,64 @@ export class PortfolioController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.portfolioService.getStats(id, query, user)
+  }
+
+  @Post('sync-upsert/:parent_id')
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  syncUpsert(
+    @Param('parent_id') parentId: string,
+    @Body() dto: SyncUpsertPortfolioDto
+  ) {
+    return this.portfolioService.syncUpsert(parentId, dto)
+  }
+
+  @Post('sync-bulk-upsert')
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  @ApiOperation({
+    summary: 'Bulk sync upsert portfolios (DBMS sync)',
+    description: `
+    Create or update portfolios by Parent ID from a JSON array.
+
+    Each item must include:
+    - row: Source row number for the sync report
+    - parent_id: External portfolio identifier (upsert key)
+    - name: Portfolio name
+    - service_type: Service type name (created if missing)
+    - currency: Currency code (optional; defaults to USD when omitted or empty)
+    - is_active: Whether the portfolio is active
+    - is_commissionable: Whether the portfolio is commissionable
+
+    Optional per item:
+    - file_count: Number of associated document files (preserves existing value on update when omitted)
+    `
+  })
+  syncBulkUpsert(@Body() dto: SyncBulkUpsertPortfolioDto) {
+    return this.portfolioService.syncBulkUpsert(dto)
+  }
+
+  @Post('sync-update')
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  syncUpdate(@Body() dto: SyncUpdatePortfolioDto) {
+    return this.portfolioService.syncUpdate(dto)
+  }
+
+  @Post('sync-delete/:parent_id')
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  syncDelete(@Param('parent_id') parentId: string) {
+    return this.portfolioService.syncDelete(parentId)
+  }
+
+  @Post('sync-file-count/:parent_id')
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  updateFileCount(
+    @Param('parent_id') parentId: string,
+    @Body() dto: UpdateFileCountDto
+  ) {
+    return this.portfolioService.updateFileCount(parentId, dto.type, dto.count)
   }
 }

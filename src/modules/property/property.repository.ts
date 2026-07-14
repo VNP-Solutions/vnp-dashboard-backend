@@ -25,13 +25,8 @@ export class PropertyRepository implements IPropertyRepository {
   ) {}
 
   async create(data: CreatePropertyDto) {
-    const createData: any = { ...data }
-    if (data.next_due_date) {
-      createData.next_due_date = new Date(data.next_due_date)
-    }
-
     return this.prisma.property.create({
-      data: createData,
+      data,
       include: {
         currency: {
           select: {
@@ -64,294 +59,54 @@ export class PropertyRepository implements IPropertyRepository {
     return this.prisma
       .$transaction(
         async tx => {
-      // Create property data
-      const createData: any = { ...propertyData }
-      if (propertyData.next_due_date) {
-        createData.next_due_date = new Date(propertyData.next_due_date)
-      }
+          // Create property data
+          const createData: any = { ...propertyData }
 
-      // Create property
-      const property = await tx.property.create({
-        data: createData
-      })
-
-      // Create credentials if provided
-      if (credentialsData) {
-        await tx.propertyCredentials.create({
-          data: {
-            property_id: property.id,
-            // Only expedia_id is required, username and password are optional
-            expedia_id: credentialsData.expedia.id,
-            expedia_username: credentialsData.expedia.username || null,
-            expedia_password: credentialsData.expedia.password
-              ? EncryptionUtil.encrypt(
-                  credentialsData.expedia.password,
-                  encryptionSecret
-                )
-              : null,
-            // All agoda fields are optional
-            agoda_id: credentialsData.agoda?.id || null,
-            agoda_username: credentialsData.agoda?.username || null,
-            agoda_password: credentialsData.agoda?.password
-              ? EncryptionUtil.encrypt(
-                  credentialsData.agoda.password,
-                  encryptionSecret
-                )
-              : null,
-            // All booking fields are optional
-            booking_id: credentialsData.booking?.id || null,
-            booking_username: credentialsData.booking?.username || null,
-            booking_password: credentialsData.booking?.password
-              ? EncryptionUtil.encrypt(
-                  credentialsData.booking.password,
-                  encryptionSecret
-                )
-              : null
-          }
-        })
-      }
-
-      // Create bank details if provided
-      if (bankDetailsData) {
-        const bankData: any = {
-          property_id: property.id,
-          bank_type: bankDetailsData.bank_type as BankType
-        }
-
-        // Add optional fields if provided
-        if (bankDetailsData.bank_sub_type) {
-          bankData.bank_sub_type = bankDetailsData.bank_sub_type as BankSubType
-        }
-        if (bankDetailsData.hotel_portfolio_name) {
-          bankData.hotel_portfolio_name = bankDetailsData.hotel_portfolio_name
-        }
-        if (bankDetailsData.beneficiary_name) {
-          bankData.beneficiary_name = bankDetailsData.beneficiary_name
-        }
-        if (bankDetailsData.beneficiary_address) {
-          bankData.beneficiary_address = bankDetailsData.beneficiary_address
-        }
-        if (bankDetailsData.account_number) {
-          bankData.account_number = bankDetailsData.account_number
-        }
-        if (bankDetailsData.account_name) {
-          bankData.account_name = bankDetailsData.account_name
-        }
-        if (bankDetailsData.bank_name) {
-          bankData.bank_name = bankDetailsData.bank_name
-        }
-        if (bankDetailsData.bank_branch) {
-          bankData.bank_branch = bankDetailsData.bank_branch
-        }
-        if (bankDetailsData.iban_number) {
-          bankData.iban_number = bankDetailsData.iban_number
-        }
-        if (bankDetailsData.swift_bic_number) {
-          bankData.swift_bic_number = bankDetailsData.swift_bic_number
-        }
-        if (bankDetailsData.routing_number) {
-          bankData.routing_number = bankDetailsData.routing_number
-        }
-        if (bankDetailsData.bank_wiring_routing_number) {
-          bankData.bank_wiring_routing_number = bankDetailsData.bank_wiring_routing_number
-        }
-        bankData.bank_account_type =
-          bankDetailsData.bank_account_type?.trim() ?? ''
-        if (bankDetailsData.currency) {
-          bankData.currency = bankDetailsData.currency
-        }
-        if (bankDetailsData.stripe_account_email) {
-          bankData.stripe_account_email = bankDetailsData.stripe_account_email
-        }
-        if (bankDetailsData.contact_name) {
-          bankData.contact_name = bankDetailsData.contact_name
-        }
-        if (bankDetailsData.email_address) {
-          bankData.email_address = bankDetailsData.email_address
-        }
-        if (bankDetailsData.bank_address) {
-          bankData.bank_address = bankDetailsData.bank_address
-        }
-        if (bankDetailsData.comments) {
-          bankData.comments = bankDetailsData.comments
-        }
-        if (userId) {
-          bankData.associated_user_id = userId
-        }
-
-        await tx.propertyBankDetails.create({
-          data: bankData
-        })
-      }
-
-      // Fetch and return the complete property with all relations
-      const completeProperty = await tx.property.findUnique({
-        where: { id: property.id },
-        include: {
-          currency: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              symbol: true
-            }
-          },
-          portfolio: {
-            select: {
-              id: true,
-              name: true,
-              is_active: true,
-              service_type_id: true,
-              contact_email: true,
-              access_email: true,
-              access_phone: true,
-              serviceType: {
-                select: {
-                  id: true,
-                  type: true
-                }
-              }
-            }
-          },
-          credentials: true,
-          bankDetails: true,
-          audits: {
-            select: {
-              id: true,
-              type_of_ota: true,
-              audit_status_id: true,
-              expedia_amount_collectable: true,
-              expedia_amount_confirmed: true,
-              agoda_amount_collectable: true,
-              agoda_amount_confirmed: true,
-              booking_amount_collectable: true,
-              booking_amount_confirmed: true
-            }
-          }
-        }
-      })
-
-      if (!completeProperty) {
-        throw new Error('Failed to retrieve created property')
-      }
-
-      return completeProperty
-    },
-    {
-      timeout: 30000 // 30 seconds timeout for complex create operations
-    }
-  )
-  .then(result => {
-    if (credentialsData) {
-      this.otaPasswordPlaintextCache.invalidate()
-    }
-    return result
-  })
-  }
-
-  async completeUpdate(
-    propertyId: string,
-    propertyData?: UpdatePropertyDto,
-    credentialsData?: CompletePropertyCredentialsUpdateDto,
-    bankDetailsData?: CompleteBankDetailsDto,
-    userId?: string
-  ) {
-    const encryptionSecret = process.env.JWT_ACCESS_SECRET || ''
-
-    return this.prisma.$transaction(
-      async tx => {
-        // Update property data if provided
-        if (propertyData && Object.keys(propertyData).length > 0) {
-          const updateData: any = { ...propertyData }
-          if (propertyData.next_due_date) {
-            updateData.next_due_date = new Date(propertyData.next_due_date)
-          }
-
-          await tx.property.update({
-            where: { id: propertyId },
-            data: updateData
-          })
-        }
-
-        // Update or create credentials if provided
-        if (credentialsData) {
-          const existingCredentials = await tx.propertyCredentials.findUnique({
-            where: { property_id: propertyId }
+          // Create property
+          const property = await tx.property.create({
+            data: createData
           })
 
-          const exp = credentialsData.expedia
-          const idInPayload =
-            exp.id !== undefined && String(exp.id).trim() !== ''
-          const resolvedExpediaId = idInPayload
-            ? exp.id!
-            : existingCredentials?.expedia_id ?? null
-
-          if (!resolvedExpediaId) {
-            throw new Error(
-              'Expedia ID could not be resolved for credentials update'
-            )
-          }
-
-          const credentialsPayload: any = {
-            expedia_id: resolvedExpediaId,
-            expedia_username: credentialsData.expedia.username || null,
-            expedia_password: credentialsData.expedia.password
-              ? EncryptionUtil.encrypt(
-                  credentialsData.expedia.password,
-                  encryptionSecret
-                )
-              : null,
-            // All agoda fields are optional
-            agoda_id: credentialsData.agoda?.id || null,
-            agoda_username: credentialsData.agoda?.username || null,
-            agoda_password: credentialsData.agoda?.password
-              ? EncryptionUtil.encrypt(
-                  credentialsData.agoda.password,
-                  encryptionSecret
-                )
-              : null,
-            // All booking fields are optional
-            booking_id: credentialsData.booking?.id || null,
-            booking_username: credentialsData.booking?.username || null,
-            booking_password: credentialsData.booking?.password
-              ? EncryptionUtil.encrypt(
-                  credentialsData.booking.password,
-                  encryptionSecret
-                )
-              : null
-          }
-
-          if (existingCredentials) {
-            await tx.propertyCredentials.update({
-              where: { property_id: propertyId },
-              data: credentialsPayload
-            })
-          } else {
+          // Create credentials if provided
+          if (credentialsData) {
             await tx.propertyCredentials.create({
               data: {
-                property_id: propertyId,
-                ...credentialsPayload
+                property_id: property.id,
+                // Only expedia_id is required, username and password are optional
+                expedia_id: credentialsData.expedia.id,
+                expedia_username: credentialsData.expedia.username || null,
+                expedia_password: credentialsData.expedia.password
+                  ? EncryptionUtil.encrypt(
+                      credentialsData.expedia.password,
+                      encryptionSecret
+                    )
+                  : null,
+                // All agoda fields are optional
+                agoda_id: credentialsData.agoda?.id || null,
+                agoda_username: credentialsData.agoda?.username || null,
+                agoda_password: credentialsData.agoda?.password
+                  ? EncryptionUtil.encrypt(
+                      credentialsData.agoda.password,
+                      encryptionSecret
+                    )
+                  : null,
+                // All booking fields are optional
+                booking_id: credentialsData.booking?.id || null,
+                booking_username: credentialsData.booking?.username || null,
+                booking_password: credentialsData.booking?.password
+                  ? EncryptionUtil.encrypt(
+                      credentialsData.booking.password,
+                      encryptionSecret
+                    )
+                  : null
               }
             })
           }
-        }
 
-        // Update or create bank details if provided
-        if (bankDetailsData) {
-          const existingBankDetails = await tx.propertyBankDetails.findUnique({
-            where: { property_id: propertyId }
-          })
-
-          // If bank_type is "none", delete existing bank details
-          if (bankDetailsData.bank_type === 'none') {
-            if (existingBankDetails) {
-              await tx.propertyBankDetails.delete({
-                where: { property_id: propertyId }
-              })
-            }
-            // Skip the rest of bank details processing
-          } else {
+          // Create bank details if provided
+          if (bankDetailsData) {
             const bankData: any = {
+              property_id: property.id,
               bank_type: bankDetailsData.bank_type as BankType
             }
 
@@ -392,16 +147,11 @@ export class PropertyRepository implements IPropertyRepository {
               bankData.routing_number = bankDetailsData.routing_number
             }
             if (bankDetailsData.bank_wiring_routing_number) {
-              bankData.bank_wiring_routing_number = bankDetailsData.bank_wiring_routing_number
+              bankData.bank_wiring_routing_number =
+                bankDetailsData.bank_wiring_routing_number
             }
-            if (bankDetailsData.bank_account_type !== undefined) {
-              bankData.bank_account_type =
-                bankDetailsData.bank_account_type?.trim() ?? ''
-            }
-
-            if (!existingBankDetails && bankData.bank_account_type === undefined) {
-              bankData.bank_account_type = ''
-            }
+            bankData.bank_account_type =
+              bankDetailsData.bank_account_type?.trim() ?? ''
             if (bankDetailsData.currency) {
               bankData.currency = bankDetailsData.currency
             }
@@ -425,85 +175,334 @@ export class PropertyRepository implements IPropertyRepository {
               bankData.associated_user_id = userId
             }
 
-            if (existingBankDetails) {
-              await tx.propertyBankDetails.update({
-                where: { property_id: propertyId },
-                data: bankData
-              })
-            } else {
-              await tx.propertyBankDetails.create({
-                data: {
-                  property_id: propertyId,
-                  ...bankData
-                }
-              })
-            }
+            await tx.propertyBankDetails.create({
+              data: bankData
+            })
           }
-        }
 
-        // Fetch and return the complete property with all relations
-        const completeProperty = await tx.property.findUnique({
-          where: { id: propertyId },
-          include: {
-            currency: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                symbol: true
-              }
-            },
-            portfolio: {
-              select: {
-                id: true,
-                name: true,
-                is_active: true,
-                service_type_id: true,
-                contact_email: true,
-                access_email: true,
-                access_phone: true,
-                serviceType: {
-                  select: {
-                    id: true,
-                    type: true
+          // Fetch and return the complete property with all relations
+          const completeProperty = await tx.property.findUnique({
+            where: { id: property.id },
+            include: {
+              currency: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  symbol: true
+                }
+              },
+              portfolio: {
+                select: {
+                  id: true,
+                  name: true,
+                  is_active: true,
+                  service_type_id: true,
+                  parent_id: true,
+                  serviceType: {
+                    select: {
+                      id: true,
+                      type: true
+                    }
                   }
                 }
+              },
+              credentials: true,
+              bankDetails: true,
+              audits: {
+                select: {
+                  id: true,
+                  type_of_ota: true,
+                  audit_status_id: true,
+                  expedia_amount_collectable: true,
+                  expedia_amount_confirmed: true,
+                  agoda_amount_collectable: true,
+                  agoda_amount_confirmed: true,
+                  booking_amount_collectable: true,
+                  booking_amount_confirmed: true
+                }
               }
-            },
-            credentials: true,
-            bankDetails: true,
-            audits: {
-              select: {
-                id: true,
-                type_of_ota: true,
-                audit_status_id: true,
-                expedia_amount_collectable: true,
-                expedia_amount_confirmed: true,
-                agoda_amount_collectable: true,
-                agoda_amount_confirmed: true,
-                booking_amount_collectable: true,
-                booking_amount_confirmed: true
+            }
+          })
+
+          if (!completeProperty) {
+            throw new Error('Failed to retrieve created property')
+          }
+
+          return completeProperty
+        },
+        {
+          timeout: 30000 // 30 seconds timeout for complex create operations
+        }
+      )
+      .then(result => {
+        if (credentialsData) {
+          this.otaPasswordPlaintextCache.invalidate()
+        }
+        return result
+      })
+  }
+
+  async completeUpdate(
+    propertyId: string,
+    propertyData?: UpdatePropertyDto,
+    credentialsData?: CompletePropertyCredentialsUpdateDto,
+    bankDetailsData?: CompleteBankDetailsDto,
+    userId?: string
+  ) {
+    const encryptionSecret = process.env.JWT_ACCESS_SECRET || ''
+
+    return this.prisma
+      .$transaction(
+        async tx => {
+          // Update property data if provided
+          if (propertyData && Object.keys(propertyData).length > 0) {
+            const updateData: any = { ...propertyData }
+
+            await tx.property.update({
+              where: { id: propertyId },
+              data: updateData
+            })
+          }
+
+          // Update or create credentials if provided
+          if (credentialsData) {
+            const existingCredentials = await tx.propertyCredentials.findUnique(
+              {
+                where: { property_id: propertyId }
+              }
+            )
+
+            const exp = credentialsData.expedia
+            const idInPayload =
+              exp.id !== undefined && String(exp.id).trim() !== ''
+            const resolvedExpediaId = idInPayload
+              ? exp.id!
+              : (existingCredentials?.expedia_id ?? null)
+
+            if (!resolvedExpediaId) {
+              throw new Error(
+                'Expedia ID could not be resolved for credentials update'
+              )
+            }
+
+            const credentialsPayload: any = {
+              expedia_id: resolvedExpediaId,
+              expedia_username: credentialsData.expedia.username || null,
+              expedia_password: credentialsData.expedia.password
+                ? EncryptionUtil.encrypt(
+                    credentialsData.expedia.password,
+                    encryptionSecret
+                  )
+                : null,
+              // All agoda fields are optional
+              agoda_id: credentialsData.agoda?.id || null,
+              agoda_username: credentialsData.agoda?.username || null,
+              agoda_password: credentialsData.agoda?.password
+                ? EncryptionUtil.encrypt(
+                    credentialsData.agoda.password,
+                    encryptionSecret
+                  )
+                : null,
+              // All booking fields are optional
+              booking_id: credentialsData.booking?.id || null,
+              booking_username: credentialsData.booking?.username || null,
+              booking_password: credentialsData.booking?.password
+                ? EncryptionUtil.encrypt(
+                    credentialsData.booking.password,
+                    encryptionSecret
+                  )
+                : null
+            }
+
+            if (existingCredentials) {
+              await tx.propertyCredentials.update({
+                where: { property_id: propertyId },
+                data: credentialsPayload
+              })
+            } else {
+              await tx.propertyCredentials.create({
+                data: {
+                  property_id: propertyId,
+                  ...credentialsPayload
+                }
+              })
+            }
+          }
+
+          // Update or create bank details if provided
+          if (bankDetailsData) {
+            const existingBankDetails = await tx.propertyBankDetails.findUnique(
+              {
+                where: { property_id: propertyId }
+              }
+            )
+
+            // If bank_type is "none", delete existing bank details
+            if (bankDetailsData.bank_type === 'none') {
+              if (existingBankDetails) {
+                await tx.propertyBankDetails.delete({
+                  where: { property_id: propertyId }
+                })
+              }
+              // Skip the rest of bank details processing
+            } else {
+              const bankData: any = {
+                bank_type: bankDetailsData.bank_type as BankType
+              }
+
+              // Add optional fields if provided
+              if (bankDetailsData.bank_sub_type) {
+                bankData.bank_sub_type =
+                  bankDetailsData.bank_sub_type as BankSubType
+              }
+              if (bankDetailsData.hotel_portfolio_name) {
+                bankData.hotel_portfolio_name =
+                  bankDetailsData.hotel_portfolio_name
+              }
+              if (bankDetailsData.beneficiary_name) {
+                bankData.beneficiary_name = bankDetailsData.beneficiary_name
+              }
+              if (bankDetailsData.beneficiary_address) {
+                bankData.beneficiary_address =
+                  bankDetailsData.beneficiary_address
+              }
+              if (bankDetailsData.account_number) {
+                bankData.account_number = bankDetailsData.account_number
+              }
+              if (bankDetailsData.account_name) {
+                bankData.account_name = bankDetailsData.account_name
+              }
+              if (bankDetailsData.bank_name) {
+                bankData.bank_name = bankDetailsData.bank_name
+              }
+              if (bankDetailsData.bank_branch) {
+                bankData.bank_branch = bankDetailsData.bank_branch
+              }
+              if (bankDetailsData.iban_number) {
+                bankData.iban_number = bankDetailsData.iban_number
+              }
+              if (bankDetailsData.swift_bic_number) {
+                bankData.swift_bic_number = bankDetailsData.swift_bic_number
+              }
+              if (bankDetailsData.routing_number) {
+                bankData.routing_number = bankDetailsData.routing_number
+              }
+              if (bankDetailsData.bank_wiring_routing_number) {
+                bankData.bank_wiring_routing_number =
+                  bankDetailsData.bank_wiring_routing_number
+              }
+              if (bankDetailsData.bank_account_type !== undefined) {
+                bankData.bank_account_type =
+                  bankDetailsData.bank_account_type?.trim() ?? ''
+              }
+
+              if (
+                !existingBankDetails &&
+                bankData.bank_account_type === undefined
+              ) {
+                bankData.bank_account_type = ''
+              }
+              if (bankDetailsData.currency) {
+                bankData.currency = bankDetailsData.currency
+              }
+              if (bankDetailsData.stripe_account_email) {
+                bankData.stripe_account_email =
+                  bankDetailsData.stripe_account_email
+              }
+              if (bankDetailsData.contact_name) {
+                bankData.contact_name = bankDetailsData.contact_name
+              }
+              if (bankDetailsData.email_address) {
+                bankData.email_address = bankDetailsData.email_address
+              }
+              if (bankDetailsData.bank_address) {
+                bankData.bank_address = bankDetailsData.bank_address
+              }
+              if (bankDetailsData.comments) {
+                bankData.comments = bankDetailsData.comments
+              }
+              if (userId) {
+                bankData.associated_user_id = userId
+              }
+
+              if (existingBankDetails) {
+                await tx.propertyBankDetails.update({
+                  where: { property_id: propertyId },
+                  data: bankData
+                })
+              } else {
+                await tx.propertyBankDetails.create({
+                  data: {
+                    property_id: propertyId,
+                    ...bankData
+                  }
+                })
               }
             }
           }
-        })
 
-        if (!completeProperty) {
-          throw new Error('Failed to retrieve updated property')
+          // Fetch and return the complete property with all relations
+          const completeProperty = await tx.property.findUnique({
+            where: { id: propertyId },
+            include: {
+              currency: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  symbol: true
+                }
+              },
+              portfolio: {
+                select: {
+                  id: true,
+                  name: true,
+                  is_active: true,
+                  service_type_id: true,
+                  parent_id: true,
+                  serviceType: {
+                    select: {
+                      id: true,
+                      type: true
+                    }
+                  }
+                }
+              },
+              credentials: true,
+              bankDetails: true,
+              audits: {
+                select: {
+                  id: true,
+                  type_of_ota: true,
+                  audit_status_id: true,
+                  expedia_amount_collectable: true,
+                  expedia_amount_confirmed: true,
+                  agoda_amount_collectable: true,
+                  agoda_amount_confirmed: true,
+                  booking_amount_collectable: true,
+                  booking_amount_confirmed: true
+                }
+              }
+            }
+          })
+
+          if (!completeProperty) {
+            throw new Error('Failed to retrieve updated property')
+          }
+
+          return completeProperty
+        },
+        {
+          timeout: 30000 // 30 seconds timeout for complex update operations
         }
-
-        return completeProperty
-      },
-      {
-        timeout: 30000 // 30 seconds timeout for complex update operations
-      }
-    )
-    .then(result => {
-      if (credentialsData) {
-        this.otaPasswordPlaintextCache.invalidate()
-      }
-      return result
-    })
+      )
+      .then(result => {
+        if (credentialsData) {
+          this.otaPasswordPlaintextCache.invalidate()
+        }
+        return result
+      })
   }
 
   async findAll(
@@ -533,9 +532,7 @@ export class PropertyRepository implements IPropertyRepository {
             name: true,
             is_active: true,
             service_type_id: true,
-            contact_email: true,
-            access_email: true,
-            access_phone: true,
+            parent_id: true,
             serviceType: {
               select: {
                 id: true,
@@ -623,7 +620,9 @@ export class PropertyRepository implements IPropertyRepository {
       }))
     )
 
-    const noteCountMap = new Map(noteCounts.map(nc => [nc.propertyId, nc.count]))
+    const noteCountMap = new Map(
+      noteCounts.map(nc => [nc.propertyId, nc.count])
+    )
 
     // Get contract URL counts for each property
     const contractUrlCounts = await Promise.all(
@@ -714,9 +713,7 @@ export class PropertyRepository implements IPropertyRepository {
             name: true,
             is_active: true,
             service_type_id: true,
-            contact_email: true,
-            access_email: true,
-            access_phone: true,
+            parent_id: true,
             serviceType: {
               select: {
                 id: true,
@@ -790,6 +787,12 @@ export class PropertyRepository implements IPropertyRepository {
     })
   }
 
+  async findByParentId(parentId: string) {
+    return this.prisma.property.findFirst({
+      where: { parent_id: parentId }
+    })
+  }
+
   async findByExpediaId(expediaId: string) {
     return this.prisma.property.findFirst({
       where: {
@@ -821,14 +824,9 @@ export class PropertyRepository implements IPropertyRepository {
   }
 
   async update(id: string, data: UpdatePropertyDto) {
-    const updateData: any = { ...data }
-    if (data.next_due_date) {
-      updateData.next_due_date = new Date(data.next_due_date)
-    }
-
     return this.prisma.property.update({
       where: { id },
-      data: updateData,
+      data,
       include: {
         currency: {
           select: {

@@ -2701,17 +2701,6 @@ export class AuditService implements IAuditService {
 
     const recipientEmails: string[] = []
 
-    // Get portfolio details with contact_email
-    const portfolio = await this.prisma.portfolio.findUnique({
-      where: { id: property.portfolio_id },
-      select: { contact_email: true }
-    })
-
-    // Add portfolio contact email if exists
-    if (portfolio?.contact_email) {
-      recipientEmails.push(portfolio.contact_email)
-    }
-
     // Generate audit name from type_of_ota array
     const auditName =
       audit.type_of_ota && audit.type_of_ota.length > 0

@@ -117,9 +117,7 @@ export class AggregationBuilder {
       'portfolioName',
       'currency',
       'auditStatus',
-      'serviceType',
-      'portfolioContactEmail',
-      'nextDueDate'
+      'serviceType'
     )
 
     // Always need credentials for OTA ID/Username/Password
@@ -253,7 +251,12 @@ export class AggregationBuilder {
    */
   private addUnwindStages(): void {
     // Only unwind fields that weren't already unwound in addLookupStages
-    const fieldsToUnwind = ['auditStatus', 'credentials', 'currency', 'serviceType']
+    const fieldsToUnwind = [
+      'auditStatus',
+      'credentials',
+      'currency',
+      'serviceType'
+    ]
 
     for (const field of fieldsToUnwind) {
       if (this.requiredLookups.has(field)) {
@@ -340,15 +343,24 @@ export class AggregationBuilder {
         break
 
       case FilterOperator.CONTAINS:
-        condition[fieldPath] = { $regex: this.escapeRegex(String(value)), $options: 'i' }
+        condition[fieldPath] = {
+          $regex: this.escapeRegex(String(value)),
+          $options: 'i'
+        }
         break
 
       case FilterOperator.STARTS_WITH:
-        condition[fieldPath] = { $regex: `^${this.escapeRegex(String(value))}`, $options: 'i' }
+        condition[fieldPath] = {
+          $regex: `^${this.escapeRegex(String(value))}`,
+          $options: 'i'
+        }
         break
 
       case FilterOperator.ENDS_WITH:
-        condition[fieldPath] = { $regex: `${this.escapeRegex(String(value))}$`, $options: 'i' }
+        condition[fieldPath] = {
+          $regex: `${this.escapeRegex(String(value))}$`,
+          $options: 'i'
+        }
         break
 
       case FilterOperator.GT:
@@ -376,7 +388,12 @@ export class AggregationBuilder {
         break
 
       case FilterOperator.BETWEEN:
-        if (value && typeof value === 'object' && 'from' in value && 'to' in value) {
+        if (
+          value &&
+          typeof value === 'object' &&
+          'from' in value &&
+          'to' in value
+        ) {
           if (col.dataType === ColumnDataType.DATE) {
             condition[fieldPath] = {
               $gte: this.toExtendedJsonDate(value.from),
@@ -431,7 +448,9 @@ export class AggregationBuilder {
 
       case FilterOperator.IN: {
         // Match if any OTA ID field is in the array
-        const values = Array.isArray(filter.value) ? filter.value : [filter.value]
+        const values = Array.isArray(filter.value)
+          ? filter.value
+          : [filter.value]
         return {
           $or: otaIdFields.map(field => ({ [field]: { $in: values } }))
         }
@@ -439,7 +458,10 @@ export class AggregationBuilder {
 
       case FilterOperator.CONTAINS: {
         // Match if any OTA ID field contains the value (case-insensitive)
-        const regex = { $regex: this.escapeRegex(String(filter.value)), $options: 'i' }
+        const regex = {
+          $regex: this.escapeRegex(String(filter.value)),
+          $options: 'i'
+        }
         return {
           $or: otaIdFields.map(field => ({ [field]: regex }))
         }
@@ -469,14 +491,19 @@ export class AggregationBuilder {
       }
 
       case FilterOperator.IN: {
-        const values = Array.isArray(filter.value) ? filter.value : [filter.value]
+        const values = Array.isArray(filter.value)
+          ? filter.value
+          : [filter.value]
         return {
           $or: otaUsernameFields.map(field => ({ [field]: { $in: values } }))
         }
       }
 
       case FilterOperator.CONTAINS: {
-        const regex = { $regex: this.escapeRegex(String(filter.value)), $options: 'i' }
+        const regex = {
+          $regex: this.escapeRegex(String(filter.value)),
+          $options: 'i'
+        }
         return {
           $or: otaUsernameFields.map(field => ({ [field]: regex }))
         }
@@ -507,14 +534,19 @@ export class AggregationBuilder {
       }
 
       case FilterOperator.IN: {
-        const values = Array.isArray(filter.value) ? filter.value : [filter.value]
+        const values = Array.isArray(filter.value)
+          ? filter.value
+          : [filter.value]
         return {
           $or: otaPasswordFields.map(field => ({ [field]: { $in: values } }))
         }
       }
 
       case FilterOperator.CONTAINS: {
-        const regex = { $regex: this.escapeRegex(String(filter.value)), $options: 'i' }
+        const regex = {
+          $regex: this.escapeRegex(String(filter.value)),
+          $options: 'i'
+        }
         return {
           $or: otaPasswordFields.map(field => ({ [field]: regex }))
         }
@@ -540,7 +572,9 @@ export class AggregationBuilder {
 
       case FilterOperator.IN: {
         // Check if array contains any of these values
-        const values = Array.isArray(filter.value) ? filter.value : [filter.value]
+        const values = Array.isArray(filter.value)
+          ? filter.value
+          : [filter.value]
         return { [fieldPath]: { $in: values } }
       }
 
@@ -570,11 +604,18 @@ export class AggregationBuilder {
   /**
    * Convert filter value based on column data type
    */
-  private convertValue(col: ColumnMetadata, value: any, operator: FilterOperator): any {
+  private convertValue(
+    col: ColumnMetadata,
+    value: any,
+    operator: FilterOperator
+  ): any {
     if (value === null || value === undefined) return value
 
     // For IS_NULL and IS_NOT_NULL, value doesn't matter
-    if (operator === FilterOperator.IS_NULL || operator === FilterOperator.IS_NOT_NULL) {
+    if (
+      operator === FilterOperator.IS_NULL ||
+      operator === FilterOperator.IS_NOT_NULL
+    ) {
       return value
     }
 
@@ -681,7 +722,6 @@ export class AggregationBuilder {
 
       // Property
       'property.name': 1,
-      'property.next_due_date': 1,
 
       // Credentials - OTA IDs, usernames, and passwords
       'credentials.expedia_id': 1,
@@ -699,7 +739,6 @@ export class AggregationBuilder {
 
       // Portfolio
       'portfolio.name': 1,
-      'portfolio.contact_email': 1,
 
       // Service Type
       'serviceType.type': 1

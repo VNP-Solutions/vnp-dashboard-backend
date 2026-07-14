@@ -1,14 +1,28 @@
 import { Module } from '@nestjs/common'
+import { ConfigService as NestConfigService } from '@nestjs/config'
+import { JwtModule } from '@nestjs/jwt'
 import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
-import { ContractUrlRepository } from '../contract-url/contract-url.repository'
+import { Configuration } from '../../config/configuration'
+import { ConfigService } from '../../config/config.service'
+import { ExternalJwtGuard } from './guards/external-jwt.guard'
 import { PrismaService } from '../prisma/prisma.service'
 import { ServiceTypeRepository } from '../service-type/service-type.repository'
 import { PortfolioController } from './portfolio.controller'
 import { PortfolioRepository } from './portfolio.repository'
 import { PortfolioService } from './portfolio.service'
+import { ServiceTokenGuard } from '../../common/guards/service-token.guard'
 
 @Module({
+  imports: [
+    JwtModule.registerAsync({
+      inject: [NestConfigService],
+      useFactory: (configService: NestConfigService<Configuration>) => ({
+        secret:
+          configService.get('jwt.communicationSecret', { infer: true }) ?? ''
+      })
+    })
+  ],
   controllers: [PortfolioController],
   providers: [
     {
@@ -23,10 +37,9 @@ import { PortfolioService } from './portfolio.service'
       provide: 'IServiceTypeRepository',
       useClass: ServiceTypeRepository
     },
-    {
-      provide: 'IContractUrlRepository',
-      useClass: ContractUrlRepository
-    },
+    ServiceTokenGuard,
+    ExternalJwtGuard,
+    ConfigService,
     PermissionService,
     PrismaService,
     EmailUtil

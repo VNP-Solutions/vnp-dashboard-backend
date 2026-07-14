@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException
 } from '@nestjs/common'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -27,9 +28,6 @@ import {
   spreadsheetCellValueToPlainString,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
-import { splitEmails } from '../../common/validators/comma-separated-emails.validator'
-import type { IContractUrlRepository } from '../contract-url/contract-url.interface'
-import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IServiceTypeRepository } from '../service-type/service-type.interface'
 import { Prisma } from '@prisma/client'
@@ -40,7 +38,11 @@ import {
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
   PortfolioStatsResponseDto,
-  UpdatePortfolioDto
+  UpdatePortfolioDto,
+  SyncUpsertPortfolioDto,
+  SyncUpdatePortfolioDto,
+  SyncBulkUpsertPortfolioDto,
+  SyncBulkUpsertPortfolioResultDto
 } from './portfolio.dto'
 import type {
   IPortfolioRepository,
@@ -49,13 +51,13 @@ import type {
 
 @Injectable()
 export class PortfolioService implements IPortfolioService {
+  private readonly logger = new Logger(PortfolioService.name)
+
   constructor(
     @Inject('IPortfolioRepository')
     private portfolioRepository: IPortfolioRepository,
     @Inject('IServiceTypeRepository')
     private serviceTypeRepository: IServiceTypeRepository,
-    @Inject('IContractUrlRepository')
-    private contractUrlRepository: IContractUrlRepository,
     @Inject(PermissionService)
     private permissionService: PermissionService,
     @Inject(EmailUtil)
@@ -67,10 +69,9 @@ export class PortfolioService implements IPortfolioService {
   /**
    * External users must not receive commission or sales-agent fields on portfolio reads.
    */
-  private omitCommissionableAndSalesAgentForExternal<T extends Record<string, unknown>>(
-    user: IUserWithPermissions,
-    portfolio: T
-  ): T {
+  private omitCommissionableAndSalesAgentForExternal<
+    T extends Record<string, unknown>
+  >(user: IUserWithPermissions, portfolio: T): T {
     if (!isExternalUser(user)) {
       return portfolio
     }
@@ -81,41 +82,6 @@ export class PortfolioService implements IPortfolioService {
       ...rest
     } = portfolio
     return rest as T
-  }
-
-  /**
-   * Check if user can upload contract documents to a portfolio
-   * User can upload if they are Super Admin OR
-   * Internal user with at least 'update' permission level and 'partial' access level
-   */
-  private canUploadContractDocuments(user: IUserWithPermissions): boolean {
-    // Super Admin can always upload
-    if (isUserSuperAdmin(user)) {
-      return true
-    }
-
-    // Must be internal user
-    if (!isInternalUser(user)) {
-      return false
-    }
-
-    // Check portfolio permissions
-    const portfolioPermission = user.role.portfolio_permission
-    if (!portfolioPermission) {
-      return false
-    }
-
-    // Must have at least 'update' permission level
-    const hasUpdatePermission =
-      portfolioPermission.permission_level === 'all' ||
-      portfolioPermission.permission_level === 'update'
-
-    // Must have at least 'partial' access level
-    const hasAccess =
-      portfolioPermission.access_level === 'all' ||
-      portfolioPermission.access_level === 'partial'
-
-    return hasUpdatePermission && hasAccess
   }
 
   async create(data: CreatePortfolioDto, user: IUserWithPermissions) {
@@ -132,32 +98,12 @@ export class PortfolioService implements IPortfolioService {
       throw new ConflictException('Portfolio with this name already exists')
     }
 
-    // Extract contract_url from data before creating portfolio
-    const { contract_url, ...portfolioData } = data
-
-    // Check if user can upload contract URLs
-    if (contract_url && !this.canUploadContractDocuments(user)) {
-      throw new BadRequestException(
-        'Only Super Admin or internal users with at least update permission and partial access can upload contract URLs.'
-      )
-    }
-
     const isSuperAdmin = isUserSuperAdmin(user)
     const portfolio = await this.portfolioRepository.create(
-      portfolioData,
+      data,
       user.id,
       isSuperAdmin
     )
-
-    // If contract_url is provided and user has permission, create a contract URL entry
-    if (contract_url && this.canUploadContractDocuments(user)) {
-      await this.contractUrlRepository.create({
-        url: contract_url,
-        portfolio_id: portfolio.id,
-        user_id: user.id,
-        is_active: true
-      })
-    }
 
     // If user has partial access, grant them access to the created portfolio
     const permission = user.role.portfolio_permission
@@ -176,15 +122,235 @@ export class PortfolioService implements IPortfolioService {
         ModuleType.PROPERTY
       )
 
-    // Re-fetch the portfolio to include the newly created contract URL
-    const portfolioWithContractUrls = await this.portfolioRepository.findById(
+    // Re-fetch the portfolio to include all relations
+    const portfolioWithDetails = await this.portfolioRepository.findById(
       portfolio.id,
       user.id,
       isSuperAdmin,
       accessiblePropertyIds
     )
 
-    return portfolioWithContractUrls || portfolio
+    return portfolioWithDetails || portfolio
+  }
+
+  async syncUpsert(parentId: string, dto: SyncUpsertPortfolioDto) {
+    this.logger.log(
+      `[sync-upsert] parent_id=${parentId} body=${JSON.stringify(dto)}`
+    )
+    this.logger.log(
+      `[sync-upsert] currency received=${JSON.stringify(dto.currency)} (type=${typeof dto.currency})`
+    )
+
+    const service_type_id =
+      await this.portfolioRepository.resolveServiceTypeIdByType(
+        dto.service_type
+      )
+
+    const currency =
+      (typeof dto.currency === 'string' ? dto.currency.trim() : '') || 'USD'
+
+    const existing = await this.portfolioRepository.findByParentId(parentId)
+
+    if (existing) {
+      if (dto.name !== existing.name) {
+        const clash = await this.portfolioRepository.findByName(dto.name)
+        if (clash && clash.id !== existing.id) {
+          throw new ConflictException('Portfolio with this name already exists')
+        }
+      }
+
+      const updated = await this.prisma.portfolio.update({
+        where: { id: existing.id },
+        data: {
+          name: dto.name,
+          service_type_id,
+          currency,
+          is_active: dto.is_active,
+          is_commissionable: dto.is_commissionable,
+          parent_id: parentId,
+          ...(dto.file_count !== undefined
+            ? { file_count: dto.file_count }
+            : {})
+        },
+        include: {
+          serviceType: {
+            select: {
+              id: true,
+              type: true,
+              is_active: true
+            }
+          }
+        }
+      })
+      this.logger.log(
+        `[sync-upsert] updated portfolio id=${updated.id} currency saved=${updated.currency}`
+      )
+      return updated
+    }
+
+    const nameClash = await this.portfolioRepository.findByName(dto.name)
+    if (nameClash) {
+      throw new ConflictException('Portfolio with this name already exists')
+    }
+
+    const created = await this.portfolioRepository.create({
+      name: dto.name,
+      service_type_id,
+      currency,
+      is_active: dto.is_active,
+      is_commissionable: dto.is_commissionable,
+      parent_id: parentId,
+      ...(dto.file_count !== undefined ? { file_count: dto.file_count } : {})
+    })
+    this.logger.log(
+      `[sync-upsert] created portfolio id=${created.id} currency saved=${created.currency}`
+    )
+    return created
+  }
+
+  async syncBulkUpsert(
+    dto: SyncBulkUpsertPortfolioDto
+  ): Promise<SyncBulkUpsertPortfolioResultDto> {
+    this.logger.log(`[sync-bulk-upsert] body=${JSON.stringify(dto)}`)
+
+    const items = dto.items ?? []
+    if (!items.length) {
+      throw new BadRequestException('No items provided')
+    }
+
+    const result: SyncBulkUpsertPortfolioResultDto = {
+      totalRows: items.length,
+      createdCount: 0,
+      updatedCount: 0,
+      failureCount: 0,
+      errors: [],
+      successfulUpserts: []
+    }
+
+    for (const item of items) {
+      const rowNumber = item.row
+      const parentId =
+        typeof item.parent_id === 'string' ? item.parent_id.trim() : ''
+
+      if (!Number.isInteger(rowNumber) || rowNumber < 1) {
+        result.errors.push({
+          row: Number.isInteger(rowNumber) ? rowNumber : 0,
+          parent_id: parentId || 'Unknown',
+          error: 'Row is required and must be a positive integer'
+        })
+        result.failureCount++
+        continue
+      }
+
+      if (!parentId) {
+        result.errors.push({
+          row: rowNumber,
+          parent_id: 'Unknown',
+          error: 'Parent ID is required'
+        })
+        result.failureCount++
+        continue
+      }
+
+      try {
+        const name = typeof item.name === 'string' ? item.name.trim() : ''
+        if (!name) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'Portfolio name is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const service_type =
+          typeof item.service_type === 'string' ? item.service_type.trim() : ''
+        if (!service_type) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'Service type is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const currency =
+          (typeof item.currency === 'string' ? item.currency.trim() : '') ||
+          'USD'
+
+        if (typeof item.is_active !== 'boolean') {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'is_active is required and must be a boolean'
+          })
+          result.failureCount++
+          continue
+        }
+
+        if (typeof item.is_commissionable !== 'boolean') {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'is_commissionable is required and must be a boolean'
+          })
+          result.failureCount++
+          continue
+        }
+
+        if (
+          item.file_count !== undefined &&
+          item.file_count !== null &&
+          (!Number.isInteger(item.file_count) || item.file_count < 0)
+        ) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'file_count must be a non-negative integer when provided'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const existing = await this.portfolioRepository.findByParentId(parentId)
+
+        await this.syncUpsert(parentId, {
+          name,
+          service_type,
+          currency,
+          is_active: item.is_active,
+          is_commissionable: item.is_commissionable,
+          ...(item.file_count !== undefined && item.file_count !== null
+            ? { file_count: item.file_count }
+            : {})
+        })
+
+        const action = existing ? 'updated' : 'created'
+        if (existing) {
+          result.updatedCount++
+        } else {
+          result.createdCount++
+        }
+
+        result.successfulUpserts.push({ parent_id: parentId, action })
+      } catch (error) {
+        result.errors.push({
+          row: rowNumber,
+          parent_id: parentId,
+          error:
+            error instanceof Error ? error.message : 'Unknown error occurred'
+        })
+        result.failureCount++
+      }
+    }
+
+    this.logger.log(
+      `[sync-bulk-upsert] result created=${result.createdCount} updated=${result.updatedCount} failed=${result.failureCount}`
+    )
+
+    return result
   }
 
   async findAll(query: PortfolioQueryDto, user: IUserWithPermissions) {
@@ -789,6 +955,48 @@ export class PortfolioService implements IPortfolioService {
     return this.portfolioRepository.update(id, data, user.id, isSuperAdmin)
   }
 
+  async syncUpdate(
+    dto: SyncUpdatePortfolioDto
+  ): Promise<{ status: string; id?: string }> {
+    let existing = await this.prisma.portfolio.findUnique({
+      where: { id: dto._id }
+    })
+
+    if (!existing && dto.oldName) {
+      existing = await this.portfolioRepository.findByName(dto.oldName)
+    }
+
+    if (!existing) {
+      return { status: 'not_found' }
+    }
+
+    if (dto.name && dto.name !== existing.name) {
+      const clash = await this.portfolioRepository.findByName(dto.name)
+      if (clash && clash.id !== existing.id)
+        return { status: 'conflict', id: clash.id }
+    }
+
+    const data: any = {}
+    if (dto.name) data.name = dto.name
+    if (dto.is_active !== undefined) data.is_active = dto.is_active
+    if (dto.is_commissionable !== undefined)
+      data.is_commissionable = dto.is_commissionable
+    if (dto.contact_email !== undefined) data.contact_email = dto.contact_email
+    if (dto.service_type) {
+      data.service_type_id =
+        await this.portfolioRepository.resolveServiceTypeIdByType(
+          dto.service_type
+        )
+    }
+
+    if (!Object.keys(data).length) {
+      return { status: 'no_op', id: existing.id }
+    }
+
+    const updated = await this.portfolioRepository.update(existing.id, data)
+    return { status: 'updated', id: updated.id }
+  }
+
   async remove(id: string, password: string, user: IUserWithPermissions) {
     const isSuperAdmin = isUserSuperAdmin(user)
 
@@ -838,6 +1046,52 @@ export class PortfolioService implements IPortfolioService {
     await this.portfolioRepository.delete(id)
 
     return { message: 'Portfolio deleted successfully' }
+  }
+
+  async syncDelete(parentId: string): Promise<{ message: string }> {
+    const existing = await this.portfolioRepository.findByParentId(parentId)
+
+    if (!existing) {
+      throw new NotFoundException(
+        `Portfolio not found with parent_id: ${parentId}`
+      )
+    }
+
+    if (existing.name.trim().toLowerCase() === 'internal portfolio') {
+      throw new BadRequestException('Cannot delete Internal Portfolio')
+    }
+
+    const internal = await this.portfolioRepository.ensureInternalPortfolio()
+    await this.portfolioRepository.reassignPropertiesToPortfolio(
+      existing.id,
+      internal.id
+    )
+    await this.portfolioRepository.delete(existing.id)
+    return { message: 'Portfolio deleted successfully' }
+  }
+
+  async updateFileCount(
+    parentId: string,
+    type: 'increment' | 'decrement',
+    count: number
+  ): Promise<{ status: string; id: string; file_count: number }> {
+    const portfolio = await this.prisma.portfolio.findFirst({
+      where: { parent_id: parentId }
+    })
+
+    if (!portfolio) {
+      return { status: 'not_found', id: parentId, file_count: 0 }
+    }
+
+    const delta = type === 'increment' ? count : -count
+    const newCount = Math.max(0, portfolio.file_count + delta)
+
+    const updated = await this.prisma.portfolio.update({
+      where: { id: portfolio.id },
+      data: { file_count: newCount }
+    })
+
+    return { status: 'updated', id: updated.id, file_count: updated.file_count }
   }
 
   async bulkDelete(
@@ -1209,97 +1463,6 @@ export class PortfolioService implements IPortfolioService {
     }
   }
 
-  async sendEmail(
-    id: string,
-    subject: string,
-    body: string,
-    user: IUserWithPermissions,
-    uploadedAttachments?: EmailAttachment[],
-    attachmentUrls?: AttachmentUrlDto[]
-  ) {
-    const isSuperAdmin = isUserSuperAdmin(user)
-
-    // CRITICAL: Explicit permission check to ensure user has access to this portfolio
-    // This prevents partial access users from sending emails to portfolios they cannot access
-    if (!isSuperAdmin) {
-      await this.permissionService.requirePermission(
-        user,
-        ModuleType.PORTFOLIO,
-        PermissionAction.READ,
-        id
-      )
-    }
-
-    const portfolio = await this.portfolioRepository.findById(
-      id,
-      user.id,
-      isSuperAdmin
-    )
-
-    if (!portfolio) {
-      throw new NotFoundException('Portfolio not found')
-    }
-
-    if (!portfolio.contact_email) {
-      throw new BadRequestException(
-        'Portfolio does not have a contact email configured'
-      )
-    }
-
-    // Split comma-separated emails
-    const emailAddresses = splitEmails(portfolio.contact_email)
-
-    if (emailAddresses.length === 0) {
-      throw new BadRequestException(
-        'Portfolio does not have valid contact email addresses configured'
-      )
-    }
-
-    // Log email details for debugging
-    console.log('📧 Sending email to portfolio contact(s):', {
-      requestedPortfolioId: id,
-      portfolioId: portfolio.id,
-      portfolioName: portfolio.name,
-      contact_email: portfolio.contact_email,
-      email_addresses: emailAddresses,
-      recipient_count: emailAddresses.length,
-      access_email: portfolio.access_email,
-      subject,
-      hasAttachments:
-        (uploadedAttachments?.length || 0) + (attachmentUrls?.length || 0) > 0
-    })
-
-    // Combine attachments from file uploads and URLs
-    let allAttachments: EmailAttachment[] = []
-
-    // Add uploaded file attachments if provided
-    if (uploadedAttachments && uploadedAttachments.length > 0) {
-      allAttachments = [...uploadedAttachments]
-    }
-
-    // Fetch and add URL-based attachments if provided
-    if (attachmentUrls && attachmentUrls.length > 0) {
-      const urlAttachments =
-        await this.emailUtil.fetchAttachmentsFromUrls(attachmentUrls)
-      allAttachments = [...allAttachments, ...urlAttachments]
-    }
-
-    // Send email to each recipient
-    for (const emailAddress of emailAddresses) {
-      await this.emailUtil.sendEmail(
-        emailAddress,
-        subject,
-        body,
-        allAttachments.length > 0 ? allAttachments : undefined
-      )
-    }
-
-    return {
-      message: `Email sent successfully to ${emailAddresses.length} recipient(s)`,
-      recipients: emailAddresses
-    }
-  }
-
   async bulkImport(
     file: Express.Multer.File,
     _user: IUserWithPermissions
@@ -1475,37 +1638,12 @@ export class PortfolioService implements IPortfolioService {
               'currency_code'
             ]) || 'USD'
 
-          // Extract contact email (OPTIONAL)
-          const contactEmail = findHeaderValue(row, [
-            'Contact Email',
-            'Contact email',
-            'Contact'
-          ])
-
-          // Extract access email (OPTIONAL)
-          const accessEmail = findHeaderValue(row, [
-            'Access Email',
-            'Access email'
-          ])
-
-          // Extract access phone (OPTIONAL)
-          const accessPhone = findHeaderValue(row, [
-            'Access Phone',
-            'Access phone',
-            'Access Phone NO',
-            'Access Phone No',
-            'Access Phone no',
-            'Access phone no',
-            'Access Contact',
-            'Access contact'
-          ])
-
-          // Extract contract URL/Documents (OPTIONAL)
-          const contractUrl = findHeaderValue(row, [
-            'Documents',
-            'Contract URL',
-            'Contract Url',
-            'Contract url'
+          // Extract parent ID (OPTIONAL)
+          const parentId = findHeaderValue(row, [
+            'Parent ID',
+            'Parent Id',
+            'Parent id',
+            'parent_id'
           ])
 
           // Extract commissionable (OPTIONAL) - map "Yes"/"No" to true/false
@@ -1536,15 +1674,13 @@ export class PortfolioService implements IPortfolioService {
           }
 
           // Create portfolio
-          const portfolioData: Omit<CreatePortfolioDto, 'contract_url'> = {
+          const portfolioData: CreatePortfolioDto = {
             name: portfolioName,
             service_type_id: serviceType.id,
             currency: currency,
             is_active: isActive,
-            contact_email: contactEmail || undefined,
             is_commissionable: isCommissionable,
-            access_email: accessEmail || undefined,
-            access_phone: accessPhone || undefined
+            parent_id: parentId || undefined
           }
 
           const newPortfolio = await this.portfolioRepository.create(
@@ -1560,23 +1696,6 @@ export class PortfolioService implements IPortfolioService {
               ModuleType.PORTFOLIO,
               newPortfolio.id
             )
-          }
-
-          // If contract URL is provided and user has permission, create contract URL entries for the user
-          // Handle comma-separated values
-          if (contractUrl && this.canUploadContractDocuments(_user)) {
-            const urls = contractUrl
-              .split(',')
-              .map(url => url.trim())
-              .filter(url => url)
-            for (const url of urls) {
-              await this.contractUrlRepository.create({
-                url,
-                portfolio_id: newPortfolio.id,
-                user_id: _user.id,
-                is_active: true
-              })
-            }
           }
 
           result.successCount++
@@ -1749,6 +1868,8 @@ export class PortfolioService implements IPortfolioService {
             continue
           }
 
+          const existingPortfolioName = existingPortfolio.name
+
           // Check if user has permission to update this portfolio
           try {
             await this.permissionService.requirePermission(
@@ -1761,6 +1882,7 @@ export class PortfolioService implements IPortfolioService {
             result.errors.push({
               row: rowNumber,
               portfolioId: portfolioIdValue,
+              portfolioName: existingPortfolioName,
               error:
                 error.message ||
                 'You do not have permission to update this portfolio'
@@ -1788,6 +1910,7 @@ export class PortfolioService implements IPortfolioService {
                 result.errors.push({
                   row: rowNumber,
                   portfolioId: portfolioIdValue,
+                  portfolioName: existingPortfolioName,
                   error: 'Portfolio with this name already exists'
                 })
                 result.failureCount++
@@ -1834,6 +1957,7 @@ export class PortfolioService implements IPortfolioService {
               result.errors.push({
                 row: rowNumber,
                 portfolioId: portfolioIdValue,
+                portfolioName: existingPortfolioName,
                 error: `Invalid Active status value: "${activeStatusRaw}". Expected "Active" or "Inactive"`
               })
               result.failureCount++
@@ -1852,47 +1976,16 @@ export class PortfolioService implements IPortfolioService {
             updateData.currency = currency
           }
 
-          // Extract contact email (if provided)
-          const contactEmail = findHeaderValue(row, [
-            'Contact Email',
-            'Contact email',
-            'Contact'
+          // Extract parent ID (if provided)
+          const parentId = findHeaderValue(row, [
+            'Parent ID',
+            'Parent Id',
+            'Parent id',
+            'parent_id'
           ])
-          if (contactEmail !== undefined) {
-            updateData.contact_email = contactEmail || undefined
+          if (parentId !== undefined) {
+            updateData.parent_id = parentId || undefined
           }
-
-          // Extract access email (if provided)
-          const accessEmail = findHeaderValue(row, [
-            'Access Email',
-            'Access email'
-          ])
-          if (accessEmail !== undefined) {
-            updateData.access_email = accessEmail || undefined
-          }
-
-          // Extract access phone (if provided)
-          const accessPhone = findHeaderValue(row, [
-            'Access Phone',
-            'Access phone',
-            'Access Phone NO',
-            'Access Phone No',
-            'Access Phone no',
-            'Access phone no',
-            'Access Contact',
-            'Access contact'
-          ])
-          if (accessPhone !== undefined) {
-            updateData.access_phone = accessPhone || undefined
-          }
-
-          // Extract contract URL/Documents (if provided)
-          const contractUrl = findHeaderValue(row, [
-            'Documents',
-            'Contract URL',
-            'Contract Url',
-            'Contract url'
-          ])
 
           // Extract commissionable (if provided) - map "Yes"/"No" to true/false
           const commissionableRaw = findHeaderValue(row, [
@@ -1912,6 +2005,7 @@ export class PortfolioService implements IPortfolioService {
               result.errors.push({
                 row: rowNumber,
                 portfolioId: portfolioIdValue,
+                portfolioName: existingPortfolioName,
                 error: `Invalid Commissionable value: "${commissionableRaw}". Expected "Yes" or "No"`
               })
               result.failureCount++
@@ -1919,11 +2013,46 @@ export class PortfolioService implements IPortfolioService {
             }
           }
 
+          // Extract sales agent name (if provided)
+          const salesAgentName = findHeaderValue(row, [
+            'Sales Agent',
+            'Sales agent',
+            'sales agent',
+            'SalesAgent',
+            'salesAgent',
+            'sales_agent'
+          ])
+          if (salesAgentName) {
+            const matchedAgent = await this.prisma.salesAgent.findFirst({
+              where: {
+                full_name: {
+                  equals: salesAgentName.trim(),
+                  mode: 'insensitive'
+                }
+              },
+              select: { id: true, full_name: true }
+            })
+
+            if (!matchedAgent) {
+              result.errors.push({
+                row: rowNumber,
+                portfolioId: portfolioIdValue,
+                portfolioName: existingPortfolioName,
+                error: `Sales agent not found: "${salesAgentName}"`
+              })
+              result.failureCount++
+              continue
+            }
+
+            updateData.sales_agent_id = matchedAgent.id
+          }
+
           // Only update if there's something to update
           if (Object.keys(updateData).length === 0) {
             result.errors.push({
               row: rowNumber,
               portfolioId: portfolioIdValue,
+              portfolioName: existingPortfolioName,
               error: 'No fields to update (all fields are empty)'
             })
             result.failureCount++
@@ -1937,22 +2066,6 @@ export class PortfolioService implements IPortfolioService {
             user.id,
             isSuperAdmin
           )
-
-          // If contract URL is provided and user has permission, create contract URL entries
-          if (contractUrl && this.canUploadContractDocuments(user)) {
-            const urls = contractUrl
-              .split(',')
-              .map(url => url.trim())
-              .filter(url => url)
-            for (const url of urls) {
-              await this.contractUrlRepository.create({
-                url,
-                portfolio_id: portfolioIdValue,
-                user_id: user.id,
-                is_active: true
-              })
-            }
-          }
 
           result.successCount++
           result.successfulUpdates.push(portfolioIdValue)
@@ -2167,10 +2280,7 @@ export class PortfolioService implements IPortfolioService {
     // Recent audits in the same window as the amounts (and ordered by business date)
     const recentAudits = await this.prisma.audit.findMany({
       where: auditInDurationWhere,
-      orderBy: [
-        { review_collection_date: 'desc' },
-        { created_at: 'desc' }
-      ],
+      orderBy: [{ review_collection_date: 'desc' }, { created_at: 'desc' }],
       take: 10,
       include: {
         property: {

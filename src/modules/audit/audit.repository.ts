@@ -143,7 +143,7 @@ export class AuditRepository implements IAuditRepository {
               select: {
                 id: true,
                 name: true,
-                contact_email: true
+                parent_id: true
               }
             }
           }
@@ -335,9 +335,7 @@ export class AuditRepository implements IAuditRepository {
     const updateData: any = { ...data }
 
     if (data.review_collection_date) {
-      updateData.review_collection_date = new Date(
-        data.review_collection_date
-      )
+      updateData.review_collection_date = new Date(data.review_collection_date)
     }
 
     return this.prisma.audit.update({
@@ -449,9 +447,7 @@ export class AuditRepository implements IAuditRepository {
     const updateData: any = { ...data }
 
     if (data.review_collection_date) {
-      updateData.review_collection_date = new Date(
-        data.review_collection_date
-      )
+      updateData.review_collection_date = new Date(data.review_collection_date)
     }
 
     const result = await this.prisma.audit.updateMany({

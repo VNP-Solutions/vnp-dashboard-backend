@@ -8,12 +8,12 @@ import { Transform, Type } from 'class-transformer'
 import {
   IsArray,
   IsBoolean,
-  IsDateString,
   IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   Length,
+  ArrayMinSize,
   ValidateNested
 } from 'class-validator'
 import { RejectNumericBankIdentifier } from '../../common/decorators/bank-identifier.decorator'
@@ -24,7 +24,7 @@ import {
   OtaCredentialsDto,
   PatchExpediaCredentialsDto
 } from '../property-credentials/property-credentials.dto'
-
+import { IsObject } from 'class-validator'
 export type AccessType = 'owned' | 'shared'
 
 export class CreatePropertyDto {
@@ -68,14 +68,6 @@ export class CreatePropertyDto {
   @IsOptional()
   is_active: boolean
 
-  @ApiPropertyOptional({
-    example: '2025-12-31T23:59:59.000Z',
-    description: 'Next due date for payment or audit (optional)'
-  })
-  @IsDateString()
-  @IsOptional()
-  next_due_date?: string
-
   @ApiProperty({
     example: '507f1f77bcf86cd799439012',
     description: 'Portfolio ID'
@@ -83,6 +75,14 @@ export class CreatePropertyDto {
   @IsString()
   @IsNotEmpty()
   portfolio_id: string
+
+  @ApiPropertyOptional({
+    example: 'external-property-123',
+    description: 'Optional external parent property identifier'
+  })
+  @IsString()
+  @IsOptional()
+  parent_id?: string
 
   @ApiPropertyOptional({
     example: ['507f1f77bcf86cd799439014', '507f1f77bcf86cd799439015'],
@@ -316,6 +316,175 @@ export class BulkImportResultDto {
   successfulImports: string[]
 }
 
+export class SyncBulkUpsertPropertyResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  totalRows: number
+
+  @ApiProperty({ example: 4, description: 'Number of properties created' })
+  createdCount: number
+
+  @ApiProperty({ example: 4, description: 'Number of properties updated' })
+  updatedCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of rows that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      {
+        row: 3,
+        parent_id: 'property-parent-123',
+        error: 'Expedia ID is required'
+      }
+    ],
+    description: 'List of errors encountered during sync bulk upsert'
+  })
+  errors: Array<{
+    row: number
+    parent_id: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: [
+      { parent_id: 'property-parent-123', action: 'created' },
+      { parent_id: 'property-parent-456', action: 'updated' }
+    ],
+    description: 'List of successfully upserted properties'
+  })
+  successfulUpserts: Array<{
+    parent_id: string
+    action: 'created' | 'updated'
+  }>
+}
+
+export class SyncBulkDeletePropertyItemDto {
+  @ApiProperty({
+    example: 'property-parent-123',
+    description: 'External property identifier (DBMS property id)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  parent_id: string
+}
+
+export class SyncBulkDeletePropertyDto {
+  @ApiProperty({
+    type: [SyncBulkDeletePropertyItemDto],
+    description: 'Properties to delete by Parent ID'
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => SyncBulkDeletePropertyItemDto)
+  items: SyncBulkDeletePropertyItemDto[]
+}
+
+export class SyncBulkDeletePropertyResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of items processed' })
+  totalCount: number
+
+  @ApiProperty({ example: 8, description: 'Number of properties deleted' })
+  deletedCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of items that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      {
+        parent_id: 'property-parent-123',
+        error: 'Property not found with parent_id: property-parent-123'
+      }
+    ],
+    description: 'List of errors encountered during sync bulk delete'
+  })
+  errors: Array<{
+    parent_id: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: [{ parent_id: 'property-parent-123' }],
+    description: 'List of successfully deleted properties'
+  })
+  successfulDeletes: Array<{
+    parent_id: string
+  }>
+}
+
+export class SyncBulkUpsertPropertyItemDto {
+  @ApiProperty({
+    example: 2,
+    description:
+      'Source row number used in the sync report (e.g. spreadsheet row)'
+  })
+  row: number
+
+  @ApiProperty({
+    example: 'property-parent-123',
+    description: 'External property identifier (upsert key)'
+  })
+  parent_id: string
+
+  @ApiProperty({ example: 'Grand Hotel', description: 'Property name' })
+  name: string
+
+  @ApiProperty({
+    example: '123 Main Street, New York, NY 10001',
+    description: 'Property address'
+  })
+  address: string
+
+  @ApiProperty({ example: 'USD', description: 'Currency code' })
+  currency: string
+
+  @ApiPropertyOptional({
+    example: 'GRAND HOTEL NY',
+    description: 'Card descriptor for payment processing'
+  })
+  card_descriptor?: string
+
+  @ApiProperty({
+    example: 'portfolio-parent-123',
+    description: 'External portfolio parent ID used to resolve portfolio_id'
+  })
+  portfolio_parent_id: string
+
+  @ApiProperty({ example: true, description: 'Whether property is active' })
+  is_active: boolean
+
+  @ApiProperty({
+    example: 'EXP123456',
+    description: 'Expedia property ID (required)'
+  })
+  expedia_id: string
+
+  @ApiPropertyOptional({ example: 'hotel@expedia.com' })
+  expedia_username?: string
+
+  @ApiPropertyOptional()
+  expedia_password?: string
+
+  @ApiPropertyOptional({ example: 'AGD123456' })
+  agoda_id?: string
+
+  @ApiPropertyOptional({ example: 'hotel@agoda.com' })
+  agoda_username?: string
+
+  @ApiPropertyOptional()
+  agoda_password?: string
+
+  @ApiPropertyOptional({ example: 'BKG123456' })
+  booking_id?: string
+
+  @ApiPropertyOptional({ example: 'hotel@booking.com' })
+  booking_username?: string
+
+  @ApiPropertyOptional()
+  booking_password?: string
+}
+
 export class BulkUpdateResultDto {
   @ApiProperty({ example: 10, description: 'Total number of rows processed' })
   totalRows: number
@@ -374,7 +543,6 @@ export class PropertyStatsResponseDto {
     address: string
     card_descriptor: string | null
     is_active: boolean
-    next_due_date: Date | null
     portfolio_id: string
     currency_id: string
     currency: {
@@ -847,4 +1015,172 @@ export class CompleteUpdatePropertyDto {
   @Type(() => CompleteBankDetailsDto)
   @IsOptional()
   bank_details?: CompleteBankDetailsDto
+}
+
+export class SyncUpsertPropertyCurrencyDto {
+  @ApiProperty({ example: 'USD', description: 'Currency code (ISO 4217)' })
+  @IsString()
+  @IsNotEmpty()
+  code: string
+
+  @ApiProperty({
+    example: 'United States Dollar',
+    description: 'Currency name'
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string
+
+  @ApiPropertyOptional({ example: '$', description: 'Currency symbol' })
+  @IsString()
+  @IsOptional()
+  symbol?: string
+}
+
+export class SyncUpsertPropertyCredentialsDto {
+  @ApiProperty({
+    example: 'EXP123456',
+    description: 'Expedia property ID (required for property creation)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  expedia_id: string
+
+  @ApiPropertyOptional({ example: 'hotel@expedia.com' })
+  @IsOptional()
+  @IsString()
+  expedia_username?: string | null
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  expedia_password?: string | null
+
+  @ApiPropertyOptional({ example: 'AGD123456' })
+  @IsOptional()
+  @IsString()
+  agoda_id?: string | null
+
+  @ApiPropertyOptional({ example: 'hotel@agoda.com' })
+  @IsOptional()
+  @IsString()
+  agoda_username?: string | null
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  agoda_password?: string | null
+
+  @ApiPropertyOptional({ example: 'BKG123456' })
+  @IsOptional()
+  @IsString()
+  booking_id?: string | null
+
+  @ApiPropertyOptional({ example: 'hotel@booking.com' })
+  @IsOptional()
+  @IsString()
+  booking_username?: string | null
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  booking_password?: string | null
+}
+
+export class SyncUpsertPropertyDto {
+  @ApiProperty({ example: 'Grand Hotel', description: 'Property name' })
+  @IsString()
+  @IsNotEmpty()
+  name: string
+
+  @ApiProperty({
+    example: '123 Main Street, New York, NY 10001',
+    description: 'Property address'
+  })
+  @IsString()
+  @IsNotEmpty()
+  address: string
+
+  @ApiProperty({
+    type: SyncUpsertPropertyCurrencyDto,
+    description: 'Currency details (matched by code, created if missing)'
+  })
+  @ValidateNested()
+  @Type(() => SyncUpsertPropertyCurrencyDto)
+  currency: SyncUpsertPropertyCurrencyDto
+
+  @ApiPropertyOptional({
+    example: 'GRAND HOTEL NY',
+    description: 'Card descriptor for payment processing'
+  })
+  @IsString()
+  @IsOptional()
+  card_descriptor?: string
+
+  @ApiProperty({
+    example: 'portfolio-parent-123',
+    description: 'External portfolio parent ID used to resolve portfolio_id'
+  })
+  @IsString()
+  @IsNotEmpty()
+  portfolio_parent_id: string
+
+  @ApiProperty({ example: true, description: 'Whether property is active' })
+  @IsBoolean()
+  @IsNotEmpty()
+  is_active: boolean
+
+  @ApiProperty({
+    type: SyncUpsertPropertyCredentialsDto,
+    description: 'OTA credentials for the property'
+  })
+  @ValidateNested()
+  @Type(() => SyncUpsertPropertyCredentialsDto)
+  credentials: SyncUpsertPropertyCredentialsDto
+}
+
+export class SyncCreatePropertyDto {
+  @ApiProperty()
+  @IsString()
+  name: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  portfolio_name?: string | null
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sub_portfolio_name?: string | null
+
+  @ApiPropertyOptional() @IsOptional() expedia_id?: number | string | null
+  @ApiPropertyOptional() @IsOptional() booking_id?: number | string | null
+  @ApiPropertyOptional() @IsOptional() agoda_id?: number | string | null
+
+  @ApiPropertyOptional() @IsOptional() @IsString() expedia_status?:
+    | string
+    | null
+  @ApiPropertyOptional() @IsOptional() @IsString() booking_status?:
+    | string
+    | null
+  @ApiPropertyOptional() @IsOptional() @IsString() agoda_status?: string | null
+}
+
+export class SyncByOtaPropertyDto {
+  @ApiPropertyOptional() @IsOptional() expedia_id?: number | string | null
+  @ApiPropertyOptional() @IsOptional() booking_id?: number | string | null
+  @ApiPropertyOptional() @IsOptional() agoda_id?: number | string | null
+
+  @ApiProperty({ type: Object })
+  @IsObject()
+  data: Record<string, any>
+}
+
+export class SyncBulkCreatePropertyDto {
+  @ApiProperty({ type: [SyncCreatePropertyDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SyncCreatePropertyDto)
+  items: SyncCreatePropertyDto[]
 }

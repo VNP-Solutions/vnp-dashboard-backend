@@ -160,43 +160,7 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
     portfolioId: string,
     reportUrls: string[]
   ): Promise<MultiRecipientEmailResult | undefined> {
-    try {
-      const portfolio = await this.prisma.portfolio.findUnique({
-        where: { id: portfolioId },
-        select: { name: true, contact_email: true }
-      })
-
-      if (!portfolio?.contact_email) return undefined
-
-      const recipientEmails = portfolio.contact_email
-        .split(',')
-        .map(e => e.trim())
-        .filter(e => e.length > 0)
-
-      if (recipientEmails.length === 0) return undefined
-
-      return this.emailUtil.sendConsolidatedReportUploadedEmail(
-        recipientEmails,
-        portfolio.name,
-        reportUrls,
-        new Date()
-      )
-    } catch (error) {
-      const msg =
-        error instanceof HttpException
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : String(error)
-      this.logger.error(
-        'Failed to send consolidated report notification email',
-        error instanceof Error ? error.stack : error
-      )
-      return {
-        sent: [],
-        failed: [{ email: '(notification)', message: msg }]
-      }
-    }
+    return undefined
   }
 
   async findAll(query: ConsolidatedReportQueryDto, user: IUserWithPermissions) {
