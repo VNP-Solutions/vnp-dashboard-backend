@@ -146,6 +146,9 @@ export class PortfolioService implements IPortfolioService {
         dto.service_type
       )
 
+    const currency =
+      (typeof dto.currency === 'string' ? dto.currency.trim() : '') || 'USD'
+
     const existing = await this.portfolioRepository.findByParentId(parentId)
 
     if (existing) {
@@ -161,7 +164,7 @@ export class PortfolioService implements IPortfolioService {
         data: {
           name: dto.name,
           service_type_id,
-          currency: dto.currency,
+          currency,
           is_active: dto.is_active,
           is_commissionable: dto.is_commissionable,
           parent_id: parentId,
@@ -193,7 +196,7 @@ export class PortfolioService implements IPortfolioService {
     const created = await this.portfolioRepository.create({
       name: dto.name,
       service_type_id,
-      currency: dto.currency,
+      currency,
       is_active: dto.is_active,
       is_commissionable: dto.is_commissionable,
       parent_id: parentId,
@@ -274,16 +277,8 @@ export class PortfolioService implements IPortfolioService {
         }
 
         const currency =
-          typeof item.currency === 'string' ? item.currency.trim() : ''
-        if (!currency) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Currency is required'
-          })
-          result.failureCount++
-          continue
-        }
+          (typeof item.currency === 'string' ? item.currency.trim() : '') ||
+          'USD'
 
         if (typeof item.is_active !== 'boolean') {
           result.errors.push({
@@ -350,6 +345,10 @@ export class PortfolioService implements IPortfolioService {
         result.failureCount++
       }
     }
+
+    this.logger.log(
+      `[sync-bulk-upsert] result created=${result.createdCount} updated=${result.updatedCount} failed=${result.failureCount}`
+    )
 
     return result
   }

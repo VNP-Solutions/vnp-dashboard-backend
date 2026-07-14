@@ -601,7 +601,7 @@ export class PortfolioController {
     - parent_id: External portfolio identifier (upsert key)
     - name: Portfolio name
     - service_type: Service type name (created if missing)
-    - currency: Currency code
+    - currency: Currency code (optional; defaults to USD when omitted or empty)
     - is_active: Whether the portfolio is active
     - is_commissionable: Whether the portfolio is commissionable
 

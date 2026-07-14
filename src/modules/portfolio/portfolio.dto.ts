@@ -510,8 +510,11 @@ export class SyncBulkUpsertPortfolioItemDto {
   })
   service_type: string
 
-  @ApiProperty({ example: 'USD', description: 'Currency code' })
-  currency: string
+  @ApiPropertyOptional({
+    example: 'USD',
+    description: 'Currency code (defaults to USD when omitted or empty)'
+  })
+  currency?: string
 
   @ApiProperty({ example: true, description: 'Whether portfolio is active' })
   is_active: boolean
