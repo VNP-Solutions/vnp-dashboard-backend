@@ -3,6 +3,8 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
+  BadRequestException,
+  Param,
   Post,
   UploadedFile,
   UseGuards,
@@ -14,6 +16,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags
 } from '@nestjs/swagger'
@@ -24,6 +27,7 @@ import {
   GenerateTokenResponseDto
 } from './external-communication.dto'
 import { ExternalCommunicationService } from './external-communication.service'
+import { isBulkAuditImportType } from './external-communication.constants'
 import { ExternalJwtGuard } from './guards/external-jwt.guard'
 import { ExternalRawSecretGuard } from './guards/external-raw-secret.guard'
 
@@ -113,19 +117,26 @@ export class ExternalCommunicationController {
   }
 
   /**
-   * @route POST /api/external/bulk-audit-import
+   * @route POST /api/external/bulk-audit-import/:type
    * @auth Bearer <signed-JWT>  (JWT signed with JWT_COMMUNICATION_SECRET, obtained from /generate-token)
    */
-  @Post('bulk-audit-import')
+  @Post('bulk-audit-import/:type')
   @UseGuards(ExternalJwtGuard)
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
+  @ApiParam({
+    name: 'type',
+    enum: ['ota', 'ota-post'],
+    description:
+      'Import source type. `ota` callbacks to `/qa-panel/import-callback`; `ota-post` callbacks to `/qa-panel/ota-post/import-callback`.'
+  })
   @ApiOperation({
     summary: 'Auto-import audits from an OTA reservation sheet (async via SQS)',
     description:
       'Upload an Excel (.xlsx, .xls) or CSV spreadsheet containing OTA reservation rows. ' +
       'Processing follows the same rules as `POST /audit/auto-import`, except audit status is always set to **Reported to Property**.\n\n' +
+      '**Path parameter `type`:** `ota` or `ota-post`. Determines which external callback URL is used when the job completes.\n\n' +
       '**Authentication:** Pass a signed JWT as the Bearer token. ' +
       'The JWT must be signed with `JWT_COMMUNICATION_SECRET` and must not be expired. ' +
       'Obtain the token first from `POST /external/generate-token`.\n\n' +
@@ -181,7 +192,8 @@ export class ExternalCommunicationController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request — no file provided or unsupported file format'
+    description:
+      'Bad Request — invalid type, no file provided, or unsupported file format'
   })
   @ApiResponse({
     status: 401,
@@ -193,13 +205,21 @@ export class ExternalCommunicationController {
       'Internal Server Error — SQS queue URL (AUDIT_IMPORT_QUEUE_URL) is not configured'
   })
   async bulkAuditImport(
+    @Param('type') type: string,
     @UploadedFile() file: Express.Multer.File,
     @Body() body: BulkAuditImportBodyDto
   ): Promise<BulkAuditImportAcceptedDto> {
+    if (!isBulkAuditImportType(type)) {
+      throw new BadRequestException(
+        `Invalid import type "${type}". Must be one of: ota, ota-post`
+      )
+    }
+
     return this.externalCommunicationService.enqueueBulkAuditImport(
       file,
       body.qa_panel_id,
-      body.email
+      body.email,
+      type
     )
   }
 }
