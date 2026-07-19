@@ -27,7 +27,12 @@ import {
   AuditImportRowError
 } from '../external-communication.dto'
 
-import { EXTERNAL_BULK_IMPORT_AUDIT_STATUS } from '../external-communication.constants'
+import {
+  BULK_AUDIT_IMPORT_CALLBACK_PATHS,
+  EXTERNAL_BULK_IMPORT_AUDIT_STATUS,
+  type BulkAuditImportType,
+  isBulkAuditImportType
+} from '../external-communication.constants'
 
 import {
   AuditImportSqsMessage,
@@ -199,7 +204,9 @@ export class AuditImportConsumer
           `total: ${report.totalRows}, success: ${report.successCount}, failed: ${report.failureCount}`
       )
 
-      await this.onImportComplete(parsedMessage.jobId, report)
+      const importType = this.resolveImportType(parsedMessage.importType)
+
+      await this.onImportComplete(parsedMessage.jobId, report, importType)
 
       await deleteAuditImportMessage(
         this.sqsClient,
@@ -315,7 +322,7 @@ export class AuditImportConsumer
 
    * Called after every import job completes.
 
-   * Fires POST {EXTERNAL_BASE_URL}/qa-panel/import-callback with a communication JWT
+   * Fires POST {EXTERNAL_BASE_URL}{callbackPath} with a communication JWT
 
    * and the full import report so the external system knows the job outcome.
 
@@ -324,7 +331,8 @@ export class AuditImportConsumer
   private async onImportComplete(
     _jobId: string,
 
-    report: AuditImportReport
+    report: AuditImportReport,
+    importType: BulkAuditImportType = 'ota'
   ): Promise<void> {
     const baseUrl = this.configService.externalBaseUrl
 
@@ -376,7 +384,7 @@ export class AuditImportConsumer
       }))
     }
 
-    const url = `${baseUrl.replace(/\/$/, '')}/qa-panel/import-callback`
+    const url = `${baseUrl.replace(/\/$/, '')}${BULK_AUDIT_IMPORT_CALLBACK_PATHS[importType]}`
 
     try {
       console.log(
@@ -413,6 +421,12 @@ export class AuditImportConsumer
         (err as Error).message
       )
     }
+  }
+
+  private resolveImportType(
+    importType: string | undefined
+  ): BulkAuditImportType {
+    return importType && isBulkAuditImportType(importType) ? importType : 'ota'
   }
 
   private logSummary(report: AuditImportReport): void {

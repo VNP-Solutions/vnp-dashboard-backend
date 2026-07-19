@@ -13,6 +13,7 @@ import {
   BulkAuditImportAcceptedDto,
   GenerateTokenResponseDto
 } from './external-communication.dto'
+import type { BulkAuditImportType } from './external-communication.constants'
 import {
   AuditImportSqsMessage,
   createS3Client,
@@ -56,7 +57,8 @@ export class ExternalCommunicationService {
   async enqueueBulkAuditImport(
     file: Express.Multer.File,
     qaPanelId: string,
-    email: string
+    email: string,
+    importType: BulkAuditImportType
   ): Promise<BulkAuditImportAcceptedDto> {
     if (!file) {
       throw new BadRequestException('No file provided')
@@ -89,7 +91,8 @@ export class ExternalCommunicationService {
       originalName: file.originalname,
       requestedAt: new Date().toISOString(),
       qaPanelId,
-      email
+      email,
+      importType
     }
 
     const messageId = await enqueueAuditImport(
@@ -99,7 +102,7 @@ export class ExternalCommunicationService {
     )
 
     console.log(
-      `[ExternalCommunicationService] Enqueued audit import job ${jobId} qa_panel_id=${qaPanelId} email=${email} (SQS MessageId: ${messageId})`
+      `[ExternalCommunicationService] Enqueued audit import job ${jobId} type=${importType} qa_panel_id=${qaPanelId} email=${email} (SQS MessageId: ${messageId})`
     )
 
     return {
