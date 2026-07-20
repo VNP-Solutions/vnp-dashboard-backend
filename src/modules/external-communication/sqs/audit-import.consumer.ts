@@ -13,6 +13,8 @@ import { JwtService } from '@nestjs/jwt'
 
 import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../../common/constants/external-api-user.context'
 
+import { ColoredLogger } from '../../../common/utils/colored-logger.util'
+
 import {
   parseSpreadsheetToJson,
   validateSpreadsheetFile
@@ -48,6 +50,8 @@ import {
 export class AuditImportConsumer
   implements OnApplicationBootstrap, OnApplicationShutdown
 {
+  private readonly logger = new ColoredLogger(AuditImportConsumer.name)
+
   private sqsClient!: SQSClient
 
   private s3Client!: S3Client
@@ -73,8 +77,8 @@ export class AuditImportConsumer
     const queueUrl = this.configService.sqs.auditImportQueueUrl
 
     if (!queueUrl) {
-      console.log(
-        '[AuditImportConsumer] AUDIT_IMPORT_QUEUE_URL is not set — consumer will not start'
+      this.logger.warn(
+        'AUDIT_IMPORT_QUEUE_URL is not set — consumer will not start'
       )
 
       return
@@ -102,7 +106,12 @@ export class AuditImportConsumer
       secretAccessKey: s3Config.secretKey
     })
 
-    console.log('[AuditImportConsumer] Starting long-poll loop...')
+    this.logger.success(
+      `SQS consumer bootstrapped — queue="${queueUrl}" bucket="${this.bucketName}"`
+    )
+    this.logger.info(
+      '🔄 Starting long-poll loop (WaitTimeSeconds=20, VisibilityTimeout=300)...'
+    )
 
     void this.startPolling()
   }
@@ -110,13 +119,17 @@ export class AuditImportConsumer
   async onApplicationShutdown(): Promise<void> {
     this.shutdownSignal = true
 
+    this.logger.warn(
+      'Shutdown signal received — waiting for in-flight job to finish...'
+    )
+
     const timeout = Date.now() + 30_000
 
     while (this.isRunning && Date.now() < timeout) {
       await new Promise(resolve => setTimeout(resolve, 500))
     }
 
-    console.log('[AuditImportConsumer] Shutdown complete')
+    this.logger.warn('Shutdown complete')
   }
 
   private async startPolling(): Promise<void> {
@@ -128,6 +141,15 @@ export class AuditImportConsumer
           this.queueUrl
         )
 
+        if (messages.length === 0) {
+          // Long-poll returned no messages — stay quiet to avoid log spam.
+          continue
+        }
+
+        this.logger.info(
+          `📬 SQS long-poll returned ${messages.length} message(s)`
+        )
+
         for (const message of messages) {
           if (this.shutdownSignal) break
 
@@ -135,11 +157,7 @@ export class AuditImportConsumer
         }
       } catch (error) {
         if (!this.shutdownSignal) {
-          console.error(
-            '[AuditImportConsumer] Poll error:',
-
-            (error as Error).message
-          )
+          this.logger.error(`SQS poll error: ${(error as Error).message}`)
 
           await new Promise(resolve => setTimeout(resolve, 5_000))
         }
@@ -150,15 +168,23 @@ export class AuditImportConsumer
   private async processMessage(message: Message): Promise<void> {
     if (!message.Body || !message.ReceiptHandle) return
 
+    this.logger.info(
+      `🆔 SQS message received — MessageId=${message.MessageId} (body length=${message.Body.length} chars)`
+    )
+
     let parsedMessage: AuditImportSqsMessage
 
     try {
       parsedMessage = JSON.parse(message.Body) as AuditImportSqsMessage
+      this.logger.info(
+        `   ├─ Parsed SQS body → jobId=${parsedMessage.jobId} importType=${parsedMessage.importType} qa_panel_id=${parsedMessage.qaPanelId} email=${parsedMessage.email}`
+      )
+      this.logger.info(
+        `   └─ s3Key=${parsedMessage.s3Key} originalName="${parsedMessage.originalName}" requestedAt=${parsedMessage.requestedAt}`
+      )
     } catch {
-      console.error(
-        '[AuditImportConsumer] Invalid JSON in message — dropping:',
-
-        message.MessageId
+      this.logger.error(
+        `Invalid JSON in SQS message — dropping. MessageId=${message.MessageId}`
       )
 
       await deleteAuditImportMessage(
@@ -168,15 +194,15 @@ export class AuditImportConsumer
 
         message.ReceiptHandle
       )
+
+      this.logger.warn(`🗑️  Deleted malformed SQS message ${message.MessageId}`)
 
       return
     }
 
     if (!parsedMessage.jobId || !parsedMessage.s3Key) {
-      console.error(
-        '[AuditImportConsumer] Missing required fields — dropping:',
-
-        message.MessageId
+      this.logger.error(
+        `Missing required fields in SQS message — dropping. MessageId=${message.MessageId}`
       )
 
       await deleteAuditImportMessage(
@@ -186,21 +212,25 @@ export class AuditImportConsumer
 
         message.ReceiptHandle
       )
+
+      this.logger.warn(`🗑️  Deleted invalid SQS message ${message.MessageId}`)
 
       return
     }
 
     this.isRunning = true
 
-    console.log(
-      `[AuditImportConsumer] Processing job ${parsedMessage.jobId} (${parsedMessage.originalName})`
+    this.logger.info(
+      `▶️  Processing job ${parsedMessage.jobId} (${parsedMessage.originalName})`
     )
+
+    const jobStart = Date.now()
 
     try {
       const report = await this.runImport(parsedMessage)
 
-      console.log(
-        `[AuditImportConsumer] Job ${parsedMessage.jobId} complete — ` +
+      this.logger.success(
+        `✓ Job ${parsedMessage.jobId} import finished in ${Date.now() - jobStart}ms — ` +
           `total: ${report.totalRows}, success: ${report.successCount}, failed: ${report.failureCount}`
       )
 
@@ -215,11 +245,13 @@ export class AuditImportConsumer
 
         message.ReceiptHandle
       )
-    } catch (error) {
-      console.error(
-        `[AuditImportConsumer] Job ${parsedMessage.jobId} failed:`,
 
-        (error as Error).message
+      this.logger.success(
+        `🗑️  Deleted SQS message ${message.MessageId} (job ${parsedMessage.jobId} fully processed)`
+      )
+    } catch (error) {
+      this.logger.error(
+        `Job ${parsedMessage.jobId} failed: ${(error as Error).message}`
       )
     } finally {
       this.isRunning = false
@@ -229,12 +261,19 @@ export class AuditImportConsumer
   private async runImport(
     msg: AuditImportSqsMessage
   ): Promise<AuditImportReport> {
+    this.logger.info(
+      `☁️  Downloading spreadsheet from S3 — bucket="${this.bucketName}" key="${msg.s3Key}"`
+    )
+    const s3DownloadStart = Date.now()
     const fileBuffer = await downloadFileFromS3(
       this.s3Client,
 
       this.bucketName,
 
       msg.s3Key
+    )
+    this.logger.success(
+      `✓ S3 download complete (${Date.now() - s3DownloadStart}ms) — ${fileBuffer.length} bytes`
     )
 
     const fakeFile = {
@@ -247,9 +286,13 @@ export class AuditImportConsumer
       size: fileBuffer.length
     } as Express.Multer.File
 
+    this.logger.info('🔍 Validating downloaded spreadsheet file format...')
     validateSpreadsheetFile(fakeFile)
+    this.logger.success('✓ Downloaded spreadsheet validated')
 
+    this.logger.info('📄 Parsing spreadsheet into JSON rows...')
     const rows = parseSpreadsheetToJson(fakeFile)
+    this.logger.success(`✓ Parsed ${rows.length} data row(s) from spreadsheet`)
 
     const report: AuditImportReport = {
       jobId: msg.jobId,
@@ -269,12 +312,21 @@ export class AuditImportConsumer
       successfulImports: []
     }
 
+    this.logger.info(
+      `💾 Calling AuditService.autoImport → will validate rows, resolve properties, ` +
+        `create audits (status="${EXTERNAL_BULK_IMPORT_AUDIT_STATUS}"), generate per-property ` +
+        `xlsx reports and upload them to S3 — writing to the dashboard DB...`
+    )
+    const importStart = Date.now()
     const result = await this.auditService.autoImport(
       fakeFile,
 
       EXTERNAL_API_SUPER_ADMIN_CONTEXT,
 
       { fixedAuditStatusLabel: EXTERNAL_BULK_IMPORT_AUDIT_STATUS }
+    )
+    this.logger.info(
+      `⏱️  AuditService.autoImport returned in ${Date.now() - importStart}ms (success=${result.success})`
     )
 
     if (!result.success && result.errors?.length) {
@@ -292,6 +344,10 @@ export class AuditImportConsumer
           reason: e.error
         })
       )
+
+      this.logger.error(
+        `❌ autoImport reported ${report.failureCount} failed row(s) — no audits written to the dashboard DB`
+      )
     } else if (result.success) {
       report.successCount = report.totalRows
       report.failureCount = 0
@@ -300,6 +356,18 @@ export class AuditImportConsumer
         report.successfulImports = result.created_audits.map(
           a => `${a.property} - Audit created (${a.audit_id})`
         )
+        this.logger.success(
+          `✅ Wrote ${result.created_audits.length} audit(s) to the dashboard DB:`
+        )
+        result.created_audits.forEach(a => {
+          this.logger.success(
+            `   • property="${a.property}" audit_id=${a.audit_id} report_url=${a.report_url}`
+          )
+        })
+      } else {
+        this.logger.warn(
+          'autoImport succeeded but created 0 audits — nothing written to the dashboard DB'
+        )
       }
     }
 
@@ -307,11 +375,10 @@ export class AuditImportConsumer
 
     try {
       await deleteFileFromS3(this.s3Client, this.bucketName, msg.s3Key)
+      this.logger.info(`🗑️  Deleted temp S3 object "${msg.s3Key}"`)
     } catch (err) {
-      console.warn(
-        `[AuditImportConsumer] Could not delete temp S3 file ${msg.s3Key}:`,
-
-        (err as Error).message
+      this.logger.warn(
+        `Could not delete temp S3 file ${msg.s3Key}: ${(err as Error).message}`
       )
     }
 
@@ -337,8 +404,8 @@ export class AuditImportConsumer
     const baseUrl = this.configService.externalBaseUrl
 
     if (!baseUrl) {
-      console.warn(
-        '[AuditImportConsumer] EXTERNAL_BASE_URL is not set — skipping import callback'
+      this.logger.warn(
+        'EXTERNAL_BASE_URL is not set — skipping import callback'
       )
 
       return
@@ -347,8 +414,8 @@ export class AuditImportConsumer
     const communicationSecret = this.configService.jwt.communicationSecret
 
     if (!communicationSecret) {
-      console.warn(
-        '[AuditImportConsumer] JWT_COMMUNICATION_SECRET is not set — skipping import callback'
+      this.logger.warn(
+        'JWT_COMMUNICATION_SECRET is not set — skipping import callback'
       )
 
       return
@@ -386,11 +453,18 @@ export class AuditImportConsumer
 
     const url = `${baseUrl.replace(/\/$/, '')}${BULK_AUDIT_IMPORT_CALLBACK_PATHS[importType]}`
 
-    try {
-      console.log(
-        `[AuditImportConsumer] Sending import callback to ${url} (status=${status})`
-      )
+    this.logger.info(
+      `📤 Sending import callback → POST ${url} (importType=${importType}, status=${status})`
+    )
+    this.logger.info(
+      `   ├─ qa_panel_id=${report.qaPanelId}, email=${report.email}`
+    )
+    this.logger.info(
+      `   └─ report={total=${report.totalRows}, success=${report.successCount}, failed=${report.failureCount}}, errors=${report.errors.length}`
+    )
 
+    try {
+      const callbackStart = Date.now()
       const response = await fetch(url, {
         method: 'POST',
 
@@ -403,22 +477,22 @@ export class AuditImportConsumer
         body: JSON.stringify(body)
       })
 
+      const elapsed = Date.now() - callbackStart
+
       if (!response.ok) {
         const text = await response.text().catch(() => '')
 
-        console.error(
-          `[AuditImportConsumer] Callback responded with ${response.status}: ${text}`
+        this.logger.error(
+          `❌ Callback responded with HTTP ${response.status} (${elapsed}ms): ${text}`
         )
       } else {
-        console.log(
-          `[AuditImportConsumer] Callback acknowledged (${response.status})`
+        this.logger.success(
+          `✓ Callback acknowledged — HTTP ${response.status} (${elapsed}ms)`
         )
       }
     } catch (err) {
-      console.error(
-        '[AuditImportConsumer] Failed to send import callback:',
-
-        (err as Error).message
+      this.logger.error(
+        `Failed to send import callback: ${(err as Error).message}`
       )
     }
   }
@@ -430,33 +504,56 @@ export class AuditImportConsumer
   }
 
   private logSummary(report: AuditImportReport): void {
-    console.log(
-      '\n\x1b[36m%s\x1b[0m',
+    const cyan = '\x1b[36m'
+    const green = '\x1b[32m'
+    const red = '\x1b[31m'
+    const yellow = '\x1b[33m'
+    const magenta = '\x1b[35m'
+    const bold = '\x1b[1m'
+    const reset = '\x1b[0m'
 
-      '========================================'
+    const line = '════════════════════════════════════════════════════════════'
+
+    process.stdout.write(`\n${magenta}${bold}${line}${reset}\n`)
+    process.stdout.write(
+      `${magenta}${bold}  📊 BULK AUDIT IMPORT SUMMARY — Job ${report.jobId}${reset}\n`
+    )
+    process.stdout.write(`${magenta}${bold}${line}${reset}\n`)
+
+    process.stdout.write(
+      `${yellow}  📝 Total Rows      : ${report.totalRows}${reset}\n`
+    )
+    process.stdout.write(
+      `${green}  ✅ Successful     : ${report.successCount}${reset}\n`
+    )
+    process.stdout.write(
+      `${red}  ❌ Failed         : ${report.failureCount}${reset}\n`
+    )
+    process.stdout.write(
+      `${cyan}  🗄️  Audits in DB   : ${report.successfulImports.length}${reset}\n`
+    )
+    process.stdout.write(
+      `${cyan}  📧 Email          : ${report.email}${reset}\n`
+    )
+    process.stdout.write(
+      `${cyan}  🆔 QA Panel ID    : ${report.qaPanelId}${reset}\n`
     )
 
-    console.log('\x1b[36m%s\x1b[0m', `📊 IMPORT SUMMARY — Job ${report.jobId}`)
-
-    console.log('\x1b[36m%s\x1b[0m', '========================================')
-
-    console.log('\x1b[33m%s\x1b[0m', `📝 Total Rows: ${report.totalRows}`)
-
-    console.log('\x1b[32m%s\x1b[0m', `✅ Successful: ${report.successCount}`)
-
-    console.log('\x1b[31m%s\x1b[0m', `❌ Failed: ${report.failureCount}`)
+    if (report.successfulImports.length > 0) {
+      process.stdout.write(
+        `\n${green}${bold}  ✅ Audits written to dashboard DB:${reset}\n`
+      )
+      report.successfulImports.forEach(item => {
+        process.stdout.write(`${green}     • ${item}${reset}\n`)
+      })
+    }
 
     if (report.failureCount > 0) {
-      console.log('\n\x1b[31m%s\x1b[0m', '❌ Errors:')
-
+      process.stdout.write(`\n${red}${bold}  ❌ Row errors:${reset}\n`)
       console.table(report.errors)
     }
 
-    console.log(
-      '\x1b[36m%s\x1b[0m',
-
-      '========================================\n'
-    )
+    process.stdout.write(`${magenta}${bold}${line}${reset}\n\n`)
   }
 }
 
