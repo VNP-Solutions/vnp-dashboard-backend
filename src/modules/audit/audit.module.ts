@@ -13,6 +13,7 @@ import { PropertyRepository } from '../property/property.repository'
 import { AuditController } from './audit.controller'
 import { AuditRepository } from './audit.repository'
 import { AuditService } from './audit.service'
+import { PayoutClient } from './payout.client'
 
 @Module({
   imports: [AuthModule],
@@ -53,7 +54,8 @@ import { AuditService } from './audit.service'
     PermissionService,
     PrismaService,
     EmailUtil,
-    ConfigService
+    ConfigService,
+    PayoutClient
   ],
   exports: [
     {

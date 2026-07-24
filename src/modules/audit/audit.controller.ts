@@ -47,6 +47,7 @@ import {
   UpdateReportUrlDto
 } from './audit.dto'
 import type { IAuditService } from './audit.interface'
+import { PayoutClient } from './payout.client'
 
 @ApiTags('Audit')
 @ApiBearerAuth('JWT-auth')
@@ -57,7 +58,8 @@ export class AuditController {
     @Inject('IAuditService')
     private readonly auditService: IAuditService,
     @Inject('IAuthRepository')
-    private readonly authRepository: IAuthRepository
+    private readonly authRepository: IAuthRepository,
+    private readonly payoutClient: PayoutClient
   ) {}
 
   @Post()
@@ -170,6 +172,23 @@ export class AuditController {
   })
   archive(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.auditService.archive(id, user)
+  }
+
+  @Post(':id/payout')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Initiate a Rail B payout for an audit (Internal operators only)',
+    description:
+      'Forwards the audit id to the payout service, which derives the amount, rail, and destination ' +
+      'server-side and dispatches the payout. Internal operators only. Idempotent per audit.'
+  })
+  @ApiResponse({ status: 200, description: 'Payout dispatch result (per-OTA groups + skipped)' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({ status: 422, description: 'Property mapping is unmapped or ambiguous; payout blocked' })
+  @ApiResponse({ status: 501, description: 'Payout read adapters not configured' })
+  @ApiResponse({ status: 502, description: 'Payout service unreachable' })
+  initiatePayout(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
+    return this.payoutClient.dispatchFromAudit(id, user.id)
   }
 
   @Post('bulk-update')

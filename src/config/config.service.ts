@@ -84,4 +84,12 @@ export class ConfigService {
   get externalBaseUrl(): string | undefined {
     return this.configService.get('externalBaseUrl', { infer: true })
   }
+
+  get payoutBaseUrl(): string | undefined {
+    return this.configService.get('payoutBaseUrl', { infer: true })
+  }
+
+  get payoutServiceApiKey(): string | undefined {
+    return this.configService.get('payoutServiceApiKey', { infer: true })
+  }
 }
