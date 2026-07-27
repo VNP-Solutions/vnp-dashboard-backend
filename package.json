@@ -21,6 +21,7 @@
     "fix:passwords": "ts-node scripts/fix-encrypted-passwords.ts",
     "fix:expedia-ids": "ts-node scripts/fix-duplicate-expedia-ids.ts",
     "fix:expedia-ids-advanced": "ts-node scripts/fix-duplicate-expedia-ids-advanced.ts",
+    "upsert:expedia-ids": "ts-node scripts/upsert-missing-expedia-ids.ts",
     "backup:db": "ts-node scripts/backup-production-db.ts",
     "backup:prisma": "ts-node scripts/backup-prisma-json.ts",
     "migrate:bank-details": "ts-node scripts/migrate-bank-details-schema.ts",
