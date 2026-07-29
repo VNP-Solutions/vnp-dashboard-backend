@@ -37,7 +37,7 @@ async function backupProductionDatabase() {
 
     // Step 2: Get collection counts before backup
     console.log('📊 Collecting database statistics...\n')
-    
+
     const collections = [
       'User',
       'UserRole',
@@ -64,22 +64,34 @@ async function backupProductionDatabase() {
     for (const collection of collections) {
       try {
         // @ts-ignore - Dynamic collection access
-        const count = await prisma[collection.charAt(0).toLowerCase() + collection.slice(1)].count()
+        const count =
+          await prisma[
+            collection.charAt(0).toLowerCase() + collection.slice(1)
+          ].count()
         counts.push({ name: collection, count })
         console.log(`  ${collection.padEnd(25)} : ${count}`)
       } catch (error) {
-        console.log(`  ${collection.padEnd(25)} : N/A (collection may not exist)`)
+        console.log(
+          `  ${collection.padEnd(25)} : N/A (collection may not exist)`
+        )
       }
     }
 
     // Save collection counts to file
     const statsFile = path.join(backupDir, 'collection-stats.json')
     fs.mkdirSync(backupDir, { recursive: true })
-    fs.writeFileSync(statsFile, JSON.stringify({
-      timestamp: new Date().toISOString(),
-      counts,
-      totalRecords: counts.reduce((sum, c) => sum + c.count, 0)
-    }, null, 2))
+    fs.writeFileSync(
+      statsFile,
+      JSON.stringify(
+        {
+          timestamp: new Date().toISOString(),
+          counts,
+          totalRecords: counts.reduce((sum, c) => sum + c.count, 0)
+        },
+        null,
+        2
+      )
+    )
 
     console.log(`\n✓ Statistics saved to: ${statsFile}`)
 
@@ -87,7 +99,7 @@ async function backupProductionDatabase() {
     console.log('\n📋 Exporting current schema...')
     const schemaSource = path.join(process.cwd(), 'prisma', 'schema.prisma')
     const schemaBackup = path.join(backupDir, 'schema.prisma')
-    
+
     if (fs.existsSync(schemaSource)) {
       fs.copyFileSync(schemaSource, schemaBackup)
       console.log(`✓ Schema backed up to: ${schemaBackup}`)
@@ -112,7 +124,9 @@ async function backupProductionDatabase() {
     } catch (error: any) {
       console.error('\n❌ mongodump failed:', error.message)
       console.log('\n⚠ Note: Make sure MongoDB Database Tools are installed:')
-      console.log('   Download from: https://www.mongodb.com/try/download/database-tools')
+      console.log(
+        '   Download from: https://www.mongodb.com/try/download/database-tools'
+      )
       console.log('   Or install via package manager:')
       console.log('     - Windows: choco install mongodb-database-tools')
       console.log('     - Mac: brew install mongodb-database-tools')
@@ -142,11 +156,11 @@ async function backupProductionDatabase() {
     // Step 6: Verify backup
     console.log('\n✅ Verifying backup integrity...')
     const dumpDir = path.join(backupDir, 'mongodb-dump')
-    
+
     if (fs.existsSync(dumpDir)) {
       const dbDirs = fs.readdirSync(dumpDir)
       console.log(`✓ Backup contains ${dbDirs.length} database(s)`)
-      
+
       for (const dbDir of dbDirs) {
         const dbPath = path.join(dumpDir, dbDir)
         if (fs.statSync(dbPath).isDirectory()) {
@@ -169,7 +183,9 @@ async function backupProductionDatabase() {
     console.log('  - schema.prisma          (Prisma schema)')
     console.log('  - collection-stats.json  (Record counts)')
     console.log('  - backup-manifest.json   (Backup metadata)')
-    console.log('\n⚠ IMPORTANT: Keep this backup safe until migration is verified!')
+    console.log(
+      '\n⚠ IMPORTANT: Keep this backup safe until migration is verified!'
+    )
     console.log('========================================\n')
 
     // Return backup info for use in scripts
@@ -178,11 +194,12 @@ async function backupProductionDatabase() {
       backupDir,
       manifest
     }
-
   } catch (error) {
     console.error('\n❌ BACKUP FAILED:', error)
-    console.error('Please fix the error and try again before proceeding with migration.')
-    process.exit(1)
+    console.error(
+      'Please fix the error and try again before proceeding with migration.'
+    )
+    throw error
   } finally {
     await prisma.$disconnect()
   }
@@ -190,7 +207,7 @@ async function backupProductionDatabase() {
 
 // Run if executed directly
 if (require.main === module) {
-  backupProductionDatabase()
+  backupProductionDatabase().catch(() => process.exit(1))
 }
 
 export default backupProductionDatabase
