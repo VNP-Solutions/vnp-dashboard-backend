@@ -22,7 +22,6 @@ export const FULL_BACKUP_COLLECTION_ORDER = [
   'PropertyCredentials',
   'PropertyBankDetails',
   'PortfolioBankDetails',
-  'PropertyBatch',
   'PropertyContractUrl',
   'UserAccessedProperty',
   'Audit',
