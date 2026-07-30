@@ -3,6 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { OtaType, Prisma } from '@prisma/client'
 import { Transform } from 'class-transformer'
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -536,4 +537,28 @@ export class AutoImportAuditResultDto {
     required: false
   })
   created_audits?: AutoImportAuditSuccessDto[]
+}
+
+export class InitiateAuditPayoutDto {
+  @ApiProperty({
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    description:
+      'Short-lived confirmation token from GET /audit/:id/payout-preview. Bound to this audit and ' +
+      'this user, so a payout can only be dispatched after the operator was shown the amounts.'
+  })
+  @IsString()
+  @IsNotEmpty()
+  confirm_token: string
+}
+
+export class AuditPayoutStatusDto {
+  @ApiProperty({
+    type: [String],
+    example: ['6a6a2017a6890692e3f8a58d', '6a6a2017a6890692e3f8a58e'],
+    description: 'Audit ids from the current table page. Capped to keep the lookup bounded.'
+  })
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  audit_ids: string[]
 }

@@ -41,13 +41,16 @@ import {
   CreateAuditDto,
   DeleteAuditDto,
   DeleteAuditsByPortfolioDto,
+  AuditPayoutStatusDto,
   GlobalStatsResponseDto,
+  InitiateAuditPayoutDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
   UpdateReportUrlDto
 } from './audit.dto'
 import type { IAuditService } from './audit.interface'
 import { PayoutClient } from './payout.client'
+import { PayoutConfirmTokenService } from './payout-confirm-token.service'
 
 @ApiTags('Audit')
 @ApiBearerAuth('JWT-auth')
@@ -59,7 +62,8 @@ export class AuditController {
     private readonly auditService: IAuditService,
     @Inject('IAuthRepository')
     private readonly authRepository: IAuthRepository,
-    private readonly payoutClient: PayoutClient
+    private readonly payoutClient: PayoutClient,
+    private readonly payoutConfirmTokenService: PayoutConfirmTokenService
   ) {}
 
   @Post()
@@ -174,20 +178,65 @@ export class AuditController {
     return this.auditService.archive(id, user)
   }
 
+  @Get(':id/payout-preview')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Preview an audit payout and mint a confirmation token (Internal operators only)',
+    description:
+      'Runs the payout service dry-run: resolves the audit, maps the property, picks the rail and ' +
+      'computes gross/commission/net per OTA, checks the destination and the funding gate. Sends ' +
+      'nothing and writes nothing. Returns the breakdown the confirmation dialog renders, plus a ' +
+      'short-lived confirm_token that must be presented back to POST :id/payout.'
+  })
+  @ApiResponse({ status: 200, description: 'Preview breakdown + confirm_token + expires_at' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({ status: 422, description: 'Property mapping is unmapped or ambiguous; payout blocked' })
+  @ApiResponse({ status: 502, description: 'Payout service unreachable' })
+  async previewPayout(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
+    const preview = await this.payoutClient.previewFromAudit(id, user.id)
+    const { token, expiresAt } = this.payoutConfirmTokenService.mint(id, user.id)
+    return { preview, confirm_token: token, expires_at: expiresAt }
+  }
+
+  @Post('payout-status')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Which of these audits already have a payout?',
+    description:
+      'Bulk lookup for one page of the audits table, so rows that were already paid can show that ' +
+      'state instead of offering the button again. Audits with no payout are absent from the result.'
+  })
+  @ApiResponse({ status: 200, description: 'Map of audit id to payout summary' })
+  @ApiResponse({ status: 502, description: 'Payout service unreachable' })
+  payoutStatus(@Body() dto: AuditPayoutStatusDto, @CurrentUser() user: IUserWithPermissions) {
+    return this.payoutClient.payoutStatusByAudits(dto.audit_ids, user.id)
+  }
+
   @Post(':id/payout')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
   @ApiOperation({
-    summary: 'Initiate a Rail B payout for an audit (Internal operators only)',
+    summary: 'Dispatch a payout for an audit (Internal operators only)',
     description:
       'Forwards the audit id to the payout service, which derives the amount, rail, and destination ' +
-      'server-side and dispatches the payout. Internal operators only. Idempotent per audit.'
+      'server-side and dispatches the payout. Rail-agnostic: the engine picks Rail A (Stripe Connect) ' +
+      'or Rail B (Global Payouts) per OTA. Internal operators only. Idempotent per audit.\n\n' +
+      'Requires the confirm_token returned by GET :id/payout-preview, so a payout can only be sent ' +
+      'after an operator was shown the amounts and confirmed them.'
   })
   @ApiResponse({ status: 200, description: 'Payout dispatch result (per-OTA groups + skipped)' })
+  @ApiResponse({ status: 403, description: 'Missing, expired, or mismatched confirmation token' })
   @ApiResponse({ status: 404, description: 'Audit not found' })
   @ApiResponse({ status: 422, description: 'Property mapping is unmapped or ambiguous; payout blocked' })
   @ApiResponse({ status: 501, description: 'Payout read adapters not configured' })
   @ApiResponse({ status: 502, description: 'Payout service unreachable' })
-  initiatePayout(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
+  initiatePayout(
+    @Param('id') id: string,
+    @Body() dto: InitiateAuditPayoutDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // Fails closed: no valid token means no dispatch, even though the route is already
+    // permission-guarded. The payout service still re-derives every amount from the audit id.
+    this.payoutConfirmTokenService.verify(dto?.confirm_token, id, user.id)
     return this.payoutClient.dispatchFromAudit(id, user.id)
   }
 

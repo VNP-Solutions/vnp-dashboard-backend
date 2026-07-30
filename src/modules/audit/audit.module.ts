@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { JwtModule } from '@nestjs/jwt'
 import { ConfigService } from '../../config/config.service'
 import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
@@ -14,10 +15,13 @@ import { AuditController } from './audit.controller'
 import { AuditRepository } from './audit.repository'
 import { AuditService } from './audit.service'
 import { PayoutClient } from './payout.client'
+import { PayoutConfirmTokenService } from './payout-confirm-token.service'
+import { InternalAuditController } from './internal-audit.controller'
+import { InternalApiKeyGuard } from './internal-api-key.guard'
 
 @Module({
-  imports: [AuthModule],
-  controllers: [AuditController],
+  imports: [AuthModule, JwtModule.register({})],
+  controllers: [AuditController, InternalAuditController],
   providers: [
     {
       provide: 'IAuditService',
@@ -55,7 +59,9 @@ import { PayoutClient } from './payout.client'
     PrismaService,
     EmailUtil,
     ConfigService,
-    PayoutClient
+    PayoutClient,
+    PayoutConfirmTokenService,
+    InternalApiKeyGuard
   ],
   exports: [
     {
