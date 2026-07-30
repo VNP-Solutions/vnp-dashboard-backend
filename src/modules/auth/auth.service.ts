@@ -472,7 +472,8 @@ export class AuthService implements IAuthService {
         await this.emailUtil.sendPasswordResetOtpEmail(user.email, otp)
       }, DB_EMAIL_TX)
 
-      console.log(`Password Reset OTP for ${user.email}: ${otp}`)
+      // The OTP is a live account-takeover credential; log that one was issued, never its value.
+      console.log(`Password reset OTP issued for ${user.email}`)
 
       return { message: 'An OTP has been sent to the email' }
     } catch (error) {

@@ -37,7 +37,8 @@ export class ExternalJwtGuard implements CanActivate {
     }
 
     const token = authHeader.substring(7).trim()
-    console.log(`${TAG} Received token: ${token}`)
+    // Never log the bearer token itself - it is a live service credential until it expires.
+    console.log(`${TAG} Received token: [redacted, len=${token.length}]`)
 
     const secret = this.configService.jwt.communicationSecret
     console.log(`${TAG} Communication secret configured: ${!!secret}`)
