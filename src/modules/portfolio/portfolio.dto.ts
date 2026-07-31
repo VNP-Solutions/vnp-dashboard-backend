@@ -2,17 +2,17 @@ import { OmitType, PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
+  ArrayMinSize,
   IsArray,
   IsBoolean,
-  IsEmail,
+  IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
-  ValidateNested
+  Min
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
-import { IsCommaSeparatedEmails } from '../../common/validators/comma-separated-emails.validator'
-import { AttachmentUrlDto } from '../email/email.dto'
 
 export class CreatePortfolioDto {
   @ApiProperty({
@@ -40,29 +40,10 @@ export class CreatePortfolioDto {
   @IsOptional()
   currency?: string
 
-  @ApiPropertyOptional({
-    example: 'https://example.com/contract.pdf',
-    description:
-      'Contract document URL (will be saved as user-specific contract URL)'
-  })
-  @IsString()
-  @IsOptional()
-  contract_url?: string
-
   @ApiProperty({ example: true, description: 'Whether portfolio is active' })
   @IsBoolean()
   @IsNotEmpty()
   is_active: boolean
-
-  @ApiPropertyOptional({
-    example: 'contact@example.com, contact2@example.com',
-    description:
-      'Contact email(s) for portfolio - can be a single email or comma-separated emails for multiple recipients'
-  })
-  @IsString()
-  @IsCommaSeparatedEmails()
-  @IsOptional()
-  contact_email?: string
 
   @ApiProperty({
     example: true,
@@ -73,21 +54,12 @@ export class CreatePortfolioDto {
   is_commissionable: boolean
 
   @ApiPropertyOptional({
-    example: 'access@example.com',
-    description: 'Access email for portfolio'
-  })
-  @IsString()
-  @IsEmail()
-  @IsOptional()
-  access_email?: string
-
-  @ApiPropertyOptional({
-    example: '+1234567890',
-    description: 'Access phone number for portfolio'
+    example: '507f1f77bcf86cd799439011',
+    description: 'Optional parent portfolio identifier'
   })
   @IsString()
   @IsOptional()
-  access_phone?: string
+  parent_id?: string
 
   @ApiPropertyOptional({
     example: '507f1f77bcf86cd799439011',
@@ -139,41 +111,6 @@ export class PortfolioQueryDto extends QueryDto {
   is_active?: string
 }
 
-export class SendPortfolioEmailDto {
-  @ApiProperty({
-    example: 'Quarterly Review Meeting',
-    description: 'Email subject'
-  })
-  @IsString()
-  @IsNotEmpty()
-  subject: string
-
-  @ApiProperty({
-    example:
-      'Dear Team,\n\nWe would like to schedule a quarterly review meeting...',
-    description: 'Email body (plain text)'
-  })
-  @IsString()
-  @IsNotEmpty()
-  body: string
-
-  @ApiPropertyOptional({
-    type: [AttachmentUrlDto],
-    example: [
-      {
-        url: 'https://s3.amazonaws.com/bucket/report.pdf',
-        filename: 'quarterly-report.pdf'
-      }
-    ],
-    description: 'Optional array of file URLs to attach to the email'
-  })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AttachmentUrlDto)
-  @IsOptional()
-  attachment_urls?: AttachmentUrlDto[]
-}
-
 export class BulkImportResultDto {
   @ApiProperty({ example: 10, description: 'Total number of rows processed' })
   totalRows: number
@@ -206,6 +143,48 @@ export class BulkImportResultDto {
   successfulImports: string[]
 }
 
+export class SyncBulkUpsertPortfolioResultDto {
+  @ApiProperty({ example: 10, description: 'Total number of rows processed' })
+  totalRows: number
+
+  @ApiProperty({ example: 4, description: 'Number of portfolios created' })
+  createdCount: number
+
+  @ApiProperty({ example: 4, description: 'Number of portfolios updated' })
+  updatedCount: number
+
+  @ApiProperty({ example: 2, description: 'Number of rows that failed' })
+  failureCount: number
+
+  @ApiProperty({
+    example: [
+      {
+        row: 3,
+        parent_id: 'portfolio-parent-123',
+        error: 'Portfolio with this name already exists'
+      }
+    ],
+    description: 'List of errors encountered during sync bulk upsert'
+  })
+  errors: Array<{
+    row: number
+    parent_id: string
+    error: string
+  }>
+
+  @ApiProperty({
+    example: [
+      { parent_id: 'portfolio-parent-123', action: 'created' },
+      { parent_id: 'portfolio-parent-456', action: 'updated' }
+    ],
+    description: 'List of successfully upserted portfolios'
+  })
+  successfulUpserts: Array<{
+    parent_id: string
+    action: 'created' | 'updated'
+  }>
+}
+
 export class BulkUpdateResultDto {
   @ApiProperty({ example: 10, description: 'Total number of rows processed' })
   totalRows: number
@@ -224,6 +203,7 @@ export class BulkUpdateResultDto {
       {
         row: 3,
         portfolioId: '507f1f77bcf86cd799439011',
+        portfolioName: 'My Portfolio',
         error: 'Portfolio not found'
       }
     ],
@@ -232,6 +212,7 @@ export class BulkUpdateResultDto {
   errors: Array<{
     row: number
     portfolioId: string
+    portfolioName?: string
     error: string
   }>
 
@@ -282,7 +263,10 @@ export class PortfolioStatsAuditDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Audit ID' })
   id: string
 
-  @ApiProperty({ example: '507f1f77bcf86cd799439012', description: 'Property ID' })
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439012',
+    description: 'Property ID'
+  })
   property_id: string
 
   @ApiProperty({
@@ -327,22 +311,37 @@ export class PortfolioStatsAuditDto {
   })
   type_of_ota: string[]
 
-  @ApiPropertyOptional({ example: 10000, description: 'Expedia amount collectable' })
+  @ApiPropertyOptional({
+    example: 10000,
+    description: 'Expedia amount collectable'
+  })
   expedia_amount_collectable: number | null
 
-  @ApiPropertyOptional({ example: 8000, description: 'Expedia amount confirmed' })
+  @ApiPropertyOptional({
+    example: 8000,
+    description: 'Expedia amount confirmed'
+  })
   expedia_amount_confirmed: number | null
 
-  @ApiPropertyOptional({ example: 8000, description: 'Agoda amount collectable' })
+  @ApiPropertyOptional({
+    example: 8000,
+    description: 'Agoda amount collectable'
+  })
   agoda_amount_collectable: number | null
 
   @ApiPropertyOptional({ example: 7000, description: 'Agoda amount confirmed' })
   agoda_amount_confirmed: number | null
 
-  @ApiPropertyOptional({ example: 7000, description: 'Booking amount collectable' })
+  @ApiPropertyOptional({
+    example: 7000,
+    description: 'Booking amount collectable'
+  })
   booking_amount_collectable: number | null
 
-  @ApiPropertyOptional({ example: 5000, description: 'Booking amount confirmed' })
+  @ApiPropertyOptional({
+    example: 5000,
+    description: 'Booking amount confirmed'
+  })
   booking_amount_confirmed: number | null
 
   @ApiProperty({ example: 'Hotel ABC', description: 'Property name' })
@@ -483,4 +482,153 @@ export class ActivatePortfolioDto {
   @IsString()
   @IsOptional()
   reason?: string
+}
+
+export class SyncBulkUpsertPortfolioItemDto {
+  @ApiProperty({
+    example: 2,
+    description:
+      'Source row number used in the sync report (e.g. spreadsheet row)'
+  })
+  row: number
+
+  @ApiProperty({
+    example: 'portfolio-parent-123',
+    description: 'External portfolio identifier (upsert key)'
+  })
+  parent_id: string
+
+  @ApiProperty({
+    example: 'Luxury Hotels Portfolio',
+    description: 'Portfolio name'
+  })
+  name: string
+
+  @ApiProperty({
+    example: 'OTA',
+    description: 'Service type name (created if missing)'
+  })
+  service_type: string
+
+  @ApiPropertyOptional({
+    example: 'USD',
+    description: 'Currency code (defaults to USD when omitted or empty)'
+  })
+  currency?: string
+
+  @ApiProperty({ example: true, description: 'Whether portfolio is active' })
+  is_active: boolean
+
+  @ApiProperty({
+    example: true,
+    description: 'Whether portfolio is commissionable'
+  })
+  is_commissionable: boolean
+
+  @ApiPropertyOptional({
+    example: 3,
+    description:
+      'Number of associated document files (optional; when omitted, existing value is preserved on update)'
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  file_count?: number
+}
+
+export class SyncBulkUpsertPortfolioDto {
+  @ApiProperty({
+    type: [SyncBulkUpsertPortfolioItemDto],
+    description: 'Portfolio records to create or update by Parent ID'
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @Type(() => SyncBulkUpsertPortfolioItemDto)
+  items: SyncBulkUpsertPortfolioItemDto[]
+}
+
+export class SyncUpsertPortfolioDto {
+  @ApiProperty({
+    example: 'Luxury Hotels Portfolio',
+    description: 'Portfolio name'
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string
+
+  @ApiProperty({
+    example: 'OTA',
+    description: 'Service type name (created if missing)'
+  })
+  @IsString()
+  @IsNotEmpty()
+  service_type: string
+
+  @ApiProperty({ example: 'USD', description: 'Currency code' })
+  @IsString()
+  @IsNotEmpty()
+  currency: string
+
+  @ApiProperty({ example: true, description: 'Whether portfolio is active' })
+  @IsBoolean()
+  @IsNotEmpty()
+  is_active: boolean
+
+  @ApiProperty({
+    example: true,
+    description: 'Whether portfolio is commissionable'
+  })
+  @IsBoolean()
+  @IsNotEmpty()
+  is_commissionable: boolean
+
+  @ApiPropertyOptional({
+    example: 3,
+    description: 'Number of associated document files'
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  file_count?: number
+}
+export class SyncUpdatePortfolioDto {
+  @IsString()
+  @IsNotEmpty()
+  _id: string
+
+  @IsString()
+  @IsNotEmpty()
+  oldName: string
+
+  @IsOptional()
+  @IsString()
+  name?: string
+
+  @IsOptional()
+  @IsString()
+  service_type?: string
+
+  @IsOptional()
+  @IsBoolean()
+  is_active?: boolean
+
+  @IsOptional()
+  @IsBoolean()
+  is_commissionable?: boolean
+
+  @IsOptional()
+  @IsString()
+  contact_email?: string
+}
+
+export class UpdateFileCountDto {
+  @IsString()
+  @IsIn(['increment', 'decrement'])
+  @IsNotEmpty()
+  type: 'increment' | 'decrement'
+
+  @IsInt()
+  @Min(1)
+  @IsNotEmpty()
+  count: number
 }

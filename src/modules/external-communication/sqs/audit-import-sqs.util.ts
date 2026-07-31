@@ -12,6 +12,7 @@ import {
 } from '@aws-sdk/client-sqs'
 import { Upload } from '@aws-sdk/lib-storage'
 import { Readable } from 'stream'
+import type { BulkAuditImportType } from '../external-communication.constants'
 
 export interface AuditImportSqsMessage {
   jobId: string
@@ -20,6 +21,7 @@ export interface AuditImportSqsMessage {
   requestedAt: string
   qaPanelId: string
   email: string
+  importType: BulkAuditImportType
 }
 
 export interface S3ClientConfig {

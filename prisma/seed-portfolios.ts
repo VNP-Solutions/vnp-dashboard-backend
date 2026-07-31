@@ -1,90 +1,77 @@
-import { Portfolio, PrismaClient, ServiceType } from '@prisma/client'
+import { PrismaClient, Portfolio } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 type PortfolioWithServiceType = Portfolio & {
-  serviceType: ServiceType
+  serviceType: { type: string }
 }
 
 async function main() {
-  console.log('Starting portfolio seeding...')
+  console.log('='.repeat(80))
+  console.log('PORTFOLIO SEED SCRIPT')
+  console.log('='.repeat(80))
 
-  // 1. Ensure ServiceTypes exist (required for portfolios)
-  const serviceTypes = await Promise.all([
-    prisma.serviceType.upsert({
-      where: { type: 'Full Service' },
-      update: {},
-      create: { type: 'Full Service', is_active: true, order: 1 }
-    }),
-    prisma.serviceType.upsert({
-      where: { type: 'Limited Service' },
-      update: {},
-      create: { type: 'Limited Service', is_active: true, order: 2 }
-    }),
-    prisma.serviceType.upsert({
-      where: { type: 'Select Service' },
-      update: {},
-      create: { type: 'Select Service', is_active: true, order: 3 }
-    }),
-    prisma.serviceType.upsert({
-      where: { type: 'Audit Only' },
-      update: {},
-      create: { type: 'Audit Only', is_active: true, order: 4 }
+  // 1. Ensure service types exist
+  const serviceTypeData = [
+    { type: 'Full Service', is_active: true, order: 1 },
+    { type: 'Limited Service', is_active: true, order: 2 },
+    { type: 'Select Service', is_active: true, order: 3 },
+    { type: 'Audit Only', is_active: true, order: 4 }
+  ]
+
+  const serviceTypes: Awaited<ReturnType<typeof prisma.serviceType.upsert>>[] =
+    []
+  for (const data of serviceTypeData) {
+    const serviceType = await prisma.serviceType.upsert({
+      where: { type: data.type },
+      update: { is_active: data.is_active, order: data.order },
+      create: data
     })
-  ])
+    serviceTypes.push(serviceType)
+  }
   console.log(`✓ Ensured ${serviceTypes.length} service types exist`)
 
   // 2. Create 5 portfolios with diverse data
   const portfolioData = [
     {
       name: 'Marriott Hotels Group',
-      service_type_id: serviceTypes[0].id, // Full Service
+      service_type_id: serviceTypes[0].id,
       currency: 'USD',
       is_active: true,
-      contact_email: 'contact@marriott.com',
       is_commissionable: true,
-      access_email: 'access@marriott.com',
-      access_phone: '+1-555-0101'
+      parent_id: null as string | null
     },
     {
       name: 'Hilton Worldwide',
-      service_type_id: serviceTypes[1].id, // Limited Service
+      service_type_id: serviceTypes[1].id,
       currency: 'USD',
       is_active: true,
-      contact_email: 'contact@hilton.com',
       is_commissionable: true,
-      access_email: 'access@hilton.com',
-      access_phone: '+1-555-0102'
+      parent_id: null as string | null
     },
     {
       name: 'Hyatt Hotels Corporation',
-      service_type_id: serviceTypes[0].id, // Full Service
+      service_type_id: serviceTypes[0].id,
       currency: 'EUR',
       is_active: true,
-      contact_email: 'contact@hyatt.com',
       is_commissionable: false,
-      access_email: 'access@hyatt.com',
-      access_phone: '+44-20-5555-0103'
+      parent_id: null as string | null
     },
     {
       name: 'IHG Hotels & Resorts',
-      service_type_id: serviceTypes[2].id, // Select Service
+      service_type_id: serviceTypes[2].id,
       currency: 'GBP',
       is_active: true,
-      contact_email: 'contact@ihg.com',
       is_commissionable: true,
-      access_email: 'access@ihg.com',
-      access_phone: '+44-20-5555-0104'
+      parent_id: null as string | null
     },
     {
       name: 'Wyndham Hotels & Resorts',
-      service_type_id: serviceTypes[3].id, // Audit Only
+      service_type_id: serviceTypes[3].id,
       currency: 'USD',
       is_active: true,
-      contact_email: 'contact@wyndham.com',
       is_commissionable: false,
-      access_email: 'access@wyndham.com',
-      access_phone: '+1-555-0105'
+      parent_id: null as string | null
     }
   ]
 
@@ -99,20 +86,16 @@ async function main() {
           service_type_id: data.service_type_id,
           currency: data.currency,
           is_active: data.is_active,
-          contact_email: data.contact_email,
           is_commissionable: data.is_commissionable,
-          access_email: data.access_email,
-          access_phone: data.access_phone
+          parent_id: data.parent_id
         },
         create: {
           name: data.name,
           service_type_id: data.service_type_id,
           currency: data.currency,
           is_active: data.is_active,
-          contact_email: data.contact_email,
           is_commissionable: data.is_commissionable,
-          access_email: data.access_email,
-          access_phone: data.access_phone
+          parent_id: data.parent_id
         },
         include: {
           serviceType: true
@@ -121,11 +104,10 @@ async function main() {
       createdPortfolios.push(portfolio)
       console.log(`  ✓ ${portfolio.name}`)
     } catch (error) {
-      console.error(`  ✗ Failed to create ${data.name}:`, error.message)
+      console.error(`  ✗ Failed to create portfolio ${data.name}:`, error)
     }
   }
 
-  // Print summary
   console.log('\n' + '='.repeat(80))
   console.log('PORTFOLIO SEED SUMMARY')
   console.log('='.repeat(80))
@@ -141,9 +123,7 @@ async function main() {
     console.log(
       `   Commissionable:  ${portfolio.is_commissionable ? 'Yes' : 'No'}`
     )
-    console.log(`   Contact Email:   ${portfolio.contact_email}`)
-    console.log(`   Access Email:    ${portfolio.access_email}`)
-    console.log(`   Access Phone:    ${portfolio.access_phone}`)
+    console.log(`   Parent ID:       ${portfolio.parent_id ?? '—'}`)
     console.log('')
   }
 

@@ -17,6 +17,13 @@ import {
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
+  SyncBulkUpsertPropertyItemDto,
+  SyncUpsertPropertyDto,
+  SyncBulkUpsertPropertyResultDto,
+  SyncBulkDeletePropertyDto,
+  SyncBulkDeletePropertyResultDto,
+  SyncByOtaPropertyDto,
+  SyncCreatePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
   UpdatePropertyDto
@@ -170,6 +177,7 @@ export interface IPropertyRepository {
   >
   findByIds(ids: string[]): Promise<Property[]>
   findByName(name: string): Promise<Property | null>
+  findByParentId(parentId: string): Promise<Property | null>
   findByExpediaId(expediaId: string): Promise<Property | null>
   findByAgodaId(agodaId: string): Promise<Property | null>
   findByBookingId(bookingId: string): Promise<Property | null>
@@ -188,6 +196,23 @@ export interface IPropertyService {
     user: IUserWithPermissions,
     location?: string | null
   ): Promise<PropertyWithFullDetails>
+  syncUpsert(
+    parentId: string,
+    dto: SyncUpsertPropertyDto
+  ): Promise<PropertyWithRelations & { credentials: any }>
+  syncBulkUpsert(
+    items: SyncBulkUpsertPropertyItemDto[]
+  ): Promise<SyncBulkUpsertPropertyResultDto>
+  syncBulkDelete(
+    dto: SyncBulkDeletePropertyDto
+  ): Promise<SyncBulkDeletePropertyResultDto>
+  syncCreate(
+    dto: SyncCreatePropertyDto
+  ): Promise<{ status: string; id?: string }>
+  syncByOta(dto: SyncByOtaPropertyDto): Promise<{ status: string; id?: string }>
+  syncBulkCreate(
+    items: SyncCreatePropertyDto[]
+  ): Promise<{ created: number; alreadyExists: number; failed: number }>
   completeUpdate(
     id: string,
     data: CompleteUpdatePropertyDto,
@@ -298,6 +323,7 @@ export interface IPropertyService {
       message?: string
     }>
   }>
+  syncDelete(parentId: string): Promise<{ message: string }>
   deactivate(
     id: string,
     user: IUserWithPermissions,

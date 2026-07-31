@@ -1,13 +1,16 @@
 import { Portfolio, Prisma } from '@prisma/client'
 import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { AttachmentUrlDto, EmailAttachment } from '../email/email.dto'
 import {
   BulkUpdateResultDto,
   CreatePortfolioDto,
   PortfolioQueryDto,
   PortfolioStatsQueryDto,
   PortfolioStatsResponseDto,
+  SyncUpsertPortfolioDto,
+  SyncUpdatePortfolioDto,
+  SyncBulkUpsertPortfolioDto,
+  SyncBulkUpsertPortfolioResultDto,
   UpdatePortfolioDto
 } from './portfolio.dto'
 
@@ -36,7 +39,6 @@ type PortfolioWithRelations = Prisma.PortfolioGetPayload<{
 }> & {
   bankDetails: any
   total_properties: number
-  total_contract_urls: number
   total_notes: number
 }
 
@@ -53,7 +55,6 @@ type PortfolioWithFullDetails = Prisma.PortfolioGetPayload<{
 }> & {
   bankDetails: any
   total_properties: number
-  total_contract_urls: number
   total_notes: number
 }
 
@@ -78,6 +79,7 @@ export interface IPortfolioRepository {
     accessiblePropertyIds?: string[] | 'all'
   ): Promise<PortfolioWithFullDetails | null>
   findByName(name: string): Promise<Portfolio | null>
+  findByParentId(parentId: string): Promise<Portfolio | null>
   update(
     id: string,
     data: UpdatePortfolioDto,
@@ -86,9 +88,23 @@ export interface IPortfolioRepository {
   ): Promise<PortfolioWithServiceType>
   delete(id: string): Promise<Portfolio>
   countProperties(portfolioId: string): Promise<number>
+  ensureInternalPortfolio(): Promise<{ id: string; name: string }>
+  reassignPropertiesToPortfolio(fromId: string, toId: string): Promise<number>
+  resolveServiceTypeIdByType(type?: string): Promise<string>
 }
 
 export interface IPortfolioService {
+  syncUpsert(
+    parentId: string,
+    dto: SyncUpsertPortfolioDto
+  ): Promise<PortfolioWithServiceType>
+  syncBulkUpsert(
+    dto: SyncBulkUpsertPortfolioDto
+  ): Promise<SyncBulkUpsertPortfolioResultDto>
+  syncUpdate(
+    dto: SyncUpdatePortfolioDto
+  ): Promise<{ status: string; id?: string }>
+  syncDelete(parentId: string): Promise<{ message: string }>
   create(
     data: CreatePortfolioDto,
     user: IUserWithPermissions
@@ -152,14 +168,6 @@ export interface IPortfolioService {
     user: IUserWithPermissions,
     reason?: string
   ): Promise<{ message: string }>
-  sendEmail(
-    id: string,
-    subject: string,
-    body: string,
-    user: IUserWithPermissions,
-    uploadedAttachments?: EmailAttachment[],
-    attachmentUrls?: AttachmentUrlDto[]
-  ): Promise<{ message: string }>
   bulkImport(
     file: Express.Multer.File,
     user: IUserWithPermissions
@@ -173,4 +181,9 @@ export interface IPortfolioService {
     query: PortfolioStatsQueryDto,
     user: IUserWithPermissions
   ): Promise<PortfolioStatsResponseDto>
+  updateFileCount(
+    parentId: string,
+    type: 'increment' | 'decrement',
+    count: number
+  ): Promise<{ status: string; id: string; file_count: number }>
 }

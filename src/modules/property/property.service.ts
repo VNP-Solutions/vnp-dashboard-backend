@@ -9,7 +9,7 @@ import {
   forwardRef
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { BankSubType, BankType, Prisma } from '@prisma/client'
+import { BankSubType, BankType, Prisma, Property } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
 import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../common/constants/external-api-user.context'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
@@ -67,6 +67,13 @@ import {
   PropertyQueryDto,
   PropertyStatsResponseDto,
   SharePropertyDto,
+  SyncByOtaPropertyDto,
+  SyncBulkUpsertPropertyItemDto,
+  SyncUpsertPropertyDto,
+  SyncBulkUpsertPropertyResultDto,
+  SyncBulkDeletePropertyDto,
+  SyncBulkDeletePropertyResultDto,
+  SyncCreatePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
   UpdatePropertyDto
@@ -82,23 +89,14 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
   'VNP Admin'
 ]
 
-/** Column headers for GET /property/export/file (flat OTA + property fields) */
+/** Column headers for GET /property/export/file (property fields only; credentials excluded) */
 const PROPERTY_FLAT_EXPORT_HEADERS = [
-  'Expedia ID*',
   'Portfolio*',
   'Property Name*',
   'Property Address',
   'Property Currency*',
   'Card Descriptor',
-  'Property ID*',
-  'Agoda ID',
-  'Booking ID',
-  'Expedia Username',
-  'Expedia Password',
-  'Agoda Username',
-  'Agoda Password',
-  'Booking Username',
-  'Booking Password'
+  'Property ID*'
 ] as const
 
 /** Static copy for the "Access Guidance" tab of `export/access-levels` */
@@ -127,10 +125,7 @@ const ACCESS_LEVELS_SHEET_HEADERS = [
   'Property',
   'Expedia ID',
   'Access Levels',
-  'Date of Export',
-  'Portfolio Contact Email',
-  'Portfolio Access Email',
-  'Portfolio Contact Number'
+  'Date of Export'
 ] as const
 
 /**
@@ -746,7 +741,6 @@ export class PropertyService implements IPropertyService {
         'name',
         'address',
         'card_descriptor',
-        'next_due_date',
         'created_at',
         'updated_at',
         'is_active',
@@ -1121,7 +1115,6 @@ export class PropertyService implements IPropertyService {
         'name',
         'address',
         'card_descriptor',
-        'next_due_date',
         'created_at',
         'updated_at',
         'is_active',
@@ -1439,13 +1432,10 @@ export class PropertyService implements IPropertyService {
         p.name ?? '',
         cred?.expedia_id ?? '',
         formatPropertyOtaAccessLevels(cred),
-        exportDateStr,
-        port?.contact_email ?? '',
-        port?.access_email ?? '',
-        port?.access_phone ?? ''
+        exportDateStr
       ])
     }
-    const widths = [24, 28, 16, 24, 16, 28, 28, 26]
+    const widths = [24, 28, 16, 24, 16]
     widths.forEach((w, i) => {
       sheet.getColumn(i + 1).width = w
     })
@@ -1476,35 +1466,14 @@ export class PropertyService implements IPropertyService {
     card_descriptor: string | null
     currency?: { code: string } | null
     portfolio?: { name: string } | null
-    credentials?: {
-      expedia_id?: string
-      agoda_id?: string | null
-      booking_id?: string | null
-      expedia_username?: string | null
-      expedia_password?: string | null
-      agoda_username?: string | null
-      agoda_password?: string | null
-      booking_username?: string | null
-      booking_password?: string | null
-    } | null
   }): string[] {
-    const c = property.credentials
     return [
-      c?.expedia_id ?? '',
       property.portfolio?.name ?? '',
       property.name ?? '',
       property.address ?? '',
       property.currency?.code ?? '',
       property.card_descriptor ?? '',
-      property.id ?? '',
-      c?.agoda_id ?? '',
-      c?.booking_id ?? '',
-      c?.expedia_username ?? '',
-      c?.expedia_password ?? '',
-      c?.agoda_username ?? '',
-      c?.agoda_password ?? '',
-      c?.booking_username ?? '',
-      c?.booking_password ?? ''
+      property.id ?? ''
     ]
   }
 
@@ -1523,7 +1492,7 @@ export class PropertyService implements IPropertyService {
       sheet.addRow(this.buildPropertyFlatExportRow(p))
     }
 
-    const widths = [16, 22, 28, 32, 14, 22, 26, 14, 14, 22, 22, 22, 22, 22, 22]
+    const widths = [22, 28, 32, 14, 22, 26]
     widths.forEach((w, i) => {
       sheet.getColumn(i + 1).width = w
     })
@@ -1936,7 +1905,6 @@ export class PropertyService implements IPropertyService {
         'name',
         'address',
         'card_descriptor',
-        'next_due_date',
         'created_at',
         'updated_at',
         'is_active',
@@ -2121,14 +2089,6 @@ export class PropertyService implements IPropertyService {
       )
 
       const recipientEmails: string[] = []
-
-      if (currentPortfolio?.contact_email) {
-        recipientEmails.push(currentPortfolio.contact_email)
-      }
-
-      if (newPortfolio.contact_email) {
-        recipientEmails.push(newPortfolio.contact_email)
-      }
 
       const emailDelivery = await this.emailUtil.sendPropertyTransferEmail(
         recipientEmails,
@@ -2842,26 +2802,6 @@ export class PropertyService implements IPropertyService {
             'Descriptor'
           ])
 
-          // Extract next due date (optional) - use raw value to preserve Excel date format
-          const nextDueDateValue = getRawValue(row, [
-            'Next Due Date',
-            'Next due date',
-            'Due Date'
-          ])
-          let nextDueDate: Date | null = null
-
-          if (nextDueDateValue) {
-            nextDueDate = parseDate(nextDueDateValue)
-            if (!nextDueDate) {
-              addError(
-                rowNumber,
-                propertyName,
-                'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
-              )
-              continue
-            }
-          }
-
           // Extract portfolio name (REQUIRED)
           const portfolioName = findHeaderValue(row, [
             'Portfolio',
@@ -2910,9 +2850,6 @@ export class PropertyService implements IPropertyService {
               currency_id: currency.id,
               card_descriptor: cardDescriptor || undefined,
               is_active: true,
-              next_due_date: nextDueDate
-                ? nextDueDate.toISOString()
-                : undefined,
               portfolio_id: portfolio.id
             }
 
@@ -3768,27 +3705,6 @@ export class PropertyService implements IPropertyService {
             updateData.card_descriptor = cardDescriptor || undefined
           }
 
-          // Extract next due date (if provided)
-          const nextDueDateValue = getRawValue(row, [
-            'Next Due Date',
-            'Next due date',
-            'Due Date'
-          ])
-          if (nextDueDateValue) {
-            const nextDueDate = parseDate(nextDueDateValue)
-            if (!nextDueDate) {
-              result.errors.push({
-                row: rowNumber,
-                expediaId: expediaIdValue,
-                error:
-                  'Invalid date format for Next Due Date (expected mm/dd/yyyy)'
-              })
-              result.failureCount++
-              continue
-            }
-            updateData.next_due_date = nextDueDate.toISOString()
-          }
-
           // Extract portfolio name (if provided)
           const portfolioName = findHeaderValue(row, [
             'Portfolio',
@@ -4276,7 +4192,6 @@ export class PropertyService implements IPropertyService {
         address: property.address,
         card_descriptor: property.card_descriptor,
         is_active: property.is_active,
-        next_due_date: property.next_due_date,
         portfolio_id: property.portfolio_id,
         currency_id: property.currency_id,
         currency: property.currency,
@@ -4654,5 +4569,575 @@ export class PropertyService implements IPropertyService {
       console.log(`========================================\n`)
       // Don't throw - email notifications are non-critical
     }
+  }
+  private async resolveDefaultCurrencyId(): Promise<string> {
+    const usd = await this.currencyRepository.findByCode('USD')
+    if (usd) return usd.id
+    const all = await this.currencyRepository.findAll()
+    if (all?.length) return all[0].id
+    throw new BadRequestException('No currency configured on dashboard')
+  }
+  private async resolvePortfolioIdByName(
+    name?: string | null
+  ): Promise<string> {
+    if (name) {
+      const existing = await this.portfolioRepository.findByName(name)
+      if (existing) return existing.id
+      const service_type_id =
+        await this.portfolioRepository.resolveServiceTypeIdByType(undefined)
+      const created = await this.portfolioRepository.create({
+        name,
+        service_type_id,
+        is_active: true,
+        is_commissionable: false
+      } as any)
+      return created.id
+    }
+    const internal = await this.portfolioRepository.ensureInternalPortfolio()
+    return internal.id
+  }
+  private async findByAnyOta(
+    expediaId: string | null,
+    bookingId: string | null,
+    agodaId: string | null
+  ): Promise<Property | null> {
+    let p: Property | null = null
+    if (expediaId) p = await this.propertyRepository.findByExpediaId(expediaId)
+    if (!p && bookingId)
+      p = await this.propertyRepository.findByBookingId(bookingId)
+    if (!p && agodaId) p = await this.propertyRepository.findByAgodaId(agodaId)
+    return p
+  }
+  private async resolveCurrencyId(
+    currency: SyncUpsertPropertyDto['currency']
+  ): Promise<string> {
+    const existing = await this.currencyRepository.findByCode(currency.code)
+    if (existing) return existing.id
+
+    const created = await this.currencyRepository.create({
+      code: currency.code,
+      name: currency.name,
+      symbol: currency.symbol,
+      is_active: true
+    })
+    return created.id
+  }
+
+  private async resolvePortfolioIdByParentId(
+    portfolioParentId: string
+  ): Promise<string> {
+    const portfolio =
+      await this.portfolioRepository.findByParentId(portfolioParentId)
+    if (!portfolio) {
+      throw new NotFoundException(
+        `Portfolio not found with parent_id: ${portfolioParentId}`
+      )
+    }
+    return portfolio.id
+  }
+
+  private validateSyncUpsertCredentials(
+    credentials: SyncUpsertPropertyDto['credentials']
+  ): void {
+    const hasExpediaUsername = !!credentials.expedia_username?.trim()
+    const hasExpediaPassword = !!credentials.expedia_password?.trim()
+    if (hasExpediaUsername !== hasExpediaPassword) {
+      throw new BadRequestException(
+        'Expedia username and password must be provided together'
+      )
+    }
+
+    const hasAgodaUsername = !!credentials.agoda_username?.trim()
+    const hasAgodaPassword = !!credentials.agoda_password?.trim()
+    if (hasAgodaPassword && !hasAgodaUsername) {
+      throw new BadRequestException(
+        'Agoda username is required when Agoda password is provided'
+      )
+    }
+
+    const hasBookingUsername = !!credentials.booking_username?.trim()
+    const hasBookingPassword = !!credentials.booking_password?.trim()
+    if (hasBookingUsername !== hasBookingPassword) {
+      throw new BadRequestException(
+        'Booking username and password must be provided together'
+      )
+    }
+  }
+
+  private async upsertSyncCredentials(
+    propertyId: string,
+    credentials: SyncUpsertPropertyDto['credentials'],
+    isCreate: boolean
+  ): Promise<void> {
+    if (isCreate && !credentials.expedia_id?.trim()) {
+      throw new BadRequestException(
+        'credentials.expedia_id is required to create a property'
+      )
+    }
+
+    const encryptionSecret = this.configService.get('encryption.secret', {
+      infer: true
+    })!
+
+    const existingCredentials =
+      await this.credentialsRepository.findByPropertyId(propertyId)
+    const credentialsData: Record<string, string | null> = {
+      expedia_id: String(credentials.expedia_id)
+    }
+
+    if (credentials.expedia_username !== undefined) {
+      credentialsData.expedia_username =
+        credentials.expedia_username?.trim() || null
+    }
+    if (credentials.expedia_password?.trim()) {
+      credentialsData.expedia_password = EncryptionUtil.encrypt(
+        credentials.expedia_password.trim(),
+        encryptionSecret
+      )
+    }
+
+    if (credentials.agoda_id !== undefined) {
+      credentialsData.agoda_id = credentials.agoda_id
+        ? String(credentials.agoda_id)
+        : null
+    }
+    if (credentials.agoda_username !== undefined) {
+      credentialsData.agoda_username =
+        credentials.agoda_username?.trim() || null
+    }
+    if (credentials.agoda_password?.trim()) {
+      credentialsData.agoda_password = EncryptionUtil.encrypt(
+        credentials.agoda_password.trim(),
+        encryptionSecret
+      )
+    }
+
+    if (credentials.booking_id !== undefined) {
+      credentialsData.booking_id = credentials.booking_id
+        ? String(credentials.booking_id)
+        : null
+    }
+    if (credentials.booking_username !== undefined) {
+      credentialsData.booking_username =
+        credentials.booking_username?.trim() || null
+    }
+    if (credentials.booking_password?.trim()) {
+      credentialsData.booking_password = EncryptionUtil.encrypt(
+        credentials.booking_password.trim(),
+        encryptionSecret
+      )
+    }
+
+    if (existingCredentials) {
+      await this.credentialsRepository.update(propertyId, credentialsData)
+    } else {
+      await this.credentialsRepository.create({
+        property_id: propertyId,
+        ...credentialsData
+      })
+    }
+
+    this.otaPasswordPlaintextCache.invalidate()
+  }
+
+  private async fetchSyncUpsertProperty(propertyId: string) {
+    const property = await this.prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        currency: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            symbol: true
+          }
+        },
+        portfolio: {
+          select: {
+            id: true,
+            name: true,
+            is_active: true
+          }
+        },
+        credentials: true
+      }
+    })
+
+    if (!property) {
+      throw new NotFoundException('Property not found after sync upsert')
+    }
+
+    return property
+  }
+
+  async syncUpsert(parentId: string, dto: SyncUpsertPropertyDto) {
+    this.validateSyncUpsertCredentials(dto.credentials)
+
+    const [currency_id, portfolio_id] = await Promise.all([
+      this.resolveCurrencyId(dto.currency),
+      this.resolvePortfolioIdByParentId(dto.portfolio_parent_id)
+    ])
+
+    const existing = await this.propertyRepository.findByParentId(parentId)
+
+    if (existing) {
+      if (dto.name !== existing.name) {
+        const clash = await this.propertyRepository.findByName(dto.name)
+        if (clash && clash.id !== existing.id) {
+          throw new ConflictException('Property with this name already exists')
+        }
+      }
+
+      await this.prisma.property.update({
+        where: { id: existing.id },
+        data: {
+          name: dto.name,
+          address: dto.address,
+          currency_id,
+          card_descriptor: dto.card_descriptor || undefined,
+          portfolio_id,
+          parent_id: parentId,
+          is_active: dto.is_active
+        }
+      })
+      await this.upsertSyncCredentials(existing.id, dto.credentials, false)
+      return this.fetchSyncUpsertProperty(existing.id)
+    }
+
+    const nameClash = await this.propertyRepository.findByName(dto.name)
+    if (nameClash) {
+      throw new ConflictException('Property with this name already exists')
+    }
+
+    const created = await this.propertyRepository.create({
+      name: dto.name,
+      address: dto.address,
+      currency_id,
+      card_descriptor: dto.card_descriptor || undefined,
+      is_active: dto.is_active,
+      portfolio_id,
+      parent_id: parentId
+    })
+
+    await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
+      portfolio_id,
+      created.id
+    )
+    await this.upsertSyncCredentials(created.id, dto.credentials, true)
+    return this.fetchSyncUpsertProperty(created.id)
+  }
+
+  async syncBulkUpsert(
+    items: SyncBulkUpsertPropertyItemDto[]
+  ): Promise<SyncBulkUpsertPropertyResultDto> {
+    if (!Array.isArray(items) || !items.length) {
+      throw new BadRequestException('No items provided')
+    }
+
+    const result: SyncBulkUpsertPropertyResultDto = {
+      totalRows: items.length,
+      createdCount: 0,
+      updatedCount: 0,
+      failureCount: 0,
+      errors: [],
+      successfulUpserts: []
+    }
+
+    const optionalString = (value: unknown): string | undefined => {
+      if (value === undefined || value === null) return undefined
+      if (typeof value !== 'string') return undefined
+      const trimmed = value.trim()
+      return trimmed || undefined
+    }
+
+    for (const item of items) {
+      const rowNumber = item.row
+      const parentId =
+        typeof item.parent_id === 'string' ? item.parent_id.trim() : ''
+
+      if (!Number.isInteger(rowNumber) || rowNumber < 1) {
+        result.errors.push({
+          row: Number.isInteger(rowNumber) ? rowNumber : 0,
+          parent_id: parentId || 'Unknown',
+          error: 'Row is required and must be a positive integer'
+        })
+        result.failureCount++
+        continue
+      }
+
+      if (!parentId) {
+        result.errors.push({
+          row: rowNumber,
+          parent_id: 'Unknown',
+          error: 'Parent ID is required'
+        })
+        result.failureCount++
+        continue
+      }
+
+      try {
+        const name = typeof item.name === 'string' ? item.name.trim() : ''
+        if (!name) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'Property name is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const address =
+          typeof item.address === 'string' ? item.address.trim() : ''
+        if (!address) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'Address is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const currencyCode =
+          typeof item.currency === 'string' ? item.currency.trim() : ''
+        if (!currencyCode) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'Currency is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const portfolioParentId =
+          typeof item.portfolio_parent_id === 'string'
+            ? item.portfolio_parent_id.trim()
+            : ''
+        if (!portfolioParentId) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'Portfolio Parent ID is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        if (typeof item.is_active !== 'boolean') {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'is_active is required and must be a boolean'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const expediaId = optionalString(item.expedia_id)
+        if (!expediaId) {
+          result.errors.push({
+            row: rowNumber,
+            parent_id: parentId,
+            error: 'Expedia ID is required'
+          })
+          result.failureCount++
+          continue
+        }
+
+        const existing = await this.propertyRepository.findByParentId(parentId)
+
+        await this.syncUpsert(parentId, {
+          name,
+          address,
+          currency: {
+            code: currencyCode,
+            name: currencyCode,
+            symbol: ''
+          },
+          card_descriptor: optionalString(item.card_descriptor),
+          portfolio_parent_id: portfolioParentId,
+          is_active: item.is_active,
+          credentials: {
+            expedia_id: expediaId,
+            expedia_username: optionalString(item.expedia_username),
+            expedia_password: optionalString(item.expedia_password),
+            agoda_id: optionalString(item.agoda_id),
+            agoda_username: optionalString(item.agoda_username),
+            agoda_password: optionalString(item.agoda_password),
+            booking_id: optionalString(item.booking_id),
+            booking_username: optionalString(item.booking_username),
+            booking_password: optionalString(item.booking_password)
+          }
+        })
+
+        const action = existing ? 'updated' : 'created'
+        if (existing) {
+          result.updatedCount++
+        } else {
+          result.createdCount++
+        }
+
+        result.successfulUpserts.push({ parent_id: parentId, action })
+      } catch (error) {
+        result.errors.push({
+          row: rowNumber,
+          parent_id: parentId,
+          error:
+            error instanceof Error ? error.message : 'Unknown error occurred'
+        })
+        result.failureCount++
+      }
+    }
+
+    return result
+  }
+
+  async syncCreate(
+    dto: SyncCreatePropertyDto
+  ): Promise<{ status: string; id?: string }> {
+    const expediaId = dto.expedia_id != null ? String(dto.expedia_id) : null
+    const bookingId = dto.booking_id != null ? String(dto.booking_id) : null
+    const agodaId = dto.agoda_id != null ? String(dto.agoda_id) : null
+    let existing = await this.findByAnyOta(expediaId, bookingId, agodaId)
+    if (!existing) existing = await this.propertyRepository.findByName(dto.name)
+    if (existing) return { status: 'already_exists', id: existing.id }
+    const portfolio_id = await this.resolvePortfolioIdByName(dto.portfolio_name)
+    const currency_id = await this.resolveDefaultCurrencyId()
+    const created = await this.propertyRepository.create({
+      name: dto.name,
+      address: '',
+      currency_id,
+      portfolio_id,
+      is_active: true
+    } as any)
+    if (expediaId) {
+      await this.credentialsRepository.create({
+        property_id: created.id,
+        expedia_id: expediaId,
+        ...(agodaId ? { agoda_id: agodaId } : {}),
+        ...(bookingId ? { booking_id: bookingId } : {})
+      })
+    }
+    return { status: 'created', id: created.id }
+  }
+  async syncByOta(
+    dto: SyncByOtaPropertyDto
+  ): Promise<{ status: string; id?: string }> {
+    const expediaId = dto.expedia_id != null ? String(dto.expedia_id) : null
+    const bookingId = dto.booking_id != null ? String(dto.booking_id) : null
+    const agodaId = dto.agoda_id != null ? String(dto.agoda_id) : null
+    if (!expediaId && !bookingId && !agodaId) return { status: 'no_ota_ids' }
+    const property = await this.findByAnyOta(expediaId, bookingId, agodaId)
+    if (!property) return { status: 'not_found' }
+    const allowed = ['name', 'card_descriptor', 'is_active']
+    const patch: any = {}
+    for (const k of allowed)
+      if (dto.data?.[k] !== undefined) patch[k] = dto.data[k]
+    if (!Object.keys(patch).length) return { status: 'no_op', id: property.id }
+    const updated = await this.propertyRepository.update(property.id, patch)
+    return { status: 'updated', id: updated.id }
+  }
+  async syncDelete(parentId: string): Promise<{ message: string }> {
+    await this.deleteSyncedPropertyByParentId(parentId)
+    return { message: 'Property deleted successfully' }
+  }
+
+  async syncBulkDelete(
+    dto: SyncBulkDeletePropertyDto
+  ): Promise<SyncBulkDeletePropertyResultDto> {
+    const items = dto.items ?? []
+    if (!items.length) {
+      throw new BadRequestException('No items provided')
+    }
+
+    this.logger.log(`[sync-bulk-delete] body=${JSON.stringify(dto)}`)
+
+    const result: SyncBulkDeletePropertyResultDto = {
+      totalCount: items.length,
+      deletedCount: 0,
+      failureCount: 0,
+      errors: [],
+      successfulDeletes: []
+    }
+
+    for (const item of items) {
+      const parentId =
+        typeof item.parent_id === 'string' ? item.parent_id.trim() : ''
+
+      if (!parentId) {
+        result.errors.push({
+          parent_id: 'Unknown',
+          error: 'Parent ID is required'
+        })
+        result.failureCount++
+        continue
+      }
+
+      try {
+        await this.deleteSyncedPropertyByParentId(parentId)
+        result.deletedCount++
+        result.successfulDeletes.push({ parent_id: parentId })
+      } catch (error) {
+        result.errors.push({
+          parent_id: parentId,
+          error:
+            error instanceof Error ? error.message : 'Unknown error occurred'
+        })
+        result.failureCount++
+      }
+    }
+
+    return result
+  }
+
+  private async deleteSyncedPropertyByParentId(
+    parentId: string
+  ): Promise<void> {
+    const property = await this.propertyRepository.findByParentId(parentId)
+
+    if (!property) {
+      throw new NotFoundException(
+        `Property not found with parent_id: ${parentId}`
+      )
+    }
+
+    const unarchivedAuditCount = await this.prisma.audit.count({
+      where: {
+        property_id: property.id,
+        is_archived: false
+      }
+    })
+
+    if (unarchivedAuditCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete property. It has ${unarchivedAuditCount} unarchived audit${unarchivedAuditCount === 1 ? '' : 's'}. Please archive all audits before deleting the property.`
+      )
+    }
+
+    await this.propertyRepository.delete(property.id)
+    await this.permissionService.removePropertyFromAllUserAccessLists(
+      property.id
+    )
+  }
+
+  async syncBulkCreate(items: SyncCreatePropertyDto[]) {
+    let created = 0,
+      alreadyExists = 0,
+      failed = 0
+    for (const item of items) {
+      try {
+        const r = await this.syncCreate(item)
+        if (r.status === 'created') created++
+        else if (r.status === 'already_exists') alreadyExists++
+      } catch (e: any) {
+        failed++
+        this.logger.error(
+          `[sync] bulk create failed for "${item.name}": ${e?.message ?? e}`
+        )
+      }
+    }
+    return { created, alreadyExists, failed }
   }
 }

@@ -51,12 +51,12 @@ model Portfolio {
   serviceType       ServiceType @relation(fields: [service_type_id], references: [id])
   currency          String      @default("USD")
   is_active         Boolean
-  contact_email     String?
   is_commissionable Boolean
-  access_email      String?
-  access_phone      String?
+  parent_id         String?
   sales_agent_id    String?     @db.ObjectId
   salesAgent        SalesAgent? @relation(fields: [sales_agent_id], references: [id])
+
+  file_count Int @default(0)
 
   properties          Property[]
   notes               Note[]
@@ -74,6 +74,7 @@ model Portfolio {
   @@index([is_active])
   @@index([is_commissionable])
   @@index([sales_agent_id])
+  @@index([parent_id])
 }
 
 model ApiKey {
@@ -114,10 +115,10 @@ model Property {
   currency              Currency  @relation(fields: [currency_id], references: [id])
   card_descriptor       String?
   is_active             Boolean   @default(true)
-  next_due_date         DateTime?
   portfolio_id          String    @db.ObjectId
   portfolio             Portfolio @relation(fields: [portfolio_id], references: [id], onDelete: Cascade)
   previous_portfolio_id String?   @db.ObjectId
+  parent_id             String?
   show_in_portfolio     String[]  @db.ObjectId
 
   audits               Audit[]
@@ -134,8 +135,8 @@ model Property {
   @@index([portfolio_id])
   @@index([currency_id])
   @@index([is_active])
-  @@index([next_due_date])
   @@index([portfolio_id, is_active])
+  @@index([parent_id])
 }
 
 model Otp {

@@ -5,7 +5,7 @@ import type {
   IGlobalReportRepository,
   AggregationResult,
   OtaIdItem,
-  PortfolioContactEmailItem,
+  PortfolioParentIdItem,
   OtaUsernameItem,
   PortfolioListItem,
   PropertyListItem
@@ -24,14 +24,17 @@ export class GlobalReportRepository implements IGlobalReportRepository {
   /** In-memory cache for OTA IDs */
   private otaIdsCache: CacheEntry<OtaIdItem[]> | null = null
 
-  /** In-memory cache for portfolio contact emails */
-  private portfolioEmailsCache: CacheEntry<PortfolioContactEmailItem[]> | null = null
+  /** In-memory cache for portfolio parent IDs */
+  private portfolioParentIdsCache: CacheEntry<PortfolioParentIdItem[]> | null =
+    null
 
   /** In-memory cache for OTA usernames */
   private otaUsernamesCache: CacheEntry<OtaUsernameItem[]> | null = null
 
   /** In-memory cache for OTA passwords */
-  private otaPasswordsCache: CacheEntry<{ password: string; otaType: string }[]> | null = null
+  private otaPasswordsCache: CacheEntry<
+    { password: string; otaType: string }[]
+  > | null = null
 
   /** In-memory cache for portfolios list */
   private portfoliosCache: CacheEntry<PortfolioListItem[]> | null = null
@@ -53,7 +56,7 @@ export class GlobalReportRepository implements IGlobalReportRepository {
    */
   invalidateCache(): void {
     this.otaIdsCache = null
-    this.portfolioEmailsCache = null
+    this.portfolioParentIdsCache = null
     this.otaUsernamesCache = null
     this.otaPasswordsCache = null
     this.portfoliosCache = null
@@ -307,21 +310,36 @@ export class GlobalReportRepository implements IGlobalReportRepository {
                 input: [
                   {
                     $cond: [
-                      { $and: [{ $ne: ['$expedia_id', null] }, { $ne: ['$expedia_id', ''] }] },
+                      {
+                        $and: [
+                          { $ne: ['$expedia_id', null] },
+                          { $ne: ['$expedia_id', ''] }
+                        ]
+                      },
                       { otaId: '$expedia_id', otaType: 'expedia' },
                       null
                     ]
                   },
                   {
                     $cond: [
-                      { $and: [{ $ne: ['$agoda_id', null] }, { $ne: ['$agoda_id', ''] }] },
+                      {
+                        $and: [
+                          { $ne: ['$agoda_id', null] },
+                          { $ne: ['$agoda_id', ''] }
+                        ]
+                      },
                       { otaId: '$agoda_id', otaType: 'agoda' },
                       null
                     ]
                   },
                   {
                     $cond: [
-                      { $and: [{ $ne: ['$booking_id', null] }, { $ne: ['$booking_id', ''] }] },
+                      {
+                        $and: [
+                          { $ne: ['$booking_id', null] },
+                          { $ne: ['$booking_id', ''] }
+                        ]
+                      },
                       { otaId: '$booking_id', otaType: 'booking' },
                       null
                     ]
@@ -366,48 +384,38 @@ export class GlobalReportRepository implements IGlobalReportRepository {
    * Get all unique portfolio contact emails
    * Uses MongoDB aggregation for efficient deduplication and in-memory caching
    */
-  async findAllPortfolioContactEmails(): Promise<PortfolioContactEmailItem[]> {
-    // Return cached data if valid
-    if (this.isCacheValid(this.portfolioEmailsCache)) {
-      return this.portfolioEmailsCache.data
+  async findAllPortfolioParentIds(): Promise<PortfolioParentIdItem[]> {
+    if (this.isCacheValid(this.portfolioParentIdsCache)) {
+      return this.portfolioParentIdsCache.data
     }
 
-    // Use MongoDB aggregation for efficient deduplication at DB level
     const result = await this.prisma.portfolio.aggregateRaw({
       pipeline: [
-        // Filter out null/empty contact emails
         {
           $match: {
-            $and: [
-              { contact_email: { $ne: null } },
-              { contact_email: { $ne: '' } }
-            ]
+            $and: [{ parent_id: { $ne: null } }, { parent_id: { $ne: '' } }]
           }
         },
-        // Group by email to remove duplicates, keep first portfolio name
         {
           $group: {
-            _id: '$contact_email',
+            _id: '$parent_id',
             portfolioName: { $first: '$name' }
           }
         },
-        // Project to final format
         {
           $project: {
             _id: 0,
-            email: '$_id',
+            parentId: '$_id',
             portfolioName: 1
           }
         },
-        // Sort by email
-        { $sort: { email: 1 } }
+        { $sort: { parentId: 1 } }
       ]
     })
 
-    const data = result as unknown as PortfolioContactEmailItem[]
+    const data = result as unknown as PortfolioParentIdItem[]
 
-    // Cache the result
-    this.portfolioEmailsCache = { data, timestamp: Date.now() }
+    this.portfolioParentIdsCache = { data, timestamp: Date.now() }
 
     return data
   }
@@ -433,21 +441,36 @@ export class GlobalReportRepository implements IGlobalReportRepository {
                 input: [
                   {
                     $cond: [
-                      { $and: [{ $ne: ['$expedia_username', null] }, { $ne: ['$expedia_username', ''] }] },
+                      {
+                        $and: [
+                          { $ne: ['$expedia_username', null] },
+                          { $ne: ['$expedia_username', ''] }
+                        ]
+                      },
                       { username: '$expedia_username', otaType: 'expedia' },
                       null
                     ]
                   },
                   {
                     $cond: [
-                      { $and: [{ $ne: ['$agoda_username', null] }, { $ne: ['$agoda_username', ''] }] },
+                      {
+                        $and: [
+                          { $ne: ['$agoda_username', null] },
+                          { $ne: ['$agoda_username', ''] }
+                        ]
+                      },
                       { username: '$agoda_username', otaType: 'agoda' },
                       null
                     ]
                   },
                   {
                     $cond: [
-                      { $and: [{ $ne: ['$booking_username', null] }, { $ne: ['$booking_username', ''] }] },
+                      {
+                        $and: [
+                          { $ne: ['$booking_username', null] },
+                          { $ne: ['$booking_username', ''] }
+                        ]
+                      },
                       { username: '$booking_username', otaType: 'booking' },
                       null
                     ]
@@ -495,7 +518,9 @@ export class GlobalReportRepository implements IGlobalReportRepository {
    * Note: Passwords are returned encrypted. Decryption happens in the service layer
    * with parallel processing for performance.
    */
-  async findAllOtaPasswords(): Promise<{ password: string; otaType: string }[]> {
+  async findAllOtaPasswords(): Promise<
+    { password: string; otaType: string }[]
+  > {
     // Return cached data if valid
     if (this.isCacheValid(this.otaPasswordsCache)) {
       return this.otaPasswordsCache.data
@@ -512,21 +537,36 @@ export class GlobalReportRepository implements IGlobalReportRepository {
                 input: [
                   {
                     $cond: [
-                      { $and: [{ $ne: ['$expedia_password', null] }, { $ne: ['$expedia_password', ''] }] },
+                      {
+                        $and: [
+                          { $ne: ['$expedia_password', null] },
+                          { $ne: ['$expedia_password', ''] }
+                        ]
+                      },
                       { password: '$expedia_password', otaType: 'expedia' },
                       null
                     ]
                   },
                   {
                     $cond: [
-                      { $and: [{ $ne: ['$agoda_password', null] }, { $ne: ['$agoda_password', ''] }] },
+                      {
+                        $and: [
+                          { $ne: ['$agoda_password', null] },
+                          { $ne: ['$agoda_password', ''] }
+                        ]
+                      },
                       { password: '$agoda_password', otaType: 'agoda' },
                       null
                     ]
                   },
                   {
                     $cond: [
-                      { $and: [{ $ne: ['$booking_password', null] }, { $ne: ['$booking_password', ''] }] },
+                      {
+                        $and: [
+                          { $ne: ['$booking_password', null] },
+                          { $ne: ['$booking_password', ''] }
+                        ]
+                      },
                       { password: '$booking_password', otaType: 'booking' },
                       null
                     ]

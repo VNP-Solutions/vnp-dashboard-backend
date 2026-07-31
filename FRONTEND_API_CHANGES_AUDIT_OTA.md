@@ -14,31 +14,35 @@ The `type_of_ota` field in the Audit model has been changed from a **single valu
 ### 1. Audit Data Structure Change
 
 **BEFORE:**
+
 ```json
 {
   "id": "65f8a7b2c3d4e5f6g7h8i9j0",
   "type_of_ota": "expedia",
   "property_id": "...",
-  "amount_collectable": 5000.50
+  "amount_collectable": 5000.5
 }
 ```
 
 **AFTER:**
+
 ```json
 {
   "id": "65f8a7b2c3d4e5f6g7h8i9j0",
   "type_of_ota": ["expedia", "agoda"],
   "property_id": "...",
-  "amount_collectable": 5000.50
+  "amount_collectable": 5000.5
 }
 ```
 
 **Possible values for array items:**
+
 - `"expedia"`
 - `"agoda"`
 - `"booking"`
 
 **Array characteristics:**
+
 - Can be empty: `[]`
 - Can contain 1-3 unique values (no duplicates)
 - Values are strings (enum)
@@ -50,15 +54,16 @@ The `type_of_ota` field in the Audit model has been changed from a **single valu
 ### 1. GET `/api/audit` - Get All Audits
 
 **Response Change:**
+
 ```typescript
 // OLD
 interface Audit {
-  type_of_ota?: "expedia" | "agoda" | "booking" | null
+  type_of_ota?: 'expedia' | 'agoda' | 'booking' | null
 }
 
 // NEW
 interface Audit {
-  type_of_ota: ("expedia" | "agoda" | "booking")[]  // Array, defaults to []
+  type_of_ota: ('expedia' | 'agoda' | 'booking')[] // Array, defaults to []
 }
 ```
 
@@ -81,31 +86,35 @@ GET /api/audit?type_of_ota=expedia
 **Request Body Change:**
 
 **OLD:**
+
 ```json
 {
   "property_id": "65f8a7b2...",
   "audit_status_id": "65f8a7b2...",
   "type_of_ota": "expedia",
-  "amount_collectable": 5000.50
+  "amount_collectable": 5000.5
 }
 ```
 
 **NEW:**
+
 ```json
 {
   "property_id": "65f8a7b2...",
   "audit_status_id": "65f8a7b2...",
   "type_of_ota": ["expedia", "agoda"],
-  "amount_collectable": 5000.50
+  "amount_collectable": 5000.5
 }
 ```
 
 **Validation:**
+
 - Array is optional, defaults to `[]`
 - Duplicates are automatically removed by backend
 - Values must be valid OTA types
 
 **Examples:**
+
 ```typescript
 // Single OTA type
 { "type_of_ota": ["expedia"] }
@@ -125,6 +134,7 @@ GET /api/audit?type_of_ota=expedia
 Same changes as Create - `type_of_ota` is now an array.
 
 **Example:**
+
 ```json
 {
   "type_of_ota": ["booking"]
@@ -138,6 +148,7 @@ Same changes as Create - `type_of_ota` is now an array.
 **OTA Type Column (formerly single value):**
 
 **OLD:**
+
 ```
 OTA
 ----
@@ -147,6 +158,7 @@ booking
 ```
 
 **NEW (comma-separated for multiple):**
+
 ```
 OTA
 ----
@@ -157,6 +169,7 @@ agoda, booking, expedia
 ```
 
 The backend will:
+
 - Split comma-separated values
 - Trim whitespace
 - Remove duplicates
@@ -173,18 +186,20 @@ Same Excel format changes as Bulk Import.
 The statistics now handle audits with multiple OTA types:
 
 **Behavior:**
+
 - An audit with `["expedia", "agoda"]` contributes to BOTH `expedia` and `agoda` totals
 - The `total` amount counts each audit only once
 - Individual OTA totals may sum to more than the total
 
 **Example:**
+
 ```json
 {
   "amount_collectable": {
-    "total": 10000,      // Total across all audits (each counted once)
-    "expedia": 7000,     // May include audits with multiple OTAs
-    "agoda": 5000,       // May include audits with multiple OTAs
-    "booking": 3000      // May include audits with multiple OTAs
+    "total": 10000, // Total across all audits (each counted once)
+    "expedia": 7000, // May include audits with multiple OTAs
+    "agoda": 5000, // May include audits with multiple OTAs
+    "booking": 3000 // May include audits with multiple OTAs
   }
 }
 ```
@@ -196,6 +211,7 @@ The statistics now handle audits with multiple OTA types:
 **Response Changes:**
 
 **OLD:**
+
 ```json
 {
   "data": [
@@ -211,6 +227,7 @@ The statistics now handle audits with multiple OTA types:
 ```
 
 **NEW (Separate Fields Approach):**
+
 ```json
 {
   "data": [
@@ -236,6 +253,7 @@ The statistics now handle audits with multiple OTA types:
 ```
 
 **Why This Change:**
+
 - An audit can now have multiple OTA types (e.g., both Expedia and Agoda for the same property)
 - Separate fields for each OTA make filtering, sorting, and data manipulation much easier
 - Each OTA credential is in its own column, creating a more structured and maintainable table
@@ -243,11 +261,13 @@ The statistics now handle audits with multiple OTA types:
 - Better export experience: clean columns in CSV/Excel instead of concatenated values
 
 **Display Format:**
+
 - `otaType`: Display as array/tags (e.g., badges for "expedia", "agoda")
 - Individual OTA fields: Display in separate columns
 - Null values: Show as empty cells or "-"
 
 **Filtering (NEW Capabilities):**
+
 ```typescript
 // Filter by OTA type (array contains check)
 {
@@ -345,7 +365,7 @@ export interface Audit {
   id: string
   property_id: string
   audit_status_id: string
-  type_of_ota: OtaType[]  // Changed from OtaType | null to OtaType[]
+  type_of_ota: OtaType[] // Changed from OtaType | null to OtaType[]
   amount_collectable?: number
   amount_confirmed?: number
   // ... other fields
@@ -364,27 +384,26 @@ export interface GlobalReportRow {
   propertyName: string
   serviceType: string | null
   billingType: string | null
-  otaType: string[]  // Array of OTA types
-  
+  otaType: string[] // Array of OTA types
+
   // Expedia credentials
   expediaId: string | null
   expediaUsername: string | null
   expediaPassword: string | null
-  
+
   // Agoda credentials
   agodaId: string | null
   agodaUsername: string | null
   agodaPassword: string | null
-  
+
   // Booking credentials
   bookingId: string | null
   bookingUsername: string | null
   bookingPassword: string | null
-  
+
   auditStatus: string | null
   startDate: Date | null
   endDate: Date | null
-  nextDueDate: Date | null
   currency: string
   amountCollectable: number | null
   amountConfirmed: number | null
@@ -405,12 +424,12 @@ function AuditRow({ audit }: { audit: Audit }) {
       <td>
         {audit.type_of_ota.length > 0 ? (
           audit.type_of_ota.map(ota => (
-            <span key={ota} className="badge badge-primary">
+            <span key={ota} className='badge badge-primary'>
               {ota}
             </span>
           ))
         ) : (
-          <span className="text-muted">No OTA</span>
+          <span className='text-muted'>No OTA</span>
         )}
       </td>
       <td>${audit.amount_collectable}</td>
@@ -436,7 +455,7 @@ const fetchAudits = async (otaType?: string) => {
   if (otaType) {
     params.append('type_of_ota', otaType)
   }
-  
+
   const response = await fetch(`/api/audit?${params}`)
   return response.json()
 }
@@ -480,7 +499,7 @@ function AuditForm() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type_of_ota: selectedOtas,  // Array
+        type_of_ota: selectedOtas // Array
         // ... other fields
       })
     })
@@ -492,7 +511,7 @@ function AuditForm() {
         options={otaOptions}
         value={selectedOtas}
         onChange={setSelectedOtas}
-        placeholder="Select OTA Types"
+        placeholder='Select OTA Types'
         maxSelections={3}
       />
       {/* Other form fields */}
@@ -520,15 +539,15 @@ Hotel D       |                        | 3000
 ```typescript
 function parseExcelOtaColumn(cell: string): OtaType[] {
   if (!cell || cell.trim() === '') return []
-  
+
   return cell
     .split(',')
     .map(ota => ota.trim().toLowerCase())
-    .filter((ota): ota is OtaType => 
+    .filter((ota): ota is OtaType =>
       ['expedia', 'agoda', 'booking'].includes(ota)
     )
-    .filter((ota, index, self) => 
-      self.indexOf(ota) === index  // Remove duplicates
+    .filter(
+      (ota, index, self) => self.indexOf(ota) === index // Remove duplicates
     )
 }
 ```
@@ -542,7 +561,7 @@ function GlobalStats({ stats }: { stats: GlobalStatsResponse }) {
   return (
     <div>
       <h3>Total Amount: ${stats.amount_collectable.total}</h3>
-      <div className="ota-breakdown">
+      <div className='ota-breakdown'>
         <div>
           <span>Expedia:</span>
           <span>${stats.amount_collectable.expedia}</span>
@@ -556,7 +575,7 @@ function GlobalStats({ stats }: { stats: GlobalStatsResponse }) {
           <span>${stats.amount_collectable.booking}</span>
         </div>
       </div>
-      <p className="note">
+      <p className='note'>
         * Note: Audits with multiple OTAs are counted in each category
       </p>
     </div>
@@ -598,7 +617,9 @@ function GlobalReportTable({ data }: { data: GlobalReportRow[] }) {
             <td>{row.propertyName}</td>
             <td>
               {row.otaType.map(ota => (
-                <span key={ota} className="badge">{ota}</span>
+                <span key={ota} className='badge'>
+                  {ota}
+                </span>
               ))}
             </td>
             <td>{row.expediaId || '-'}</td>
@@ -626,15 +647,19 @@ function GlobalReportTable({ data }: { data: GlobalReportRow[] }) {
 // For smaller screens, group OTA credentials in collapsible sections
 function GlobalReportCard({ row }: { row: GlobalReportRow }) {
   return (
-    <div className="report-card">
+    <div className='report-card'>
       <h4>{row.propertyName}</h4>
       <p>{row.portfolioName}</p>
-      
+
       {/* OTA Type badges */}
-      <div className="ota-types">
-        {row.otaType.map(ota => <span key={ota} className="badge">{ota}</span>)}
+      <div className='ota-types'>
+        {row.otaType.map(ota => (
+          <span key={ota} className='badge'>
+            {ota}
+          </span>
+        ))}
       </div>
-      
+
       {/* Collapsible Expedia section */}
       {row.expediaId && (
         <details>
@@ -646,7 +671,7 @@ function GlobalReportCard({ row }: { row: GlobalReportRow }) {
           </div>
         </details>
       )}
-      
+
       {/* Collapsible Agoda section */}
       {row.agodaId && (
         <details>
@@ -658,7 +683,7 @@ function GlobalReportCard({ row }: { row: GlobalReportRow }) {
           </div>
         </details>
       )}
-      
+
       {/* Collapsible Booking section */}
       {row.bookingId && (
         <details>
@@ -670,7 +695,7 @@ function GlobalReportCard({ row }: { row: GlobalReportRow }) {
           </div>
         </details>
       )}
-      
+
       <p>Status: {row.auditStatus}</p>
       <p>Amount: ${row.amountCollectable}</p>
     </div>
@@ -686,48 +711,60 @@ function GlobalReportFilters() {
   const [expediaIds, setExpediaIds] = useState<string[]>([])
   const [agodaIds, setAgodaIds] = useState<string[]>([])
   const [bookingIds, setBookingIds] = useState<string[]>([])
-  
+
   useEffect(() => {
     // Load filter options from new endpoints
     fetch('/api/global-report/expedia-ids')
       .then(res => res.json())
       .then(data => setExpediaIds(data.data))
-    
+
     fetch('/api/global-report/agoda-ids')
       .then(res => res.json())
       .then(data => setAgodaIds(data.data))
-    
+
     fetch('/api/global-report/booking-ids')
       .then(res => res.json())
       .then(data => setBookingIds(data.data))
   }, [])
-  
+
   return (
-    <div className="filters">
+    <div className='filters'>
       {/* Expedia filters */}
-      <div className="filter-group">
+      <div className='filter-group'>
         <h4>Expedia</h4>
-        <select name="expediaId">
-          <option value="">All IDs</option>
-          {expediaIds.map(id => <option key={id} value={id}>{id}</option>)}
+        <select name='expediaId'>
+          <option value=''>All IDs</option>
+          {expediaIds.map(id => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
         </select>
       </div>
-      
+
       {/* Agoda filters */}
-      <div className="filter-group">
+      <div className='filter-group'>
         <h4>Agoda</h4>
-        <select name="agodaId">
-          <option value="">All IDs</option>
-          {agodaIds.map(id => <option key={id} value={id}>{id}</option>)}
+        <select name='agodaId'>
+          <option value=''>All IDs</option>
+          {agodaIds.map(id => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
         </select>
       </div>
-      
+
       {/* Booking filters */}
-      <div className="filter-group">
+      <div className='filter-group'>
         <h4>Booking</h4>
-        <select name="bookingId">
-          <option value="">All IDs</option>
-          {bookingIds.map(id => <option key={id} value={id}>{id}</option>)}
+        <select name='bookingId'>
+          <option value=''>All IDs</option>
+          {bookingIds.map(id => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
         </select>
       </div>
     </div>
@@ -742,6 +779,7 @@ function GlobalReportFilters() {
 ### Overview of Changes
 
 The Global Report now displays OTA credentials in **separate columns** for each OTA type (Expedia, Agoda, Booking) instead of concatenated values. This provides:
+
 - Better filtering capabilities
 - Easier sorting
 - Cleaner CSV/Excel exports
@@ -752,8 +790,8 @@ The Global Report now displays OTA credentials in **separate columns** for each 
 ```typescript
 // OLD: Concatenated approach
 interface OldReportRow {
-  otaType: string  // "expedia, agoda"
-  otaId: string    // "expedia: EXP-123; agoda: AGO-456"
+  otaType: string // "expedia, agoda"
+  otaId: string // "expedia: EXP-123; agoda: AGO-456"
   otaUsername: string
   otaPassword: string
 }
@@ -765,28 +803,27 @@ interface GlobalReportRow {
   propertyName: string
   serviceType: string | null
   billingType: string | null
-  
-  otaType: string[]  // ["expedia", "agoda"]
-  
+
+  otaType: string[] // ["expedia", "agoda"]
+
   // Expedia credentials (separate fields)
   expediaId: string | null
   expediaUsername: string | null
   expediaPassword: string | null
-  
+
   // Agoda credentials (separate fields)
   agodaId: string | null
   agodaUsername: string | null
   agodaPassword: string | null
-  
+
   // Booking credentials (separate fields)
   bookingId: string | null
   bookingUsername: string | null
   bookingPassword: string | null
-  
+
   auditStatus: string | null
   startDate: Date | null
   endDate: Date | null
-  nextDueDate: Date | null
   currency: string
   amountCollectable: number | null
   amountConfirmed: number | null
@@ -814,26 +851,25 @@ export interface GlobalReportRow {
   serviceType: string | null
   billingType: string | null
   otaType: OtaType[]
-  
+
   // Expedia
   expediaId: string | null
   expediaUsername: string | null
   expediaPassword: string | null
-  
+
   // Agoda
   agodaId: string | null
   agodaUsername: string | null
   agodaPassword: string | null
-  
+
   // Booking
   bookingId: string | null
   bookingUsername: string | null
   bookingPassword: string | null
-  
+
   auditStatus: string | null
   startDate: Date | null
   endDate: Date | null
-  nextDueDate: Date | null
   currency: string
   amountCollectable: number | null
   amountConfirmed: number | null
@@ -885,7 +921,7 @@ export const useGlobalReportFilters = () => {
     const fetchFilters = async () => {
       try {
         setLoading(true)
-        
+
         // Fetch all filter options in parallel
         const [
           expediaIdsRes,
@@ -984,52 +1020,54 @@ export const GlobalReportFilters: React.FC<{
   }
 
   return (
-    <div className="global-report-filters">
+    <div className='global-report-filters'>
       {/* OTA Type Multi-Select */}
-      <div className="filter-group">
+      <div className='filter-group'>
         <label>OTA Types</label>
         <select
           multiple
           value={selectedFilters.otaType}
-          onChange={(e) => {
+          onChange={e => {
             const values = Array.from(
               e.target.selectedOptions,
-              (option) => option.value
+              option => option.value
             )
             handleFilterChange('otaType', values)
           }}
         >
-          <option value="expedia">Expedia</option>
-          <option value="agoda">Agoda</option>
-          <option value="booking">Booking</option>
+          <option value='expedia'>Expedia</option>
+          <option value='agoda'>Agoda</option>
+          <option value='booking'>Booking</option>
         </select>
       </div>
 
       {/* Expedia Filters */}
-      <div className="filter-section">
+      <div className='filter-section'>
         <h3>Expedia</h3>
-        <div className="filter-group">
+        <div className='filter-group'>
           <label>Expedia ID</label>
           <select
             value={selectedFilters.expediaId}
-            onChange={(e) => handleFilterChange('expediaId', e.target.value)}
+            onChange={e => handleFilterChange('expediaId', e.target.value)}
           >
-            <option value="">All</option>
-            {filters.expediaIds.map((id) => (
+            <option value=''>All</option>
+            {filters.expediaIds.map(id => (
               <option key={id} value={id}>
                 {id}
               </option>
             ))}
           </select>
         </div>
-        <div className="filter-group">
+        <div className='filter-group'>
           <label>Expedia Username</label>
           <select
             value={selectedFilters.expediaUsername}
-            onChange={(e) => handleFilterChange('expediaUsername', e.target.value)}
+            onChange={e =>
+              handleFilterChange('expediaUsername', e.target.value)
+            }
           >
-            <option value="">All</option>
-            {filters.expediaUsernames.map((username) => (
+            <option value=''>All</option>
+            {filters.expediaUsernames.map(username => (
               <option key={username} value={username}>
                 {username}
               </option>
@@ -1039,30 +1077,30 @@ export const GlobalReportFilters: React.FC<{
       </div>
 
       {/* Agoda Filters */}
-      <div className="filter-section">
+      <div className='filter-section'>
         <h3>Agoda</h3>
-        <div className="filter-group">
+        <div className='filter-group'>
           <label>Agoda ID</label>
           <select
             value={selectedFilters.agodaId}
-            onChange={(e) => handleFilterChange('agodaId', e.target.value)}
+            onChange={e => handleFilterChange('agodaId', e.target.value)}
           >
-            <option value="">All</option>
-            {filters.agodaIds.map((id) => (
+            <option value=''>All</option>
+            {filters.agodaIds.map(id => (
               <option key={id} value={id}>
                 {id}
               </option>
             ))}
           </select>
         </div>
-        <div className="filter-group">
+        <div className='filter-group'>
           <label>Agoda Username</label>
           <select
             value={selectedFilters.agodaUsername}
-            onChange={(e) => handleFilterChange('agodaUsername', e.target.value)}
+            onChange={e => handleFilterChange('agodaUsername', e.target.value)}
           >
-            <option value="">All</option>
-            {filters.agodaUsernames.map((username) => (
+            <option value=''>All</option>
+            {filters.agodaUsernames.map(username => (
               <option key={username} value={username}>
                 {username}
               </option>
@@ -1072,30 +1110,32 @@ export const GlobalReportFilters: React.FC<{
       </div>
 
       {/* Booking Filters */}
-      <div className="filter-section">
+      <div className='filter-section'>
         <h3>Booking.com</h3>
-        <div className="filter-group">
+        <div className='filter-group'>
           <label>Booking ID</label>
           <select
             value={selectedFilters.bookingId}
-            onChange={(e) => handleFilterChange('bookingId', e.target.value)}
+            onChange={e => handleFilterChange('bookingId', e.target.value)}
           >
-            <option value="">All</option>
-            {filters.bookingIds.map((id) => (
+            <option value=''>All</option>
+            {filters.bookingIds.map(id => (
               <option key={id} value={id}>
                 {id}
               </option>
             ))}
           </select>
         </div>
-        <div className="filter-group">
+        <div className='filter-group'>
           <label>Booking Username</label>
           <select
             value={selectedFilters.bookingUsername}
-            onChange={(e) => handleFilterChange('bookingUsername', e.target.value)}
+            onChange={e =>
+              handleFilterChange('bookingUsername', e.target.value)
+            }
           >
-            <option value="">All</option>
-            {filters.bookingUsernames.map((username) => (
+            <option value=''>All</option>
+            {filters.bookingUsernames.map(username => (
               <option key={username} value={username}>
                 {username}
               </option>
@@ -1120,8 +1160,8 @@ export const GlobalReportTable: React.FC<{
   data: GlobalReportRow[]
 }> = ({ data }) => {
   return (
-    <div className="table-responsive">
-      <table className="global-report-table">
+    <div className='table-responsive'>
+      <table className='global-report-table'>
         <thead>
           <tr>
             <th>Portfolio</th>
@@ -1146,14 +1186,14 @@ export const GlobalReportTable: React.FC<{
           </tr>
         </thead>
         <tbody>
-          {data.map((row) => (
+          {data.map(row => (
             <tr key={row.auditId}>
               <td>{row.portfolioName}</td>
               <td>{row.propertyName}</td>
               <td>{row.serviceType || '-'}</td>
               <td>
-                <div className="ota-badges">
-                  {row.otaType.map((ota) => (
+                <div className='ota-badges'>
+                  {row.otaType.map(ota => (
                     <span key={ota} className={`badge badge-${ota}`}>
                       {ota}
                     </span>
@@ -1165,9 +1205,7 @@ export const GlobalReportTable: React.FC<{
               <td>{row.expediaUsername || '-'}</td>
               <td>
                 {row.expediaPassword ? (
-                  <span className="password-field">
-                    {row.expediaPassword}
-                  </span>
+                  <span className='password-field'>{row.expediaPassword}</span>
                 ) : (
                   '-'
                 )}
@@ -1177,9 +1215,7 @@ export const GlobalReportTable: React.FC<{
               <td>{row.agodaUsername || '-'}</td>
               <td>
                 {row.agodaPassword ? (
-                  <span className="password-field">
-                    {row.agodaPassword}
-                  </span>
+                  <span className='password-field'>{row.agodaPassword}</span>
                 ) : (
                   '-'
                 )}
@@ -1189,9 +1225,7 @@ export const GlobalReportTable: React.FC<{
               <td>{row.bookingUsername || '-'}</td>
               <td>
                 {row.bookingPassword ? (
-                  <span className="password-field">
-                    {row.bookingPassword}
-                  </span>
+                  <span className='password-field'>{row.bookingPassword}</span>
                 ) : (
                   '-'
                 )}
@@ -1228,16 +1262,16 @@ export const GlobalReportCard: React.FC<{
   }
 
   return (
-    <div className="report-card">
+    <div className='report-card'>
       {/* Header */}
-      <div className="card-header">
+      <div className='card-header'>
         <h3>{row.propertyName}</h3>
-        <p className="text-muted">{row.portfolioName}</p>
+        <p className='text-muted'>{row.portfolioName}</p>
       </div>
 
       {/* OTA Type Badges */}
-      <div className="ota-badges">
-        {row.otaType.map((ota) => (
+      <div className='ota-badges'>
+        {row.otaType.map(ota => (
           <span key={ota} className={`badge badge-${ota}`}>
             {ota}
           </span>
@@ -1245,18 +1279,18 @@ export const GlobalReportCard: React.FC<{
       </div>
 
       {/* Basic Info */}
-      <div className="card-info">
-        <div className="info-row">
-          <span className="label">Service Type:</span>
-          <span className="value">{row.serviceType || '-'}</span>
+      <div className='card-info'>
+        <div className='info-row'>
+          <span className='label'>Service Type:</span>
+          <span className='value'>{row.serviceType || '-'}</span>
         </div>
-        <div className="info-row">
-          <span className="label">Status:</span>
-          <span className="value">{row.auditStatus || '-'}</span>
+        <div className='info-row'>
+          <span className='label'>Status:</span>
+          <span className='value'>{row.auditStatus || '-'}</span>
         </div>
-        <div className="info-row">
-          <span className="label">Amount:</span>
-          <span className="value">
+        <div className='info-row'>
+          <span className='label'>Amount:</span>
+          <span className='value'>
             {row.currency} {row.amountCollectable?.toFixed(2) || '0.00'}
           </span>
         </div>
@@ -1264,27 +1298,24 @@ export const GlobalReportCard: React.FC<{
 
       {/* Collapsible OTA Credentials */}
       {row.expediaId && (
-        <div className="ota-section">
-          <button
-            className="ota-toggle"
-            onClick={() => toggleOta('expedia')}
-          >
+        <div className='ota-section'>
+          <button className='ota-toggle' onClick={() => toggleOta('expedia')}>
             <span>Expedia Credentials</span>
             <span>{expandedOta === 'expedia' ? '▼' : '▶'}</span>
           </button>
           {expandedOta === 'expedia' && (
-            <div className="ota-details">
-              <div className="detail-row">
-                <span className="label">ID:</span>
-                <span className="value">{row.expediaId}</span>
+            <div className='ota-details'>
+              <div className='detail-row'>
+                <span className='label'>ID:</span>
+                <span className='value'>{row.expediaId}</span>
               </div>
-              <div className="detail-row">
-                <span className="label">Username:</span>
-                <span className="value">{row.expediaUsername || '-'}</span>
+              <div className='detail-row'>
+                <span className='label'>Username:</span>
+                <span className='value'>{row.expediaUsername || '-'}</span>
               </div>
-              <div className="detail-row">
-                <span className="label">Password:</span>
-                <span className="value password-field">
+              <div className='detail-row'>
+                <span className='label'>Password:</span>
+                <span className='value password-field'>
                   {row.expediaPassword || '-'}
                 </span>
               </div>
@@ -1294,27 +1325,24 @@ export const GlobalReportCard: React.FC<{
       )}
 
       {row.agodaId && (
-        <div className="ota-section">
-          <button
-            className="ota-toggle"
-            onClick={() => toggleOta('agoda')}
-          >
+        <div className='ota-section'>
+          <button className='ota-toggle' onClick={() => toggleOta('agoda')}>
             <span>Agoda Credentials</span>
             <span>{expandedOta === 'agoda' ? '▼' : '▶'}</span>
           </button>
           {expandedOta === 'agoda' && (
-            <div className="ota-details">
-              <div className="detail-row">
-                <span className="label">ID:</span>
-                <span className="value">{row.agodaId}</span>
+            <div className='ota-details'>
+              <div className='detail-row'>
+                <span className='label'>ID:</span>
+                <span className='value'>{row.agodaId}</span>
               </div>
-              <div className="detail-row">
-                <span className="label">Username:</span>
-                <span className="value">{row.agodaUsername || '-'}</span>
+              <div className='detail-row'>
+                <span className='label'>Username:</span>
+                <span className='value'>{row.agodaUsername || '-'}</span>
               </div>
-              <div className="detail-row">
-                <span className="label">Password:</span>
-                <span className="value password-field">
+              <div className='detail-row'>
+                <span className='label'>Password:</span>
+                <span className='value password-field'>
                   {row.agodaPassword || '-'}
                 </span>
               </div>
@@ -1324,27 +1352,24 @@ export const GlobalReportCard: React.FC<{
       )}
 
       {row.bookingId && (
-        <div className="ota-section">
-          <button
-            className="ota-toggle"
-            onClick={() => toggleOta('booking')}
-          >
+        <div className='ota-section'>
+          <button className='ota-toggle' onClick={() => toggleOta('booking')}>
             <span>Booking Credentials</span>
             <span>{expandedOta === 'booking' ? '▼' : '▶'}</span>
           </button>
           {expandedOta === 'booking' && (
-            <div className="ota-details">
-              <div className="detail-row">
-                <span className="label">ID:</span>
-                <span className="value">{row.bookingId}</span>
+            <div className='ota-details'>
+              <div className='detail-row'>
+                <span className='label'>ID:</span>
+                <span className='value'>{row.bookingId}</span>
               </div>
-              <div className="detail-row">
-                <span className="label">Username:</span>
-                <span className="value">{row.bookingUsername || '-'}</span>
+              <div className='detail-row'>
+                <span className='label'>Username:</span>
+                <span className='value'>{row.bookingUsername || '-'}</span>
               </div>
-              <div className="detail-row">
-                <span className="label">Password:</span>
-                <span className="value password-field">
+              <div className='detail-row'>
+                <span className='label'>Password:</span>
+                <span className='value password-field'>
                   {row.bookingPassword || '-'}
                 </span>
               </div>
@@ -1391,7 +1416,7 @@ export const exportToCSV = (data: GlobalReportRow[]) => {
   ]
 
   // Convert data to CSV rows
-  const rows = data.map((row) => [
+  const rows = data.map(row => [
     row.auditId,
     row.portfolioName,
     row.propertyName,
@@ -1418,8 +1443,8 @@ export const exportToCSV = (data: GlobalReportRow[]) => {
   // Combine headers and rows
   const csvContent = [
     headers.join(','),
-    ...rows.map((row) =>
-      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ...rows.map(row =>
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
     )
   ].join('\n')
 
@@ -1575,10 +1600,10 @@ export const GlobalReportPage: React.FC = () => {
   }
 
   return (
-    <div className="global-report-page">
-      <div className="page-header">
+    <div className='global-report-page'>
+      <div className='page-header'>
         <h1>Global Report</h1>
-        <button onClick={handleExport} className="btn-export">
+        <button onClick={handleExport} className='btn-export'>
           Export to Excel
         </button>
       </div>
@@ -1587,7 +1612,7 @@ export const GlobalReportPage: React.FC = () => {
       <GlobalReportFilters onFilterChange={handleFilterChange} />
 
       {/* Loading State */}
-      {loading && <div className="loading">Loading...</div>}
+      {loading && <div className='loading'>Loading...</div>}
 
       {/* Data Display */}
       {data && (
@@ -1597,15 +1622,15 @@ export const GlobalReportPage: React.FC = () => {
 
           {/* Mobile View: Cards */}
           {isMobile && (
-            <div className="report-cards">
-              {data.data.map((row) => (
+            <div className='report-cards'>
+              {data.data.map(row => (
                 <GlobalReportCard key={row.auditId} row={row} />
               ))}
             </div>
           )}
 
           {/* Pagination */}
-          <div className="pagination">
+          <div className='pagination'>
             <button
               disabled={page === 1}
               onClick={() => {
@@ -1828,6 +1853,7 @@ export const GlobalReportPage: React.FC = () => {
 ## Migration Checklist
 
 ### Backend (Already Done ✅)
+
 - [x] Update Prisma schema
 - [x] Run migration script
 - [x] Update DTOs
@@ -1841,6 +1867,7 @@ export const GlobalReportPage: React.FC = () => {
 ### Frontend (Your Tasks)
 
 #### Audit Module
+
 - [ ] Update TypeScript interfaces (type_of_ota as array)
 - [ ] Update list/table displays (show badges/tags)
 - [ ] Update filter components (single select still works)
@@ -1852,6 +1879,7 @@ export const GlobalReportPage: React.FC = () => {
 - [ ] Test bulk operations
 
 #### Global Report Module
+
 - [ ] Create `GlobalReportRow` TypeScript interface
 - [ ] Create `OtaCredentialFilter` interface
 - [ ] Build `useGlobalReportFilters` hook
@@ -1889,6 +1917,7 @@ export const GlobalReportPage: React.FC = () => {
   - [ ] Test password field display
 
 #### Documentation
+
 - [ ] Update user documentation
 - [ ] Create migration guide for team
 - [ ] Document new filter capabilities
@@ -1898,6 +1927,7 @@ export const GlobalReportPage: React.FC = () => {
 ## Testing Scenarios
 
 ### Test Case 1: Create Audit with Single OTA
+
 ```json
 POST /api/audit
 {
@@ -1906,9 +1936,11 @@ POST /api/audit
   "audit_status_id": "..."
 }
 ```
+
 **Expected:** Success, audit created with OTA array containing one value.
 
 ### Test Case 2: Create Audit with Multiple OTAs
+
 ```json
 POST /api/audit
 {
@@ -1917,9 +1949,11 @@ POST /api/audit
   "audit_status_id": "..."
 }
 ```
+
 **Expected:** Success, audit created with all three OTA types.
 
 ### Test Case 3: Create Audit with Duplicates
+
 ```json
 POST /api/audit
 {
@@ -1928,9 +1962,11 @@ POST /api/audit
   "audit_status_id": "..."
 }
 ```
+
 **Expected:** Success, duplicates removed automatically → `["expedia", "agoda"]`.
 
 ### Test Case 4: Create Audit with Empty Array
+
 ```json
 POST /api/audit
 {
@@ -1939,43 +1975,54 @@ POST /api/audit
   "audit_status_id": "..."
 }
 ```
+
 **Expected:** Success, audit created with no OTA types.
 
 ### Test Case 5: Filter by OTA Type
+
 ```
 GET /api/audit?type_of_ota=expedia
 ```
+
 **Expected:** Returns all audits where `type_of_ota` array contains "expedia".
 
 ### Test Case 6: Update Audit OTA Types
+
 ```json
 PATCH /api/audit/65f8a7b2...
 {
   "type_of_ota": ["booking"]
 }
 ```
+
 **Expected:** Success, OTA types updated to contain only "booking".
 
 ### Test Case 7: Bulk Import with Comma-Separated
+
 **Excel row:**
+
 ```
 Property | OTA              | Amount
 Hotel A  | expedia, agoda   | 1000
 ```
+
 **Expected:** Success, audit created with `type_of_ota: ["expedia", "agoda"]`.
 
 ### Test Case 8: Global Stats with Mixed OTAs
+
 **Data:**
+
 - Audit 1: `["expedia"]` - $1000
 - Audit 2: `["expedia", "agoda"]` - $2000
 
 **Expected Stats:**
+
 ```json
 {
   "amount_collectable": {
-    "total": 3000,      // 1000 + 2000
-    "expedia": 3000,    // 1000 + 2000 (both audits)
-    "agoda": 2000,      // 2000 (only Audit 2)
+    "total": 3000, // 1000 + 2000
+    "expedia": 3000, // 1000 + 2000 (both audits)
+    "agoda": 2000, // 2000 (only Audit 2)
     "booking": 0
   }
 }
@@ -1986,25 +2033,31 @@ Hotel A  | expedia, agoda   | 1000
 ## Common Pitfalls & Solutions
 
 ### Pitfall 1: Treating as Single Value
+
 **Problem:**
+
 ```typescript
 // OLD CODE - Will break
 if (audit.type_of_ota === 'expedia') { ... }
 ```
 
 **Solution:**
+
 ```typescript
 // NEW CODE
 if (audit.type_of_ota.includes('expedia')) { ... }
 ```
 
 ### Pitfall 2: Not Handling Empty Arrays
+
 **Problem:**
+
 ```typescript
-const otaType = audit.type_of_ota[0]  // Could be undefined
+const otaType = audit.type_of_ota[0] // Could be undefined
 ```
 
 **Solution:**
+
 ```typescript
 const otaType = audit.type_of_ota[0] || 'Unknown'
 // OR
@@ -2012,17 +2065,21 @@ const hasOta = audit.type_of_ota.length > 0
 ```
 
 ### Pitfall 3: Filter Not Working
+
 **Problem:** Using old filter format
+
 ```typescript
-params.append('type_of_ota', 'expedia')  // Still works!
+params.append('type_of_ota', 'expedia') // Still works!
 ```
 
 **Explanation:** The backend now uses the `has` operator, so this still works. The filter checks if the array contains the value.
 
 ### Pitfall 4: Duplicate Handling in Forms
+
 **Problem:** User can select same OTA twice in UI
 
 **Solution:** Backend removes duplicates automatically, but prevent in UI:
+
 ```typescript
 const handleOtaChange = (newOtas: OtaType[]) => {
   const unique = [...new Set(newOtas)]
@@ -2035,6 +2092,7 @@ const handleOtaChange = (newOtas: OtaType[]) => {
 ## Quick Reference: Global Report API Endpoints
 
 ### Main Report Endpoint
+
 ```typescript
 POST /api/global-report
 Body: {
@@ -2060,38 +2118,47 @@ Response: {
 ### Filter Data Endpoints
 
 #### Combined Endpoints (Grouped by OTA)
+
 ```typescript
-GET /api/global-report/ota-ids
-Response: { data: [{ otaId: string, otaType: string }] }
+GET / api / global - report / ota - ids
+Response: {
+  data: [{ otaId: string, otaType: string }]
+}
 
-GET /api/global-report/ota-usernames
-Response: { data: [{ username: string, otaType: string }] }
+GET / api / global - report / ota - usernames
+Response: {
+  data: [{ username: string, otaType: string }]
+}
 
-GET /api/global-report/ota-passwords
-Response: { data: [{ password: string, otaType: string }] }
+GET / api / global - report / ota - passwords
+Response: {
+  data: [{ password: string, otaType: string }]
+}
 ```
 
 #### Individual OTA Endpoints (Flat Arrays)
+
 ```typescript
 // Expedia
-GET /api/global-report/expedia-ids
-GET /api/global-report/expedia-usernames
-GET /api/global-report/expedia-passwords
+GET / api / global - report / expedia - ids
+GET / api / global - report / expedia - usernames
+GET / api / global - report / expedia - passwords
 
 // Agoda
-GET /api/global-report/agoda-ids
-GET /api/global-report/agoda-usernames
-GET /api/global-report/agoda-passwords
+GET / api / global - report / agoda - ids
+GET / api / global - report / agoda - usernames
+GET / api / global - report / agoda - passwords
 
 // Booking
-GET /api/global-report/booking-ids
-GET /api/global-report/booking-usernames
-GET /api/global-report/booking-passwords
+GET / api / global - report / booking - ids
+GET / api / global - report / booking - usernames
+GET / api / global - report / booking - passwords
 
 // All return: { data: string[] }
 ```
 
 ### Export Endpoint
+
 ```typescript
 POST /api/global-report/export
 Body: {
@@ -2107,6 +2174,7 @@ Response: File download (binary)
 ### Filter Format Examples
 
 #### Filter by OTA Type
+
 ```json
 {
   "column": "otaType",
@@ -2116,6 +2184,7 @@ Response: File download (binary)
 ```
 
 #### Filter by Expedia ID
+
 ```json
 {
   "column": "expediaId",
@@ -2125,6 +2194,7 @@ Response: File download (binary)
 ```
 
 #### Filter by Multiple OTA Types
+
 ```json
 {
   "column": "otaType",
@@ -2134,6 +2204,7 @@ Response: File download (binary)
 ```
 
 #### Filter by Agoda Username
+
 ```json
 {
   "column": "agodaUsername",
@@ -2143,6 +2214,7 @@ Response: File download (binary)
 ```
 
 #### Filter by Date Range
+
 ```json
 {
   "column": "startDate",
@@ -2157,12 +2229,14 @@ Response: File download (binary)
 ### Available Filter Operators by Column Type
 
 **OTA Type (Array):**
+
 - `eq` - Array contains specific value
 - `in` - Array contains any of the values
 - `isNull` - Array is empty
 - `isNotNull` - Array is not empty
 
 **OTA Credentials (String):**
+
 - `eq` - Exact match
 - `contains` - Partial match
 - `in` - Match any of values
@@ -2172,11 +2246,13 @@ Response: File download (binary)
 - `isNotNull` - Field is not null
 
 **Dates:**
+
 - `eq`, `gt`, `gte`, `lt`, `lte`
 - `between` - { from, to }
 - `isNull`, `isNotNull`
 
 **Numbers:**
+
 - `eq`, `gt`, `gte`, `lt`, `lte`
 - `between` - { from, to }
 - `isNull`, `isNotNull`
@@ -2186,6 +2262,7 @@ Response: File download (binary)
 ## Support & Questions
 
 For questions or issues related to this migration:
+
 1. Check this documentation first
 2. Review the test cases above
 3. Contact the backend team

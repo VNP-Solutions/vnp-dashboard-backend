@@ -58,9 +58,18 @@ import {
   SharePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
-  UpdatePropertyDto
+  UpdatePropertyDto,
+  SyncBulkUpsertPropertyItemDto,
+  SyncUpsertPropertyDto,
+  SyncCreatePropertyDto,
+  SyncByOtaPropertyDto,
+  SyncBulkCreatePropertyDto,
+  SyncBulkDeletePropertyDto
 } from './property.dto'
 import type { IPropertyService } from './property.interface'
+import { Public } from '../auth/decorators/public.decorator'
+import { ServiceTokenGuard } from '../../common/guards/service-token.guard'
+import { ExternalJwtGuard } from '../portfolio/guards/external-jwt.guard'
 
 @ApiTags('Property')
 @ApiBearerAuth('JWT-auth')
@@ -74,6 +83,89 @@ export class PropertyController {
     private readonly authRepository: IAuthRepository
   ) {}
 
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  @Post('sync-upsert/:parent_id')
+  syncUpsert(
+    @Param('parent_id') parentId: string,
+    @Body() dto: SyncUpsertPropertyDto
+  ) {
+    return this.propertyService.syncUpsert(parentId, dto)
+  }
+
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  @Post('sync-delete/:parent_id')
+  syncDelete(@Param('parent_id') parentId: string) {
+    return this.propertyService.syncDelete(parentId)
+  }
+
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  @Post('sync-bulk-delete')
+  @ApiOperation({
+    summary: 'Bulk sync delete properties (DBMS sync)',
+    description: `
+    Delete multiple properties by Parent ID from a JSON array.
+
+    Each item must include:
+    - parent_id: External property identifier (DBMS property id)
+
+    Properties with unarchived audits are skipped and reported in errors.
+    `
+  })
+  syncBulkDelete(@Body() dto: SyncBulkDeletePropertyDto) {
+    return this.propertyService.syncBulkDelete(dto)
+  }
+
+  @Public()
+  @UseGuards(ExternalJwtGuard)
+  @Post('sync-bulk-upsert')
+  @ApiOperation({
+    summary: 'Bulk sync upsert properties (DBMS sync)',
+    description: `
+    Create or update properties by Parent ID from a JSON array.
+
+    Each item must include:
+    - row: Source row number for the sync report
+    - parent_id: External property identifier (upsert key)
+    - name: Property name
+    - address: Property address
+    - currency: Currency code
+    - portfolio_parent_id: External portfolio parent ID (must exist)
+    - is_active: Whether the property is active
+    - expedia_id: Expedia property ID (required)
+
+    Optional fields:
+    - card_descriptor
+    - expedia_username, expedia_password
+    - agoda_id, agoda_username, agoda_password
+    - booking_id, booking_username, booking_password
+    `
+  })
+  @ApiBody({ type: [SyncBulkUpsertPropertyItemDto] })
+  syncBulkUpsert(@Body() items: SyncBulkUpsertPropertyItemDto[]) {
+    return this.propertyService.syncBulkUpsert(items)
+  }
+
+  @Public()
+  @UseGuards(ServiceTokenGuard)
+  @Post('sync-create')
+  syncCreate(@Body() dto: SyncCreatePropertyDto) {
+    return this.propertyService.syncCreate(dto)
+  }
+  @Public()
+  @UseGuards(ServiceTokenGuard)
+  @Patch('sync-by-ota')
+  syncByOta(@Body() dto: SyncByOtaPropertyDto) {
+    return this.propertyService.syncByOta(dto)
+  }
+  @Public()
+  @UseGuards(ServiceTokenGuard)
+  @Post('sync-bulk-create')
+  syncBulkCreate(@Body() dto: SyncBulkCreatePropertyDto) {
+    return this.propertyService.syncBulkCreate(dto.items ?? [])
+  }
   @Post()
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({ summary: 'Create a new property (Internal users only)' })
@@ -454,7 +546,7 @@ export class PropertyController {
     description:
       'Same query parameters as `GET /property/export/all` (search, filters, sort, etc.), ' +
       'with an additional required `fileType` of `xlsx` or `csv`. ' +
-      'Response is a file attachment with a flat table of OTA credentials and property fields. ' +
+      'Response is a file attachment with a flat table of property fields (credentials excluded). ' +
       'If `portfolio_id` is set, only properties **owned** by that portfolio are included (properties ' +
       'only shared *into* that portfolio via show_in are excluded).'
   })
@@ -1193,7 +1285,6 @@ export class PropertyController {
     - Address/Property Address: Property address
     - Property Currency/Currency/Currency Code: Currency code (will be created if doesn't exist)
     - Card Descriptor/Card descriptor/Descriptor: Card descriptor
-    - Next Due Date/Next due date/Due Date: Next due date (mm/dd/yyyy)
     - Portfolio/Portfolio Name/Portfolio name: Portfolio name (will be created if doesn't exist)
     - Expedia Username/Expedia username/Expedia User: Expedia username
     - Expedia Password/Expedia password/Expedia Pass: Expedia password
