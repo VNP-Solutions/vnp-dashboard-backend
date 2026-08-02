@@ -89,23 +89,14 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
   'VNP Admin'
 ]
 
-/** Column headers for GET /property/export/file (flat OTA + property fields) */
+/** Column headers for GET /property/export/file (property fields only; credentials excluded) */
 const PROPERTY_FLAT_EXPORT_HEADERS = [
-  'Expedia ID*',
   'Portfolio*',
   'Property Name*',
   'Property Address',
   'Property Currency*',
   'Card Descriptor',
-  'Property ID*',
-  'Agoda ID',
-  'Booking ID',
-  'Expedia Username',
-  'Expedia Password',
-  'Agoda Username',
-  'Agoda Password',
-  'Booking Username',
-  'Booking Password'
+  'Property ID*'
 ] as const
 
 /** Static copy for the "Access Guidance" tab of `export/access-levels` */
@@ -1475,35 +1466,14 @@ export class PropertyService implements IPropertyService {
     card_descriptor: string | null
     currency?: { code: string } | null
     portfolio?: { name: string } | null
-    credentials?: {
-      expedia_id?: string
-      agoda_id?: string | null
-      booking_id?: string | null
-      expedia_username?: string | null
-      expedia_password?: string | null
-      agoda_username?: string | null
-      agoda_password?: string | null
-      booking_username?: string | null
-      booking_password?: string | null
-    } | null
   }): string[] {
-    const c = property.credentials
     return [
-      c?.expedia_id ?? '',
       property.portfolio?.name ?? '',
       property.name ?? '',
       property.address ?? '',
       property.currency?.code ?? '',
       property.card_descriptor ?? '',
-      property.id ?? '',
-      c?.agoda_id ?? '',
-      c?.booking_id ?? '',
-      c?.expedia_username ?? '',
-      c?.expedia_password ?? '',
-      c?.agoda_username ?? '',
-      c?.agoda_password ?? '',
-      c?.booking_username ?? '',
-      c?.booking_password ?? ''
+      property.id ?? ''
     ]
   }
 
@@ -1522,7 +1492,7 @@ export class PropertyService implements IPropertyService {
       sheet.addRow(this.buildPropertyFlatExportRow(p))
     }
 
-    const widths = [16, 22, 28, 32, 14, 22, 26, 14, 14, 22, 22, 22, 22, 22, 22]
+    const widths = [22, 28, 32, 14, 22, 26]
     widths.forEach((w, i) => {
       sheet.getColumn(i + 1).width = w
     })
