@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
+import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { RequirePermission } from '../../common/decorators/require-permission.decorator'
 import { PermissionGuard } from '../../common/guards/permission.guard'
@@ -83,7 +83,14 @@ export class PayoutHistoryController {
     return this.payoutClient.payoutSummary(await this.scopedQuery(query, user), user.id)
   }
 
-  // Registered after 'summary' so that literal path is never captured as an id.
+  /**
+   * Registered after 'summary' so that literal path is never captured as an id, and the id is
+   * validated as a UUID so no other literal can be either.
+   *
+   * Without the pipe this route swallows any single path segment: a request for
+   * /payouts/export.csv matched here, was forwarded to the payout service's CSV endpoint, and the
+   * streamed file was parsed as JSON, producing a 500 that blamed the server for a routing mistake.
+   */
   @Get(':id')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
   @ApiOperation({
@@ -94,7 +101,10 @@ export class PayoutHistoryController {
   })
   @ApiResponse({ status: 200, description: 'Payout detail' })
   @ApiResponse({ status: 404, description: 'No payout with that id' })
-  async detail(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
+  async detail(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
     const { dashboard_property_ids } = await this.scopedQuery({}, user)
     return this.payoutClient.getPayout(id, user.id, { dashboard_property_ids })
   }
