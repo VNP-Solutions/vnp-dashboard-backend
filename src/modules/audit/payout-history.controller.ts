@@ -2,6 +2,7 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { RequirePermission } from '../../common/decorators/require-permission.decorator'
 import { PermissionGuard } from '../../common/guards/permission.guard'
+import { PermissionService } from '../../common/services/permission.service'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { ModuleType, PermissionAction } from '../../common/interfaces/permission.interface'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -25,7 +26,34 @@ import { PayoutClient } from './payout.client'
 @Controller('payouts')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class PayoutHistoryController {
-  constructor(private readonly payoutClient: PayoutClient) {}
+  constructor(
+    private readonly payoutClient: PayoutClient,
+    private readonly permissionService: PermissionService
+  ) {}
+
+  /**
+   * Narrow the query to the properties this user may actually see.
+   *
+   * REQUIRED, not defensive. The payout service treats a peer service as unrestricted, because a
+   * service principal has no hotel assignments of its own to resolve; that is only safe if we say
+   * which properties the human behind the call may see. Until this existed, a user with PARTIAL
+   * audit access saw two audits and every hotel's payouts, because the permission guard checks
+   * whether they may read audits at all and says nothing about which ones.
+   *
+   * `all` means no narrowing. An empty list is sent through as an empty string so the payout service
+   * denies rather than falling back to unrestricted: a user assigned no properties must see nothing.
+   */
+  private async scopedQuery(
+    query: PayoutHistoryQueryDto,
+    user: IUserWithPermissions
+  ): Promise<PayoutHistoryQueryDto & { dashboard_property_ids?: string }> {
+    const accessible = await this.permissionService.getAccessibleResourceIds(
+      user,
+      ModuleType.PROPERTY
+    )
+    if (accessible === 'all') return query
+    return { ...query, dashboard_property_ids: accessible.join(',') }
+  }
 
   @Get()
   @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
@@ -37,8 +65,8 @@ export class PayoutHistoryController {
       'Pass hotel_id to scope the page to a single property.'
   })
   @ApiResponse({ status: 200, description: 'Payout rows plus paging metadata' })
-  list(@Query() query: PayoutHistoryQueryDto, @CurrentUser() user: IUserWithPermissions) {
-    return this.payoutClient.listPayouts(query, user.id)
+  async list(@Query() query: PayoutHistoryQueryDto, @CurrentUser() user: IUserWithPermissions) {
+    return this.payoutClient.listPayouts(await this.scopedQuery(query, user), user.id)
   }
 
   @Get('summary')
@@ -51,8 +79,8 @@ export class PayoutHistoryController {
       'filters as the list so the header and the rows always describe the same set.'
   })
   @ApiResponse({ status: 200, description: 'Per-currency settled totals and counts' })
-  summary(@Query() query: PayoutHistoryQueryDto, @CurrentUser() user: IUserWithPermissions) {
-    return this.payoutClient.payoutSummary(query, user.id)
+  async summary(@Query() query: PayoutHistoryQueryDto, @CurrentUser() user: IUserWithPermissions) {
+    return this.payoutClient.payoutSummary(await this.scopedQuery(query, user), user.id)
   }
 
   // Registered after 'summary' so that literal path is never captured as an id.
@@ -66,7 +94,8 @@ export class PayoutHistoryController {
   })
   @ApiResponse({ status: 200, description: 'Payout detail' })
   @ApiResponse({ status: 404, description: 'No payout with that id' })
-  detail(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
-    return this.payoutClient.getPayout(id, user.id)
+  async detail(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
+    const { dashboard_property_ids } = await this.scopedQuery({}, user)
+    return this.payoutClient.getPayout(id, user.id, { dashboard_property_ids })
   }
 }

@@ -37,6 +37,11 @@ export interface PayoutHistoryQuery {
   currency?: string
   date_from?: string
   date_to?: string
+  /**
+   * Comma-separated dashboard property ids this user may see. Set by the controller for users with
+   * PARTIAL access, never by the browser: it is an authorization decision, not a filter.
+   */
+  dashboard_property_ids?: string
 }
 
 @Injectable()
@@ -223,7 +228,8 @@ export class PayoutClient {
       'hotel_id',
       'currency',
       'date_from',
-      'date_to'
+      'date_to',
+      'dashboard_property_ids'
     ]
     const qs = new URLSearchParams()
     for (const key of allowed) {
@@ -272,9 +278,22 @@ export class PayoutClient {
     return body?.data ?? body
   }
 
-  /** One payout request with its legs and status history. */
-  async getPayout(id: string, actorUserId: string): Promise<unknown> {
-    const body = await this.get(`/payouts/${encodeURIComponent(id)}`, actorUserId)
+  /**
+   * One payout request with its legs and status history.
+   *
+   * Takes the same property scope as the list. Scoping the list while leaving lookup-by-id open
+   * would not be a partial fix: the ids appear in list responses, so an unscoped detail route hands
+   * back any payout to anyone who has ever seen its id.
+   */
+  async getPayout(
+    id: string,
+    actorUserId: string,
+    scope?: Pick<PayoutHistoryQuery, 'dashboard_property_ids'>
+  ): Promise<unknown> {
+    const body = await this.get(
+      `/payouts/${encodeURIComponent(id)}${PayoutClient.query(scope ?? {})}`,
+      actorUserId
+    )
     return body?.data ?? body
   }
 }
