@@ -666,7 +666,8 @@ export class PropertyRepository implements IPropertyRepository {
       name: string
       portfolio_id: string
       portfolio: { id: string; name: string }
-      bankDetails: PropertyBankDetails
+      credentials: { expedia_id: string | null } | null
+      bankDetails: PropertyBankDetails | null
     }>
   > {
     return this.prisma.property.findMany({
@@ -682,17 +683,14 @@ export class PropertyRepository implements IPropertyRepository {
             name: true
           }
         },
+        credentials: {
+          select: {
+            expedia_id: true
+          }
+        },
         bankDetails: true
       }
-    }) as Promise<
-      Array<{
-        id: string
-        name: string
-        portfolio_id: string
-        portfolio: { id: string; name: string }
-        bankDetails: PropertyBankDetails
-      }>
-    >
+    })
   }
 
   async findById(id: string) {

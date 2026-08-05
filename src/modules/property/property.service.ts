@@ -89,14 +89,16 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
   'VNP Admin'
 ]
 
-/** Column headers for GET /property/export/file (property fields only; credentials excluded) */
+/** Column headers for GET /property/export/file (Expedia ID is the unit identifier) */
 const PROPERTY_FLAT_EXPORT_HEADERS = [
-  'Portfolio*',
+  'Expedia ID*',
+  'Agoda ID',
+  'Booking ID',
   'Property Name*',
+  'Portfolio*',
   'Property Address',
   'Property Currency*',
-  'Card Descriptor',
-  'Property ID*'
+  'Card Descriptor'
 ] as const
 
 /** Static copy for the "Access Guidance" tab of `export/access-levels` */
@@ -121,9 +123,9 @@ const ACCESS_GUIDANCE_COPY = {
 } as const
 
 const ACCESS_LEVELS_SHEET_HEADERS = [
-  'Portfolio',
-  'Property',
   'Expedia ID',
+  'Property',
+  'Portfolio',
   'Access Levels',
   'Date of Export'
 ] as const
@@ -1428,14 +1430,14 @@ export class PropertyService implements IPropertyService {
       const port = p.portfolio
       const cred = p.credentials
       sheet.addRow([
-        port?.name ?? '',
-        p.name ?? '',
         cred?.expedia_id ?? '',
+        p.name ?? '',
+        port?.name ?? '',
         formatPropertyOtaAccessLevels(cred),
         exportDateStr
       ])
     }
-    const widths = [24, 28, 16, 24, 16]
+    const widths = [16, 28, 24, 24, 16]
     widths.forEach((w, i) => {
       sheet.getColumn(i + 1).width = w
     })
@@ -1460,20 +1462,26 @@ export class PropertyService implements IPropertyService {
   }
 
   private buildPropertyFlatExportRow(property: {
-    id: string
     name: string
     address: string
     card_descriptor: string | null
     currency?: { code: string } | null
     portfolio?: { name: string } | null
+    credentials?: {
+      expedia_id?: string | null
+      agoda_id?: string | null
+      booking_id?: string | null
+    } | null
   }): string[] {
     return [
-      property.portfolio?.name ?? '',
+      property.credentials?.expedia_id ?? '',
+      property.credentials?.agoda_id ?? '',
+      property.credentials?.booking_id ?? '',
       property.name ?? '',
+      property.portfolio?.name ?? '',
       property.address ?? '',
       property.currency?.code ?? '',
-      property.card_descriptor ?? '',
-      property.id ?? ''
+      property.card_descriptor ?? ''
     ]
   }
 
@@ -1492,7 +1500,7 @@ export class PropertyService implements IPropertyService {
       sheet.addRow(this.buildPropertyFlatExportRow(p))
     }
 
-    const widths = [22, 28, 32, 14, 22, 26]
+    const widths = [16, 16, 16, 28, 22, 32, 14, 22]
     widths.forEach((w, i) => {
       sheet.getColumn(i + 1).width = w
     })
@@ -1751,22 +1759,6 @@ export class PropertyService implements IPropertyService {
       return []
     }
 
-    const bankSubTypeRaw = data.bank_sub_type?.toLowerCase().trim() ?? 'all'
-    let bankDetailsFilter: Prisma.PropertyBankDetailsNullableScalarRelationFilter
-
-    if (bankSubTypeRaw !== 'all') {
-      const subTypeEnum = bankSubTypeRaw as BankSubType
-      bankDetailsFilter = {
-        is: {
-          bank_sub_type: subTypeEnum
-        }
-      }
-    } else {
-      bankDetailsFilter = {
-        isNot: null
-      }
-    }
-
     const andParts: Prisma.PropertyWhereInput[] = []
 
     if (accessibleIds !== 'all') {
@@ -1800,24 +1792,23 @@ export class PropertyService implements IPropertyService {
       })
     }
 
-    andParts.push({
-      bankDetails: bankDetailsFilter
-    })
-
     const where: Prisma.PropertyWhereInput =
-      andParts.length === 1 ? andParts[0] : { AND: andParts }
+      andParts.length === 0
+        ? {}
+        : andParts.length === 1
+          ? andParts[0]
+          : { AND: andParts }
 
     const rows =
       await this.propertyRepository.findManyForBankDetailsSecureList(where)
 
-    return rows
-      .filter(row => row.bankDetails != null)
-      .map(row => ({
-        property_id: row.id,
-        property_name: row.name,
-        portfolio: row.portfolio,
-        bank_details: row.bankDetails
-      }))
+    return rows.map(row => ({
+      property_id: row.id,
+      property_name: row.name,
+      portfolio: row.portfolio,
+      credentials: row.credentials,
+      bank_details: row.bankDetails
+    }))
   }
 
   async findAllSecure(query: PropertyQueryDto, user: IUserWithPermissions) {

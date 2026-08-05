@@ -737,8 +737,8 @@ export class PropertyController {
       'List property bank details with full values (password required, no pagination)',
     description:
       'Returns unmasked bank details for all matching properties the user can access. ' +
-      'Optional filters: portfolio_id (owned properties only — not show-in), search (property or portfolio name), bank_sub_type ' +
-      '(all | ach | domestic_wire | international_wire). Only properties that have bank details are included.'
+      'Optional filters: portfolio_id (owned properties only — not show-in), search (property or portfolio name). ' +
+      'Returns all matching accessible properties; bank_details is null when a property has no bank details.'
   })
   @ApiBody({ type: GetPropertiesBankDetailsSecureDto })
   @ApiResponse({

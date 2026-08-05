@@ -641,7 +641,7 @@ export class GetPropertiesBankDetailsSecureDto {
     enum: ['all', 'ach', 'domestic_wire', 'international_wire'],
     default: 'all',
     description:
-      'Filter by bank sub-type. Use "all" or omit for no filter (only properties with bank details are returned).'
+      'Deprecated for property filtering on this endpoint. All matching properties are returned regardless of bank sub-type.'
   })
   @IsOptional()
   @IsIn(['all', 'ach', 'domestic_wire', 'international_wire'])
