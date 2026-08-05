@@ -261,6 +261,10 @@ export class AuditRepository implements IAuditRepository {
             is_active: true,
             portfolio_id: true,
             card_descriptor: true,
+            // The DBMS property id. Consumers of the external audit seam need it to look up which
+            // processor collected each OTA's money, which is what decides the payout rail; without
+            // it every OTA on the audit resolves as unknown_processor and nothing can be paid.
+            parent_id: true,
             currency: {
               select: {
                 id: true,
