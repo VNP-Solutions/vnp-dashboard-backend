@@ -810,3 +810,77 @@ export function isRestrictedPropertyCredentialsAndBankDetailsProfile(
     )
   )
 }
+
+function hasPropertyPartialOrAllAccess(
+  propertyPermission: IPermission | null | undefined
+): boolean {
+  return (
+    propertyPermission?.access_level === AccessLevel.partial ||
+    propertyPermission?.access_level === AccessLevel.all
+  )
+}
+
+/** Consolidated Report - View: property read + partial/all; internal or external; VNP Sales profile excluded. */
+export function canViewConsolidatedReports(
+  user: IUserWithPermissions
+): boolean {
+  if (!user?.role) {
+    return false
+  }
+
+  if (isUserSuperAdmin(user)) {
+    return true
+  }
+
+  if (isRestrictedPropertyCredentialsAndBankDetailsProfile(user.role)) {
+    return false
+  }
+
+  const propertyPermission = user.role.property_permission
+  if (
+    !propertyPermission ||
+    !hasPropertyPartialOrAllAccess(propertyPermission)
+  ) {
+    return false
+  }
+
+  return (
+    propertyPermission.permission_level === PermissionLevel.view ||
+    propertyPermission.permission_level === PermissionLevel.update ||
+    propertyPermission.permission_level === PermissionLevel.all
+  )
+}
+
+/** Consolidated Report - Upload/Remove: internal + property update + partial/all; VNP Sales profile excluded. */
+export function canManageConsolidatedReports(
+  user: IUserWithPermissions
+): boolean {
+  if (!user?.role) {
+    return false
+  }
+
+  if (isUserSuperAdmin(user)) {
+    return true
+  }
+
+  if (isRestrictedPropertyCredentialsAndBankDetailsProfile(user.role)) {
+    return false
+  }
+
+  if (!isInternalUser(user)) {
+    return false
+  }
+
+  const propertyPermission = user.role.property_permission
+  if (
+    !propertyPermission ||
+    !hasPropertyPartialOrAllAccess(propertyPermission)
+  ) {
+    return false
+  }
+
+  return (
+    propertyPermission.permission_level === PermissionLevel.update ||
+    propertyPermission.permission_level === PermissionLevel.all
+  )
+}
