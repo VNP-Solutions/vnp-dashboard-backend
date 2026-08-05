@@ -261,7 +261,8 @@ export interface IPropertyService {
       property_id: string
       property_name: string
       portfolio: { id: string; name: string }
-      bank_details: NonNullable<PropertyWithFullDetails['bankDetails']>
+      credentials: { expedia_id: string | null } | null
+      bank_details: PropertyWithFullDetails['bankDetails']
     }>
   >
   getPropertiesByPortfolios(
