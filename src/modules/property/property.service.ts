@@ -92,6 +92,8 @@ const BANK_DETAILS_NOTIFICATION_ROLE_NAMES = [
 /** Column headers for GET /property/export/file (Expedia ID is the unit identifier) */
 const PROPERTY_FLAT_EXPORT_HEADERS = [
   'Expedia ID*',
+  'Agoda ID',
+  'Booking ID',
   'Property Name*',
   'Portfolio*',
   'Property Address',
@@ -1465,10 +1467,16 @@ export class PropertyService implements IPropertyService {
     card_descriptor: string | null
     currency?: { code: string } | null
     portfolio?: { name: string } | null
-    credentials?: { expedia_id?: string | null } | null
+    credentials?: {
+      expedia_id?: string | null
+      agoda_id?: string | null
+      booking_id?: string | null
+    } | null
   }): string[] {
     return [
       property.credentials?.expedia_id ?? '',
+      property.credentials?.agoda_id ?? '',
+      property.credentials?.booking_id ?? '',
       property.name ?? '',
       property.portfolio?.name ?? '',
       property.address ?? '',
@@ -1492,7 +1500,7 @@ export class PropertyService implements IPropertyService {
       sheet.addRow(this.buildPropertyFlatExportRow(p))
     }
 
-    const widths = [16, 28, 22, 32, 14, 22]
+    const widths = [16, 16, 16, 28, 22, 32, 14, 22]
     widths.forEach((w, i) => {
       sheet.getColumn(i + 1).width = w
     })
