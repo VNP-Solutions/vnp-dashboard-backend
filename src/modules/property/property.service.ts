@@ -1751,22 +1751,6 @@ export class PropertyService implements IPropertyService {
       return []
     }
 
-    const bankSubTypeRaw = data.bank_sub_type?.toLowerCase().trim() ?? 'all'
-    let bankDetailsFilter: Prisma.PropertyBankDetailsNullableScalarRelationFilter
-
-    if (bankSubTypeRaw !== 'all') {
-      const subTypeEnum = bankSubTypeRaw as BankSubType
-      bankDetailsFilter = {
-        is: {
-          bank_sub_type: subTypeEnum
-        }
-      }
-    } else {
-      bankDetailsFilter = {
-        isNot: null
-      }
-    }
-
     const andParts: Prisma.PropertyWhereInput[] = []
 
     if (accessibleIds !== 'all') {
@@ -1800,24 +1784,23 @@ export class PropertyService implements IPropertyService {
       })
     }
 
-    andParts.push({
-      bankDetails: bankDetailsFilter
-    })
-
     const where: Prisma.PropertyWhereInput =
-      andParts.length === 1 ? andParts[0] : { AND: andParts }
+      andParts.length === 0
+        ? {}
+        : andParts.length === 1
+          ? andParts[0]
+          : { AND: andParts }
 
     const rows =
       await this.propertyRepository.findManyForBankDetailsSecureList(where)
 
-    return rows
-      .filter(row => row.bankDetails != null)
-      .map(row => ({
-        property_id: row.id,
-        property_name: row.name,
-        portfolio: row.portfolio,
-        bank_details: row.bankDetails
-      }))
+    return rows.map(row => ({
+      property_id: row.id,
+      property_name: row.name,
+      portfolio: row.portfolio,
+      credentials: row.credentials,
+      bank_details: row.bankDetails
+    }))
   }
 
   async findAllSecure(query: PropertyQueryDto, user: IUserWithPermissions) {

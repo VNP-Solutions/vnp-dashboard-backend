@@ -172,7 +172,8 @@ export interface IPropertyRepository {
       name: string
       portfolio_id: string
       portfolio: { id: string; name: string }
-      bankDetails: NonNullable<PropertyWithPendingActions['bankDetails']>
+      credentials: { expedia_id: string | null } | null
+      bankDetails: PropertyWithPendingActions['bankDetails']
     }>
   >
   findByIds(ids: string[]): Promise<Property[]>
