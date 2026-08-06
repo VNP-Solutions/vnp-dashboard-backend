@@ -108,7 +108,10 @@ type PropertyFlatExportHeader = (typeof PROPERTY_FLAT_EXPORT_HEADERS)[number]
 
 const PROPERTY_EXPORT_LOCKED_COLUMN: PropertyFlatExportHeader = 'Expedia ID*'
 
-const PROPERTY_FLAT_EXPORT_COLUMN_WIDTHS: Record<PropertyFlatExportHeader, number> = {
+const PROPERTY_FLAT_EXPORT_COLUMN_WIDTHS: Record<
+  PropertyFlatExportHeader,
+  number
+> = {
   'Expedia ID*': 16,
   'Agoda ID': 16,
   'Booking ID': 16,
@@ -1977,7 +1980,9 @@ export class PropertyService implements IPropertyService {
       nestedFieldMap: {
         'portfolio.name': 'portfolio.name',
         'currency.code': 'currency.code',
-        'currency.name': 'currency.name'
+        'currency.name': 'currency.name',
+        bank_type: 'bankDetails.bank_type',
+        bank_sub_type: 'bankDetails.bank_sub_type'
       }
     }
 
