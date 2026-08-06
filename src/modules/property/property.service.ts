@@ -96,9 +96,12 @@ const PROPERTY_FLAT_EXPORT_HEADERS = [
   'Booking ID',
   'Property Name*',
   'Portfolio*',
+  'Status',
   'Property Address',
   'Property Currency*',
-  'Card Descriptor'
+  'Card Descriptor',
+  'YTD Reported',
+  'YTD Confirmed'
 ] as const
 
 /** Static copy for the "Access Guidance" tab of `export/access-levels` */
@@ -1465,6 +1468,7 @@ export class PropertyService implements IPropertyService {
     name: string
     address: string
     card_descriptor: string | null
+    is_active?: boolean | null
     currency?: { code: string } | null
     portfolio?: { name: string } | null
     credentials?: {
@@ -1472,16 +1476,21 @@ export class PropertyService implements IPropertyService {
       agoda_id?: string | null
       booking_id?: string | null
     } | null
-  }): string[] {
+    total_amount_collectable?: number | null
+    total_amount_confirmed?: number | null
+  }): (string | number)[] {
     return [
       property.credentials?.expedia_id ?? '',
       property.credentials?.agoda_id ?? '',
       property.credentials?.booking_id ?? '',
       property.name ?? '',
       property.portfolio?.name ?? '',
+      property.is_active ? 'Active' : 'Inactive',
       property.address ?? '',
       property.currency?.code ?? '',
-      property.card_descriptor ?? ''
+      property.card_descriptor ?? '',
+      Number(property.total_amount_collectable ?? 0),
+      Number(property.total_amount_confirmed ?? 0)
     ]
   }
 
@@ -1500,7 +1509,7 @@ export class PropertyService implements IPropertyService {
       sheet.addRow(this.buildPropertyFlatExportRow(p))
     }
 
-    const widths = [16, 16, 16, 28, 22, 32, 14, 22]
+    const widths = [16, 16, 16, 28, 22, 12, 32, 14, 22, 16, 16]
     widths.forEach((w, i) => {
       sheet.getColumn(i + 1).width = w
     })
