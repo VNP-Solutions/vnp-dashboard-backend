@@ -104,6 +104,24 @@ const PROPERTY_FLAT_EXPORT_HEADERS = [
   'YTD Confirmed'
 ] as const
 
+type PropertyFlatExportHeader = (typeof PROPERTY_FLAT_EXPORT_HEADERS)[number]
+
+const PROPERTY_EXPORT_LOCKED_COLUMN: PropertyFlatExportHeader = 'Expedia ID*'
+
+const PROPERTY_FLAT_EXPORT_COLUMN_WIDTHS: Record<PropertyFlatExportHeader, number> = {
+  'Expedia ID*': 16,
+  'Agoda ID': 16,
+  'Booking ID': 16,
+  'Property Name*': 28,
+  'Portfolio*': 22,
+  Status: 12,
+  'Property Address': 32,
+  'Property Currency*': 14,
+  'Card Descriptor': 22,
+  'YTD Reported': 16,
+  'YTD Confirmed': 16
+}
+
 /** Static copy for the "Access Guidance" tab of `export/access-levels` */
 const ACCESS_GUIDANCE_COPY = {
   accessEmailLabel: 'Access Email',
@@ -1347,16 +1365,17 @@ export class PropertyService implements IPropertyService {
     query: PropertyFileExportQueryDto,
     user: IUserWithPermissions
   ): Promise<Buffer> {
-    const { fileType, ...listQuery } = query
+    const { fileType, columns, ...listQuery } = query
     const list = listQuery as PropertyQueryDto
     const properties = this.filterFileExportToOwnedPortfolioOnly(
       list,
       await this.findAllForExport(list, user)
     )
+    const headers = this.resolvePropertyFlatExportHeaders(columns)
     if (fileType === 'xlsx') {
-      return this.buildPropertyFlatExportXlsx(properties)
+      return this.buildPropertyFlatExportXlsx(properties, headers)
     }
-    return this.buildPropertyFlatExportCsv(properties)
+    return this.buildPropertyFlatExportCsv(properties, headers)
   }
 
   async exportAccessLevelsXlsx(
@@ -1464,7 +1483,26 @@ export class PropertyService implements IPropertyService {
     return Buffer.from(buf)
   }
 
-  private buildPropertyFlatExportRow(property: {
+  private resolvePropertyFlatExportHeaders(
+    columns?: string[]
+  ): PropertyFlatExportHeader[] {
+    if (!columns?.length) {
+      return [...PROPERTY_FLAT_EXPORT_HEADERS]
+    }
+
+    const allowed = new Set<string>(PROPERTY_FLAT_EXPORT_HEADERS)
+    const requested = columns
+      .filter((c): c is PropertyFlatExportHeader => allowed.has(c))
+      .filter((c, i, arr) => arr.indexOf(c) === i)
+
+    const withLocked = requested.includes(PROPERTY_EXPORT_LOCKED_COLUMN)
+      ? requested
+      : [PROPERTY_EXPORT_LOCKED_COLUMN, ...requested]
+
+    return PROPERTY_FLAT_EXPORT_HEADERS.filter(h => withLocked.includes(h))
+  }
+
+  private buildPropertyFlatExportValueMap(property: {
     name: string
     address: string
     card_descriptor: string | null
@@ -1478,47 +1516,72 @@ export class PropertyService implements IPropertyService {
     } | null
     total_amount_collectable?: number | null
     total_amount_confirmed?: number | null
-  }): (string | number)[] {
-    return [
-      property.credentials?.expedia_id ?? '',
-      property.credentials?.agoda_id ?? '',
-      property.credentials?.booking_id ?? '',
-      property.name ?? '',
-      property.portfolio?.name ?? '',
-      property.is_active ? 'Active' : 'Inactive',
-      property.address ?? '',
-      property.currency?.code ?? '',
-      property.card_descriptor ?? '',
-      Number(property.total_amount_collectable ?? 0),
-      Number(property.total_amount_confirmed ?? 0)
-    ]
+  }): Record<PropertyFlatExportHeader, string | number> {
+    return {
+      'Expedia ID*': property.credentials?.expedia_id ?? '',
+      'Agoda ID': property.credentials?.agoda_id ?? '',
+      'Booking ID': property.credentials?.booking_id ?? '',
+      'Property Name*': property.name ?? '',
+      'Portfolio*': property.portfolio?.name ?? '',
+      Status: property.is_active ? 'Active' : 'Inactive',
+      'Property Address': property.address ?? '',
+      'Property Currency*': property.currency?.code ?? '',
+      'Card Descriptor': property.card_descriptor ?? '',
+      'YTD Reported': Number(property.total_amount_collectable ?? 0),
+      'YTD Confirmed': Number(property.total_amount_confirmed ?? 0)
+    }
+  }
+
+  private buildPropertyFlatExportRow(
+    property: {
+      name: string
+      address: string
+      card_descriptor: string | null
+      is_active?: boolean | null
+      currency?: { code: string } | null
+      portfolio?: { name: string } | null
+      credentials?: {
+        expedia_id?: string | null
+        agoda_id?: string | null
+        booking_id?: string | null
+      } | null
+      total_amount_collectable?: number | null
+      total_amount_confirmed?: number | null
+    },
+    headers: PropertyFlatExportHeader[] = [...PROPERTY_FLAT_EXPORT_HEADERS]
+  ): (string | number)[] {
+    const values = this.buildPropertyFlatExportValueMap(property)
+    return headers.map(header => values[header])
   }
 
   private async buildPropertyFlatExportXlsx(
-    properties: any[]
+    properties: any[],
+    headers: PropertyFlatExportHeader[] = [...PROPERTY_FLAT_EXPORT_HEADERS]
   ): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook()
     const sheet = workbook.addWorksheet('Properties', {
       views: [{ state: 'frozen', ySplit: 1 }]
     })
-    const headerRow = sheet.addRow([...PROPERTY_FLAT_EXPORT_HEADERS])
+    const headerRow = sheet.addRow([...headers])
     headerRow.font = { bold: true }
     headerRow.alignment = { vertical: 'middle', wrapText: true }
 
     for (const p of properties) {
-      sheet.addRow(this.buildPropertyFlatExportRow(p))
+      sheet.addRow(this.buildPropertyFlatExportRow(p, headers))
     }
 
-    const widths = [16, 16, 16, 28, 22, 12, 32, 14, 22, 16, 16]
-    widths.forEach((w, i) => {
-      sheet.getColumn(i + 1).width = w
+    headers.forEach((header, i) => {
+      sheet.getColumn(i + 1).width = PROPERTY_FLAT_EXPORT_COLUMN_WIDTHS[header]
     })
 
     const buf = await workbook.xlsx.writeBuffer()
     return Buffer.from(buf)
   }
 
-  private buildPropertyFlatExportCsv(properties: any[]): Buffer {
+  private buildPropertyFlatExportCsv(
+    properties: any[],
+    headers: PropertyFlatExportHeader[] = [...PROPERTY_FLAT_EXPORT_HEADERS]
+  ): Buffer {
     const escapeCsv = (val: unknown): string => {
       const str =
         val === null || val === undefined
@@ -1532,11 +1595,9 @@ export class PropertyService implements IPropertyService {
       return str
     }
 
-    const lines: string[] = [
-      [...PROPERTY_FLAT_EXPORT_HEADERS].map(h => escapeCsv(h)).join(',')
-    ]
+    const lines: string[] = [headers.map(h => escapeCsv(h)).join(',')]
     for (const p of properties) {
-      const row = this.buildPropertyFlatExportRow(p)
+      const row = this.buildPropertyFlatExportRow(p, headers)
       lines.push(row.map(escapeCsv).join(','))
     }
     return Buffer.from(lines.join('\r\n'), 'utf-8')

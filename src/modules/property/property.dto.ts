@@ -258,6 +258,22 @@ export class PropertyFileExportQueryDto extends PropertyQueryDto {
   @IsNotEmpty()
   @IsString()
   fileType: 'xlsx' | 'csv'
+
+  @ApiPropertyOptional({
+    description:
+      'Optional spreadsheet column headers to include. Unknown values are ignored. ' +
+      '`Expedia ID*` is always included. When omitted, all columns are exported.',
+    type: [String],
+    example: ['Expedia ID*', 'Property Name*', 'Portfolio*', 'Status']
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined
+    return Array.isArray(value) ? value : [value]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  columns?: string[]
 }
 
 export class SharePropertyDto {
