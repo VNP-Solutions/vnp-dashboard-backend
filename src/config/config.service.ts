@@ -92,8 +92,4 @@ export class ConfigService {
   get payoutServiceApiKey(): string | undefined {
     return this.configService.get('payoutServiceApiKey', { infer: true })
   }
-
-  get internalApiKey(): string | undefined {
-    return this.configService.get('internalApiKey', { infer: true })
-  }
 }

@@ -16,13 +16,11 @@ import { AuditRepository } from './audit.repository'
 import { AuditService } from './audit.service'
 import { PayoutClient } from './payout.client'
 import { PayoutConfirmTokenService } from './payout-confirm-token.service'
-import { InternalAuditController } from './internal-audit.controller'
-import { InternalApiKeyGuard } from './internal-api-key.guard'
 import { PayoutHistoryController } from './payout-history.controller'
 
 @Module({
   imports: [AuthModule, JwtModule.register({})],
-  controllers: [AuditController, InternalAuditController, PayoutHistoryController],
+  controllers: [AuditController, PayoutHistoryController],
   providers: [
     {
       provide: 'IAuditService',
@@ -61,8 +59,7 @@ import { PayoutHistoryController } from './payout-history.controller'
     EmailUtil,
     ConfigService,
     PayoutClient,
-    PayoutConfirmTokenService,
-    InternalApiKeyGuard
+    PayoutConfirmTokenService
   ],
   exports: [
     {
