@@ -11,8 +11,8 @@ import type { IUserWithPermissions } from '../../common/interfaces/permission.in
 import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import {
-  isInternalUser,
-  isUserSuperAdmin
+  canManageConsolidatedReports,
+  canViewConsolidatedReports
 } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import { EmailUtil } from '../../common/utils/email.util'
@@ -47,15 +47,30 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
     private emailUtil: EmailUtil
   ) {}
 
-  async create(data: CreateConsolidatedReportDto, user: IUserWithPermissions) {
-    // Only internal users (super admin and internal) can create consolidated reports
-    if (!isInternalUser(user)) {
+  private readonly consolidatedReportViewForbiddenMessage =
+    'Only Super Admin, or users with property view/update/all permission and partial or all access, can view consolidated reports'
+
+  private readonly consolidatedReportManageForbiddenMessage =
+    'Only Super Admin, or internal users with property update/all permission and partial or all access, can manage consolidated reports'
+
+  private assertCanViewConsolidatedReports(user: IUserWithPermissions): void {
+    if (!canViewConsolidatedReports(user)) {
+      throw new ForbiddenException(this.consolidatedReportViewForbiddenMessage)
+    }
+  }
+
+  private assertCanManageConsolidatedReports(user: IUserWithPermissions): void {
+    if (!canManageConsolidatedReports(user)) {
       throw new ForbiddenException(
-        'Only internal users can create consolidated reports'
+        this.consolidatedReportManageForbiddenMessage
       )
     }
+  }
 
-    // Verify user has access to the portfolio
+  private async assertPortfolioAccess(
+    user: IUserWithPermissions,
+    portfolioId: string
+  ): Promise<void> {
     const accessiblePortfolioIds =
       await this.permissionService.getAccessibleResourceIds(
         user,
@@ -65,10 +80,16 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
     if (
       accessiblePortfolioIds !== 'all' &&
       Array.isArray(accessiblePortfolioIds) &&
-      !accessiblePortfolioIds.includes(data.portfolio_id)
+      !accessiblePortfolioIds.includes(portfolioId)
     ) {
-      throw new BadRequestException('You do not have access to this portfolio')
+      throw new NotFoundException('Portfolio not found')
     }
+  }
+
+  async create(data: CreateConsolidatedReportDto, user: IUserWithPermissions) {
+    this.assertCanManageConsolidatedReports(user)
+
+    await this.assertPortfolioAccess(user, data.portfolio_id)
 
     const consolidatedReport = await this.consolidatedReportRepository.create({
       ...data,
@@ -86,27 +107,9 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
     data: BulkCreateConsolidatedReportDto,
     user: IUserWithPermissions
   ): Promise<BulkCreateResultDto> {
-    // Only internal users (super admin and internal) can create consolidated reports
-    if (!isInternalUser(user)) {
-      throw new ForbiddenException(
-        'Only internal users can create consolidated reports'
-      )
-    }
+    this.assertCanManageConsolidatedReports(user)
 
-    // Verify user has access to the portfolio
-    const accessiblePortfolioIds =
-      await this.permissionService.getAccessibleResourceIds(
-        user,
-        ModuleType.PORTFOLIO
-      )
-
-    if (
-      accessiblePortfolioIds !== 'all' &&
-      Array.isArray(accessiblePortfolioIds) &&
-      !accessiblePortfolioIds.includes(data.portfolio_id)
-    ) {
-      throw new BadRequestException('You do not have access to this portfolio')
-    }
+    await this.assertPortfolioAccess(user, data.portfolio_id)
 
     const result: BulkCreateResultDto = {
       totalReports: data.reports.length,
@@ -164,6 +167,8 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
   }
 
   async findAll(query: ConsolidatedReportQueryDto, user: IUserWithPermissions) {
+    this.assertCanViewConsolidatedReports(user)
+
     const accessiblePortfolioIds =
       await this.permissionService.getAccessibleResourceIds(
         user,
@@ -247,6 +252,8 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
     query: ConsolidatedReportQueryDto,
     user: IUserWithPermissions
   ) {
+    this.assertCanViewConsolidatedReports(user)
+
     const accessiblePortfolioIds =
       await this.permissionService.getAccessibleResourceIds(
         user,
@@ -314,6 +321,8 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
+    this.assertCanViewConsolidatedReports(user)
+
     const consolidatedReport =
       await this.consolidatedReportRepository.findById(id)
 
@@ -340,20 +349,9 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
   }
 
   async findByPortfolio(portfolioId: string, user: IUserWithPermissions) {
-    // Verify user has access to the portfolio
-    const accessiblePortfolioIds =
-      await this.permissionService.getAccessibleResourceIds(
-        user,
-        ModuleType.PORTFOLIO
-      )
+    this.assertCanViewConsolidatedReports(user)
 
-    if (
-      accessiblePortfolioIds !== 'all' &&
-      Array.isArray(accessiblePortfolioIds) &&
-      !accessiblePortfolioIds.includes(portfolioId)
-    ) {
-      throw new NotFoundException('Portfolio not found')
-    }
+    await this.assertPortfolioAccess(user, portfolioId)
 
     const consolidatedReports =
       await this.consolidatedReportRepository.findByPortfolioId(portfolioId)
@@ -366,12 +364,7 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
     data: UpdateConsolidatedReportDto,
     user: IUserWithPermissions
   ) {
-    // Only internal users (super admin and internal) can update consolidated reports
-    if (!isInternalUser(user)) {
-      throw new ForbiddenException(
-        'Only internal users can update consolidated reports'
-      )
-    }
+    this.assertCanManageConsolidatedReports(user)
 
     const consolidatedReport =
       await this.consolidatedReportRepository.findById(id)
@@ -415,12 +408,7 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
   }
 
   async remove(id: string, user: IUserWithPermissions) {
-    // Only super admin can delete consolidated reports
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException(
-        'Only Super Admin can delete consolidated reports'
-      )
-    }
+    this.assertCanManageConsolidatedReports(user)
 
     const consolidatedReport =
       await this.consolidatedReportRepository.findById(id)
@@ -453,27 +441,9 @@ export class ConsolidatedReportService implements IConsolidatedReportService {
     data: BulkDeleteConsolidatedReportDto,
     user: IUserWithPermissions
   ): Promise<BulkDeleteResultDto> {
-    // Only super admin can delete consolidated reports
-    if (!isUserSuperAdmin(user)) {
-      throw new ForbiddenException(
-        'Only Super Admin can delete consolidated reports'
-      )
-    }
+    this.assertCanManageConsolidatedReports(user)
 
-    // Verify user has access to the portfolio
-    const accessiblePortfolioIds =
-      await this.permissionService.getAccessibleResourceIds(
-        user,
-        ModuleType.PORTFOLIO
-      )
-
-    if (
-      accessiblePortfolioIds !== 'all' &&
-      Array.isArray(accessiblePortfolioIds) &&
-      !accessiblePortfolioIds.includes(data.portfolio_id)
-    ) {
-      throw new BadRequestException('You do not have access to this portfolio')
-    }
+    await this.assertPortfolioAccess(user, data.portfolio_id)
 
     const result: BulkDeleteResultDto = {
       totalReports: data.report_ids.length,

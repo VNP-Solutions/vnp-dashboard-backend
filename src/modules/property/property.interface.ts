@@ -172,7 +172,8 @@ export interface IPropertyRepository {
       name: string
       portfolio_id: string
       portfolio: { id: string; name: string }
-      bankDetails: NonNullable<PropertyWithPendingActions['bankDetails']>
+      credentials: { expedia_id: string | null } | null
+      bankDetails: PropertyWithPendingActions['bankDetails']
     }>
   >
   findByIds(ids: string[]): Promise<Property[]>
@@ -203,6 +204,11 @@ export interface IPropertyService {
   syncBulkUpsert(
     items: SyncBulkUpsertPropertyItemDto[]
   ): Promise<SyncBulkUpsertPropertyResultDto>
+  syncBulkUpsertAsync(
+    items: SyncBulkUpsertPropertyItemDto[],
+    batchId: string,
+    callbackUrl: string
+  ): Promise<{ batchId: string; status: string }>
   syncBulkDelete(
     dto: SyncBulkDeletePropertyDto
   ): Promise<SyncBulkDeletePropertyResultDto>
@@ -260,7 +266,8 @@ export interface IPropertyService {
       property_id: string
       property_name: string
       portfolio: { id: string; name: string }
-      bank_details: NonNullable<PropertyWithFullDetails['bankDetails']>
+      credentials: { expedia_id: string | null } | null
+      bank_details: PropertyWithFullDetails['bankDetails']
     }>
   >
   getPropertiesByPortfolios(

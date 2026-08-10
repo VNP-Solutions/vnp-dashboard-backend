@@ -45,9 +45,10 @@ export class ConsolidatedReportController {
   ) {}
 
   @Post()
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Create a new consolidated report (Internal users only)'
+    summary:
+      'Create a new consolidated report (Super Admin or internal users with property update permission and partial access)'
   })
   @ApiResponse({
     status: 201,
@@ -55,7 +56,8 @@ export class ConsolidatedReportController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only internal users can create consolidated reports'
+    description:
+      'Forbidden - Super Admin or internal users with property update permission and partial or all access'
   })
   create(
     @Body() createConsolidatedReportDto: CreateConsolidatedReportDto,
@@ -68,10 +70,10 @@ export class ConsolidatedReportController {
   }
 
   @Post('bulk')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.CREATE)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
     summary:
-      'Create multiple consolidated reports for a portfolio (Internal users only)'
+      'Create multiple consolidated reports for a portfolio (Super Admin or internal users with property update permission and partial access)'
   })
   @ApiResponse({
     status: 201,
@@ -80,7 +82,7 @@ export class ConsolidatedReportController {
   @ApiResponse({
     status: 403,
     description:
-      'Forbidden - Only internal users can create consolidated reports'
+      'Forbidden - Super Admin or internal users with property update permission and partial or all access'
   })
   bulkCreate(
     @Body() bulkCreateDto: BulkCreateConsolidatedReportDto,
@@ -90,7 +92,7 @@ export class ConsolidatedReportController {
   }
 
   @Get()
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
   @ApiOperation({
     summary:
       'Get all consolidated reports accessible to the user with pagination, search, filter, and sort'
@@ -98,6 +100,11 @@ export class ConsolidatedReportController {
   @ApiResponse({
     status: 200,
     description: 'Paginated list of consolidated reports retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden - Super Admin, property update/all with partial or all access, or users with property view and partial or all access'
   })
   findAll(
     @Query() query: ConsolidatedReportQueryDto,
@@ -107,7 +114,7 @@ export class ConsolidatedReportController {
   }
 
   @Get('export/all')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
   @ApiOperation({
     summary:
       'Get all consolidated reports without pagination for export purposes (supports search, filter, and sort)'
@@ -115,6 +122,11 @@ export class ConsolidatedReportController {
   @ApiResponse({
     status: 200,
     description: 'All consolidated reports retrieved successfully'
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden - Super Admin, property update/all with partial or all access, or users with property view and partial or all access'
   })
   findAllForExport(
     @Query() query: ConsolidatedReportQueryDto,
@@ -124,7 +136,7 @@ export class ConsolidatedReportController {
   }
 
   @Get('portfolio/:portfolioId')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
   @ApiOperation({
     summary: 'Get all consolidated reports for a specific portfolio'
   })
@@ -135,7 +147,8 @@ export class ConsolidatedReportController {
   @ApiResponse({ status: 404, description: 'Portfolio not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - No access to this portfolio'
+    description:
+      'Forbidden - Super Admin, property update/all with partial or all access, or users with property view and partial or all access'
   })
   findByPortfolio(
     @Param('portfolioId') portfolioId: string,
@@ -145,7 +158,7 @@ export class ConsolidatedReportController {
   }
 
   @Get(':id')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ)
   @ApiOperation({ summary: 'Get a consolidated report by ID' })
   @ApiResponse({
     status: 200,
@@ -154,16 +167,18 @@ export class ConsolidatedReportController {
   @ApiResponse({ status: 404, description: 'Consolidated report not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - No access to this consolidated report'
+    description:
+      'Forbidden - Super Admin, property update/all with partial or all access, or users with property view and partial or all access'
   })
   findOne(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.consolidatedReportService.findOne(id, user)
   }
 
   @Patch(':id')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.UPDATE, true)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Update a consolidated report (Internal users only)'
+    summary:
+      'Update a consolidated report (Super Admin or internal users with property update permission and partial access)'
   })
   @ApiResponse({
     status: 200,
@@ -172,7 +187,8 @@ export class ConsolidatedReportController {
   @ApiResponse({ status: 404, description: 'Consolidated report not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only internal users can update consolidated reports'
+    description:
+      'Forbidden - Super Admin or internal users with property update permission and partial or all access'
   })
   update(
     @Param('id') id: string,
@@ -187,10 +203,10 @@ export class ConsolidatedReportController {
   }
 
   @Delete('bulk')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
     summary:
-      'Delete multiple consolidated reports for a portfolio (Super Admin only)'
+      'Delete multiple consolidated reports for a portfolio (Super Admin or internal users with property update permission and partial access)'
   })
   @ApiResponse({
     status: 200,
@@ -198,7 +214,8 @@ export class ConsolidatedReportController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only Super Admin can delete consolidated reports'
+    description:
+      'Forbidden - Super Admin or internal users with property update permission and partial or all access'
   })
   @ApiResponse({
     status: 400,
@@ -212,9 +229,10 @@ export class ConsolidatedReportController {
   }
 
   @Delete(':id')
-  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.DELETE, true)
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Delete a consolidated report (Super Admin only)'
+    summary:
+      'Delete a consolidated report (Super Admin or internal users with property update permission and partial access)'
   })
   @ApiResponse({
     status: 200,
@@ -223,7 +241,8 @@ export class ConsolidatedReportController {
   @ApiResponse({ status: 404, description: 'Consolidated report not found' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - Only Super Admin can delete consolidated reports'
+    description:
+      'Forbidden - Super Admin or internal users with property update permission and partial or all access'
   })
   remove(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.consolidatedReportService.remove(id, user)
