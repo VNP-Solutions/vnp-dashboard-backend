@@ -9,6 +9,7 @@ import {
   forwardRef
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { JwtService } from '@nestjs/jwt'
 import { BankSubType, BankType, Prisma, Property } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
 import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../common/constants/external-api-user.context'
@@ -22,6 +23,7 @@ import {
 import { OtaPasswordPlaintextCacheService } from '../../common/services/ota-password-plaintext-cache.service'
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount } from '../../common/utils/amount.util'
+import { ColoredLogger } from '../../common/utils/colored-logger.util'
 import {
   comparableBankDetailsEqual,
   logBankDetailsEmailComparison,
@@ -211,6 +213,7 @@ const OTA_PASSWORD_DECRYPT_PROCESSOR_CODE = `
 @Injectable()
 export class PropertyService implements IPropertyService {
   private readonly logger = new Logger(PropertyService.name)
+  private readonly syncLogger = new ColoredLogger('PropertyBulkSync')
 
   /**
    * Pre-derived AES key (same idea as global report). Avoids `scryptSync` on every
@@ -237,7 +240,8 @@ export class PropertyService implements IPropertyService {
     private configService: ConfigService<Configuration>,
     @Inject(EmailUtil)
     private emailUtil: EmailUtil,
-    private otaPasswordPlaintextCache: OtaPasswordPlaintextCacheService
+    private otaPasswordPlaintextCache: OtaPasswordPlaintextCacheService,
+    private readonly jwtService: JwtService
   ) {
     const encryptionSecret = this.configService.get('encryption.secret', {
       infer: true
@@ -4836,15 +4840,29 @@ export class PropertyService implements IPropertyService {
     return property
   }
 
-  async syncUpsert(parentId: string, dto: SyncUpsertPropertyDto) {
+  async syncUpsert(
+    parentId: string,
+    dto: SyncUpsertPropertyDto,
+    opts?: {
+      currencyId?: string
+      portfolioId?: string
+      existing?: { id: string; name: string } | null
+      skipFetch?: boolean
+    }
+  ) {
     this.validateSyncUpsertCredentials(dto.credentials)
 
     const [currency_id, portfolio_id] = await Promise.all([
-      this.resolveCurrencyId(dto.currency),
-      this.resolvePortfolioIdByParentId(dto.portfolio_parent_id)
+      opts?.currencyId
+        ? Promise.resolve(opts.currencyId)
+        : this.resolveCurrencyId(dto.currency),
+      opts?.portfolioId
+        ? Promise.resolve(opts.portfolioId)
+        : this.resolvePortfolioIdByParentId(dto.portfolio_parent_id)
     ])
 
-    const existing = await this.propertyRepository.findByParentId(parentId)
+    const existing =
+      opts?.existing ?? (await this.propertyRepository.findByParentId(parentId))
 
     if (existing) {
       if (dto.name !== existing.name) {
@@ -4867,6 +4885,7 @@ export class PropertyService implements IPropertyService {
         }
       })
       await this.upsertSyncCredentials(existing.id, dto.credentials, false)
+      if (opts?.skipFetch) return { id: existing.id }
       return this.fetchSyncUpsertProperty(existing.id)
     }
 
@@ -4890,6 +4909,7 @@ export class PropertyService implements IPropertyService {
       created.id
     )
     await this.upsertSyncCredentials(created.id, dto.credentials, true)
+    if (opts?.skipFetch) return { id: created.id }
     return this.fetchSyncUpsertProperty(created.id)
   }
 
@@ -4900,6 +4920,9 @@ export class PropertyService implements IPropertyService {
       throw new BadRequestException('No items provided')
     }
 
+    const syncStart = Date.now()
+    this.syncLogger.step(`📥 SYNC BULK UPSERT RECEIVED — ${items.length} items`)
+
     const result: SyncBulkUpsertPropertyResultDto = {
       totalRows: items.length,
       createdCount: 0,
@@ -4909,11 +4932,68 @@ export class PropertyService implements IPropertyService {
       successfulUpserts: []
     }
 
+    // Pre-fetch existing properties, portfolios, and currencies for the
+    // whole batch in a few queries instead of one-per-item. Items are still
+    // upserted one at a time so per-item failures stay isolated (no behavior
+    // change). Currency/portfolio ids are resolved from these maps when
+    // present; otherwise syncUpsert falls back to its own resolution (which
+    // can create a missing currency or throw for a missing portfolio), so
+    // behavior is identical to the per-item path.
+    const validParentIds: string[] = []
+    const validPortfolioParentIds: string[] = []
+    const currencyCodes: string[] = []
+    for (const it of items) {
+      const pid = typeof it.parent_id === 'string' ? it.parent_id.trim() : ''
+      if (pid) validParentIds.push(pid)
+      const ppid =
+        typeof it.portfolio_parent_id === 'string'
+          ? it.portfolio_parent_id.trim()
+          : ''
+      if (ppid) validPortfolioParentIds.push(ppid)
+      const code = typeof it.currency === 'string' ? it.currency.trim() : ''
+      if (code) currencyCodes.push(code)
+    }
+
+    const [existingByParentId, portfolioByParentId, currencyByCode] =
+      await Promise.all([
+        this.prisma.property
+          .findMany({
+            where: { parent_id: { in: [...new Set(validParentIds)] } }
+          })
+          .then(rows => new Map(rows.map(p => [p.parent_id, p]))),
+        this.prisma.portfolio
+          .findMany({
+            where: { parent_id: { in: [...new Set(validPortfolioParentIds)] } }
+          })
+          .then(rows => new Map(rows.map(p => [p.parent_id, p.id]))),
+        this.prisma.currency
+          .findMany({
+            where: { code: { in: [...new Set(currencyCodes)] } }
+          })
+          .then(rows => new Map(rows.map(c => [c.code, c.id])))
+      ])
+
+    this.syncLogger.info(
+      `Pre-fetch done — existing=${existingByParentId.size}, portfolios=${portfolioByParentId.size}, currencies=${currencyByCode.size} (${Date.now() - syncStart}ms)`
+    )
+
     const optionalString = (value: unknown): string | undefined => {
       if (value === undefined || value === null) return undefined
       if (typeof value !== 'string') return undefined
       const trimmed = value.trim()
       return trimmed || undefined
+    }
+
+    // Centralizes per-row failure recording + a colored row-level log so the
+    // dashboard's bulk upsert is as observable as the DBMS import loop.
+    const recordRowError = (
+      row: number,
+      parentId: string,
+      error: string
+    ): void => {
+      result.errors.push({ row, parent_id: parentId, error })
+      result.failureCount++
+      this.syncLogger.warn(`Row ${row} | ${parentId} | ❌ FAILED: ${error}`)
     }
 
     for (const item of items) {
@@ -4922,58 +5002,37 @@ export class PropertyService implements IPropertyService {
         typeof item.parent_id === 'string' ? item.parent_id.trim() : ''
 
       if (!Number.isInteger(rowNumber) || rowNumber < 1) {
-        result.errors.push({
-          row: Number.isInteger(rowNumber) ? rowNumber : 0,
-          parent_id: parentId || 'Unknown',
-          error: 'Row is required and must be a positive integer'
-        })
-        result.failureCount++
+        recordRowError(
+          Number.isInteger(rowNumber) ? rowNumber : 0,
+          parentId || 'Unknown',
+          'Row is required and must be a positive integer'
+        )
         continue
       }
 
       if (!parentId) {
-        result.errors.push({
-          row: rowNumber,
-          parent_id: 'Unknown',
-          error: 'Parent ID is required'
-        })
-        result.failureCount++
+        recordRowError(rowNumber, 'Unknown', 'Parent ID is required')
         continue
       }
 
       try {
         const name = typeof item.name === 'string' ? item.name.trim() : ''
         if (!name) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Property name is required'
-          })
-          result.failureCount++
+          recordRowError(rowNumber, parentId, 'Property name is required')
           continue
         }
 
         const address =
           typeof item.address === 'string' ? item.address.trim() : ''
         if (!address) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Address is required'
-          })
-          result.failureCount++
+          recordRowError(rowNumber, parentId, 'Address is required')
           continue
         }
 
         const currencyCode =
           typeof item.currency === 'string' ? item.currency.trim() : ''
         if (!currencyCode) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Currency is required'
-          })
-          result.failureCount++
+          recordRowError(rowNumber, parentId, 'Currency is required')
           continue
         }
 
@@ -4982,61 +5041,59 @@ export class PropertyService implements IPropertyService {
             ? item.portfolio_parent_id.trim()
             : ''
         if (!portfolioParentId) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Portfolio Parent ID is required'
-          })
-          result.failureCount++
+          recordRowError(rowNumber, parentId, 'Portfolio Parent ID is required')
           continue
         }
 
         if (typeof item.is_active !== 'boolean') {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'is_active is required and must be a boolean'
-          })
-          result.failureCount++
+          recordRowError(
+            rowNumber,
+            parentId,
+            'is_active is required and must be a boolean'
+          )
           continue
         }
 
         const expediaId = optionalString(item.expedia_id)
         if (!expediaId) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Expedia ID is required'
-          })
-          result.failureCount++
+          recordRowError(rowNumber, parentId, 'Expedia ID is required')
           continue
         }
 
-        const existing = await this.propertyRepository.findByParentId(parentId)
+        const existing = existingByParentId.get(parentId) ?? null
 
-        await this.syncUpsert(parentId, {
-          name,
-          address,
-          currency: {
-            code: currencyCode,
-            name: currencyCode,
-            symbol: ''
+        await this.syncUpsert(
+          parentId,
+          {
+            name,
+            address,
+            currency: {
+              code: currencyCode,
+              name: currencyCode,
+              symbol: ''
+            },
+            card_descriptor: optionalString(item.card_descriptor),
+            portfolio_parent_id: portfolioParentId,
+            is_active: item.is_active,
+            credentials: {
+              expedia_id: expediaId,
+              expedia_username: optionalString(item.expedia_username),
+              expedia_password: optionalString(item.expedia_password),
+              agoda_id: optionalString(item.agoda_id),
+              agoda_username: optionalString(item.agoda_username),
+              agoda_password: optionalString(item.agoda_password),
+              booking_id: optionalString(item.booking_id),
+              booking_username: optionalString(item.booking_username),
+              booking_password: optionalString(item.booking_password)
+            }
           },
-          card_descriptor: optionalString(item.card_descriptor),
-          portfolio_parent_id: portfolioParentId,
-          is_active: item.is_active,
-          credentials: {
-            expedia_id: expediaId,
-            expedia_username: optionalString(item.expedia_username),
-            expedia_password: optionalString(item.expedia_password),
-            agoda_id: optionalString(item.agoda_id),
-            agoda_username: optionalString(item.agoda_username),
-            agoda_password: optionalString(item.agoda_password),
-            booking_id: optionalString(item.booking_id),
-            booking_username: optionalString(item.booking_username),
-            booking_password: optionalString(item.booking_password)
+          {
+            existing,
+            currencyId: currencyByCode.get(currencyCode),
+            portfolioId: portfolioByParentId.get(portfolioParentId),
+            skipFetch: true
           }
-        })
+        )
 
         const action = existing ? 'updated' : 'created'
         if (existing) {
@@ -5046,18 +5103,138 @@ export class PropertyService implements IPropertyService {
         }
 
         result.successfulUpserts.push({ parent_id: parentId, action })
+        this.syncLogger.info(
+          `Row ${rowNumber} | ${name} | ✅ ${action.toUpperCase()}`
+        )
       } catch (error) {
-        result.errors.push({
-          row: rowNumber,
-          parent_id: parentId,
-          error:
-            error instanceof Error ? error.message : 'Unknown error occurred'
-        })
-        result.failureCount++
+        recordRowError(
+          rowNumber,
+          parentId,
+          error instanceof Error ? error.message : 'Unknown error occurred'
+        )
       }
     }
 
+    this.syncLogger.success(
+      `✅ SYNC BULK UPSERT DONE — created=${result.createdCount}, updated=${result.updatedCount}, failed=${result.failureCount} (${Date.now() - syncStart}ms)`
+    )
+
     return result
+  }
+
+  // Async/callback variant: accept the batch, return 202 immediately, process
+  // the items in the background using the same syncBulkUpsert logic, then POST
+  // the per-row result back to the DBMS callback URL. This removes the 15s
+  // timeout pressure entirely — no long-held HTTP connection anywhere.
+  async syncBulkUpsertAsync(
+    items: SyncBulkUpsertPropertyItemDto[],
+    batchId: string,
+    callbackUrl: string
+  ): Promise<{ batchId: string; status: string }> {
+    if (!Array.isArray(items) || !items.length) {
+      throw new BadRequestException('No items provided')
+    }
+    if (!callbackUrl) {
+      throw new BadRequestException('callbackUrl is required for async sync')
+    }
+
+    this.syncLogger.step(
+      `📥 SYNC BULK UPSERT (ASYNC) RECEIVED — ${items.length} items, batch=${batchId}`
+    )
+
+    // Fire-and-forget the heavy work so the request returns immediately.
+    this.processBulkUpsertInBackground(items, batchId, callbackUrl).catch(e =>
+      this.syncLogger.error(
+        `[async] background sync failed for batch ${batchId}: ${e?.message ?? e}`
+      )
+    )
+
+    return { batchId, status: 'accepted' }
+  }
+
+  private async processBulkUpsertInBackground(
+    items: SyncBulkUpsertPropertyItemDto[],
+    batchId: string,
+    callbackUrl: string
+  ): Promise<void> {
+    let result: SyncBulkUpsertPropertyResultDto
+    try {
+      result = await this.syncBulkUpsert(items)
+    } catch (e: any) {
+      // If the whole batch throws, report a synthetic all-failed result so the
+      // DBMS can still finalize the email instead of waiting for the sweeper.
+      this.syncLogger.error(
+        `[async] syncBulkUpsert threw for batch ${batchId}: ${e?.message ?? e}`
+      )
+      result = {
+        totalRows: items.length,
+        createdCount: 0,
+        updatedCount: 0,
+        failureCount: items.length,
+        errors: items.map(it => ({
+          row: it.row ?? 0,
+          parent_id: it.parent_id ?? '',
+          error: e?.message ?? 'Unknown error occurred'
+        })),
+        successfulUpserts: []
+      }
+    }
+
+    await this.postSyncCallback(batchId, callbackUrl, result)
+  }
+
+  private async postSyncCallback(
+    batchId: string,
+    callbackUrl: string,
+    result: SyncBulkUpsertPropertyResultDto
+  ): Promise<void> {
+    const secret =
+      this.configService.get('jwt.communicationSecret', { infer: true }) ?? ''
+    if (!secret) {
+      this.syncLogger.warn(
+        `[async] JWT_COMMUNICATION_SECRET missing — cannot send callback for batch ${batchId}`
+      )
+      return
+    }
+
+    const token = this.jwtService.sign(
+      { type: 'external-communication' },
+      { secret, expiresIn: '24h' }
+    )
+
+    const body = { batchId, source: 'dashboard', result }
+
+    // Retry a few times so a transient network blip doesn't strand the batch
+    // (the DBMS sweeper is the backstop, but we'd rather deliver the callback).
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const res = await fetch(callbackUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(body)
+        })
+        if (res.ok) {
+          this.syncLogger.success(
+            `[async] callback delivered for batch ${batchId} (attempt ${attempt}, status ${res.status})`
+          )
+          return
+        }
+        this.syncLogger.warn(
+          `[async] callback attempt ${attempt} for batch ${batchId} returned ${res.status}`
+        )
+      } catch (e: any) {
+        this.syncLogger.warn(
+          `[async] callback attempt ${attempt} for batch ${batchId} failed: ${e?.message ?? e}`
+        )
+      }
+      await new Promise(r => setTimeout(r, 1000 * attempt))
+    }
+    this.syncLogger.error(
+      `[async] callback FAILED for batch ${batchId} after retries — DBMS sweeper will finalize`
+    )
   }
 
   async syncCreate(
