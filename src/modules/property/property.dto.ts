@@ -501,6 +501,32 @@ export class SyncBulkUpsertPropertyItemDto {
   booking_password?: string
 }
 
+/// Wrapper for the sync-bulk-upsert endpoint. When `batchId` is present the
+/// endpoint returns 202 immediately and processes the items in the
+/// background, POSTing the result back to `callbackUrl` (the DBMS). When
+/// `batchId` is absent the endpoint behaves synchronously as before.
+export class SyncBulkUpsertRequestDto {
+  @ApiProperty({
+    type: [SyncBulkUpsertPropertyItemDto],
+    description: 'Properties to upsert'
+  })
+  items: SyncBulkUpsertPropertyItemDto[]
+
+  @ApiProperty({
+    required: false,
+    description:
+      'If present, process asynchronously and call back with the result'
+  })
+  batchId?: string
+
+  @ApiProperty({
+    required: false,
+    description:
+      'DBMS endpoint to POST the result back to (required when batchId is set)'
+  })
+  callbackUrl?: string
+}
+
 export class BulkUpdateResultDto {
   @ApiProperty({ example: 10, description: 'Total number of rows processed' })
   totalRows: number

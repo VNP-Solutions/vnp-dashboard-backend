@@ -7,7 +7,8 @@ export enum LogLevel {
   INFO = 'INFO',
   SUCCESS = 'SUCCESS',
   ERROR = 'ERROR',
-  WARN = 'WARN'
+  WARN = 'WARN',
+  STEP = 'STEP'
 }
 
 export class ColoredLogger {
@@ -44,6 +45,10 @@ export class ColoredLogger {
     this.formatMessage(LogLevel.WARN, message, '\x1b[33m') // Yellow
   }
 
+  step(message: string): void {
+    this.formatMessage(LogLevel.STEP, message, '\x1b[35m') // Magenta
+  }
+
   /**
    * Log data in table format for better readability
    */
@@ -58,7 +63,7 @@ export class ColoredLogger {
 
     // Calculate column widths
     const colWidths = headers.map((header, i) => {
-      const maxRowValue = Math.max(...rows.map((row) => (row[i] || '').length))
+      const maxRowValue = Math.max(...rows.map(row => (row[i] || '').length))
       return Math.max(header.length, maxRowValue) + 2
     })
 
@@ -67,13 +72,13 @@ export class ColoredLogger {
       .map((header, i) => header.padEnd(colWidths[i]))
       .join(' | ')
     process.stdout.write(`${cyan}${headerRow}${reset}\n`)
-    process.stdout.write(
-      `${cyan}${'-'.repeat(headerRow.length)}${reset}\n`
-    )
+    process.stdout.write(`${cyan}${'-'.repeat(headerRow.length)}${reset}\n`)
 
     // Print rows
-    rows.forEach((row) => {
-      const formattedRow = row.map((cell, i) => (cell || '').padEnd(colWidths[i])).join(' | ')
+    rows.forEach(row => {
+      const formattedRow = row
+        .map((cell, i) => (cell || '').padEnd(colWidths[i]))
+        .join(' | ')
       process.stdout.write(`${formattedRow}\n`)
     })
 

@@ -60,6 +60,7 @@ import {
   UnsharePropertyDto,
   UpdatePropertyDto,
   SyncBulkUpsertPropertyItemDto,
+  SyncBulkUpsertRequestDto,
   SyncUpsertPropertyDto,
   SyncCreatePropertyDto,
   SyncByOtaPropertyDto,
@@ -143,9 +144,27 @@ export class PropertyController {
     - booking_id, booking_username, booking_password
     `
   })
-  @ApiBody({ type: [SyncBulkUpsertPropertyItemDto] })
-  syncBulkUpsert(@Body() items: SyncBulkUpsertPropertyItemDto[]) {
-    return this.propertyService.syncBulkUpsert(items)
+  @ApiBody({ type: SyncBulkUpsertRequestDto })
+  async syncBulkUpsert(
+    @Body() body: SyncBulkUpsertRequestDto | SyncBulkUpsertPropertyItemDto[]
+  ) {
+    // Support both the new wrapper object ({ items, batchId?, callbackUrl? })
+    // and the legacy bare-array shape for any non-DBMS callers.
+    const isAsync = !Array.isArray(body) && !!body.batchId
+    if (isAsync) {
+      const req = body as SyncBulkUpsertRequestDto
+      return this.propertyService.syncBulkUpsertAsync(
+        req.items,
+        req.batchId as string,
+        req.callbackUrl ?? ''
+      )
+    }
+    const items = Array.isArray(body)
+      ? body
+      : (body as SyncBulkUpsertRequestDto).items
+    // Synchronous path returns 200 with the full result (legacy behavior).
+    const result = await this.propertyService.syncBulkUpsert(items)
+    return result
   }
 
   @Public()
