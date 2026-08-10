@@ -4984,64 +4984,55 @@ export class PropertyService implements IPropertyService {
       return trimmed || undefined
     }
 
+    // Centralizes per-row failure recording + a colored row-level log so the
+    // dashboard's bulk upsert is as observable as the DBMS import loop.
+    const recordRowError = (
+      row: number,
+      parentId: string,
+      error: string
+    ): void => {
+      result.errors.push({ row, parent_id: parentId, error })
+      result.failureCount++
+      this.syncLogger.warn(`Row ${row} | ${parentId} | ❌ FAILED: ${error}`)
+    }
+
     for (const item of items) {
       const rowNumber = item.row
       const parentId =
         typeof item.parent_id === 'string' ? item.parent_id.trim() : ''
 
       if (!Number.isInteger(rowNumber) || rowNumber < 1) {
-        result.errors.push({
-          row: Number.isInteger(rowNumber) ? rowNumber : 0,
-          parent_id: parentId || 'Unknown',
-          error: 'Row is required and must be a positive integer'
-        })
-        result.failureCount++
+        recordRowError(
+          Number.isInteger(rowNumber) ? rowNumber : 0,
+          parentId || 'Unknown',
+          'Row is required and must be a positive integer'
+        )
         continue
       }
 
       if (!parentId) {
-        result.errors.push({
-          row: rowNumber,
-          parent_id: 'Unknown',
-          error: 'Parent ID is required'
-        })
-        result.failureCount++
+        recordRowError(rowNumber, 'Unknown', 'Parent ID is required')
         continue
       }
 
       try {
         const name = typeof item.name === 'string' ? item.name.trim() : ''
         if (!name) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Property name is required'
-          })
-          result.failureCount++
+          recordRowError(rowNumber, parentId, 'Property name is required')
           continue
         }
 
         const address =
           typeof item.address === 'string' ? item.address.trim() : ''
         if (!address) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Address is required'
-          })
-          result.failureCount++
+          recordRowError(rowNumber, parentId, 'Address is required')
           continue
         }
 
         const currencyCode =
           typeof item.currency === 'string' ? item.currency.trim() : ''
         if (!currencyCode) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Currency is required'
-          })
-          result.failureCount++
+          recordRowError(rowNumber, parentId, 'Currency is required')
           continue
         }
 
@@ -5050,33 +5041,22 @@ export class PropertyService implements IPropertyService {
             ? item.portfolio_parent_id.trim()
             : ''
         if (!portfolioParentId) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Portfolio Parent ID is required'
-          })
-          result.failureCount++
+          recordRowError(rowNumber, parentId, 'Portfolio Parent ID is required')
           continue
         }
 
         if (typeof item.is_active !== 'boolean') {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'is_active is required and must be a boolean'
-          })
-          result.failureCount++
+          recordRowError(
+            rowNumber,
+            parentId,
+            'is_active is required and must be a boolean'
+          )
           continue
         }
 
         const expediaId = optionalString(item.expedia_id)
         if (!expediaId) {
-          result.errors.push({
-            row: rowNumber,
-            parent_id: parentId,
-            error: 'Expedia ID is required'
-          })
-          result.failureCount++
+          recordRowError(rowNumber, parentId, 'Expedia ID is required')
           continue
         }
 
@@ -5123,14 +5103,15 @@ export class PropertyService implements IPropertyService {
         }
 
         result.successfulUpserts.push({ parent_id: parentId, action })
+        this.syncLogger.info(
+          `Row ${rowNumber} | ${name} | ✅ ${action.toUpperCase()}`
+        )
       } catch (error) {
-        result.errors.push({
-          row: rowNumber,
-          parent_id: parentId,
-          error:
-            error instanceof Error ? error.message : 'Unknown error occurred'
-        })
-        result.failureCount++
+        recordRowError(
+          rowNumber,
+          parentId,
+          error instanceof Error ? error.message : 'Unknown error occurred'
+        )
       }
     }
 
