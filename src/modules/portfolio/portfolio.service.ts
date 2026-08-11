@@ -190,7 +190,35 @@ export class PortfolioService implements IPortfolioService {
 
     const nameClash = await this.portfolioRepository.findByName(dto.name)
     if (nameClash) {
-      throw new ConflictException('Portfolio with this name already exists')
+      // Portfolio already exists in dashboard by name (e.g. created manually or
+      // from an older sync). Link it to the DBMS parent_id instead of failing.
+      const updated = await this.prisma.portfolio.update({
+        where: { id: nameClash.id },
+        data: {
+          name: dto.name,
+          service_type_id,
+          currency,
+          is_active: dto.is_active,
+          is_commissionable: dto.is_commissionable,
+          parent_id: parentId,
+          ...(dto.file_count !== undefined
+            ? { file_count: dto.file_count }
+            : {})
+        },
+        include: {
+          serviceType: {
+            select: {
+              id: true,
+              type: true,
+              is_active: true
+            }
+          }
+        }
+      })
+      this.logger.log(
+        `[sync-upsert] linked existing portfolio by name id=${updated.id} parent_id=${parentId}`
+      )
+      return updated
     }
 
     const created = await this.portfolioRepository.create({
