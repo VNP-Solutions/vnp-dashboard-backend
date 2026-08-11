@@ -170,6 +170,11 @@ export interface IAuditService {
     user: IUserWithPermissions
   ): Promise<AuditWithRelations[]>
   findOne(id: string, user: IUserWithPermissions): Promise<AuditWithFullDetails>
+  /** Narrow caller-supplied audit ids to those this user may read. Used by body-id payout routes. */
+  accessibleAuditIds(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<string[]>
   update(
     id: string,
     data: UpdateAuditDto,

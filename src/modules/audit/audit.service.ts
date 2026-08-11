@@ -875,6 +875,58 @@ export class AuditService implements IAuditService {
     return data
   }
 
+  /**
+   * Narrow a caller-supplied list of audit ids to the ones this user may actually read.
+   *
+   * Every other route on the payout path resolves its audit from the URL, so PermissionGuard's
+   * resource check (`request.params.id` -> the audit's property) runs for it. Routes that take their
+   * ids in the BODY get no such check: the guard has no `params.id` to look at, so an operator with
+   * `partial` audit access could name any audit id in the system and read back what came out.
+   *
+   * That matters here because the payout status response is not a boolean. It carries rail,
+   * currency, amounts and per-OTA lines, which is another tenant's money.
+   *
+   * Ids the caller may not read are DROPPED rather than raising. The caller is a rendered page of
+   * audits that was already scoped by the same rules, so a foreign id means a probe, not a mistake
+   * worth failing an otherwise valid page over. Anything dropped is simply absent from the result,
+   * which is the same thing the endpoint already reports for an audit with no payout.
+   */
+  async accessibleAuditIds(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<string[]> {
+    if (auditIds.length === 0) return []
+
+    const auditPermission = user.role.audit_permission
+    if (!auditPermission || auditPermission.access_level === AccessLevel.none) {
+      return []
+    }
+
+    // Ids that do not exist are dropped here too: they cannot be checked, so they cannot be allowed.
+    const audits = await this.auditRepository.findByIds(auditIds)
+    if (auditPermission.access_level === AccessLevel.all) {
+      return audits.map(audit => audit.id)
+    }
+
+    // Partial access: one check per distinct property, not per audit. A page of audits is usually a
+    // handful of properties, and canAccessResource hits the database each call.
+    const allowedByProperty = new Map<string, boolean>()
+    const allowed: string[] = []
+    for (const audit of audits) {
+      let canAccess = allowedByProperty.get(audit.property_id)
+      if (canAccess === undefined) {
+        canAccess = await this.permissionService.canAccessResource(
+          user,
+          ModuleType.PROPERTY,
+          audit.property_id
+        )
+        allowedByProperty.set(audit.property_id, canAccess)
+      }
+      if (canAccess) allowed.push(audit.id)
+    }
+    return allowed
+  }
+
   async findOne(id: string, user: IUserWithPermissions) {
     const audit = await this.auditRepository.findById(id)
 

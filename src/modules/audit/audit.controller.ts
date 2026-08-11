@@ -10,7 +10,8 @@ import {
   Query,
   UploadedFile,
   UseGuards,
-  UseInterceptors
+  UseInterceptors,
+  ForbiddenException
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import {
@@ -42,6 +43,7 @@ import {
   DeleteAuditDto,
   DeleteAuditsByPortfolioDto,
   AuditPayoutStatusDto,
+  BulkPayoutDto,
   GlobalStatsResponseDto,
   InitiateAuditPayoutDto,
   RequestUpdateAmountConfirmedDto,
@@ -208,8 +210,81 @@ export class AuditController {
   })
   @ApiResponse({ status: 200, description: 'Map of audit id to payout summary' })
   @ApiResponse({ status: 502, description: 'Payout service unreachable' })
-  payoutStatus(@Body() dto: AuditPayoutStatusDto, @CurrentUser() user: IUserWithPermissions) {
-    return this.payoutClient.payoutStatusByAudits(dto.audit_ids, user.id)
+  async payoutStatus(
+    @Body() dto: AuditPayoutStatusDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // PermissionGuard's resource check reads `params.id`, which a body-id route never has, so the
+    // ids have to be scoped here or this endpoint answers for any audit in the system.
+    const auditIds = await this.auditService.accessibleAuditIds(dto.audit_ids, user)
+    if (auditIds.length === 0) return {}
+    return this.payoutClient.payoutStatusByAudits(auditIds, user.id)
+  }
+
+  @Post('bulk-payout/preview')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary: 'Preview a bulk payout for many audits of one property (Internal operators only)',
+    description:
+      'Resolves every audit, merges them by rail and currency, and runs the same gates a real ' +
+      'dispatch runs. Sends nothing and writes nothing. Returns one summary per rail, the audits ' +
+      'excluded and why, and a confirm_token bound to this exact SET of audits.'
+  })
+  @ApiResponse({ status: 200, description: 'Per-rail totals + excluded list + confirm_token' })
+  @ApiResponse({ status: 403, description: 'One or more audits are outside your access' })
+  @ApiResponse({ status: 422, description: 'The selection spans more than one property' })
+  async previewBulkPayout(
+    @Body() dto: AuditPayoutStatusDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    await this.assertEveryAuditAccessible(dto.audit_ids, user)
+    const preview = await this.payoutClient.previewBulkPayout(dto.audit_ids, user.id)
+    const { token, expiresAt } = this.payoutConfirmTokenService.mintForSet(dto.audit_ids, user.id)
+    return { preview, confirm_token: token, expires_at: expiresAt }
+  }
+
+  @Post('bulk-payout')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary: 'Dispatch a bulk payout (Internal operators only)',
+    description:
+      'Pays many audits of one property as one payment per rail. Requires the confirm_token from ' +
+      'the preview, which is bound to this exact set of audit ids, so a caller cannot preview a ' +
+      'few audits and then dispatch many. Amounts, rails and destinations are all derived by the ' +
+      'payout service; an audit already covered by a live payout is refused, not paid twice.'
+  })
+  @ApiResponse({ status: 200, description: 'Per-rail dispatch results + excluded list' })
+  @ApiResponse({ status: 403, description: 'Missing/expired token, or audits outside your access' })
+  @ApiResponse({ status: 409, description: 'One or more audits already have a live payout' })
+  async dispatchBulkPayout(
+    @Body() dto: BulkPayoutDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    await this.assertEveryAuditAccessible(dto.audit_ids, user)
+    this.payoutConfirmTokenService.verifyForSet(dto.confirm_token, dto.audit_ids, user.id)
+    return this.payoutClient.dispatchBulkPayout(dto.audit_ids, user.id)
+  }
+
+  /**
+   * REJECT, never trim.
+   *
+   * The read-only payout-status route drops ids the caller cannot see, because the caller there is a
+   * rendered page and a foreign id is a probe. This is a money route: silently removing an audit
+   * would pay a different set than the operator selected and approved, and the totals they were
+   * shown would not be the totals sent. So an out-of-scope id refuses the whole request.
+   */
+  private async assertEveryAuditAccessible(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<void> {
+    const allowed = await this.auditService.accessibleAuditIds(auditIds, user)
+    if (allowed.length !== new Set(auditIds).size) {
+      const allowedSet = new Set(allowed)
+      const refused = [...new Set(auditIds)].filter(id => !allowedSet.has(id))
+      throw new ForbiddenException(
+        `You do not have access to ${refused.length} of the selected audits (${refused.join(', ')})`
+      )
+    }
   }
 
   @Post(':id/payout')
