@@ -11,7 +11,8 @@ import {
   IsNotEmpty,
   IsNumber,
   IsOptional,
-  IsString
+  IsString,
+  ArrayMinSize
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
 
@@ -561,4 +562,27 @@ export class AuditPayoutStatusDto {
   @ArrayMaxSize(200)
   @IsString({ each: true })
   audit_ids: string[]
+}
+
+export class BulkPayoutDto {
+  @ApiProperty({
+    type: [String],
+    example: ['6a6a2017a6890692e3f8a58d', '6a6a2017a6890692e3f8a58e'],
+    description:
+      'Audits to pay. Must all belong to ONE property: a payout has a single destination, so a ' +
+      'selection spanning properties is refused rather than split.'
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  audit_ids: string[]
+
+  @ApiProperty({
+    description:
+      'From the bulk preview. Bound to this exact set of audit ids and to this user, so a preview ' +
+      'of a few audits cannot be used to dispatch many.'
+  })
+  @IsString()
+  confirm_token: string
 }

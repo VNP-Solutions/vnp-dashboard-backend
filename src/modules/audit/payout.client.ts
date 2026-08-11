@@ -207,6 +207,21 @@ export class PayoutClient {
     })
   }
 
+  /**
+   * Bulk payout: many audits of one property, paid as one payment per rail.
+   *
+   * Preview resolves, merges and gates without sending; dispatch does the same and sends. No
+   * idempotency key is passed, and none would be honoured: the payout service derives it from the
+   * SET of audit ids, so a caller cannot vary it and two clicks of the same selection collide.
+   */
+  async previewBulkPayout(auditIds: string[], actorUserId: string): Promise<unknown> {
+    return this.post('/payout-requests/bulk/preview', actorUserId, { audit_ids: auditIds })
+  }
+
+  async dispatchBulkPayout(auditIds: string[], actorUserId: string): Promise<unknown> {
+    return this.post('/payout-requests/bulk', actorUserId, { audit_ids: auditIds })
+  }
+
   /** Bulk lookup for a table page: audit ids that already have a payout, with a per-audit summary. */
   async payoutStatusByAudits(auditIds: string[], actorUserId: string): Promise<unknown> {
     if (auditIds.length === 0) return {}

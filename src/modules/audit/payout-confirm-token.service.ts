@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { ForbiddenException, Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '../../config/config.service'
@@ -80,4 +81,29 @@ export class PayoutConfirmTokenService {
       throw new ForbiddenException('Payout confirmation token was issued for a different user')
     }
   }
+
+  /**
+   * Bind a token to a SET of audits, for the bulk payout modal.
+   *
+   * The set is reduced to a stable fingerprint: sorted, deduped, hashed. Sorting is what makes the
+   * token independent of the order rows were clicked in; hashing keeps the token short whether it
+   * covers two audits or two hundred.
+   *
+   * This is what stops a caller previewing three audits, being shown a modest total, and then
+   * dispatching thirty with the same token. The amount is always re-derived server-side, so the
+   * risk is not a wrong number, it is a larger SET than the operator approved.
+   */
+  mintForSet(auditIds: string[], userId: string): { token: string; expiresAt: string } {
+    return this.mint(fingerprintAuditIds(auditIds), userId)
+  }
+
+  verifyForSet(token: string | undefined, auditIds: string[], userId: string): void {
+    this.verify(token, fingerprintAuditIds(auditIds), userId)
+  }
+}
+
+/** Order-independent, duplicate-independent fingerprint of an audit selection. */
+export function fingerprintAuditIds(auditIds: string[]): string {
+  const canonical = [...new Set(auditIds)].sort().join(',')
+  return `set:${createHash('sha256').update(canonical).digest('hex').slice(0, 32)}`
 }
