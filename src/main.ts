@@ -65,6 +65,9 @@ async function bootstrap() {
     `Application is running on: http://localhost:${configService.app.port}`
   )
   console.log(
+    `Developer docs available at: http://localhost:${configService.app.port}/docs`
+  )
+  console.log(
     `Swagger documentation available at: http://localhost:${configService.app.port}/api/docs`
   )
   console.log(
@@ -74,7 +77,10 @@ async function bootstrap() {
     `Deployment running on: ${'https://dashboard-backend.vnpmanage.online'}`
   )
   console.log(
-    `Deployed docs: ${'https://dashboard-backend.vnpmanage.online/api/docs'}`
+    `Deployed developer docs: ${'https://dashboard-backend.vnpmanage.online/docs'}`
+  )
+  console.log(
+    `Deployed Swagger: ${'https://dashboard-backend.vnpmanage.online/api/docs'}`
   )
 }
 void bootstrap()

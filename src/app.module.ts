@@ -1,6 +1,8 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
+import { ServeStaticModule } from '@nestjs/serve-static'
+import { join } from 'path'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
@@ -44,6 +46,14 @@ import { ExternalCommunicationModule } from './modules/external-communication/ex
 
 @Module({
   imports: [
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'public', 'docs'),
+      serveRoot: '/docs',
+      serveStaticOptions: {
+        index: ['index.html'],
+        fallthrough: false
+      }
+    }),
     OtaPasswordPlaintextCacheModule,
     ConfigModule.forRoot({
       load: [configuration],
