@@ -175,6 +175,9 @@ model Audit {
   agoda_amount_confirmed     Float?
   booking_amount_collectable Float?
   booking_amount_confirmed   Float?
+  gross_total                Float        @default(0)
+  due_to_vnp                 Float        @default(0)
+  due_to_property            Float        @default(0)
   is_archived                Boolean      @default(false)
   property_id                String       @db.ObjectId
   property                   Property     @relation(fields: [property_id], references: [id], onDelete: Cascade)
