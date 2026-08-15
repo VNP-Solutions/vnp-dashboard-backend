@@ -3,6 +3,11 @@
 /node_modules
 /build
 
+# docusaurus
+/documentation/node_modules
+/documentation/build
+/public/docs
+
 /backups
 
 # Logs

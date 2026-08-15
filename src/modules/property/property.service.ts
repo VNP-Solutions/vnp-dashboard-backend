@@ -4684,13 +4684,30 @@ export class PropertyService implements IPropertyService {
     const existing = await this.currencyRepository.findByCode(currency.code)
     if (existing) return existing.id
 
-    const created = await this.currencyRepository.create({
-      code: currency.code,
-      name: currency.name,
-      symbol: currency.symbol,
-      is_active: true
-    })
-    return created.id
+    // Concurrent sync-upsert calls (e.g. from the DBMS bulk-upload pipeline,
+    // which syncs several properties in parallel) can race here: two calls
+    // both see "not found" and both try to create the same brand-new
+    // currency code, which is unique. If we lose that race, fall back to
+    // re-fetching the row the other call just created instead of failing
+    // the whole property sync.
+    try {
+      const created = await this.currencyRepository.create({
+        code: currency.code,
+        name: currency.name,
+        symbol: currency.symbol,
+        is_active: true
+      })
+      return created.id
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        const winner = await this.currencyRepository.findByCode(currency.code)
+        if (winner) return winner.id
+      }
+      throw e
+    }
   }
 
   private async resolvePortfolioIdByParentId(
