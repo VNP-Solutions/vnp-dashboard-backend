@@ -10,7 +10,7 @@ import {
 import { PendingActionStatus, PendingActionType } from '@prisma/client'
 import type { PaginatedResult } from '../../common/dto/query.dto'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
-import { roundToDecimals } from '../../common/utils/amount.util'
+import { roundToDecimals, computeAuditDerivedAmounts } from '../../common/utils/amount.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import {
   isInternalUser,
@@ -469,6 +469,32 @@ export class PendingActionService implements IPendingActionService {
             pendingAction.audit_update_data.booking_amount_confirmed
           )
         }
+
+        const currentAudit = await this.prisma.audit.findUnique({
+          where: { id: pendingAction.audit_id },
+          select: {
+            expedia_amount_confirmed: true,
+            agoda_amount_confirmed: true,
+            booking_amount_confirmed: true
+          }
+        })
+
+        const derived = computeAuditDerivedAmounts({
+          expedia_amount_confirmed:
+            updateData.expedia_amount_confirmed !== undefined
+              ? updateData.expedia_amount_confirmed
+              : currentAudit?.expedia_amount_confirmed,
+          agoda_amount_confirmed:
+            updateData.agoda_amount_confirmed !== undefined
+              ? updateData.agoda_amount_confirmed
+              : currentAudit?.agoda_amount_confirmed,
+          booking_amount_confirmed:
+            updateData.booking_amount_confirmed !== undefined
+              ? updateData.booking_amount_confirmed
+              : currentAudit?.booking_amount_confirmed
+        })
+
+        Object.assign(updateData, derived)
 
         await this.prisma.audit.update({
           where: { id: pendingAction.audit_id },

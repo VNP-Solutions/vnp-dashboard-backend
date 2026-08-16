@@ -258,6 +258,22 @@ export class PropertyFileExportQueryDto extends PropertyQueryDto {
   @IsNotEmpty()
   @IsString()
   fileType: 'xlsx' | 'csv'
+
+  @ApiPropertyOptional({
+    description:
+      'Optional spreadsheet column headers to include. Unknown values are ignored. ' +
+      '`Expedia ID*` is always included. When omitted, all columns are exported.',
+    type: [String],
+    example: ['Expedia ID*', 'Property Name*', 'Portfolio*', 'Status']
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined
+    return Array.isArray(value) ? value : [value]
+  })
+  @IsArray()
+  @IsString({ each: true })
+  columns?: string[]
 }
 
 export class SharePropertyDto {
@@ -483,6 +499,32 @@ export class SyncBulkUpsertPropertyItemDto {
 
   @ApiPropertyOptional()
   booking_password?: string
+}
+
+/// Wrapper for the sync-bulk-upsert endpoint. When `batchId` is present the
+/// endpoint returns 202 immediately and processes the items in the
+/// background, POSTing the result back to `callbackUrl` (the DBMS). When
+/// `batchId` is absent the endpoint behaves synchronously as before.
+export class SyncBulkUpsertRequestDto {
+  @ApiProperty({
+    type: [SyncBulkUpsertPropertyItemDto],
+    description: 'Properties to upsert'
+  })
+  items: SyncBulkUpsertPropertyItemDto[]
+
+  @ApiProperty({
+    required: false,
+    description:
+      'If present, process asynchronously and call back with the result'
+  })
+  batchId?: string
+
+  @ApiProperty({
+    required: false,
+    description:
+      'DBMS endpoint to POST the result back to (required when batchId is set)'
+  })
+  callbackUrl?: string
 }
 
 export class BulkUpdateResultDto {

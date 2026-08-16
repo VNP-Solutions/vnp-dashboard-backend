@@ -60,6 +60,7 @@ import {
   UnsharePropertyDto,
   UpdatePropertyDto,
   SyncBulkUpsertPropertyItemDto,
+  SyncBulkUpsertRequestDto,
   SyncUpsertPropertyDto,
   SyncCreatePropertyDto,
   SyncByOtaPropertyDto,
@@ -143,9 +144,27 @@ export class PropertyController {
     - booking_id, booking_username, booking_password
     `
   })
-  @ApiBody({ type: [SyncBulkUpsertPropertyItemDto] })
-  syncBulkUpsert(@Body() items: SyncBulkUpsertPropertyItemDto[]) {
-    return this.propertyService.syncBulkUpsert(items)
+  @ApiBody({ type: SyncBulkUpsertRequestDto })
+  async syncBulkUpsert(
+    @Body() body: SyncBulkUpsertRequestDto | SyncBulkUpsertPropertyItemDto[]
+  ) {
+    // Support both the new wrapper object ({ items, batchId?, callbackUrl? })
+    // and the legacy bare-array shape for any non-DBMS callers.
+    const isAsync = !Array.isArray(body) && !!body.batchId
+    if (isAsync) {
+      const req = body as SyncBulkUpsertRequestDto
+      return this.propertyService.syncBulkUpsertAsync(
+        req.items,
+        req.batchId as string,
+        req.callbackUrl ?? ''
+      )
+    }
+    const items = Array.isArray(body)
+      ? body
+      : (body as SyncBulkUpsertRequestDto).items
+    // Synchronous path returns 200 with the full result (legacy behavior).
+    const result = await this.propertyService.syncBulkUpsert(items)
+    return result
   }
 
   @Public()
@@ -546,6 +565,8 @@ export class PropertyController {
     description:
       'Same query parameters as `GET /property/export/all` (search, filters, sort, etc.), ' +
       'with an additional required `fileType` of `xlsx` or `csv`. ' +
+      'Optional repeated `columns` query params limit which spreadsheet headers are included ' +
+      '(`Expedia ID*` is always included). ' +
       'Response is a file attachment with a flat table of property fields (credentials excluded). ' +
       'If `portfolio_id` is set, only properties **owned** by that portfolio are included (properties ' +
       'only shared *into* that portfolio via show_in are excluded).'

@@ -204,6 +204,11 @@ export interface IPropertyService {
   syncBulkUpsert(
     items: SyncBulkUpsertPropertyItemDto[]
   ): Promise<SyncBulkUpsertPropertyResultDto>
+  syncBulkUpsertAsync(
+    items: SyncBulkUpsertPropertyItemDto[],
+    batchId: string,
+    callbackUrl: string
+  ): Promise<{ batchId: string; status: string }>
   syncBulkDelete(
     dto: SyncBulkDeletePropertyDto
   ): Promise<SyncBulkDeletePropertyResultDto>

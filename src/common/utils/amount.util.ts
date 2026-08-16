@@ -24,6 +24,39 @@ export function roundToDecimals(value: number | null | undefined): number | null
   return Math.round(value * 100) / 100
 }
 
+export type AuditConfirmedAmounts = {
+  expedia_amount_confirmed?: number | null
+  agoda_amount_confirmed?: number | null
+  booking_amount_confirmed?: number | null
+}
+
+export type AuditDerivedAmounts = {
+  gross_total: number
+  due_to_vnp: number
+  due_to_property: number
+}
+
+/**
+ * Compute derived audit amounts from OTA confirmed amounts.
+ * Missing confirmed values are treated as 0.
+ * due_to_vnp = 15% of gross_total; due_to_property = 85% of gross_total.
+ */
+export function computeAuditDerivedAmounts(
+  amounts: AuditConfirmedAmounts
+): AuditDerivedAmounts {
+  const gross_total = roundSum([
+    amounts.expedia_amount_confirmed,
+    amounts.agoda_amount_confirmed,
+    amounts.booking_amount_confirmed
+  ])
+
+  return {
+    gross_total,
+    due_to_vnp: roundAmount(gross_total * 0.15),
+    due_to_property: roundAmount(gross_total * 0.85)
+  }
+}
+
 /**
  * Round all amount fields in an audit object to 2 decimal places
  * @param audit - Audit object with OTA-specific amount fields
@@ -36,6 +69,9 @@ export function roundAuditAmounts<T extends {
   agoda_amount_confirmed?: number | null
   booking_amount_collectable?: number | null
   booking_amount_confirmed?: number | null
+  gross_total?: number | null
+  due_to_vnp?: number | null
+  due_to_property?: number | null
 }>(audit: T): T {
   if (audit.expedia_amount_collectable !== null && audit.expedia_amount_collectable !== undefined) {
     audit.expedia_amount_collectable = roundToDecimals(audit.expedia_amount_collectable)
@@ -59,6 +95,18 @@ export function roundAuditAmounts<T extends {
 
   if (audit.booking_amount_confirmed !== null && audit.booking_amount_confirmed !== undefined) {
     audit.booking_amount_confirmed = roundToDecimals(audit.booking_amount_confirmed)
+  }
+
+  if (audit.gross_total !== null && audit.gross_total !== undefined) {
+    audit.gross_total = roundToDecimals(audit.gross_total)
+  }
+
+  if (audit.due_to_vnp !== null && audit.due_to_vnp !== undefined) {
+    audit.due_to_vnp = roundToDecimals(audit.due_to_vnp)
+  }
+
+  if (audit.due_to_property !== null && audit.due_to_property !== undefined) {
+    audit.due_to_property = roundToDecimals(audit.due_to_property)
   }
 
   return audit
