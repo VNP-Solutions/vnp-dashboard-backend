@@ -97,6 +97,33 @@ export class CreateAuditDto {
   @IsOptional()
   booking_amount_confirmed?: number
 
+  @ApiPropertyOptional({
+    example: 170,
+    description:
+      'Gross total. Computed from confirmed amounts. Only super admins can set this directly; later confirmed-amount updates recalculate it.'
+  })
+  @IsNumber()
+  @IsOptional()
+  gross_total?: number
+
+  @ApiPropertyOptional({
+    example: 25.5,
+    description:
+      'Due to VNP (15% of gross total by default). Only super admins can set this directly; later confirmed-amount updates recalculate it.'
+  })
+  @IsNumber()
+  @IsOptional()
+  due_to_vnp?: number
+
+  @ApiPropertyOptional({
+    example: 144.5,
+    description:
+      'Due to property (85% of gross total by default). Only super admins can set this directly; later confirmed-amount updates recalculate it.'
+  })
+  @IsNumber()
+  @IsOptional()
+  due_to_property?: number
+
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
     description: 'Property ID'

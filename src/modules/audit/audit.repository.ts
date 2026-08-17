@@ -1,5 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { computeAuditDerivedAmounts } from '../../common/utils/amount.util'
+import {
+  applyManualDerivedAmountOverrides,
+  computeAuditDerivedAmounts,
+  shouldRecalculateAuditDerivedAmounts
+} from '../../common/utils/amount.util'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateAuditDto, UpdateAuditDto } from './audit.dto'
 import type { IAuditRepository } from './audit.interface'
@@ -20,11 +24,14 @@ export class AuditRepository implements IAuditRepository {
       due_to_property?: number
     }
 
-    const derived = computeAuditDerivedAmounts({
-      expedia_amount_confirmed: createPayload.expedia_amount_confirmed,
-      agoda_amount_confirmed: createPayload.agoda_amount_confirmed,
-      booking_amount_confirmed: createPayload.booking_amount_confirmed
-    })
+    const derived = computeAuditDerivedAmounts(
+      {
+        expedia_amount_confirmed: createPayload.expedia_amount_confirmed,
+        agoda_amount_confirmed: createPayload.agoda_amount_confirmed,
+        booking_amount_confirmed: createPayload.booking_amount_confirmed
+      },
+      createPayload.type_of_ota
+    )
 
     return this.prisma.audit.create({
       data: {
@@ -162,7 +169,13 @@ export class AuditRepository implements IAuditRepository {
               select: {
                 id: true,
                 name: true,
-                parent_id: true
+                parent_id: true,
+                serviceType: {
+                  select: {
+                    id: true,
+                    type: true
+                  }
+                }
               }
             }
           }
@@ -355,50 +368,70 @@ export class AuditRepository implements IAuditRepository {
   }
 
   async update(id: string, data: UpdateAuditDto) {
-    const {
-      gross_total: _ignoredGrossTotal,
-      due_to_vnp: _ignoredDueToVnp,
-      due_to_property: _ignoredDueToProperty,
-      ...incoming
-    } = data as UpdateAuditDto & {
-      gross_total?: number
-      due_to_vnp?: number
-      due_to_property?: number
-    }
-
+    const incoming = { ...data }
     const updateData: any = { ...incoming }
 
     if (incoming.review_collection_date) {
       updateData.review_collection_date = new Date(incoming.review_collection_date)
     }
 
-    const current = await this.prisma.audit.findUnique({
-      where: { id },
-      select: {
-        expedia_amount_confirmed: true,
-        agoda_amount_confirmed: true,
-        booking_amount_confirmed: true
+    if (shouldRecalculateAuditDerivedAmounts(incoming)) {
+      const current = await this.prisma.audit.findUnique({
+        where: { id },
+        select: {
+          type_of_ota: true,
+          expedia_amount_confirmed: true,
+          agoda_amount_confirmed: true,
+          booking_amount_confirmed: true
+        }
+      })
+
+      const typeOfOta =
+        incoming.type_of_ota !== undefined ? incoming.type_of_ota : current?.type_of_ota
+
+      const derived = computeAuditDerivedAmounts(
+        {
+          expedia_amount_confirmed:
+            incoming.expedia_amount_confirmed !== undefined
+              ? incoming.expedia_amount_confirmed
+              : current?.expedia_amount_confirmed,
+          agoda_amount_confirmed:
+            incoming.agoda_amount_confirmed !== undefined
+              ? incoming.agoda_amount_confirmed
+              : current?.agoda_amount_confirmed,
+          booking_amount_confirmed:
+            incoming.booking_amount_confirmed !== undefined
+              ? incoming.booking_amount_confirmed
+              : current?.booking_amount_confirmed
+        },
+        typeOfOta
+      )
+
+      updateData.gross_total = derived.gross_total
+      updateData.due_to_vnp = derived.due_to_vnp
+      updateData.due_to_property = derived.due_to_property
+    } else {
+      const currentDerived = await this.prisma.audit.findUnique({
+        where: { id },
+        select: {
+          gross_total: true,
+          due_to_vnp: true,
+          due_to_property: true
+        }
+      })
+
+      const derived = applyManualDerivedAmountOverrides(incoming, {
+        gross_total: currentDerived?.gross_total ?? 0,
+        due_to_vnp: currentDerived?.due_to_vnp ?? 0,
+        due_to_property: currentDerived?.due_to_property ?? 0
+      })
+
+      if (derived) {
+        updateData.gross_total = derived.gross_total
+        updateData.due_to_vnp = derived.due_to_vnp
+        updateData.due_to_property = derived.due_to_property
       }
-    })
-
-    const derived = computeAuditDerivedAmounts({
-      expedia_amount_confirmed:
-        incoming.expedia_amount_confirmed !== undefined
-          ? incoming.expedia_amount_confirmed
-          : current?.expedia_amount_confirmed,
-      agoda_amount_confirmed:
-        incoming.agoda_amount_confirmed !== undefined
-          ? incoming.agoda_amount_confirmed
-          : current?.agoda_amount_confirmed,
-      booking_amount_confirmed:
-        incoming.booking_amount_confirmed !== undefined
-          ? incoming.booking_amount_confirmed
-          : current?.booking_amount_confirmed
-    })
-
-    updateData.gross_total = derived.gross_total
-    updateData.due_to_vnp = derived.due_to_vnp
-    updateData.due_to_property = derived.due_to_property
+    }
 
     return this.prisma.audit.update({
       where: { id },

@@ -357,6 +357,9 @@ export class AuditController {
     - Agoda Amount Confirmed/Agoda Confirmed/agoda_amount_confirmed: Agoda confirmed amount (Note: Non-super-admin internal users can only set this once. Once it has been set, only super admins can update it.)
     - Booking Amount Collectable/Booking Collectable/booking_amount_collectable: Booking collectable amount
     - Booking Amount Confirmed/Booking Confirmed/booking_amount_confirmed: Booking confirmed amount (Note: Non-super-admin internal users can only set this once. Once it has been set, only super admins can update it.)
+    - Gross Total/gross_total: Super admin only. Overwritten if any amount confirmed or OTA type is also updated in the same row.
+    - Due to VNP/Due To VNP/due_to_vnp: Super admin only. Overwritten if any amount confirmed or OTA type is also updated in the same row.
+    - Due to Property/Due To Property/due_to_property: Super admin only. Overwritten if any amount confirmed or OTA type is also updated in the same row.
     - Report URL/Report url/report_url/Report/URL: Report URL
     - Review/Collection Date/Review collection date/review_collection_date: Review collection date (mm/dd/yyyy)
     - Batch/Batch No: Batch number (will be created if doesn't exist)
@@ -896,7 +899,7 @@ export class AuditController {
   @ApiOperation({
     summary: 'Update an audit (Internal users only)',
     description:
-      "Only internal users can update audits. This includes editing audit details and adding audits to batches. Note: Non-super-admin internal users can only set amount_confirmed fields once per OTA type. Once an OTA type's amount_confirmed has been set, only super admins can update it."
+      "Only internal users can update audits. This includes editing audit details and adding audits to batches. Note: Non-super-admin internal users can only set amount_confirmed fields once per OTA type. Once an OTA type's amount_confirmed has been set, only super admins can update it. Gross total, due to VNP, and due to property can be set only by super admins; they are recalculated whenever amount confirmed or type_of_ota is updated."
   })
   @ApiResponse({ status: 200, description: 'Audit updated successfully' })
   @ApiResponse({ status: 404, description: 'Audit not found' })
