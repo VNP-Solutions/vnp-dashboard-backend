@@ -88,8 +88,4 @@ export class ConfigService {
   get payoutBaseUrl(): string | undefined {
     return this.configService.get('payoutBaseUrl', { infer: true })
   }
-
-  get payoutServiceApiKey(): string | undefined {
-    return this.configService.get('payoutServiceApiKey', { infer: true })
-  }
 }

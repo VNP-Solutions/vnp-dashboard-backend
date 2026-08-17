@@ -1,26 +1,19 @@
 import { HttpException, Injectable, InternalServerErrorException } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '../../config/config.service'
 
 /**
- * Service-to-service client for the payout backend (vnps-stripe-backend-new).
+ * The only way this backend talks to the payout service.
  *
- * The operator clicks "Pay out" on an audit row; this forwards the audit id to the payout backend's
- * id-only route, authenticated with the shared service key (x-api-key) and carrying the operator's id
- * (x-actor-user-id) for that side's audit log. The payout backend derives amount/rail/destination and
- * runs the dispatch. A STABLE idempotency key (audit:<id>) makes a re-click safe: already-sent groups
- * replay without a second send, and any group parked awaiting_funding is retried once funded.
- *
- * Three calls, all over the same seam:
- *   previewFromAudit  — dry run, writes nothing, feeds the confirmation modal
- *   dispatchFromAudit — the real send
- *   payoutStatusByAudits — "which of these audits already have a payout?" for the table
+ * We send an audit id and nothing else. The payout service derives the amount, the rail and the
+ * destination itself, so a tampered browser number can never be paid. `x-actor-user-id` carries the
+ * operator for its audit log, and the idempotency key is `audit:<id>`, so a second click replays
+ * instead of paying twice.
  */
+
 /**
- * Paging block in THIS API's shape, not the payout service's. See listPayouts for why they differ.
- *
- * Field names match what every other paginated endpoint here already emits (verified against
- * /audit and /property), so the dashboard's existing IMetadata type and pagination controls work
- * unchanged. Note this is NOT the shape written in the repo's CLAUDE.md, which is out of date.
+ * Paging in THIS API's shape, not the payout service's. Matches what /audit and /property already
+ * emit, so the dashboard's existing pagination works unchanged. See listPayouts for the translation.
  */
 export interface PayoutHistoryMetadata {
   totalDocuments: number
@@ -44,78 +37,36 @@ export interface PayoutHistoryQuery {
   dashboard_property_ids?: string
 }
 
+/**
+ * The payout service requires this audience, and it matters. We also hand
+ * `{type:'external-communication'}` tokens to browsers via /external/user-generate-token, so a token
+ * without an audience is one any logged-in user already has. Requiring it keeps them off the money.
+ */
+const PAYOUT_TOKEN_AUDIENCE = 'vnps-payout-service'
+
 @Injectable()
 export class PayoutClient {
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly jwtService: JwtService
+  ) {}
 
-  /** Cached communication token for the payout service, with the epoch ms we stop reusing it. */
-  private cachedToken: { token: string; expiresAtMs: number } | null = null
-
-  /** Re-mint this far before real expiry so a token cannot lapse mid-flight. */
-  private static readonly EXPIRY_SKEW_MS = 60_000
-
-  /** Resolve base URL + key together so every call fails the same, obvious way when unconfigured. */
-  private credentials(): { base: string; key?: string } {
+  private baseUrl(): string {
     const base = this.config.payoutBaseUrl
     if (!base) {
       throw new InternalServerErrorException('Payout service is not configured (PAYOUT_BASE_URL)')
     }
-    return { base: base.replace(/\/$/, ''), key: this.config.payoutServiceApiKey }
+    return base.replace(/\/$/, '')
   }
 
-  /**
-   * Swap the shared secret for a short-lived JWT at the payout service, the same exchange this
-   * backend already exposes at /external/generate-token and that dbms and scraper both use.
-   *
-   * Cached until shortly before expiry so a burst of calls costs one mint.
-   */
-  private async communicationToken(base: string): Promise<string | null> {
+  /** Sign a communication token, the same way the DBMS callbacks do. */
+  private communicationToken(): string | null {
     const secret = this.config.jwt.communicationSecret
     if (!secret) return null
-
-    if (this.cachedToken && this.cachedToken.expiresAtMs - PayoutClient.EXPIRY_SKEW_MS > Date.now()) {
-      return this.cachedToken.token
-    }
-
-    let res: Response
-    try {
-      res = await fetch(`${base}/external-auth/generate-token`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${secret}`,
-          'content-type': 'application/json'
-        },
-        body: '{}'
-      })
-    } catch {
-      throw new HttpException('Payout service is unreachable', 502)
-    }
-    if (!res.ok) {
-      throw new HttpException(
-        `Token exchange with the payout service failed (${res.status}); check JWT_COMMUNICATION_SECRET matches`,
-        502
-      )
-    }
-
-    const body = (await res.json()) as { data?: { token?: string }; token?: string }
-    const token = body?.data?.token ?? body?.token
-    if (!token) throw new HttpException('Payout service returned no communication token', 502)
-
-    this.cachedToken = { token, expiresAtMs: this.decodeExpiry(token) }
-    return token
-  }
-
-  /** Read `exp` without verifying: the token is the peer's to validate, we only schedule re-mints. */
-  private decodeExpiry(token: string): number {
-    const parts = token.split('.')
-    if (parts.length !== 3) return Date.now() + PayoutClient.EXPIRY_SKEW_MS
-    try {
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as { exp?: number }
-      if (typeof payload.exp === 'number') return payload.exp * 1000
-    } catch {
-      // fall through
-    }
-    return Date.now() + PayoutClient.EXPIRY_SKEW_MS
+    return this.jwtService.sign(
+      { type: 'external-communication' },
+      { secret, audience: PAYOUT_TOKEN_AUDIENCE, expiresIn: '24h' }
+    )
   }
 
   /**
@@ -131,13 +82,8 @@ export class PayoutClient {
   /**
    * Read side of the same seam, for the payout history page.
    *
-   * GET carries no body; everything is in the query string, which the caller builds. Reads are
-   * otherwise identical to writes here: same token exchange, same one-shot re-mint on 401, same
-   * upstream-status translation.
-   *
-   * Returns the WHOLE envelope, not just `data`. The payout service reports paging in a sibling
-   * `metadata` block, and unwrapping to `data` here would silently drop the total and page count, so
-   * the table would render rows it could not page through.
+   * Returns the WHOLE envelope, not just `data`. Paging sits in a sibling block, so unwrapping to
+   * `data` here would drop the total and page count and the table could not be paged.
    */
   private async get(path: string, actorUserId: string): Promise<Record<string, any> | null> {
     return this.call('GET', path, actorUserId)
@@ -149,34 +95,22 @@ export class PayoutClient {
     actorUserId: string,
     payload?: unknown
   ): Promise<Record<string, any> | null> {
-    const { base, key } = this.credentials()
+    const base = this.baseUrl()
 
-    const send = async (bearer: string | null): Promise<Response> => {
-      const headers: Record<string, string> = {
-        'content-type': 'application/json',
-        'x-actor-user-id': actorUserId
-      }
-      if (bearer) headers.authorization = `Bearer ${bearer}`
-      // Legacy static key still sent alongside while the estate migrates; harmless once the peer
-      // accepts Bearer tokens, and it keeps an un-migrated deployment working.
-      if (key) headers['x-api-key'] = key
-      return fetch(`${base}${path}`, {
+    const bearer = this.communicationToken()
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      'x-actor-user-id': actorUserId
+    }
+    if (bearer) headers.authorization = `Bearer ${bearer}`
+
+    let res: Response
+    try {
+      res = await fetch(`${base}${path}`, {
         method,
         headers,
         ...(method === 'POST' ? { body: JSON.stringify(payload) } : {})
       })
-    }
-
-    let bearer = await this.communicationToken(base)
-    let res: Response
-    try {
-      res = await send(bearer)
-      // One retry with a fresh token: a cached one can be rejected if the peer restarted.
-      if (bearer && (res.status === 401 || res.status === 403)) {
-        this.cachedToken = null
-        bearer = await this.communicationToken(base)
-        res = await send(bearer)
-      }
     } catch (err) {
       if (err instanceof HttpException) throw err
       throw new HttpException('Payout service is unreachable', 502)
@@ -208,14 +142,10 @@ export class PayoutClient {
   }
 
   /**
-   * Bulk payout: many audits, each dispatched INDIVIDUALLY, and they may span properties.
+   * Bulk payout: each audit dispatched on its own, and the selection may span properties.
    *
-   * Preview returns a plan (what will be paid, what is excluded and why, and the payment count).
-   * Dispatch STARTS A RUN and returns a run id immediately without paying anything: fifty audits is
-   * minutes of work, so the payout service does it in the background and we poll.
-   *
-   * No idempotency key is passed, and none would be honoured: the payout service derives one per
-   * audit, so a caller cannot vary it and a repeat of the same audit collides with itself.
+   * No idempotency key is passed and none would be honoured. The payout service derives one per
+   * audit, so a caller can't vary it and a repeat of the same audit collides with itself.
    */
   async previewBulkPayout(auditIds: string[], actorUserId: string): Promise<unknown> {
     return this.post('/payout-requests/bulk/preview', actorUserId, { audit_ids: auditIds })
@@ -238,11 +168,8 @@ export class PayoutClient {
   }
 
   /**
-   * Build the upstream query string.
-   *
-   * Only forwards keys the payout service actually understands, so a stray dashboard-side filter
-   * cannot silently widen the result set by being ignored upstream. Empty values are dropped rather
-   * than sent as blanks, which the service would treat as a real filter value.
+   * Only forwards keys the payout service understands, so a stray filter can't silently widen the
+   * result set by being ignored upstream. Empty values are dropped, not sent as blanks.
    */
   private static query(params: PayoutHistoryQuery): string {
     const allowed: (keyof PayoutHistoryQuery)[] = [
@@ -289,8 +216,8 @@ export class PayoutClient {
       metadata: {
         totalDocuments: total,
         currentPage: Number(meta.page) || params.page || 1,
-        // Recompute rather than trusting the upstream field: if it is ever absent we must not report
-        // 0 pages while returning rows, which would make the pager disappear on a non-empty table.
+        // Recomputed, not trusted: if the upstream field is ever missing, reporting 0 pages while
+        // returning rows would make the pager vanish on a table that clearly has data.
         totalPages: Number(meta.total_pages) || (limit > 0 ? Math.ceil(total / limit) : 1) || 1
       }
     }

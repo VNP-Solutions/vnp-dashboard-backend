@@ -36,7 +36,6 @@ export interface Configuration {
   dashboardUrl?: string
   externalBaseUrl?: string
   payoutBaseUrl?: string
-  payoutServiceApiKey?: string
   auth: {
     passwordRegex: RegExp
     otpExpiryMinutes: number
@@ -90,7 +89,6 @@ export default (): Configuration => ({
   externalBaseUrl: process.env.EXTERNAL_BASE_URL,
   dashboardUrl: process.env.DASHBOARD_URL || 'https://new.dashboardvnps.com/',
   payoutBaseUrl: process.env.PAYOUT_BASE_URL,
-  payoutServiceApiKey: process.env.PAYOUT_SERVICE_API_KEY,
   auth: {
     passwordRegex:
       /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,32}$/,
