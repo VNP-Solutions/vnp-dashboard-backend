@@ -134,10 +134,18 @@ export class PayoutClient {
     })
   }
 
-  async dispatchFromAudit(auditId: string, actorUserId: string): Promise<unknown> {
+  /**
+   * The real send. `retry` re-drives groups whose previous attempt moved no money.
+   *
+   * Default off: an existing key always replays, so a double-click cannot become a second payment.
+   * The payout service refuses a retry for `returned` and `reconciliation_required`, the two states
+   * where money may already be gone.
+   */
+  async dispatchFromAudit(auditId: string, actorUserId: string, retry = false): Promise<unknown> {
     return this.post('/payout-requests/from-audit', actorUserId, {
       audit_id: auditId,
-      idempotency_key: `audit:${auditId}`
+      idempotency_key: `audit:${auditId}`,
+      ...(retry ? { retry: true } : {})
     })
   }
 
