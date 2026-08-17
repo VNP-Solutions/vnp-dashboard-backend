@@ -16,6 +16,7 @@ import { AuditRepository } from './audit.repository'
 import { AuditService } from './audit.service'
 import { PayoutClient } from './payout.client'
 import { PayoutConfirmTokenService } from './payout-confirm-token.service'
+import { PayoutOtpService } from './payout-otp.service'
 import { PayoutHistoryController } from './payout-history.controller'
 import { PayoutHistoryService } from './payout-history.service'
 
@@ -64,7 +65,8 @@ import { PayoutHistoryService } from './payout-history.service'
       useClass: PayoutHistoryService
     },
     PayoutClient,
-    PayoutConfirmTokenService
+    PayoutConfirmTokenService,
+    PayoutOtpService
   ],
   exports: [
     {

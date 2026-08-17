@@ -54,6 +54,7 @@ import {
 import type { IAuditService } from './audit.interface'
 import { PayoutClient } from './payout.client'
 import { PayoutConfirmTokenService } from './payout-confirm-token.service'
+import { PayoutOtpService } from './payout-otp.service'
 
 @ApiTags('Audit')
 @ApiBearerAuth('JWT-auth')
@@ -66,7 +67,8 @@ export class AuditController {
     @Inject('IAuthRepository')
     private readonly authRepository: IAuthRepository,
     private readonly payoutClient: PayoutClient,
-    private readonly payoutConfirmTokenService: PayoutConfirmTokenService
+    private readonly payoutConfirmTokenService: PayoutConfirmTokenService,
+    private readonly payoutOtpService: PayoutOtpService
   ) {}
 
   @Post()
@@ -198,7 +200,15 @@ export class AuditController {
   async previewPayout(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     const preview = await this.payoutClient.previewFromAudit(id, user.id)
     const { token, expiresAt } = this.payoutConfirmTokenService.mint(id, user.id)
-    return { preview, confirm_token: token, expires_at: expiresAt }
+    const totals = PayoutOtpService.totalsFrom(preview)
+    return {
+      preview,
+      confirm_token: token,
+      expires_at: expiresAt,
+      otp_required: this.payoutOtpService.isRequired(totals),
+      otp_threshold: this.payoutOtpService.threshold,
+      totals
+    }
   }
 
   @Post('payout-status')
@@ -241,9 +251,38 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     await this.assertEveryAuditAccessible(dto.audit_ids, user)
+    await this.auditService.assertSinglePortfolio(dto.audit_ids)
     const preview = await this.payoutClient.previewBulkPayout(dto.audit_ids, user.id)
     const { token, expiresAt } = this.payoutConfirmTokenService.mintForSet(dto.audit_ids, user.id)
-    return { preview, confirm_token: token, expires_at: expiresAt }
+    const totals = PayoutOtpService.totalsFrom(preview)
+    return {
+      preview,
+      confirm_token: token,
+      expires_at: expiresAt,
+      otp_required: this.payoutOtpService.isRequired(totals),
+      otp_threshold: this.payoutOtpService.threshold,
+      totals
+    }
+  }
+
+  @Post('payout-otp')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary: 'Email a confirmation code for a payout above the threshold',
+    description:
+      'Takes the SAME audit ids the dispatch will take, and emails a code bound to exactly that ' +
+      'selection. A code released for two audits cannot dispatch twenty, and it cannot be used to ' +
+      'log in. Requesting again invalidates the previous code.'
+  })
+  @ApiResponse({ status: 201, description: 'Code sent' })
+  @ApiResponse({ status: 403, description: 'One or more audits are outside your access' })
+  async sendPayoutOtp(
+    @Body() dto: BulkPayoutPreviewDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    await this.assertEveryAuditAccessible(dto.audit_ids, user)
+    await this.auditService.assertSinglePortfolio(dto.audit_ids)
+    return this.payoutOtpService.send(user.id, dto.audit_ids)
   }
 
   @Post('bulk-payout')
@@ -265,7 +304,16 @@ export class AuditController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     await this.assertEveryAuditAccessible(dto.audit_ids, user)
+    await this.auditService.assertSinglePortfolio(dto.audit_ids)
     this.payoutConfirmTokenService.verifyForSet(dto.confirm_token, dto.audit_ids, user.id)
+
+    // Re-priced here rather than trusted from the preview: the amounts are what decide whether a
+    // second factor is needed, and a caller must not be able to talk us out of asking.
+    const preview = await this.payoutClient.previewBulkPayout(dto.audit_ids, user.id)
+    if (this.payoutOtpService.isRequired(PayoutOtpService.totalsFrom(preview))) {
+      await this.payoutOtpService.verifyAndSpend(user.id, dto.audit_ids, dto.otp)
+    }
+
     return this.payoutClient.startBulkPayout(dto.audit_ids, user.id)
   }
 
@@ -324,7 +372,7 @@ export class AuditController {
   @ApiResponse({ status: 422, description: 'Property mapping is unmapped or ambiguous; payout blocked' })
   @ApiResponse({ status: 501, description: 'Payout read adapters not configured' })
   @ApiResponse({ status: 502, description: 'Payout service unreachable' })
-  initiatePayout(
+  async initiatePayout(
     @Param('id') id: string,
     @Body() dto: InitiateAuditPayoutDto,
     @CurrentUser() user: IUserWithPermissions
@@ -332,7 +380,15 @@ export class AuditController {
     // No valid token, no dispatch. The token proves the operator saw a preview; the guard above
     // proves they're allowed to.
     this.payoutConfirmTokenService.verify(dto?.confirm_token, id, user.id)
-    return this.payoutClient.dispatchFromAudit(id, user.id)
+
+    // Same rule as the bulk path, re-priced server-side. A single audit can be over the threshold
+    // on its own, so the gate cannot live only on the bulk route.
+    const preview = await this.payoutClient.previewFromAudit(id, user.id)
+    if (this.payoutOtpService.isRequired(PayoutOtpService.totalsFrom(preview))) {
+      await this.payoutOtpService.verifyAndSpend(user.id, [id], dto?.otp)
+    }
+
+    return this.payoutClient.dispatchFromAudit(id, user.id, dto?.retry === true)
   }
 
   @Post('bulk-update')
