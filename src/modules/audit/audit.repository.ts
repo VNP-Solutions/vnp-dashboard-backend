@@ -169,7 +169,13 @@ export class AuditRepository implements IAuditRepository {
               select: {
                 id: true,
                 name: true,
-                parent_id: true
+                parent_id: true,
+                serviceType: {
+                  select: {
+                    id: true,
+                    type: true
+                  }
+                }
               }
             }
           }
