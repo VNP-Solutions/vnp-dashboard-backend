@@ -985,6 +985,17 @@ export class AuditService implements IAuditService {
       }
     }
 
+    const derivedFieldProvided =
+      data.gross_total !== undefined ||
+      data.due_to_vnp !== undefined ||
+      data.due_to_property !== undefined
+
+    if (derivedFieldProvided && !isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admins can update gross total, due to VNP, or due to property'
+      )
+    }
+
     // Round amount fields to 2 decimal places if provided
     const roundAmountField = (
       value: number | undefined
@@ -1007,7 +1018,10 @@ export class AuditService implements IAuditService {
       booking_amount_collectable: roundAmountField(
         data.booking_amount_collectable
       ),
-      booking_amount_confirmed: roundAmountField(data.booking_amount_confirmed)
+      booking_amount_confirmed: roundAmountField(data.booking_amount_confirmed),
+      gross_total: roundAmountField(data.gross_total),
+      due_to_vnp: roundAmountField(data.due_to_vnp),
+      due_to_property: roundAmountField(data.due_to_property)
     }
 
     const result = await this.auditRepository.update(id, updateData)
@@ -1691,6 +1705,93 @@ export class AuditService implements IAuditService {
               updateData.booking_amount_confirmed = roundToDecimals(
                 bookingAmountConfirmed
               )
+            }
+          }
+
+          const parseDerivedAmount = (
+            value: string | undefined,
+            fieldLabel: string
+          ): number | null => {
+            if (value === undefined) {
+              return null
+            }
+
+            const parsed = parseFloat(value)
+            if (isNaN(parsed)) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error: `Invalid ${fieldLabel}`
+              })
+              result.failureCount++
+              return NaN
+            }
+
+            return roundToDecimals(parsed) ?? 0
+          }
+
+          const grossTotalValue = findHeaderValue(row, [
+            'Gross Total',
+            'gross_total'
+          ])
+          const dueToVnpValue = findHeaderValue(row, [
+            'Due to VNP',
+            'Due To VNP',
+            'due_to_vnp'
+          ])
+          const dueToPropertyValue = findHeaderValue(row, [
+            'Due to Property',
+            'Due To Property',
+            'due_to_property'
+          ])
+
+          if (
+            grossTotalValue !== undefined ||
+            dueToVnpValue !== undefined ||
+            dueToPropertyValue !== undefined
+          ) {
+            if (!isUserSuperAdmin(user)) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error:
+                  'Only super admins can update Gross Total, Due to VNP, or Due to Property'
+              })
+              result.failureCount++
+              continue
+            }
+
+            const parsedGrossTotal = parseDerivedAmount(
+              grossTotalValue,
+              'Gross Total'
+            )
+            if (Number.isNaN(parsedGrossTotal)) {
+              continue
+            }
+            if (parsedGrossTotal !== null) {
+              updateData.gross_total = parsedGrossTotal
+            }
+
+            const parsedDueToVnp = parseDerivedAmount(
+              dueToVnpValue,
+              'Due to VNP'
+            )
+            if (Number.isNaN(parsedDueToVnp)) {
+              continue
+            }
+            if (parsedDueToVnp !== null) {
+              updateData.due_to_vnp = parsedDueToVnp
+            }
+
+            const parsedDueToProperty = parseDerivedAmount(
+              dueToPropertyValue,
+              'Due to Property'
+            )
+            if (Number.isNaN(parsedDueToProperty)) {
+              continue
+            }
+            if (parsedDueToProperty !== null) {
+              updateData.due_to_property = parsedDueToProperty
             }
           }
 
