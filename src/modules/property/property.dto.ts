@@ -1129,6 +1129,28 @@ export class SyncUpsertPropertyCredentialsDto {
   booking_password?: string | null
 }
 
+/**
+ * Who collects this property's money, per OTA. DBMS resolves its `{ota}_processor` relation and
+ * sends the NAME, because the processor ids are ObjectIds in its database and mean nothing in ours.
+ * Known values: Stripe, QuantumPay, FreedomPay.
+ */
+export class SyncUpsertProcessorsDto {
+  @ApiPropertyOptional({ example: 'Stripe' })
+  @IsOptional()
+  @IsString()
+  expedia?: string | null
+
+  @ApiPropertyOptional({ example: 'QuantumPay' })
+  @IsOptional()
+  @IsString()
+  booking?: string | null
+
+  @ApiPropertyOptional({ example: 'Stripe' })
+  @IsOptional()
+  @IsString()
+  agoda?: string | null
+}
+
 export class SyncUpsertPropertyDto {
   @ApiProperty({ example: 'Grand Hotel', description: 'Property name' })
   @IsString()
@@ -1179,6 +1201,15 @@ export class SyncUpsertPropertyDto {
   @ValidateNested()
   @Type(() => SyncUpsertPropertyCredentialsDto)
   credentials: SyncUpsertPropertyCredentialsDto
+
+  @ApiPropertyOptional({
+    type: SyncUpsertProcessorsDto,
+    description: 'Processor name per OTA. Omitted leaves the stored values untouched.'
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SyncUpsertProcessorsDto)
+  processors?: SyncUpsertProcessorsDto
 }
 
 export class SyncCreatePropertyDto {
