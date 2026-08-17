@@ -41,6 +41,16 @@ export interface Configuration {
     otpExpiryMinutes: number
     tempPasswordExpiryDays: number
   }
+  payout: {
+    /**
+     * Above this, a payout needs an emailed OTP before it is dispatched.
+     *
+     * Applied to the WHOLE amount one action moves, however it was triggered: a single audit, a
+     * bulk selection, or a selection spanning properties. Compared per currency, because a mixed
+     * selection has no single total and we hold no FX rate at that moment.
+     */
+    otpThreshold: number
+  }
   encryption: {
     secret: string
   }
@@ -94,6 +104,9 @@ export default (): Configuration => ({
       /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,32}$/,
     otpExpiryMinutes: 5,
     tempPasswordExpiryDays: 5
+  },
+  payout: {
+    otpThreshold: parseFloat(process.env.PAYOUT_OTP_THRESHOLD || '20000')
   },
   encryption: {
     secret: process.env.JWT_ACCESS_SECRET!
