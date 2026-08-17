@@ -102,15 +102,10 @@ export class PermissionService {
         return { allowed: true }
       }
 
-      // COARSE CHECK ONLY. Resource ownership cannot be decided here: it needs a DB read, and this
-      // method is synchronous by design. Returning `allowed: true` is therefore NOT an authorization
-      // decision for a specific resource.
-      //
-      // Never authorize a resource-scoped request with checkPermission alone — use the async
-      // `requirePermission` (or `canAccessResource`), which performs the ownership check. The
-      // PermissionGuard previously called this method and nothing else, which silently granted every
-      // partial-access user access to every resource id.
-      return { allowed: true }
+      // For specific resource operations (READ/:id, UPDATE/:id, DELETE/:id)
+      // Check if user has access to this specific resource
+      // Note: This is synchronous, but calls async method - consider making this async
+      return { allowed: true } // Will be checked in async requirePermission
     }
 
     return { allowed: false, reason: 'Unknown permission configuration' }

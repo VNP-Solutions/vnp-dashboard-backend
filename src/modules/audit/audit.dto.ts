@@ -565,13 +565,9 @@ export class AuditPayoutStatusDto {
 }
 
 /**
- * Ceiling on one bulk selection, and it must match the payout service's own `MAX_BULK_AUDITS`.
- *
- * The two used to disagree. This side allowed 200 because the old design merged a selection into one
- * payment per rail, so 200 audits cost two Stripe calls. Each audit is now dispatched on its own, so
- * 200 audits means 200 calls and the payout service dropped its cap to 50 — but this side kept 200,
- * and an operator selecting 120 passed validation here only to be refused by the far service after
- * the request had already left. Refuse at the edge, where the operator is still looking at it.
+ * Must match the payout service's `MAX_BULK_AUDITS`. Each audit is dispatched on its own, so a
+ * selection of 50 is 50 Stripe calls. Refusing here means the operator finds out while they're
+ * still looking at the selection, rather than after the request has left.
  */
 export const MAX_BULK_PAYOUT_AUDITS = 50
 

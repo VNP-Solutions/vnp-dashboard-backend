@@ -215,8 +215,8 @@ export class AuditController {
     @Body() dto: AuditPayoutStatusDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    // PermissionGuard's resource check reads `params.id`, which a body-id route never has, so the
-    // ids have to be scoped here or this endpoint answers for any audit in the system.
+    // The guard checks `params.id`, and this route takes ids in the body, so it has no resource to
+    // check. Scope them here or the endpoint answers for any audit in the system.
     const auditIds = await this.auditService.accessibleAuditIds(dto.audit_ids, user)
     if (auditIds.length === 0) return {}
     return this.payoutClient.payoutStatusByAudits(auditIds, user.id)
@@ -287,12 +287,11 @@ export class AuditController {
   }
 
   /**
-   * REJECT, never trim.
+   * Refuse the whole request, don't quietly drop the ids the user can't see.
    *
-   * The read-only payout-status route drops ids the caller cannot see, because the caller there is a
-   * rendered page and a foreign id is a probe. This is a money route: silently removing an audit
-   * would pay a different set than the operator selected and approved, and the totals they were
-   * shown would not be the totals sent. So an out-of-scope id refuses the whole request.
+   * payout-status drops them, because there a foreign id is just a probe. Here it would pay a
+   * different set than the operator approved, and the total they were shown wouldn't be the total
+   * sent.
    */
   private async assertEveryAuditAccessible(
     auditIds: string[],
@@ -330,8 +329,8 @@ export class AuditController {
     @Body() dto: InitiateAuditPayoutDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
-    // Fails closed: no valid token means no dispatch, even though the route is already
-    // permission-guarded. The payout service still re-derives every amount from the audit id.
+    // No valid token, no dispatch. The token proves the operator saw a preview; the guard above
+    // proves they're allowed to.
     this.payoutConfirmTokenService.verify(dto?.confirm_token, id, user.id)
     return this.payoutClient.dispatchFromAudit(id, user.id)
   }

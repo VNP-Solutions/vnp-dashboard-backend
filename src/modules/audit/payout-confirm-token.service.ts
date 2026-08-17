@@ -4,20 +4,16 @@ import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '../../config/config.service'
 
 /**
- * Short-lived confirmation token for the payout modal.
+ * The ticket that proves an operator saw a preview before confirming.
  *
- * The modal opens, fetches a preview, and receives one of these. The Confirm button stays disabled
- * until it arrives, and the token must be presented back on POST /audit/:id/payout.
+ * The modal fetches a preview and gets one of these back; POST /audit/:id/payout won't run without
+ * it. It is not authorization, the route still runs the normal guards, and the payout service still
+ * re-derives every amount. It only answers "was this confirmed", which is what makes a blind POST
+ * from outside the UI fail closed.
  *
- * Deliberately NOT the service-to-service communication JWT. That credential is unscoped and lets a
- * holder call the DBMS and dashboard external APIs directly; handing it to a browser would be a
- * privilege escalation. This token is bound to one audit AND one user, is useless anywhere else, and
- * expires in minutes.
- *
- * It is a confirmation step, not an authorization step: the route still runs the normal JWT +
- * permission guards, and the payout service still re-derives every amount from the audit id. The
- * token's job is to prove "this operator was shown a preview and clicked Confirm", which also makes
- * a blind POST from outside the UI fail closed.
+ * Not the service-to-service JWT, on purpose. That one is unscoped and would let a browser call the
+ * DBMS and external APIs directly. This one is bound to one audit and one user and expires in
+ * minutes.
  */
 
 const TOKEN_TYPE = 'payout-confirm'
@@ -54,11 +50,7 @@ export class PayoutConfirmTokenService {
     }
   }
 
-  /**
-   * Throws unless the token is valid, unexpired, of the right type, and issued for exactly this
-   * audit and this user. Binding the user prevents one operator's token being used to confirm a
-   * payout as someone else.
-   */
+  /** Throws unless the token is valid, unexpired, the right type, and for this audit and user. */
   verify(token: string | undefined, auditId: string, userId: string): void {
     if (!token) {
       throw new ForbiddenException('A payout confirmation token is required')
@@ -83,15 +75,11 @@ export class PayoutConfirmTokenService {
   }
 
   /**
-   * Bind a token to a SET of audits, for the bulk payout modal.
+   * Same idea for the bulk modal, over a set of audits.
    *
-   * The set is reduced to a stable fingerprint: sorted, deduped, hashed. Sorting is what makes the
-   * token independent of the order rows were clicked in; hashing keeps the token short whether it
-   * covers two audits or two hundred.
-   *
-   * This is what stops a caller previewing three audits, being shown a modest total, and then
-   * dispatching thirty with the same token. The amount is always re-derived server-side, so the
-   * risk is not a wrong number, it is a larger SET than the operator approved.
+   * Stops someone previewing three audits, seeing a small total, then dispatching thirty with the
+   * same token. Amounts are always re-derived server-side, so the risk was never a wrong number, it
+   * was a bigger set than the operator approved.
    */
   mintForSet(auditIds: string[], userId: string): { token: string; expiresAt: string } {
     return this.mint(fingerprintAuditIds(auditIds), userId)
