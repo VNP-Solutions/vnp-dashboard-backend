@@ -17,6 +17,7 @@ import { AuditService } from './audit.service'
 import { PayoutClient } from './payout.client'
 import { PayoutConfirmTokenService } from './payout-confirm-token.service'
 import { PayoutHistoryController } from './payout-history.controller'
+import { PayoutHistoryService } from './payout-history.service'
 
 @Module({
   imports: [AuthModule, JwtModule.register({})],
@@ -58,6 +59,10 @@ import { PayoutHistoryController } from './payout-history.controller'
     PrismaService,
     EmailUtil,
     ConfigService,
+    {
+      provide: 'IPayoutHistoryService',
+      useClass: PayoutHistoryService
+    },
     PayoutClient,
     PayoutConfirmTokenService
   ],
