@@ -985,39 +985,43 @@ export class AuditService implements IAuditService {
       }
     }
 
+    const derivedFieldProvided =
+      data.gross_total !== undefined ||
+      data.due_to_vnp !== undefined ||
+      data.due_to_property !== undefined
+
+    if (derivedFieldProvided && !isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admins can update gross total, due to VNP, or due to property'
+      )
+    }
+
     // Round amount fields to 2 decimal places if provided
+    const roundAmountField = (
+      value: number | undefined
+    ): number | undefined => {
+      if (value === undefined) {
+        return undefined
+      }
+
+      return roundToDecimals(value) ?? undefined
+    }
+
     const updateData = {
       ...data,
-      expedia_amount_collectable:
-        data.expedia_amount_collectable !== undefined &&
-        data.expedia_amount_collectable !== null
-          ? (roundToDecimals(data.expedia_amount_collectable) ?? undefined)
-          : data.expedia_amount_collectable,
-      expedia_amount_confirmed:
-        data.expedia_amount_confirmed !== undefined &&
-        data.expedia_amount_confirmed !== null
-          ? (roundToDecimals(data.expedia_amount_confirmed) ?? undefined)
-          : data.expedia_amount_confirmed,
-      agoda_amount_collectable:
-        data.agoda_amount_collectable !== undefined &&
-        data.agoda_amount_collectable !== null
-          ? (roundToDecimals(data.agoda_amount_collectable) ?? undefined)
-          : data.agoda_amount_collectable,
-      agoda_amount_confirmed:
-        data.agoda_amount_confirmed !== undefined &&
-        data.agoda_amount_confirmed !== null
-          ? (roundToDecimals(data.agoda_amount_confirmed) ?? undefined)
-          : data.agoda_amount_confirmed,
-      booking_amount_collectable:
-        data.booking_amount_collectable !== undefined &&
-        data.booking_amount_collectable !== null
-          ? (roundToDecimals(data.booking_amount_collectable) ?? undefined)
-          : data.booking_amount_collectable,
-      booking_amount_confirmed:
-        data.booking_amount_confirmed !== undefined &&
-        data.booking_amount_confirmed !== null
-          ? (roundToDecimals(data.booking_amount_confirmed) ?? undefined)
-          : data.booking_amount_confirmed
+      expedia_amount_collectable: roundAmountField(
+        data.expedia_amount_collectable
+      ),
+      expedia_amount_confirmed: roundAmountField(data.expedia_amount_confirmed),
+      agoda_amount_collectable: roundAmountField(data.agoda_amount_collectable),
+      agoda_amount_confirmed: roundAmountField(data.agoda_amount_confirmed),
+      booking_amount_collectable: roundAmountField(
+        data.booking_amount_collectable
+      ),
+      booking_amount_confirmed: roundAmountField(data.booking_amount_confirmed),
+      gross_total: roundAmountField(data.gross_total),
+      due_to_vnp: roundAmountField(data.due_to_vnp),
+      due_to_property: roundAmountField(data.due_to_property)
     }
 
     const result = await this.auditRepository.update(id, updateData)
@@ -1563,7 +1567,7 @@ export class AuditService implements IAuditService {
             'Expedia Collectable',
             'expedia_amount_collectable'
           ])
-          if (expediaAmountCollectableValue) {
+          if (expediaAmountCollectableValue !== undefined) {
             const expediaAmountCollectable = parseFloat(
               expediaAmountCollectableValue
             )
@@ -1580,7 +1584,7 @@ export class AuditService implements IAuditService {
             'Expedia Confirmed',
             'expedia_amount_confirmed'
           ])
-          if (expediaAmountConfirmedValue) {
+          if (expediaAmountConfirmedValue !== undefined) {
             const expediaAmountConfirmed = parseFloat(
               expediaAmountConfirmedValue
             )
@@ -1613,7 +1617,7 @@ export class AuditService implements IAuditService {
             'Agoda Collectable',
             'agoda_amount_collectable'
           ])
-          if (agodaAmountCollectableValue) {
+          if (agodaAmountCollectableValue !== undefined) {
             const agodaAmountCollectable = parseFloat(
               agodaAmountCollectableValue
             )
@@ -1630,7 +1634,7 @@ export class AuditService implements IAuditService {
             'Agoda Confirmed',
             'agoda_amount_confirmed'
           ])
-          if (agodaAmountConfirmedValue) {
+          if (agodaAmountConfirmedValue !== undefined) {
             const agodaAmountConfirmed = parseFloat(agodaAmountConfirmedValue)
             if (!isNaN(agodaAmountConfirmed)) {
               // Check agoda_amount_confirmed update restriction for non-super-admin internal users
@@ -1660,7 +1664,7 @@ export class AuditService implements IAuditService {
             'Booking Collectable',
             'booking_amount_collectable'
           ])
-          if (bookingAmountCollectableValue) {
+          if (bookingAmountCollectableValue !== undefined) {
             const bookingAmountCollectable = parseFloat(
               bookingAmountCollectableValue
             )
@@ -1677,7 +1681,7 @@ export class AuditService implements IAuditService {
             'Booking Confirmed',
             'booking_amount_confirmed'
           ])
-          if (bookingAmountConfirmedValue) {
+          if (bookingAmountConfirmedValue !== undefined) {
             const bookingAmountConfirmed = parseFloat(
               bookingAmountConfirmedValue
             )
@@ -1701,6 +1705,93 @@ export class AuditService implements IAuditService {
               updateData.booking_amount_confirmed = roundToDecimals(
                 bookingAmountConfirmed
               )
+            }
+          }
+
+          const parseDerivedAmount = (
+            value: string | undefined,
+            fieldLabel: string
+          ): number | null => {
+            if (value === undefined) {
+              return null
+            }
+
+            const parsed = parseFloat(value)
+            if (isNaN(parsed)) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error: `Invalid ${fieldLabel}`
+              })
+              result.failureCount++
+              return NaN
+            }
+
+            return roundToDecimals(parsed) ?? 0
+          }
+
+          const grossTotalValue = findHeaderValue(row, [
+            'Gross Total',
+            'gross_total'
+          ])
+          const dueToVnpValue = findHeaderValue(row, [
+            'Due to VNP',
+            'Due To VNP',
+            'due_to_vnp'
+          ])
+          const dueToPropertyValue = findHeaderValue(row, [
+            'Due to Property',
+            'Due To Property',
+            'due_to_property'
+          ])
+
+          if (
+            grossTotalValue !== undefined ||
+            dueToVnpValue !== undefined ||
+            dueToPropertyValue !== undefined
+          ) {
+            if (!isUserSuperAdmin(user)) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error:
+                  'Only super admins can update Gross Total, Due to VNP, or Due to Property'
+              })
+              result.failureCount++
+              continue
+            }
+
+            const parsedGrossTotal = parseDerivedAmount(
+              grossTotalValue,
+              'Gross Total'
+            )
+            if (Number.isNaN(parsedGrossTotal)) {
+              continue
+            }
+            if (parsedGrossTotal !== null) {
+              updateData.gross_total = parsedGrossTotal
+            }
+
+            const parsedDueToVnp = parseDerivedAmount(
+              dueToVnpValue,
+              'Due to VNP'
+            )
+            if (Number.isNaN(parsedDueToVnp)) {
+              continue
+            }
+            if (parsedDueToVnp !== null) {
+              updateData.due_to_vnp = parsedDueToVnp
+            }
+
+            const parsedDueToProperty = parseDerivedAmount(
+              dueToPropertyValue,
+              'Due to Property'
+            )
+            if (Number.isNaN(parsedDueToProperty)) {
+              continue
+            }
+            if (parsedDueToProperty !== null) {
+              updateData.due_to_property = parsedDueToProperty
             }
           }
 
@@ -2233,9 +2324,10 @@ export class AuditService implements IAuditService {
             'Expedia Collectable',
             'expedia_amount_collectable'
           ])
-          const parsedExpediaCollectable = expediaAmountCollectableValue
-            ? parseFloat(expediaAmountCollectableValue)
-            : NaN
+          const parsedExpediaCollectable =
+            expediaAmountCollectableValue !== undefined
+              ? parseFloat(expediaAmountCollectableValue)
+              : NaN
           const expediaAmountCollectable = !isNaN(parsedExpediaCollectable)
             ? (roundToDecimals(parsedExpediaCollectable) ?? undefined)
             : undefined
@@ -2246,9 +2338,10 @@ export class AuditService implements IAuditService {
             'Expedia Confirmed',
             'expedia_amount_confirmed'
           ])
-          const parsedExpediaConfirmed = expediaAmountConfirmedValue
-            ? parseFloat(expediaAmountConfirmedValue)
-            : NaN
+          const parsedExpediaConfirmed =
+            expediaAmountConfirmedValue !== undefined
+              ? parseFloat(expediaAmountConfirmedValue)
+              : NaN
           const expediaAmountConfirmed = !isNaN(parsedExpediaConfirmed)
             ? (roundToDecimals(parsedExpediaConfirmed) ?? undefined)
             : undefined
@@ -2259,9 +2352,10 @@ export class AuditService implements IAuditService {
             'Agoda Collectable',
             'agoda_amount_collectable'
           ])
-          const parsedAgodaCollectable = agodaAmountCollectableValue
-            ? parseFloat(agodaAmountCollectableValue)
-            : NaN
+          const parsedAgodaCollectable =
+            agodaAmountCollectableValue !== undefined
+              ? parseFloat(agodaAmountCollectableValue)
+              : NaN
           const agodaAmountCollectable = !isNaN(parsedAgodaCollectable)
             ? (roundToDecimals(parsedAgodaCollectable) ?? undefined)
             : undefined
@@ -2272,9 +2366,10 @@ export class AuditService implements IAuditService {
             'Agoda Confirmed',
             'agoda_amount_confirmed'
           ])
-          const parsedAgodaConfirmed = agodaAmountConfirmedValue
-            ? parseFloat(agodaAmountConfirmedValue)
-            : NaN
+          const parsedAgodaConfirmed =
+            agodaAmountConfirmedValue !== undefined
+              ? parseFloat(agodaAmountConfirmedValue)
+              : NaN
           const agodaAmountConfirmed = !isNaN(parsedAgodaConfirmed)
             ? (roundToDecimals(parsedAgodaConfirmed) ?? undefined)
             : undefined
@@ -2285,9 +2380,10 @@ export class AuditService implements IAuditService {
             'Booking Collectable',
             'booking_amount_collectable'
           ])
-          const parsedBookingCollectable = bookingAmountCollectableValue
-            ? parseFloat(bookingAmountCollectableValue)
-            : NaN
+          const parsedBookingCollectable =
+            bookingAmountCollectableValue !== undefined
+              ? parseFloat(bookingAmountCollectableValue)
+              : NaN
           const bookingAmountCollectable = !isNaN(parsedBookingCollectable)
             ? (roundToDecimals(parsedBookingCollectable) ?? undefined)
             : undefined
@@ -2298,9 +2394,10 @@ export class AuditService implements IAuditService {
             'Booking Confirmed',
             'booking_amount_confirmed'
           ])
-          const parsedBookingConfirmed = bookingAmountConfirmedValue
-            ? parseFloat(bookingAmountConfirmedValue)
-            : NaN
+          const parsedBookingConfirmed =
+            bookingAmountConfirmedValue !== undefined
+              ? parseFloat(bookingAmountConfirmedValue)
+              : NaN
           const bookingAmountConfirmed = !isNaN(parsedBookingConfirmed)
             ? (roundToDecimals(parsedBookingConfirmed) ?? undefined)
             : undefined
