@@ -30,24 +30,44 @@ export type AuditConfirmedAmounts = {
   booking_amount_confirmed?: number | null
 }
 
+export type AuditOtaType = 'expedia' | 'agoda' | 'booking'
+
 export type AuditDerivedAmounts = {
   gross_total: number
   due_to_vnp: number
   due_to_property: number
 }
 
+function confirmedAmountForOta(
+  typeOfOta: AuditOtaType[] | null | undefined,
+  ota: AuditOtaType,
+  amount: number | null | undefined
+): number | null | undefined {
+  const activeOtas = new Set(
+    (typeOfOta ?? []).map(value => value.toLowerCase() as AuditOtaType)
+  )
+
+  if (!activeOtas.has(ota)) {
+    return null
+  }
+
+  return amount
+}
+
 /**
  * Compute derived audit amounts from OTA confirmed amounts.
+ * Only OTAs present in type_of_ota contribute to gross_total.
  * Missing confirmed values are treated as 0.
  * due_to_vnp = 15% of gross_total; due_to_property = 85% of gross_total.
  */
 export function computeAuditDerivedAmounts(
-  amounts: AuditConfirmedAmounts
+  amounts: AuditConfirmedAmounts,
+  typeOfOta?: AuditOtaType[] | null
 ): AuditDerivedAmounts {
   const gross_total = roundSum([
-    amounts.expedia_amount_confirmed,
-    amounts.agoda_amount_confirmed,
-    amounts.booking_amount_confirmed
+    confirmedAmountForOta(typeOfOta, 'expedia', amounts.expedia_amount_confirmed),
+    confirmedAmountForOta(typeOfOta, 'agoda', amounts.agoda_amount_confirmed),
+    confirmedAmountForOta(typeOfOta, 'booking', amounts.booking_amount_confirmed)
   ])
 
   return {

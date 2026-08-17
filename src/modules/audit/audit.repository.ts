@@ -20,11 +20,14 @@ export class AuditRepository implements IAuditRepository {
       due_to_property?: number
     }
 
-    const derived = computeAuditDerivedAmounts({
-      expedia_amount_confirmed: createPayload.expedia_amount_confirmed,
-      agoda_amount_confirmed: createPayload.agoda_amount_confirmed,
-      booking_amount_confirmed: createPayload.booking_amount_confirmed
-    })
+    const derived = computeAuditDerivedAmounts(
+      {
+        expedia_amount_confirmed: createPayload.expedia_amount_confirmed,
+        agoda_amount_confirmed: createPayload.agoda_amount_confirmed,
+        booking_amount_confirmed: createPayload.booking_amount_confirmed
+      },
+      createPayload.type_of_ota
+    )
 
     return this.prisma.audit.create({
       data: {
@@ -371,26 +374,33 @@ export class AuditRepository implements IAuditRepository {
     const current = await this.prisma.audit.findUnique({
       where: { id },
       select: {
+        type_of_ota: true,
         expedia_amount_confirmed: true,
         agoda_amount_confirmed: true,
         booking_amount_confirmed: true
       }
     })
 
-    const derived = computeAuditDerivedAmounts({
-      expedia_amount_confirmed:
-        incoming.expedia_amount_confirmed !== undefined
-          ? incoming.expedia_amount_confirmed
-          : current?.expedia_amount_confirmed,
-      agoda_amount_confirmed:
-        incoming.agoda_amount_confirmed !== undefined
-          ? incoming.agoda_amount_confirmed
-          : current?.agoda_amount_confirmed,
-      booking_amount_confirmed:
-        incoming.booking_amount_confirmed !== undefined
-          ? incoming.booking_amount_confirmed
-          : current?.booking_amount_confirmed
-    })
+    const typeOfOta =
+      incoming.type_of_ota !== undefined ? incoming.type_of_ota : current?.type_of_ota
+
+    const derived = computeAuditDerivedAmounts(
+      {
+        expedia_amount_confirmed:
+          incoming.expedia_amount_confirmed !== undefined
+            ? incoming.expedia_amount_confirmed
+            : current?.expedia_amount_confirmed,
+        agoda_amount_confirmed:
+          incoming.agoda_amount_confirmed !== undefined
+            ? incoming.agoda_amount_confirmed
+            : current?.agoda_amount_confirmed,
+        booking_amount_confirmed:
+          incoming.booking_amount_confirmed !== undefined
+            ? incoming.booking_amount_confirmed
+            : current?.booking_amount_confirmed
+      },
+      typeOfOta
+    )
 
     updateData.gross_total = derived.gross_total
     updateData.due_to_vnp = derived.due_to_vnp

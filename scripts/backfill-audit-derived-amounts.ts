@@ -17,6 +17,7 @@ async function backfillAuditDerivedAmounts() {
   const audits = await prisma.audit.findMany({
     select: {
       id: true,
+      type_of_ota: true,
       expedia_amount_confirmed: true,
       agoda_amount_confirmed: true,
       booking_amount_confirmed: true,
@@ -34,11 +35,14 @@ async function backfillAuditDerivedAmounts() {
 
   for (const audit of audits) {
     try {
-      const derived = computeAuditDerivedAmounts({
-        expedia_amount_confirmed: audit.expedia_amount_confirmed,
-        agoda_amount_confirmed: audit.agoda_amount_confirmed,
-        booking_amount_confirmed: audit.booking_amount_confirmed
-      })
+      const derived = computeAuditDerivedAmounts(
+        {
+          expedia_amount_confirmed: audit.expedia_amount_confirmed,
+          agoda_amount_confirmed: audit.agoda_amount_confirmed,
+          booking_amount_confirmed: audit.booking_amount_confirmed
+        },
+        audit.type_of_ota
+      )
 
       const alreadyCorrect =
         audit.gross_total === derived.gross_total &&

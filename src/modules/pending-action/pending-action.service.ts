@@ -473,26 +473,30 @@ export class PendingActionService implements IPendingActionService {
         const currentAudit = await this.prisma.audit.findUnique({
           where: { id: pendingAction.audit_id },
           select: {
+            type_of_ota: true,
             expedia_amount_confirmed: true,
             agoda_amount_confirmed: true,
             booking_amount_confirmed: true
           }
         })
 
-        const derived = computeAuditDerivedAmounts({
-          expedia_amount_confirmed:
-            updateData.expedia_amount_confirmed !== undefined
-              ? updateData.expedia_amount_confirmed
-              : currentAudit?.expedia_amount_confirmed,
-          agoda_amount_confirmed:
-            updateData.agoda_amount_confirmed !== undefined
-              ? updateData.agoda_amount_confirmed
-              : currentAudit?.agoda_amount_confirmed,
-          booking_amount_confirmed:
-            updateData.booking_amount_confirmed !== undefined
-              ? updateData.booking_amount_confirmed
-              : currentAudit?.booking_amount_confirmed
-        })
+        const derived = computeAuditDerivedAmounts(
+          {
+            expedia_amount_confirmed:
+              updateData.expedia_amount_confirmed !== undefined
+                ? updateData.expedia_amount_confirmed
+                : currentAudit?.expedia_amount_confirmed,
+            agoda_amount_confirmed:
+              updateData.agoda_amount_confirmed !== undefined
+                ? updateData.agoda_amount_confirmed
+                : currentAudit?.agoda_amount_confirmed,
+            booking_amount_confirmed:
+              updateData.booking_amount_confirmed !== undefined
+                ? updateData.booking_amount_confirmed
+                : currentAudit?.booking_amount_confirmed
+          },
+          currentAudit?.type_of_ota
+        )
 
         Object.assign(updateData, derived)
 
