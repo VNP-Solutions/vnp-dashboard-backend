@@ -208,18 +208,27 @@ export class PayoutClient {
   }
 
   /**
-   * Bulk payout: many audits of one property, paid as one payment per rail.
+   * Bulk payout: many audits, each dispatched INDIVIDUALLY, and they may span properties.
    *
-   * Preview resolves, merges and gates without sending; dispatch does the same and sends. No
-   * idempotency key is passed, and none would be honoured: the payout service derives it from the
-   * SET of audit ids, so a caller cannot vary it and two clicks of the same selection collide.
+   * Preview returns a plan (what will be paid, what is excluded and why, and the payment count).
+   * Dispatch STARTS A RUN and returns a run id immediately without paying anything: fifty audits is
+   * minutes of work, so the payout service does it in the background and we poll.
+   *
+   * No idempotency key is passed, and none would be honoured: the payout service derives one per
+   * audit, so a caller cannot vary it and a repeat of the same audit collides with itself.
    */
   async previewBulkPayout(auditIds: string[], actorUserId: string): Promise<unknown> {
     return this.post('/payout-requests/bulk/preview', actorUserId, { audit_ids: auditIds })
   }
 
-  async dispatchBulkPayout(auditIds: string[], actorUserId: string): Promise<unknown> {
+  /** Starts the run. Returns { run_id, total_items, plan }; nothing has been paid yet. */
+  async startBulkPayout(auditIds: string[], actorUserId: string): Promise<unknown> {
     return this.post('/payout-requests/bulk', actorUserId, { audit_ids: auditIds })
+  }
+
+  /** The poll: run counters plus every audit's current state. */
+  async getBulkPayoutRun(runId: string, actorUserId: string): Promise<unknown> {
+    return this.get(`/payout-requests/bulk/${encodeURIComponent(runId)}`, actorUserId)
   }
 
   /** Bulk lookup for a table page: audit ids that already have a payout, with a per-audit summary. */

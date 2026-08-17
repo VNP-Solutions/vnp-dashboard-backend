@@ -564,17 +564,44 @@ export class AuditPayoutStatusDto {
   audit_ids: string[]
 }
 
+/**
+ * Ceiling on one bulk selection, and it must match the payout service's own `MAX_BULK_AUDITS`.
+ *
+ * The two used to disagree. This side allowed 200 because the old design merged a selection into one
+ * payment per rail, so 200 audits cost two Stripe calls. Each audit is now dispatched on its own, so
+ * 200 audits means 200 calls and the payout service dropped its cap to 50 — but this side kept 200,
+ * and an operator selecting 120 passed validation here only to be refused by the far service after
+ * the request had already left. Refuse at the edge, where the operator is still looking at it.
+ */
+export const MAX_BULK_PAYOUT_AUDITS = 50
+
+/** The selection a bulk preview resolves. Same ceiling as the dispatch that follows it. */
+export class BulkPayoutPreviewDto {
+  @ApiProperty({
+    type: [String],
+    example: ['6a6a2017a6890692e3f8a58d', '6a6a2017a6890692e3f8a58e'],
+    description:
+      'Audits to plan a payout for. MAY span properties: each audit is dispatched individually, so ' +
+      'there is no single destination for the selection to agree on.'
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_BULK_PAYOUT_AUDITS)
+  @IsString({ each: true })
+  audit_ids: string[]
+}
+
 export class BulkPayoutDto {
   @ApiProperty({
     type: [String],
     example: ['6a6a2017a6890692e3f8a58d', '6a6a2017a6890692e3f8a58e'],
     description:
-      'Audits to pay. Must all belong to ONE property: a payout has a single destination, so a ' +
-      'selection spanning properties is refused rather than split.'
+      'Audits to pay, each dispatched individually. MAY span properties and rails: one payment is ' +
+      'made per audit per rail, so a selection has no single destination to agree on.'
   })
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(200)
+  @ArrayMaxSize(MAX_BULK_PAYOUT_AUDITS)
   @IsString({ each: true })
   audit_ids: string[]
 

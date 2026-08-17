@@ -44,6 +44,7 @@ import {
   DeleteAuditsByPortfolioDto,
   AuditPayoutStatusDto,
   BulkPayoutDto,
+  BulkPayoutPreviewDto,
   GlobalStatsResponseDto,
   InitiateAuditPayoutDto,
   RequestUpdateAmountConfirmedDto,
@@ -224,17 +225,19 @@ export class AuditController {
   @Post('bulk-payout/preview')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Preview a bulk payout for many audits of one property (Internal operators only)',
+    summary: 'Preview a bulk payout (Internal operators only)',
     description:
-      'Resolves every audit, merges them by rail and currency, and runs the same gates a real ' +
-      'dispatch runs. Sends nothing and writes nothing. Returns one summary per rail, the audits ' +
-      'excluded and why, and a confirm_token bound to this exact SET of audits.'
+      'Resolves every selected audit and returns the plan: which audits will be paid and on which ' +
+      'rails, which are excluded and why, how many individual payments this produces and what ' +
+      'they total. Sends nothing and writes nothing. Also returns a confirm_token bound to this ' +
+      'exact SET of audits. The selection MAY span properties: each audit is paid on its own, so ' +
+      'there is no single destination for the selection to agree on.'
   })
-  @ApiResponse({ status: 200, description: 'Per-rail totals + excluded list + confirm_token' })
+  @ApiResponse({ status: 200, description: 'Plan + excluded list + confirm_token' })
   @ApiResponse({ status: 403, description: 'One or more audits are outside your access' })
-  @ApiResponse({ status: 422, description: 'The selection spans more than one property' })
+  @ApiResponse({ status: 400, description: 'More audits selected than one run may cover' })
   async previewBulkPayout(
-    @Body() dto: AuditPayoutStatusDto,
+    @Body() dto: BulkPayoutPreviewDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
     await this.assertEveryAuditAccessible(dto.audit_ids, user)
@@ -246,23 +249,41 @@ export class AuditController {
   @Post('bulk-payout')
   @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
   @ApiOperation({
-    summary: 'Dispatch a bulk payout (Internal operators only)',
+    summary: 'Start a bulk payout run (Internal operators only)',
     description:
-      'Pays many audits of one property as one payment per rail. Requires the confirm_token from ' +
-      'the preview, which is bound to this exact set of audit ids, so a caller cannot preview a ' +
-      'few audits and then dispatch many. Amounts, rails and destinations are all derived by the ' +
-      'payout service; an audit already covered by a live payout is refused, not paid twice.'
+      'Starts a run and returns a run_id IMMEDIATELY. Nothing has been paid when this responds: ' +
+      'each audit is dispatched individually and a large selection takes minutes, so the payout ' +
+      'service works through it in the background. Poll GET bulk-payout/:runId for progress. ' +
+      'Requires the confirm_token from the preview, bound to this exact set of audit ids, so a ' +
+      'caller cannot preview a few audits and then dispatch many.'
   })
-  @ApiResponse({ status: 200, description: 'Per-rail dispatch results + excluded list' })
+  @ApiResponse({ status: 201, description: 'Run started: { run_id, total_items, plan }' })
   @ApiResponse({ status: 403, description: 'Missing/expired token, or audits outside your access' })
-  @ApiResponse({ status: 409, description: 'One or more audits already have a live payout' })
+  @ApiResponse({ status: 422, description: 'Nothing in the selection can be paid' })
   async dispatchBulkPayout(
     @Body() dto: BulkPayoutDto,
     @CurrentUser() user: IUserWithPermissions
   ) {
     await this.assertEveryAuditAccessible(dto.audit_ids, user)
     this.payoutConfirmTokenService.verifyForSet(dto.confirm_token, dto.audit_ids, user.id)
-    return this.payoutClient.dispatchBulkPayout(dto.audit_ids, user.id)
+    return this.payoutClient.startBulkPayout(dto.audit_ids, user.id)
+  }
+
+  @Get('bulk-payout/:runId')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Poll a bulk payout run',
+    description:
+      'Returns the run counters and every audit in it with its current state, so the UI can show ' +
+      'rows completing one at a time. Safe to call repeatedly; it reads and never dispatches.'
+  })
+  @ApiResponse({ status: 200, description: 'Run status + per-audit items' })
+  @ApiResponse({ status: 404, description: 'No such run' })
+  async getBulkPayoutRun(
+    @Param('runId') runId: string,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.payoutClient.getBulkPayoutRun(runId, user.id)
   }
 
   /**
