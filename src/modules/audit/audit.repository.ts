@@ -280,9 +280,9 @@ export class AuditRepository implements IAuditRepository {
             is_active: true,
             portfolio_id: true,
             card_descriptor: true,
-            // The DBMS property id. Consumers of the external audit seam need it to look up which
-            // processor collected each OTA's money, which is what decides the payout rail; without
-            // it every OTA on the audit resolves as unknown_processor and nothing can be paid.
+            // The DBMS property id. The payout service needs it to look up which processor
+            // collected each OTA's money, which is what picks the rail. Without it every OTA
+            // resolves as unknown_processor and the audit can't be paid at all.
             parent_id: true,
             currency: {
               select: {
@@ -522,6 +522,17 @@ export class AuditRepository implements IAuditRepository {
     })
 
     return { count: result.count }
+  }
+
+  /**
+   * Ids and their property, nothing else. Used on the table-page scope check, where findByIds would
+   * hydrate every audit's status, batch, property, currency and portfolio to read two columns.
+   */
+  async findScopeByIds(ids: string[]) {
+    return this.prisma.audit.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, property_id: true }
+    })
   }
 
   async findByIds(ids: string[]) {

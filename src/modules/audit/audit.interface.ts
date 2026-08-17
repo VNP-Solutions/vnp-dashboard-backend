@@ -130,6 +130,8 @@ export interface IAuditRepository {
   count(whereClause: any, propertyIds?: string[]): Promise<number>
   findById(id: string): Promise<AuditWithFullDetails | null>
   findByIds(ids: string[]): Promise<AuditWithFullDetails[]>
+  /** Just enough to answer "may this user see these audits". See findByIds for the full object. */
+  findScopeByIds(ids: string[]): Promise<{ id: string; property_id: string }[]>
   update(id: string, data: UpdateAuditDto): Promise<AuditWithRelations>
   archive(id: string): Promise<AuditWithRelations>
   unarchive(id: string): Promise<AuditWithRelations>
