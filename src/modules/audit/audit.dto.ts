@@ -1,7 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { OtaType, Prisma } from '@prisma/client'
-import { Transform } from 'class-transformer'
+import { OtaType, Prisma, PayoutStatus } from '@prisma/client'
+import { Transform, Type } from 'class-transformer'
 import {
   ArrayMaxSize,
   IsArray,
@@ -12,7 +12,10 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  ArrayMinSize
+  ArrayMinSize,
+  IsInt,
+  IsISO8601,
+  ValidateNested
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
 
@@ -577,6 +580,27 @@ export class InitiateAuditPayoutDto {
   @IsString()
   @IsNotEmpty()
   confirm_token: string
+
+  @ApiPropertyOptional({
+    example: 123456,
+    description:
+      'Emailed confirmation code. Required only when the payout is at or above the threshold; the ' +
+      'preview says so via otp_required.'
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  otp?: number
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Re-send legs whose previous attempt moved no money. Refused for returned and ' +
+      'reconciliation_required, where money may already be gone.'
+  })
+  @IsOptional()
+  @IsBoolean()
+  retry?: boolean
 }
 
 export class AuditPayoutStatusDto {
@@ -635,4 +659,60 @@ export class BulkPayoutDto {
   })
   @IsString()
   confirm_token: string
+
+  @ApiPropertyOptional({
+    example: 123456,
+    description: 'Emailed confirmation code. Required only when the selection is above the threshold.'
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  otp?: number
+}
+
+/** One payout leg's state, as the payout service reports it. */
+export class PayoutStatusLegDto {
+  @ApiProperty({ example: 'connect', description: 'connect = Rail A, global = Rail B' })
+  @IsString()
+  rail: string
+
+  @ApiProperty({ example: 'completed' })
+  @IsString()
+  status: string
+
+  @ApiPropertyOptional({ example: 'gbp' })
+  @IsOptional()
+  @IsString()
+  currency?: string | null
+
+  @ApiPropertyOptional({ example: 6460 })
+  @IsOptional()
+  @IsInt()
+  amount_minor?: number | null
+}
+
+/**
+ * Payout state pushed by the payout service.
+ *
+ * `occurred_at` is the ordering guard, not decoration. Stripe delivers some webhook pairs
+ * concurrently and unordered, so an older push must not overwrite a newer one. Ordering by time
+ * rather than by status rank also keeps the one legitimate backwards move working: a Rail B payout
+ * can be returned days after it posted, and the audit has to stop reading as completed.
+ */
+export class PayoutStatusPushDto {
+  @ApiProperty({
+    enum: ['pending', 'dispatched', 'partially_completed', 'completed', 'failed', 'needs_attention']
+  })
+  @IsEnum(PayoutStatus)
+  status: PayoutStatus
+
+  @ApiProperty({ type: [PayoutStatusLegDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PayoutStatusLegDto)
+  legs: PayoutStatusLegDto[]
+
+  @ApiProperty({ example: '2026-08-17T10:33:28.167Z' })
+  @IsISO8601()
+  occurred_at: string
 }

@@ -53,6 +53,7 @@ import {
   DeleteAuditsByPortfolioDto,
   ExternalAuditQueryDto,
   GlobalStatsResponseDto,
+  PayoutStatusPushDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
   UpdateReportUrlDto
@@ -885,6 +886,28 @@ export class AuditService implements IAuditService {
    * Ids they can't see are dropped, not rejected: the caller is a page that was already scoped, so a
    * foreign id is a probe. A dropped id is simply absent, same as an audit with no payout.
    */
+  /**
+   * Refuse a bulk selection that spans portfolios.
+   *
+   * Properties may differ, portfolios may not. A payout run is settled and reconciled against one
+   * portfolio's books, and a run mixing two leaves neither side with a total that reconciles.
+   *
+   * Enforced here as well as in the UI, because a warning dialog is a courtesy and this is the rule.
+   */
+  async assertSinglePortfolio(auditIds: string[]): Promise<void> {
+    const audits = await this.auditRepository.findScopeByIds(auditIds)
+    const portfolios = new Map<string, string>()
+    for (const a of audits) {
+      if (a.property?.portfolio_id) portfolios.set(a.property.portfolio_id, a.property.name)
+    }
+    if (portfolios.size > 1) {
+      throw new BadRequestException(
+        `A payout cannot span portfolios. This selection covers ${portfolios.size}: ` +
+          `${[...portfolios.values()].join(', ')}. Select audits from one portfolio at a time.`
+      )
+    }
+  }
+
   async accessibleAuditIds(
     auditIds: string[],
     user: IUserWithPermissions
@@ -919,6 +942,36 @@ export class AuditService implements IAuditService {
       if (canAccess) allowed.push(audit.id)
     }
     return allowed
+  }
+
+  /**
+   * Record the payout state the payout service just pushed.
+   *
+   * DISPLAY ONLY. Nothing here decides whether an audit may be paid; that stays with the payout
+   * service, which holds the locks and the idempotency keys.
+   *
+   * Ordered by `occurred_at`, not by how "final" a status looks. Stripe delivers some webhook pairs
+   * concurrently and unordered, so a stale push must not overwrite a fresh one. Ranking statuses
+   * instead would block the one backwards move that is real: a Rail B payout can be returned days
+   * after it posted, and the audit must stop reading as completed.
+   */
+  async applyPayoutStatus(auditId: string, dto: PayoutStatusPushDto) {
+    const audit = await this.auditRepository.findPayoutStateById(auditId)
+    if (!audit) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    const occurredAt = new Date(dto.occurred_at)
+    if (audit.payout_updated_at && audit.payout_updated_at >= occurredAt) {
+      return { applied: false, reason: 'stale', payout_status: audit.payout_status }
+    }
+
+    await this.auditRepository.updatePayoutState(auditId, {
+      payout_status: dto.status,
+      payout_legs: dto.legs as unknown as Prisma.InputJsonValue,
+      payout_updated_at: occurredAt
+    })
+    return { applied: true, payout_status: dto.status }
   }
 
   async findOne(id: string, user: IUserWithPermissions) {
