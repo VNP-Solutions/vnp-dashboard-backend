@@ -32,7 +32,7 @@ export class PayoutHistoryService implements IPayoutHistoryService {
   ): Promise<PayoutHistoryQueryDto & { dashboard_property_ids?: string }> {
     const accessible = await this.permissionService.getAccessibleResourceIds(
       user,
-      ModuleType.PROPERTY
+      ModuleType.PAYOUT
     )
     if (accessible === 'all') return query
     return { ...query, dashboard_property_ids: accessible.join(',') }
