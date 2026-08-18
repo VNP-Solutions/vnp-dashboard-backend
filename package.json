@@ -42,6 +42,7 @@
     "cleanup:orphans": "ts-node scripts/cleanup-orphaned-records.ts",
     "delete:stripe-bank-details": "ts-node scripts/delete-stripe-bank-details.ts",
     "remove:sales-agent": "ts-node scripts/remove-sales-agent.ts",
+    "add:payout-permission": "ts-node scripts/add-payout-permission.ts",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "push": "prisma db push",

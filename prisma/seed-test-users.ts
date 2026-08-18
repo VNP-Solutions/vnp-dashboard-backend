@@ -53,6 +53,12 @@ interface RoleData {
       access_level: AccessLevel
     }
   }
+  payout_permission: {
+    set: {
+      permission_level: PermissionLevel
+      access_level: AccessLevel
+    }
+  }
 }
 
 /**
@@ -154,6 +160,12 @@ async function createRoles(): Promise<UserRole[]> {
           permission_level: 'all',
           access_level: 'all'
         }
+      },
+      payout_permission: {
+        set: {
+          permission_level: 'all',
+          access_level: 'all'
+        }
       }
     },
     {
@@ -195,6 +207,12 @@ async function createRoles(): Promise<UserRole[]> {
       bank_details_permission: {
         set: {
           permission_level: 'view',
+          access_level: 'partial'
+        }
+      },
+      payout_permission: {
+        set: {
+          permission_level: 'update',
           access_level: 'partial'
         }
       }
@@ -240,6 +258,12 @@ async function createRoles(): Promise<UserRole[]> {
           permission_level: 'view',
           access_level: 'partial'
         }
+      },
+      payout_permission: {
+        set: {
+          permission_level: 'update',
+          access_level: 'partial'
+        }
       }
     },
     {
@@ -282,6 +306,12 @@ async function createRoles(): Promise<UserRole[]> {
         set: {
           permission_level: 'view',
           access_level: 'none'
+        }
+      },
+      payout_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'partial'
         }
       }
     },
@@ -326,6 +356,12 @@ async function createRoles(): Promise<UserRole[]> {
           permission_level: 'view',
           access_level: 'none'
         }
+      },
+      payout_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'none'
+        }
       }
     },
     {
@@ -365,6 +401,12 @@ async function createRoles(): Promise<UserRole[]> {
         }
       },
       bank_details_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'none'
+        }
+      },
+      payout_permission: {
         set: {
           permission_level: 'view',
           access_level: 'none'
@@ -414,6 +456,12 @@ async function createRoles(): Promise<UserRole[]> {
           permission_level: 'view',
           access_level: 'none'
         }
+      },
+      payout_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'none'
+        }
       }
     },
     {
@@ -453,6 +501,12 @@ async function createRoles(): Promise<UserRole[]> {
         }
       },
       bank_details_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'none'
+        }
+      },
+      payout_permission: {
         set: {
           permission_level: 'view',
           access_level: 'none'
@@ -500,6 +554,12 @@ async function createRoles(): Promise<UserRole[]> {
           permission_level: 'view',
           access_level: 'none'
         }
+      },
+      payout_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'none'
+        }
       }
     },
     {
@@ -540,6 +600,12 @@ async function createRoles(): Promise<UserRole[]> {
         }
       },
       bank_details_permission: {
+        set: {
+          permission_level: 'view',
+          access_level: 'none'
+        }
+      },
+      payout_permission: {
         set: {
           permission_level: 'view',
           access_level: 'none'

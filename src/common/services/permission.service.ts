@@ -212,6 +212,12 @@ export class PermissionService {
         return userAccessedProperties.property_id || []
       }
 
+      // PAYOUT partial access mirrors property access: payouts are scoped to the
+      // properties assigned to the user
+      if (module === ModuleType.PAYOUT) {
+        return userAccessedProperties.property_id || []
+      }
+
       // BANK_DETAILS partial access: user can access bank details for portfolios
       // and properties they have access to (property and portfolio bank details)
       if (module === ModuleType.BANK_DETAILS) {
@@ -245,6 +251,8 @@ export class PermissionService {
         return user.role.system_settings_permission
       case ModuleType.BANK_DETAILS:
         return user.role.bank_details_permission
+      case ModuleType.PAYOUT:
+        return user.role.payout_permission
       default:
         return null
     }
@@ -255,13 +263,14 @@ export class PermissionService {
    * PORTFOLIO, PROPERTY, and BANK_DETAILS have resource-level access control via UserAccessedProperty
    * USER module partial access: user can only see users they invited
    * SYSTEM_SETTINGS partial access: behaves same as 'all' access (all settings available)
-   * Note: BANK_DETAILS partial access maps to PROPERTY access (user can only access bank details for properties they have access to)
+   * Note: BANK_DETAILS and PAYOUT partial access map to PROPERTY access (user can only access bank details / payouts for properties they have access to)
    */
   moduleSupportsPartialAccess(module: ModuleType): boolean {
     return (
       module === ModuleType.PORTFOLIO ||
       module === ModuleType.PROPERTY ||
       module === ModuleType.BANK_DETAILS ||
+      module === ModuleType.PAYOUT ||
       module === ModuleType.USER ||
       module === ModuleType.SYSTEM_SETTINGS
     )
@@ -278,6 +287,7 @@ export class PermissionService {
     user_permission: IPermission | null
     system_settings_permission: IPermission | null
     bank_details_permission: IPermission | null
+    payout_permission: IPermission | null
   }): string[] {
     const warnings: string[] = []
 
@@ -294,17 +304,19 @@ export class PermissionService {
         !this.moduleSupportsPartialAccess(module)
       ) {
         warnings.push(
-          `${moduleName}: PARTIAL access_level is not supported. Only PORTFOLIO, PROPERTY, BANK_DETAILS, USER, and SYSTEM_SETTINGS support partial access. This will behave as NO ACCESS.`
+          `${moduleName}: PARTIAL access_level is not supported. Only PORTFOLIO, PROPERTY, BANK_DETAILS, PAYOUT, USER, and SYSTEM_SETTINGS support partial access. This will behave as NO ACCESS.`
         )
       }
 
       // Warn about potential CREATE issues with PARTIAL access
       // Skip for SYSTEM_SETTINGS since partial access behaves same as 'all' (no resource assignment)
+      // Skip for PAYOUT since it owns no resources of its own (scope comes from property access)
       if (
         permission.access_level === AccessLevel.partial &&
         (permission.permission_level === PermissionLevel.all ||
           permission.permission_level === PermissionLevel.update) &&
-        module !== ModuleType.SYSTEM_SETTINGS
+        module !== ModuleType.SYSTEM_SETTINGS &&
+        module !== ModuleType.PAYOUT
       ) {
         warnings.push(
           `${moduleName}: Users can CREATE resources and will automatically gain access to them through UserAccessedProperty.`
@@ -330,6 +342,7 @@ export class PermissionService {
       'Bank Details',
       ModuleType.BANK_DETAILS
     )
+    checkPermission(role.payout_permission, 'Payout', ModuleType.PAYOUT)
 
     return warnings
   }
@@ -343,8 +356,13 @@ export class PermissionService {
     module: ModuleType,
     resourceId: string
   ): Promise<void> {
-    // Only PORTFOLIO and PROPERTY support partial access
     if (!this.moduleSupportsPartialAccess(module)) {
+      return
+    }
+
+    // PAYOUT keeps no resource list of its own: its scope is read from property access, so granting
+    // here would only write an empty UserAccessedProperty row.
+    if (module === ModuleType.PAYOUT) {
       return
     }
 
@@ -437,6 +455,23 @@ export class PermissionService {
       const portfolioIds = userAccessedProperties.portfolio_id || []
       const propertyIds = userAccessedProperties.property_id || []
       return portfolioIds.includes(resourceId) || propertyIds.includes(resourceId)
+    }
+
+    // PAYOUT partial access: the resourceId is an audit id, so delegate to
+    // property access for that audit's property
+    if (module === ModuleType.PAYOUT) {
+      const audit = await this.prisma.audit.findUnique({
+        where: { id: resourceId },
+        select: { property_id: true }
+      })
+      if (!audit) {
+        return false
+      }
+      return this.checkPartialAccess(
+        user,
+        ModuleType.PROPERTY,
+        audit.property_id
+      )
     }
 
     // AUDIT partial access: delegate to property access for the audit's property

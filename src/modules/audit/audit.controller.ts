@@ -184,7 +184,7 @@ export class AuditController {
   }
 
   @Get(':id/payout-preview')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
+  @RequirePermission(ModuleType.PAYOUT, PermissionAction.UPDATE, true)
   @ApiOperation({
     summary: 'Preview an audit payout and mint a confirmation token (Internal operators only)',
     description:
@@ -212,7 +212,7 @@ export class AuditController {
   }
 
   @Post('payout-status')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @RequirePermission(ModuleType.PAYOUT, PermissionAction.READ)
   @ApiOperation({
     summary: 'Which of these audits already have a payout?',
     description:
@@ -227,13 +227,13 @@ export class AuditController {
   ) {
     // The guard checks `params.id`, and this route takes ids in the body, so it has no resource to
     // check. Scope them here or the endpoint answers for any audit in the system.
-    const auditIds = await this.auditService.accessibleAuditIds(dto.audit_ids, user)
+    const auditIds = await this.auditService.accessiblePayoutAuditIds(dto.audit_ids, user)
     if (auditIds.length === 0) return {}
     return this.payoutClient.payoutStatusByAudits(auditIds, user.id)
   }
 
   @Post('bulk-payout/preview')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @RequirePermission(ModuleType.PAYOUT, PermissionAction.UPDATE)
   @ApiOperation({
     summary: 'Preview a bulk payout (Internal operators only)',
     description:
@@ -266,7 +266,7 @@ export class AuditController {
   }
 
   @Post('payout-otp')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @RequirePermission(ModuleType.PAYOUT, PermissionAction.UPDATE)
   @ApiOperation({
     summary: 'Email a confirmation code for a payout above the threshold',
     description:
@@ -286,7 +286,7 @@ export class AuditController {
   }
 
   @Post('bulk-payout')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @RequirePermission(ModuleType.PAYOUT, PermissionAction.UPDATE)
   @ApiOperation({
     summary: 'Start a bulk payout run (Internal operators only)',
     description:
@@ -318,7 +318,7 @@ export class AuditController {
   }
 
   @Get('bulk-payout/:runId')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @RequirePermission(ModuleType.PAYOUT, PermissionAction.READ)
   @ApiOperation({
     summary: 'Poll a bulk payout run',
     description:
@@ -345,7 +345,7 @@ export class AuditController {
     auditIds: string[],
     user: IUserWithPermissions
   ): Promise<void> {
-    const allowed = await this.auditService.accessibleAuditIds(auditIds, user)
+    const allowed = await this.auditService.accessiblePayoutAuditIds(auditIds, user)
     if (allowed.length !== new Set(auditIds).size) {
       const allowedSet = new Set(allowed)
       const refused = [...new Set(auditIds)].filter(id => !allowedSet.has(id))
@@ -356,7 +356,7 @@ export class AuditController {
   }
 
   @Post(':id/payout')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
+  @RequirePermission(ModuleType.PAYOUT, PermissionAction.UPDATE, true)
   @ApiOperation({
     summary: 'Dispatch a payout for an audit (Internal operators only)',
     description:
