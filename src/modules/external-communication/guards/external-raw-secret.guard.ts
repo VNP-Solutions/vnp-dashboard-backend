@@ -33,7 +33,11 @@ export class ExternalRawSecretGuard implements CanActivate {
     }
 
     const token = authHeader.substring(7).trim()
-    console.log(`${TAG} Received token: ${token}`)
+    // NEVER log this value. The credential presented to this endpoint is the raw
+    // JWT_COMMUNICATION_SECRET, the estate's master service credential. Anyone with log read access
+    // could mint an audience-bound service token and reach the payout service, which treats service
+    // principals as unscoped. Log presence only.
+    console.log(`${TAG} Received token: [redacted, len=${token.length}]`)
 
     const secret = this.configService.jwt.communicationSecret
     console.log(`${TAG} Communication secret configured: ${!!secret}`)

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { PayoutStatus, Prisma } from '@prisma/client'
 import {
   applyManualDerivedAmountOverrides,
   computeAuditDerivedAmounts,
@@ -293,6 +294,12 @@ export class AuditRepository implements IAuditRepository {
             is_active: true,
             portfolio_id: true,
             card_descriptor: true,
+            parent_id: true,
+            // Who collected each OTA's money. The payout service turns these into a rail, so an
+            // audit whose property has none is not payable.
+            expedia_processor: true,
+            booking_processor: true,
+            agoda_processor: true,
             currency: {
               select: {
                 id: true,
@@ -551,6 +558,41 @@ export class AuditRepository implements IAuditRepository {
     })
 
     return { count: result.count }
+  }
+
+  /**
+   * Ids and their property, nothing else. Used on the table-page scope check, where findByIds would
+   * hydrate every audit's status, batch, property, currency and portfolio to read two columns.
+   */
+  async findScopeByIds(ids: string[]) {
+    return this.prisma.audit.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        property_id: true,
+        // Portfolio too: a bulk payout may span properties but never portfolios.
+        property: { select: { portfolio_id: true, name: true } }
+      }
+    })
+  }
+
+  /** Just the payout columns, for the ordering guard on an inbound status push. */
+  async findPayoutStateById(id: string) {
+    return this.prisma.audit.findUnique({
+      where: { id },
+      select: { id: true, payout_status: true, payout_updated_at: true }
+    })
+  }
+
+  async updatePayoutState(
+    id: string,
+    data: {
+      payout_status: PayoutStatus
+      payout_legs: Prisma.InputJsonValue
+      payout_updated_at: Date
+    }
+  ) {
+    return this.prisma.audit.update({ where: { id }, data })
   }
 
   async findByIds(ids: string[]) {

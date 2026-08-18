@@ -121,6 +121,14 @@ model Property {
   parent_id             String?
   show_in_portfolio     String[]  @db.ObjectId
 
+  // Who collects this property's money, per OTA, synced from DBMS (Property.{ota}_processor.name).
+  // The payout service reads these to pick a rail: Stripe pays from the hotel's connected balance,
+  // anything else was collected outside Stripe and pays from our own account. Null means the rail
+  // cannot be decided and that OTA is not payable.
+  expedia_processor     String?
+  booking_processor     String?
+  agoda_processor       String?
+
   audits               Audit[]
   credentials          PropertyCredentials?
   bankDetails          PropertyBankDetails?
@@ -152,6 +160,10 @@ model Otp {
 
   /// When set, this OTP verifies an admin verifying `user_id`'s account for this target user (user_id on row = admin).
   admin_verify_for_user_id String? @db.ObjectId
+
+  /// When set, this OTP authorises a payout of the audit selection with this fingerprint.
+  /// Scoped so a login code can never authorise a payout, nor one selection's code another's.
+  payout_scope String?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -186,6 +198,19 @@ model Audit {
   report_url                 String?
   report_data                Json?
   review_collection_date     DateTime?
+
+  /**
+   * Payout state, pushed by the payout service. DISPLAY ONLY.
+   *
+   * Null means no payout has ever been raised for this audit. Every decision that moves money is
+   * still made by the payout service, which holds the locks and the idempotency keys; if the two
+   * ever disagree, that side is right.
+   */
+  payout_status              PayoutStatus?
+  /** Per-rail detail, so a dual-rail audit renders without calling the payout service. */
+  payout_legs                Json?
+  /** Ordering guard: a push older than this is ignored, so concurrent webhooks cannot regress it. */
+  payout_updated_at          DateTime?
 
   notes          Note[]
   tasks          Task[]
@@ -515,6 +540,16 @@ model ConsolidatedReport {
 
   @@index([portfolio_id])
   @@index([user_id])
+}
+
+/** Derived from the audit's payout legs by the payout service. See payoutAuditStatus.ts there. */
+enum PayoutStatus {
+  pending
+  dispatched
+  partially_completed
+  completed
+  failed
+  needs_attention
 }
 
 enum OtaType {

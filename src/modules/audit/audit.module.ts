@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { JwtModule } from '@nestjs/jwt'
 import { ConfigService } from '../../config/config.service'
 import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
@@ -13,10 +14,15 @@ import { PropertyRepository } from '../property/property.repository'
 import { AuditController } from './audit.controller'
 import { AuditRepository } from './audit.repository'
 import { AuditService } from './audit.service'
+import { PayoutClient } from './payout.client'
+import { PayoutConfirmTokenService } from './payout-confirm-token.service'
+import { PayoutOtpService } from './payout-otp.service'
+import { PayoutHistoryController } from './payout-history.controller'
+import { PayoutHistoryService } from './payout-history.service'
 
 @Module({
-  imports: [AuthModule],
-  controllers: [AuditController],
+  imports: [AuthModule, JwtModule.register({})],
+  controllers: [AuditController, PayoutHistoryController],
   providers: [
     {
       provide: 'IAuditService',
@@ -53,7 +59,14 @@ import { AuditService } from './audit.service'
     PermissionService,
     PrismaService,
     EmailUtil,
-    ConfigService
+    ConfigService,
+    {
+      provide: 'IPayoutHistoryService',
+      useClass: PayoutHistoryService
+    },
+    PayoutClient,
+    PayoutConfirmTokenService,
+    PayoutOtpService
   ],
   exports: [
     {

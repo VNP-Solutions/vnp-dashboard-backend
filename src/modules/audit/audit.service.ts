@@ -53,6 +53,7 @@ import {
   DeleteAuditsByPortfolioDto,
   ExternalAuditQueryDto,
   GlobalStatsResponseDto,
+  PayoutStatusPushDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
   UpdateReportUrlDto
@@ -873,6 +874,104 @@ export class AuditService implements IAuditService {
     )
 
     return data
+  }
+
+  /**
+   * Narrow caller-supplied audit ids to the ones this user may read.
+   *
+   * The guard checks `params.id`, so a route taking ids in the body gets no resource check at all.
+   * Without this, a partial-access operator could name any audit and read back its rail, currency
+   * and per-OTA amounts.
+   *
+   * Ids they can't see are dropped, not rejected: the caller is a page that was already scoped, so a
+   * foreign id is a probe. A dropped id is simply absent, same as an audit with no payout.
+   */
+  /**
+   * Refuse a bulk selection that spans portfolios.
+   *
+   * Properties may differ, portfolios may not. A payout run is settled and reconciled against one
+   * portfolio's books, and a run mixing two leaves neither side with a total that reconciles.
+   *
+   * Enforced here as well as in the UI, because a warning dialog is a courtesy and this is the rule.
+   */
+  async assertSinglePortfolio(auditIds: string[]): Promise<void> {
+    const audits = await this.auditRepository.findScopeByIds(auditIds)
+    const portfolios = new Map<string, string>()
+    for (const a of audits) {
+      if (a.property?.portfolio_id) portfolios.set(a.property.portfolio_id, a.property.name)
+    }
+    if (portfolios.size > 1) {
+      throw new BadRequestException(
+        `A payout cannot span portfolios. This selection covers ${portfolios.size}: ` +
+          `${[...portfolios.values()].join(', ')}. Select audits from one portfolio at a time.`
+      )
+    }
+  }
+
+  async accessibleAuditIds(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<string[]> {
+    if (auditIds.length === 0) return []
+
+    const auditPermission = user.role.audit_permission
+    if (!auditPermission || auditPermission.access_level === AccessLevel.none) {
+      return []
+    }
+
+    // Ids that do not exist are dropped here too: they cannot be checked, so they cannot be allowed.
+    const audits = await this.auditRepository.findScopeByIds(auditIds)
+    if (auditPermission.access_level === AccessLevel.all) {
+      return audits.map(audit => audit.id)
+    }
+
+    // Partial access: one check per distinct property, not per audit. A page of audits is usually a
+    // handful of properties, and canAccessResource hits the database each call.
+    const allowedByProperty = new Map<string, boolean>()
+    const allowed: string[] = []
+    for (const audit of audits) {
+      let canAccess = allowedByProperty.get(audit.property_id)
+      if (canAccess === undefined) {
+        canAccess = await this.permissionService.canAccessResource(
+          user,
+          ModuleType.PROPERTY,
+          audit.property_id
+        )
+        allowedByProperty.set(audit.property_id, canAccess)
+      }
+      if (canAccess) allowed.push(audit.id)
+    }
+    return allowed
+  }
+
+  /**
+   * Record the payout state the payout service just pushed.
+   *
+   * DISPLAY ONLY. Nothing here decides whether an audit may be paid; that stays with the payout
+   * service, which holds the locks and the idempotency keys.
+   *
+   * Ordered by `occurred_at`, not by how "final" a status looks. Stripe delivers some webhook pairs
+   * concurrently and unordered, so a stale push must not overwrite a fresh one. Ranking statuses
+   * instead would block the one backwards move that is real: a Rail B payout can be returned days
+   * after it posted, and the audit must stop reading as completed.
+   */
+  async applyPayoutStatus(auditId: string, dto: PayoutStatusPushDto) {
+    const audit = await this.auditRepository.findPayoutStateById(auditId)
+    if (!audit) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    const occurredAt = new Date(dto.occurred_at)
+    if (audit.payout_updated_at && audit.payout_updated_at >= occurredAt) {
+      return { applied: false, reason: 'stale', payout_status: audit.payout_status }
+    }
+
+    await this.auditRepository.updatePayoutState(auditId, {
+      payout_status: dto.status,
+      payout_legs: dto.legs as unknown as Prisma.InputJsonValue,
+      payout_updated_at: occurredAt
+    })
+    return { applied: true, payout_status: dto.status }
   }
 
   async findOne(id: string, user: IUserWithPermissions) {

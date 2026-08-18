@@ -10,7 +10,8 @@ import {
   Query,
   UploadedFile,
   UseGuards,
-  UseInterceptors
+  UseInterceptors,
+  ForbiddenException
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import {
@@ -41,12 +42,19 @@ import {
   CreateAuditDto,
   DeleteAuditDto,
   DeleteAuditsByPortfolioDto,
+  AuditPayoutStatusDto,
+  BulkPayoutDto,
+  BulkPayoutPreviewDto,
   GlobalStatsResponseDto,
+  InitiateAuditPayoutDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
   UpdateReportUrlDto
 } from './audit.dto'
 import type { IAuditService } from './audit.interface'
+import { PayoutClient } from './payout.client'
+import { PayoutConfirmTokenService } from './payout-confirm-token.service'
+import { PayoutOtpService } from './payout-otp.service'
 
 @ApiTags('Audit')
 @ApiBearerAuth('JWT-auth')
@@ -57,7 +65,10 @@ export class AuditController {
     @Inject('IAuditService')
     private readonly auditService: IAuditService,
     @Inject('IAuthRepository')
-    private readonly authRepository: IAuthRepository
+    private readonly authRepository: IAuthRepository,
+    private readonly payoutClient: PayoutClient,
+    private readonly payoutConfirmTokenService: PayoutConfirmTokenService,
+    private readonly payoutOtpService: PayoutOtpService
   ) {}
 
   @Post()
@@ -170,6 +181,214 @@ export class AuditController {
   })
   archive(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
     return this.auditService.archive(id, user)
+  }
+
+  @Get(':id/payout-preview')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Preview an audit payout and mint a confirmation token (Internal operators only)',
+    description:
+      'Runs the payout service dry-run: resolves the audit, maps the property, picks the rail and ' +
+      'computes gross/commission/net per OTA, checks the destination and the funding gate. Sends ' +
+      'nothing and writes nothing. Returns the breakdown the confirmation dialog renders, plus a ' +
+      'short-lived confirm_token that must be presented back to POST :id/payout.'
+  })
+  @ApiResponse({ status: 200, description: 'Preview breakdown + confirm_token + expires_at' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({ status: 422, description: 'Property mapping is unmapped or ambiguous; payout blocked' })
+  @ApiResponse({ status: 502, description: 'Payout service unreachable' })
+  async previewPayout(@Param('id') id: string, @CurrentUser() user: IUserWithPermissions) {
+    const preview = await this.payoutClient.previewFromAudit(id, user.id)
+    const { token, expiresAt } = this.payoutConfirmTokenService.mint(id, user.id)
+    const totals = PayoutOtpService.totalsFrom(preview)
+    return {
+      preview,
+      confirm_token: token,
+      expires_at: expiresAt,
+      otp_required: this.payoutOtpService.isRequired(totals),
+      otp_threshold: this.payoutOtpService.threshold,
+      totals
+    }
+  }
+
+  @Post('payout-status')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Which of these audits already have a payout?',
+    description:
+      'Bulk lookup for one page of the audits table, so rows that were already paid can show that ' +
+      'state instead of offering the button again. Audits with no payout are absent from the result.'
+  })
+  @ApiResponse({ status: 200, description: 'Map of audit id to payout summary' })
+  @ApiResponse({ status: 502, description: 'Payout service unreachable' })
+  async payoutStatus(
+    @Body() dto: AuditPayoutStatusDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // The guard checks `params.id`, and this route takes ids in the body, so it has no resource to
+    // check. Scope them here or the endpoint answers for any audit in the system.
+    const auditIds = await this.auditService.accessibleAuditIds(dto.audit_ids, user)
+    if (auditIds.length === 0) return {}
+    return this.payoutClient.payoutStatusByAudits(auditIds, user.id)
+  }
+
+  @Post('bulk-payout/preview')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary: 'Preview a bulk payout (Internal operators only)',
+    description:
+      'Resolves every selected audit and returns the plan: which audits will be paid and on which ' +
+      'rails, which are excluded and why, how many individual payments this produces and what ' +
+      'they total. Sends nothing and writes nothing. Also returns a confirm_token bound to this ' +
+      'exact SET of audits. The selection MAY span properties: each audit is paid on its own, so ' +
+      'there is no single destination for the selection to agree on.'
+  })
+  @ApiResponse({ status: 200, description: 'Plan + excluded list + confirm_token' })
+  @ApiResponse({ status: 403, description: 'One or more audits are outside your access' })
+  @ApiResponse({ status: 400, description: 'More audits selected than one run may cover' })
+  async previewBulkPayout(
+    @Body() dto: BulkPayoutPreviewDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    await this.assertEveryAuditAccessible(dto.audit_ids, user)
+    await this.auditService.assertSinglePortfolio(dto.audit_ids)
+    const preview = await this.payoutClient.previewBulkPayout(dto.audit_ids, user.id)
+    const { token, expiresAt } = this.payoutConfirmTokenService.mintForSet(dto.audit_ids, user.id)
+    const totals = PayoutOtpService.totalsFrom(preview)
+    return {
+      preview,
+      confirm_token: token,
+      expires_at: expiresAt,
+      otp_required: this.payoutOtpService.isRequired(totals),
+      otp_threshold: this.payoutOtpService.threshold,
+      totals
+    }
+  }
+
+  @Post('payout-otp')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary: 'Email a confirmation code for a payout above the threshold',
+    description:
+      'Takes the SAME audit ids the dispatch will take, and emails a code bound to exactly that ' +
+      'selection. A code released for two audits cannot dispatch twenty, and it cannot be used to ' +
+      'log in. Requesting again invalidates the previous code.'
+  })
+  @ApiResponse({ status: 201, description: 'Code sent' })
+  @ApiResponse({ status: 403, description: 'One or more audits are outside your access' })
+  async sendPayoutOtp(
+    @Body() dto: BulkPayoutPreviewDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    await this.assertEveryAuditAccessible(dto.audit_ids, user)
+    await this.auditService.assertSinglePortfolio(dto.audit_ids)
+    return this.payoutOtpService.send(user.id, dto.audit_ids)
+  }
+
+  @Post('bulk-payout')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE)
+  @ApiOperation({
+    summary: 'Start a bulk payout run (Internal operators only)',
+    description:
+      'Starts a run and returns a run_id IMMEDIATELY. Nothing has been paid when this responds: ' +
+      'each audit is dispatched individually and a large selection takes minutes, so the payout ' +
+      'service works through it in the background. Poll GET bulk-payout/:runId for progress. ' +
+      'Requires the confirm_token from the preview, bound to this exact set of audit ids, so a ' +
+      'caller cannot preview a few audits and then dispatch many.'
+  })
+  @ApiResponse({ status: 201, description: 'Run started: { run_id, total_items, plan }' })
+  @ApiResponse({ status: 403, description: 'Missing/expired token, or audits outside your access' })
+  @ApiResponse({ status: 422, description: 'Nothing in the selection can be paid' })
+  async dispatchBulkPayout(
+    @Body() dto: BulkPayoutDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    await this.assertEveryAuditAccessible(dto.audit_ids, user)
+    await this.auditService.assertSinglePortfolio(dto.audit_ids)
+    this.payoutConfirmTokenService.verifyForSet(dto.confirm_token, dto.audit_ids, user.id)
+
+    // Re-priced here rather than trusted from the preview: the amounts are what decide whether a
+    // second factor is needed, and a caller must not be able to talk us out of asking.
+    const preview = await this.payoutClient.previewBulkPayout(dto.audit_ids, user.id)
+    if (this.payoutOtpService.isRequired(PayoutOtpService.totalsFrom(preview))) {
+      await this.payoutOtpService.verifyAndSpend(user.id, dto.audit_ids, dto.otp)
+    }
+
+    return this.payoutClient.startBulkPayout(dto.audit_ids, user.id)
+  }
+
+  @Get('bulk-payout/:runId')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @ApiOperation({
+    summary: 'Poll a bulk payout run',
+    description:
+      'Returns the run counters and every audit in it with its current state, so the UI can show ' +
+      'rows completing one at a time. Safe to call repeatedly; it reads and never dispatches.'
+  })
+  @ApiResponse({ status: 200, description: 'Run status + per-audit items' })
+  @ApiResponse({ status: 404, description: 'No such run' })
+  async getBulkPayoutRun(
+    @Param('runId') runId: string,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.payoutClient.getBulkPayoutRun(runId, user.id)
+  }
+
+  /**
+   * Refuse the whole request, don't quietly drop the ids the user can't see.
+   *
+   * payout-status drops them, because there a foreign id is just a probe. Here it would pay a
+   * different set than the operator approved, and the total they were shown wouldn't be the total
+   * sent.
+   */
+  private async assertEveryAuditAccessible(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<void> {
+    const allowed = await this.auditService.accessibleAuditIds(auditIds, user)
+    if (allowed.length !== new Set(auditIds).size) {
+      const allowedSet = new Set(allowed)
+      const refused = [...new Set(auditIds)].filter(id => !allowedSet.has(id))
+      throw new ForbiddenException(
+        `You do not have access to ${refused.length} of the selected audits (${refused.join(', ')})`
+      )
+    }
+  }
+
+  @Post(':id/payout')
+  @RequirePermission(ModuleType.AUDIT, PermissionAction.UPDATE, true)
+  @ApiOperation({
+    summary: 'Dispatch a payout for an audit (Internal operators only)',
+    description:
+      'Forwards the audit id to the payout service, which derives the amount, rail, and destination ' +
+      'server-side and dispatches the payout. Rail-agnostic: the engine picks Rail A (Stripe Connect) ' +
+      'or Rail B (Global Payouts) per OTA. Internal operators only. Idempotent per audit.\n\n' +
+      'Requires the confirm_token returned by GET :id/payout-preview, so a payout can only be sent ' +
+      'after an operator was shown the amounts and confirmed them.'
+  })
+  @ApiResponse({ status: 200, description: 'Payout dispatch result (per-OTA groups + skipped)' })
+  @ApiResponse({ status: 403, description: 'Missing, expired, or mismatched confirmation token' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({ status: 422, description: 'Property mapping is unmapped or ambiguous; payout blocked' })
+  @ApiResponse({ status: 501, description: 'Payout read adapters not configured' })
+  @ApiResponse({ status: 502, description: 'Payout service unreachable' })
+  async initiatePayout(
+    @Param('id') id: string,
+    @Body() dto: InitiateAuditPayoutDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    // No valid token, no dispatch. The token proves the operator saw a preview; the guard above
+    // proves they're allowed to.
+    this.payoutConfirmTokenService.verify(dto?.confirm_token, id, user.id)
+
+    // Same rule as the bulk path, re-priced server-side. A single audit can be over the threshold
+    // on its own, so the gate cannot live only on the bulk route.
+    const preview = await this.payoutClient.previewFromAudit(id, user.id)
+    if (this.payoutOtpService.isRequired(PayoutOtpService.totalsFrom(preview))) {
+      await this.payoutOtpService.verifyAndSpend(user.id, [id], dto?.otp)
+    }
+
+    return this.payoutClient.dispatchFromAudit(id, user.id, dto?.retry === true)
   }
 
   @Post('bulk-update')

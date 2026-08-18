@@ -19,7 +19,15 @@ export class PermissionGuard implements CanActivate {
     private permissionService: PermissionService
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  /**
+   * Has to stay async.
+   *
+   * This used to call the sync `checkPermission`, which always allows partial access and
+   * leaves the ownership check to `requirePermission`. Nothing ever called that method, so
+   * `useResourceId` did nothing and a partial-access user passed for any resource id,
+   * including another hotel's payouts.
+   */
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const permission = this.reflector.getAllAndOverride<PermissionMetadata>(
       PERMISSION_KEY,
       [context.getHandler(), context.getClass()]
@@ -45,18 +53,13 @@ export class PermissionGuard implements CanActivate {
       resourceId = request.params?.id || request.params?.portfolioId
     }
 
-    const result = this.permissionService.checkPermission(
+    // Throws if the user lacks the permission, or has partial access and doesn't own the resource.
+    await this.permissionService.requirePermission(
       user,
       permission.module,
       permission.action,
       resourceId
     )
-
-    if (!result.allowed) {
-      throw new ForbiddenException(
-        result.reason || 'You do not have permission to perform this action'
-      )
-    }
 
     return true
   }
