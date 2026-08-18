@@ -189,8 +189,13 @@ export interface IAuditService {
     auditId: string,
     dto: PayoutStatusPushDto
   ): Promise<{ applied: boolean; reason?: string; payout_status: PayoutStatus | null }>
-  /** Narrow caller-supplied audit ids to those this user may read. Used by body-id payout routes. */
+  /** Narrow caller-supplied audit ids to those this user may read. */
   accessibleAuditIds(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<string[]>
+  /** Narrow caller-supplied audit ids by payout permission. Used by body-id payout routes. */
+  accessiblePayoutAuditIds(
     auditIds: string[],
     user: IUserWithPermissions
   ): Promise<string[]>

@@ -18,7 +18,7 @@ import type { IPayoutHistoryService } from './payout-history.interface'
  *
  * Authorization happens on this side, not upstream: the payout service trusts a service principal
  * precisely because these guards already ran. Any new route here must keep the guard pair and the
- * AUDIT view permission, and must go through PayoutHistoryService so the property scope is applied.
+ * PAYOUT view permission, and must go through PayoutHistoryService so the property scope is applied.
  */
 @ApiTags('Payout History')
 @ApiBearerAuth('JWT-auth')
@@ -31,7 +31,7 @@ export class PayoutHistoryController {
   ) {}
 
   @Get()
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @RequirePermission(ModuleType.PAYOUT, PermissionAction.READ)
   @ApiOperation({
     summary: 'Paged payout history',
     description:
@@ -45,7 +45,7 @@ export class PayoutHistoryController {
   }
 
   @Get('summary')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @RequirePermission(ModuleType.PAYOUT, PermissionAction.READ)
   @ApiOperation({
     summary: 'Settlement totals for the whole filtered set',
     description:
@@ -67,7 +67,7 @@ export class PayoutHistoryController {
    * streamed file was parsed as JSON, producing a 500 that blamed the server for a routing mistake.
    */
   @Get(':id')
-  @RequirePermission(ModuleType.AUDIT, PermissionAction.READ)
+  @RequirePermission(ModuleType.PAYOUT, PermissionAction.READ)
   @ApiOperation({
     summary: 'One payout with its legs and status history',
     description:

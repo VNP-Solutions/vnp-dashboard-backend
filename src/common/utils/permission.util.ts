@@ -203,7 +203,8 @@ export function isUserSuperAdmin(user: IUserWithPermissions): boolean {
     role.property_permission,
     role.audit_permission,
     role.user_permission,
-    role.system_settings_permission
+    role.system_settings_permission,
+    role.payout_permission
   ]
 
   // User must have all permissions set with 'all' level and 'all' access
@@ -630,6 +631,7 @@ export function canInviteRole(
     user_permission: IPermission | null
     system_settings_permission: IPermission | null
     bank_details_permission: IPermission | null
+    payout_permission: IPermission | null
   }
 ): boolean {
   if (!inviterUser || !inviterUser.role || !targetRole) return false
@@ -673,6 +675,11 @@ export function canInviteRole(
       name: 'bank_details',
       inviter: inviterRole.bank_details_permission,
       target: targetRole.bank_details_permission
+    },
+    {
+      name: 'payout',
+      inviter: inviterRole.payout_permission,
+      target: targetRole.payout_permission
     }
   ]
 

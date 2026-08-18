@@ -8,7 +8,10 @@ import {
 import { OtaType, PendingActionType, Prisma, Property } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
 import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../common/constants/external-api-user.context'
-import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
+import type {
+  IPermission,
+  IUserWithPermissions
+} from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
   ModuleType,
@@ -912,16 +915,44 @@ export class AuditService implements IAuditService {
     auditIds: string[],
     user: IUserWithPermissions
   ): Promise<string[]> {
+    return this.narrowAuditIdsByPermission(
+      auditIds,
+      user,
+      user.role.audit_permission
+    )
+  }
+
+  /**
+   * Same narrowing as accessibleAuditIds, but driven by the payout module.
+   *
+   * Payout routes take audit ids, yet what may be paid is decided by payout_permission, not by who
+   * may read the audit. A role with audit access and no payout access must not reach these ids.
+   */
+  async accessiblePayoutAuditIds(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<string[]> {
+    return this.narrowAuditIdsByPermission(
+      auditIds,
+      user,
+      user.role.payout_permission
+    )
+  }
+
+  private async narrowAuditIdsByPermission(
+    auditIds: string[],
+    user: IUserWithPermissions,
+    permission: IPermission | null
+  ): Promise<string[]> {
     if (auditIds.length === 0) return []
 
-    const auditPermission = user.role.audit_permission
-    if (!auditPermission || auditPermission.access_level === AccessLevel.none) {
+    if (!permission || permission.access_level === AccessLevel.none) {
       return []
     }
 
     // Ids that do not exist are dropped here too: they cannot be checked, so they cannot be allowed.
     const audits = await this.auditRepository.findScopeByIds(auditIds)
-    if (auditPermission.access_level === AccessLevel.all) {
+    if (permission.access_level === AccessLevel.all) {
       return audits.map(audit => audit.id)
     }
 

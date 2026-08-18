@@ -6,6 +6,11 @@ const allPermission = {
   access_level: AccessLevel.all
 }
 
+const noPermission = {
+  permission_level: PermissionLevel.view,
+  access_level: AccessLevel.none
+}
+
 /**
  * Virtual super-admin context used for external API key requests so property
  * list responses match the regular portfolio-scoped property GET all API.
@@ -24,6 +29,8 @@ export const EXTERNAL_API_SUPER_ADMIN_CONTEXT: IUserWithPermissions = {
     audit_permission: allPermission,
     user_permission: allPermission,
     system_settings_permission: allPermission,
-    bank_details_permission: allPermission
+    bank_details_permission: allPermission,
+    // Moving money is never something an API key does on a human's behalf.
+    payout_permission: noPermission
   }
 }
