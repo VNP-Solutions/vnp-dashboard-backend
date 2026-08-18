@@ -20,12 +20,15 @@ export class PermissionGuard implements CanActivate {
   ) {}
 
   /**
-   * Has to stay async.
+   * Has to stay async, so the guard can do the ownership check itself.
    *
-   * This used to call the sync `checkPermission`, which always allows partial access and
-   * leaves the ownership check to `requirePermission`. Nothing ever called that method, so
-   * `useResourceId` did nothing and a partial-access user passed for any resource id,
-   * including another hotel's payouts.
+   * It used to call the sync `checkPermission`, which returns `allowed: true` for partial access
+   * with a resourceId and defers the real check to `requirePermission`. That gap has never been
+   * reachable: no route sets `useResourceId`, so `resourceId` is always undefined here, and
+   * ownership is enforced by the service layer, which calls `requirePermission` directly.
+   *
+   * Calling it here closes the gap in advance, so the first route to set `useResourceId: true`
+   * gets the check it is asking for instead of silently allowing everything.
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const permission = this.reflector.getAllAndOverride<PermissionMetadata>(
