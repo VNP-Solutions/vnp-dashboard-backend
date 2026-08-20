@@ -2333,22 +2333,12 @@ export class PropertyService implements IPropertyService {
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)
 
-    // Check if there are any unarchived audits
-    const unarchivedAuditCount = await this.prisma.audit.count({
-      where: {
-        property_id: id,
-        is_archived: false
-      }
-    })
-
-    if (unarchivedAuditCount > 0) {
-      throw new BadRequestException(
-        `Cannot delete property. It has ${unarchivedAuditCount} unarchived audit${unarchivedAuditCount === 1 ? '' : 's'}. Please archive all audits before deleting the property.`
-      )
-    }
-
-    // Super admin can directly delete
+    // Super admin can directly delete. Audits are removed with the property
+    // rather than blocking the delete; this is the only branch that actually
+    // deletes, so it is the only one that may destroy audits — the pending
+    // action path below merely files a request.
     if (isSuperAdmin) {
+      await this.deletePropertyAudits(id, 'delete')
       await this.propertyRepository.delete(id)
       await this.permissionService.removePropertyFromAllUserAccessLists(id)
       return { message: 'Property deleted successfully' }
@@ -2445,24 +2435,7 @@ export class PropertyService implements IPropertyService {
           continue
         }
 
-        // Check if there are any unarchived audits
-        const unarchivedAuditCount = await this.prisma.audit.count({
-          where: {
-            property_id: propertyId,
-            is_archived: false
-          }
-        })
-
-        if (unarchivedAuditCount > 0) {
-          results.push({
-            property_id: propertyId,
-            success: false,
-            message: `Cannot delete property. It has ${unarchivedAuditCount} unarchived audit${unarchivedAuditCount === 1 ? '' : 's'}. Please archive all audits before deleting the property.`
-          })
-          failedCount++
-          continue
-        }
-
+        await this.deletePropertyAudits(propertyId, 'bulk-delete')
         await this.propertyRepository.delete(propertyId)
         await this.permissionService.removePropertyFromAllUserAccessLists(
           propertyId
@@ -5369,6 +5342,42 @@ export class PropertyService implements IPropertyService {
     return result
   }
 
+  /** Deletes every audit attached to a property, along with the pending
+   *  actions, tasks and notes hanging off those audits. Returns the number of
+   *  audits removed.
+   *
+   *  Dependents are deleted explicitly, deepest first, rather than leaning on
+   *  Prisma's `onDelete: Cascade` — on MongoDB that emulation is client-side,
+   *  and an orphaned note or task would be invisible in the UI with no way to
+   *  clean it up afterwards. */
+  private async deletePropertyAudits(
+    propertyId: string,
+    context: string
+  ): Promise<number> {
+    const audits = await this.prisma.audit.findMany({
+      where: { property_id: propertyId },
+      select: { id: true }
+    })
+    if (!audits.length) return 0
+
+    const auditIds = audits.map(a => a.id)
+    const [pendingActions, tasks, notes] = await Promise.all([
+      this.prisma.pendingAction.deleteMany({
+        where: { audit_id: { in: auditIds } }
+      }),
+      this.prisma.task.deleteMany({ where: { audit_id: { in: auditIds } } }),
+      this.prisma.note.deleteMany({ where: { audit_id: { in: auditIds } } })
+    ])
+    await this.prisma.audit.deleteMany({ where: { id: { in: auditIds } } })
+
+    this.logger.log(
+      `[${context}] deleted ${audits.length} audit(s) for property ` +
+        `${propertyId} — ${pendingActions.count} pending action(s), ` +
+        `${tasks.count} task(s), ${notes.count} note(s)`
+    )
+    return audits.length
+  }
+
   private async deleteSyncedPropertyByParentId(
     parentId: string
   ): Promise<void> {
@@ -5380,18 +5389,10 @@ export class PropertyService implements IPropertyService {
       )
     }
 
-    const unarchivedAuditCount = await this.prisma.audit.count({
-      where: {
-        property_id: property.id,
-        is_archived: false
-      }
-    })
-
-    if (unarchivedAuditCount > 0) {
-      throw new BadRequestException(
-        `Cannot delete property. It has ${unarchivedAuditCount} unarchived audit${unarchivedAuditCount === 1 ? '' : 's'}. Please archive all audits before deleting the property.`
-      )
-    }
+    // A DBMS-originated delete is authoritative — the property is already gone
+    // upstream, so refusing it here would strand this record permanently out
+    // of sync. Audits go with it rather than blocking it.
+    await this.deletePropertyAudits(property.id, `sync parent_id=${parentId}`)
 
     await this.propertyRepository.delete(property.id)
     await this.permissionService.removePropertyFromAllUserAccessLists(
