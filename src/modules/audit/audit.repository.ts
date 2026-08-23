@@ -295,11 +295,6 @@ export class AuditRepository implements IAuditRepository {
             portfolio_id: true,
             card_descriptor: true,
             parent_id: true,
-            // Who collected each OTA's money. The payout service turns these into a rail, so an
-            // audit whose property has none is not payable.
-            expedia_processor: true,
-            booking_processor: true,
-            agoda_processor: true,
             currency: {
               select: {
                 id: true,

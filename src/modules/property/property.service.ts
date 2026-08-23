@@ -4857,21 +4857,6 @@ export class PropertyService implements IPropertyService {
     return property
   }
 
-  /**
-   * Processor names off the sync payload, in the shape the Property columns take.
-   *
-   * An omitted `processors` block leaves the stored values alone, so a caller that has not been
-   * updated yet cannot blank them and make every audit on the property unpayable.
-   */
-  private syncProcessorFields(dto: SyncUpsertPropertyDto) {
-    if (!dto.processors) return {}
-    return {
-      expedia_processor: dto.processors.expedia ?? null,
-      booking_processor: dto.processors.booking ?? null,
-      agoda_processor: dto.processors.agoda ?? null
-    }
-  }
-
   async syncUpsert(
     parentId: string,
     dto: SyncUpsertPropertyDto,
@@ -4913,8 +4898,7 @@ export class PropertyService implements IPropertyService {
           card_descriptor: dto.card_descriptor || undefined,
           portfolio_id,
           parent_id: parentId,
-          is_active: dto.is_active,
-          ...this.syncProcessorFields(dto)
+          is_active: dto.is_active
         }
       })
       await this.upsertSyncCredentials(existing.id, dto.credentials, false)
@@ -4934,8 +4918,7 @@ export class PropertyService implements IPropertyService {
       card_descriptor: dto.card_descriptor || undefined,
       is_active: dto.is_active,
       portfolio_id,
-      parent_id: parentId,
-      ...this.syncProcessorFields(dto)
+      parent_id: parentId
     })
 
     await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(

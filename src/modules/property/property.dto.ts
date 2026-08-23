@@ -1130,9 +1130,18 @@ export class SyncUpsertPropertyCredentialsDto {
 }
 
 /**
- * Who collects this property's money, per OTA. DBMS resolves its `{ota}_processor` relation and
- * sends the NAME, because the processor ids are ObjectIds in its database and mean nothing in ours.
- * Known values: Stripe, QuantumPay, FreedomPay.
+ * Processor name per OTA, as DBMS still sends it.
+ *
+ * ACCEPTED AND IGNORED, deliberately. The payout service no longer reads a property-level processor:
+ * the processor is a property of the RESERVATION, and one OTA's bookings can split across rails, so
+ * a single column per OTA could never describe it. The columns were dropped from Property.
+ *
+ * The field stays on the DTO because the global ValidationPipe runs with `forbidNonWhitelisted`.
+ * Removing it outright turns every DBMS sync payload that still carries `processors` into a 400,
+ * which would break property sync for a producer we do not control and cannot deploy in lockstep.
+ * It can come out once DBMS has stopped sending it.
+ *
+ * @deprecated Nothing reads this. See the payout service's report_data rail selection.
  */
 export class SyncUpsertProcessorsDto {
   @ApiPropertyOptional({ example: 'Stripe' })
@@ -1202,9 +1211,11 @@ export class SyncUpsertPropertyDto {
   @Type(() => SyncUpsertPropertyCredentialsDto)
   credentials: SyncUpsertPropertyCredentialsDto
 
+  /** @deprecated Accepted so existing DBMS payloads keep validating. Never stored, never read. */
   @ApiPropertyOptional({
     type: SyncUpsertProcessorsDto,
-    description: 'Processor name per OTA. Omitted leaves the stored values untouched.'
+    deprecated: true,
+    description: 'Deprecated. Accepted for backwards compatibility and ignored; the payout rail is now derived per reservation.'
   })
   @IsOptional()
   @ValidateNested()
