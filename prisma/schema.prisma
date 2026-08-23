@@ -121,14 +121,6 @@ model Property {
   parent_id             String?
   show_in_portfolio     String[]  @db.ObjectId
 
-  // Who collects this property's money, per OTA, synced from DBMS (Property.{ota}_processor.name).
-  // The payout service reads these to pick a rail: Stripe pays from the hotel's connected balance,
-  // anything else was collected outside Stripe and pays from our own account. Null means the rail
-  // cannot be decided and that OTA is not payable.
-  expedia_processor     String?
-  booking_processor     String?
-  agoda_processor       String?
-
   audits               Audit[]
   credentials          PropertyCredentials?
   bankDetails          PropertyBankDetails?
