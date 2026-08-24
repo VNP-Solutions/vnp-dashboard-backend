@@ -1733,16 +1733,29 @@ export class PropertyService implements IPropertyService {
       throw new NotFoundException('Property not found')
     }
 
-    // Add access_type field - for findOne, we consider it owned if it's in user's portfolio
-    // This is a simplified approach; you may want to add portfolio context if needed
-    // Filter bank details based on user permission
     return {
       ...property,
+      // Add access_type field - for findOne, we consider it owned if it's in user's portfolio
+      // This is a simplified approach; you may want to add portfolio context if needed
+      // Filter bank details based on user permission
+
       bankDetails: canReadBankDetails(user)
         ? maskBankDetails(property.bankDetails)
         : null,
       access_type: 'owned' as const
     }
+  }
+
+  async findByParentId(
+    parentId: string,
+    user: IUserWithPermissions
+  ): Promise<{ id: string; name: string }> {
+    const existing = await this.propertyRepository.findByParentId(parentId)
+    if (!existing) {
+      throw new NotFoundException('Property not found')
+    }
+    const property = await this.findOne(existing.id, user)
+    return { id: property.id, name: property.name }
   }
 
   async findOneSecure(id: string, user: IUserWithPermissions) {

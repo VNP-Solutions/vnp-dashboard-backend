@@ -725,6 +725,18 @@ export class PortfolioService implements IPortfolioService {
     ) as typeof withMaskedBanks
   }
 
+  async findByParentId(
+    parentId: string,
+    user: IUserWithPermissions
+  ): Promise<{ id: string; name: string }> {
+    const existing = await this.portfolioRepository.findByParentId(parentId)
+    if (!existing) {
+      throw new NotFoundException('Portfolio not found')
+    }
+    const portfolio = await this.findOne(existing.id, user)
+    return { id: portfolio.id, name: portfolio.name }
+  }
+
   async findOneSecure(id: string, user: IUserWithPermissions) {
     const isSuperAdmin = isUserSuperAdmin(user)
     const isInternal = isInternalUser(user)

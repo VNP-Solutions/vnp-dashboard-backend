@@ -121,6 +121,11 @@ export interface IPortfolioService {
     id: string,
     user: IUserWithPermissions
   ): Promise<PortfolioWithFullDetails>
+  /** Resolve dashboard portfolio by DBMS parent_id (for deep links). */
+  findByParentId(
+    parentId: string,
+    user: IUserWithPermissions
+  ): Promise<{ id: string; name: string }>
   findOneSecure(
     id: string,
     user: IUserWithPermissions
