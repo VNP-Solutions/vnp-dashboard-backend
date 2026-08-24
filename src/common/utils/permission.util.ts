@@ -632,6 +632,7 @@ export function canInviteRole(
     system_settings_permission: IPermission | null
     bank_details_permission: IPermission | null
     payout_permission: IPermission | null
+    sync_action_log_permission: IPermission | null
   }
 ): boolean {
   if (!inviterUser || !inviterUser.role || !targetRole) return false
@@ -680,6 +681,11 @@ export function canInviteRole(
       name: 'payout',
       inviter: inviterRole.payout_permission,
       target: targetRole.payout_permission
+    },
+    {
+      name: 'sync_action_log',
+      inviter: inviterRole.sync_action_log_permission,
+      target: targetRole.sync_action_log_permission
     }
   ]
 

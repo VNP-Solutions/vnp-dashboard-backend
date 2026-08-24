@@ -253,6 +253,8 @@ export class PermissionService {
         return user.role.bank_details_permission
       case ModuleType.PAYOUT:
         return user.role.payout_permission
+      case ModuleType.SYNC_ACTION_LOG:
+        return user.role.sync_action_log_permission
       default:
         return null
     }
@@ -288,6 +290,7 @@ export class PermissionService {
     system_settings_permission: IPermission | null
     bank_details_permission: IPermission | null
     payout_permission: IPermission | null
+    sync_action_log_permission: IPermission | null
   }): string[] {
     const warnings: string[] = []
 
@@ -343,6 +346,11 @@ export class PermissionService {
       ModuleType.BANK_DETAILS
     )
     checkPermission(role.payout_permission, 'Payout', ModuleType.PAYOUT)
+    checkPermission(
+      role.sync_action_log_permission,
+      'Sync Action Log',
+      ModuleType.SYNC_ACTION_LOG
+    )
 
     return warnings
   }

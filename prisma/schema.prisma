@@ -337,21 +337,22 @@ model AuditStatus {
 }
 
 model UserRole {
-  id                         String                    @id @default(auto()) @map("_id") @db.ObjectId
-  name                       String                    @unique
-  description                String
-  is_external                Boolean
-  can_access_mis             Boolean                   @default(false)
-  is_active                  Boolean                   @default(true)
-  order                      Int                       @default(0)
-  portfolio_permission       PortfolioPermission?
-  property_permission        PropertyPermission?
-  audit_permission           AuditPermission?
-  user_permission            UserPermission?
-  system_settings_permission SystemSettingsPermission?
-  bank_details_permission    BankDetailsPermission?
-  payout_permission          PayoutPermission?
-  users                      User[]
+  id                           String                      @id @default(auto()) @map("_id") @db.ObjectId
+  name                         String                      @unique
+  description                  String
+  is_external                  Boolean
+  can_access_mis               Boolean                     @default(false)
+  is_active                    Boolean                     @default(true)
+  order                        Int                         @default(0)
+  portfolio_permission         PortfolioPermission?
+  property_permission          PropertyPermission?
+  audit_permission             AuditPermission?
+  user_permission              UserPermission?
+  system_settings_permission   SystemSettingsPermission?
+  bank_details_permission      BankDetailsPermission?
+  payout_permission            PayoutPermission?
+  sync_action_log_permission   SyncActionLogPermission?
+  users                        User[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -392,6 +393,11 @@ type BankDetailsPermission {
 }
 
 type PayoutPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type SyncActionLogPermission {
   permission_level PermissionLevel
   access_level     AccessLevel
 }
@@ -654,4 +660,63 @@ model PendingAction {
   @@index([audit_id, status])
   @@index([requested_user_id, status])
   @@index([resource_type, status])
+}
+
+enum SyncActionScope {
+  SINGLE
+  BULK
+}
+
+enum SyncActionEntityType {
+  PORTFOLIO
+  PROPERTY
+}
+
+enum SyncActionType {
+  CREATE
+  UPDATE
+  DELETE
+  TRANSFER
+  IMPORT
+}
+
+type SyncActionLogItem {
+  id                   String?
+  name                 String
+  success              Boolean  @default(true)
+  reason               String?
+  dbms                 String?
+  dashboard            String?
+  scraper              String?
+  from_portfolio_id    String?
+  from_portfolio_name  String?
+  to_portfolio_id      String?
+  to_portfolio_name    String?
+}
+
+model SyncActionLog {
+  id                  String               @id @default(auto()) @map("_id") @db.ObjectId
+  scope               SyncActionScope
+  entity_type         SyncActionEntityType
+  action              SyncActionType
+  entity_id           String?
+  entity_name         String?
+  items               SyncActionLogItem[]
+  total_count         Int                  @default(0)
+  success_count       Int                  @default(0)
+  failed_count        Int                  @default(0)
+  search_text         String?
+  performed_by_email  String?
+  performed_by_name   String?
+  job_id              String?
+  created_at          DateTime             @default(now())
+
+  @@index([created_at])
+  @@index([scope])
+  @@index([entity_type])
+  @@index([action])
+  @@index([entity_name])
+  @@index([search_text])
+  @@index([job_id])
+  @@index([scope, entity_type, action])
 }

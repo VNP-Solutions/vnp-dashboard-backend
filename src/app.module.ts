@@ -29,6 +29,7 @@ import { FileUploadModule } from './modules/file-upload/file-upload.module'
 import { GlobalReportModule } from './modules/global-report/global-report.module'
 import { NoteModule } from './modules/note/note.module'
 import { PendingActionModule } from './modules/pending-action/pending-action.module'
+import { SyncActionLogModule } from './modules/sync-action-log/sync-action-log.module'
 import { PortfolioBankDetailsModule } from './modules/portfolio-bank-details/portfolio-bank-details.module'
 import { PortfolioModule } from './modules/portfolio/portfolio.module'
 import { PrismaService } from './modules/prisma/prisma.service'
@@ -79,6 +80,7 @@ import { ExternalCommunicationModule } from './modules/external-communication/ex
     PropertyBankDetailsModule,
     PropertyCredentialsModule,
     PendingActionModule,
+    SyncActionLogModule,
     PropertyContractUrlModule,
     PropertyModule,
     SalesAgentModule,
