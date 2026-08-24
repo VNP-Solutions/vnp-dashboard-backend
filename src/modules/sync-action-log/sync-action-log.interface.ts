@@ -31,6 +31,7 @@ export interface SyncActionLogRecord {
   search_text?: string | null
   performed_by_email?: string | null
   performed_by_name?: string | null
+  performed_by_role?: string | null
   job_id?: string | null
   created_at: Date
 }
@@ -49,6 +50,7 @@ export interface ISyncActionLogRepository {
     search_text?: string
     performed_by_email?: string
     performed_by_name?: string
+    performed_by_role?: string
     job_id?: string
   }): Promise<SyncActionLogRecord>
 

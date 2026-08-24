@@ -132,6 +132,11 @@ export class CreateSyncActionLogDto {
   @IsString()
   performed_by_name?: string
 
+  @ApiPropertyOptional({ description: 'Snapshotted DBMS role name' })
+  @IsOptional()
+  @IsString()
+  performed_by_role?: string
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

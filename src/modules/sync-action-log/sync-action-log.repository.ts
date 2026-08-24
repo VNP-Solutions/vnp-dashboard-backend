@@ -34,6 +34,7 @@ export class SyncActionLogRepository implements ISyncActionLogRepository {
     search_text?: string
     performed_by_email?: string
     performed_by_name?: string
+    performed_by_role?: string
     job_id?: string
   }): Promise<SyncActionLogRecord> {
     return this.prisma.syncActionLog.create({
@@ -62,6 +63,7 @@ export class SyncActionLogRepository implements ISyncActionLogRepository {
         search_text: data.search_text,
         performed_by_email: data.performed_by_email,
         performed_by_name: data.performed_by_name,
+        performed_by_role: data.performed_by_role,
         job_id: data.job_id
       }
     }) as Promise<SyncActionLogRecord>

@@ -29,6 +29,9 @@ export class SyncActionLogService implements ISyncActionLogService {
 
     const nameParts = [
       data.entity_name,
+      data.performed_by_email,
+      data.performed_by_name,
+      data.performed_by_role,
       ...items.map(i => i.name),
       ...items.map(i => i.from_portfolio_name),
       ...items.map(i => i.to_portfolio_name)
@@ -49,6 +52,7 @@ export class SyncActionLogService implements ISyncActionLogService {
       search_text: searchText,
       performed_by_email: data.performed_by_email,
       performed_by_name: data.performed_by_name,
+      performed_by_role: data.performed_by_role,
       job_id: data.job_id
     })
   }
@@ -76,6 +80,7 @@ export class SyncActionLogService implements ISyncActionLogService {
         'search_text',
         'performed_by_email',
         'performed_by_name',
+        'performed_by_role',
         'job_id',
         'entity_id'
       ],

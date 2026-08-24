@@ -708,6 +708,7 @@ model SyncActionLog {
   search_text         String?
   performed_by_email  String?
   performed_by_name   String?
+  performed_by_role   String?
   job_id              String?
   created_at          DateTime             @default(now())
 
