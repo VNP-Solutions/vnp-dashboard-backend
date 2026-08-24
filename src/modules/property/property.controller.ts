@@ -832,6 +832,20 @@ export class PropertyController {
     return this.propertyService.findOneSecure(id, user)
   }
 
+  @Get('by-parent/:parentId')
+  @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ, true)
+  @ApiOperation({
+    summary: 'Resolve a property by DBMS parent_id (for deep links)'
+  })
+  @ApiResponse({ status: 200, description: 'Property id and name' })
+  @ApiResponse({ status: 404, description: 'Property not found' })
+  findByParentId(
+    @Param('parentId') parentId: string,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.propertyService.findByParentId(parentId, user)
+  }
+
   @Get(':id')
   @RequirePermission(ModuleType.PROPERTY, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get a property by ID' })

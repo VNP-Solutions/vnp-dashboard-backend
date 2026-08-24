@@ -278,6 +278,11 @@ export interface IPropertyService {
     id: string,
     user: IUserWithPermissions
   ): Promise<PropertyWithFullDetails>
+  /** Resolve dashboard property by DBMS parent_id (for deep links). */
+  findByParentId(
+    parentId: string,
+    user: IUserWithPermissions
+  ): Promise<{ id: string; name: string }>
   update(
     id: string,
     data: UpdatePropertyDto,
