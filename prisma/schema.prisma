@@ -670,6 +670,7 @@ enum SyncActionScope {
 enum SyncActionEntityType {
   PORTFOLIO
   PROPERTY
+  MIXED
 }
 
 enum SyncActionType {
@@ -695,22 +696,30 @@ type SyncActionLogItem {
 }
 
 model SyncActionLog {
-  id                  String               @id @default(auto()) @map("_id") @db.ObjectId
-  scope               SyncActionScope
-  entity_type         SyncActionEntityType
-  action              SyncActionType
-  entity_id           String?
-  entity_name         String?
-  items               SyncActionLogItem[]
-  total_count         Int                  @default(0)
-  success_count       Int                  @default(0)
-  failed_count        Int                  @default(0)
-  search_text         String?
-  performed_by_email  String?
-  performed_by_name   String?
-  performed_by_role   String?
-  job_id              String?
-  created_at          DateTime             @default(now())
+  id                       String               @id @default(auto()) @map("_id") @db.ObjectId
+  scope                    SyncActionScope
+  entity_type              SyncActionEntityType
+  action                   SyncActionType
+  entity_id                String?
+  entity_name              String?
+  items                    SyncActionLogItem[]
+  portfolio_items          SyncActionLogItem[]
+  property_items           SyncActionLogItem[]
+  total_count              Int                  @default(0)
+  success_count            Int                  @default(0)
+  failed_count             Int                  @default(0)
+  portfolio_total_count    Int                  @default(0)
+  portfolio_success_count  Int                  @default(0)
+  portfolio_failed_count   Int                  @default(0)
+  property_total_count     Int                  @default(0)
+  property_success_count   Int                  @default(0)
+  property_failed_count    Int                  @default(0)
+  search_text              String?
+  performed_by_email       String?
+  performed_by_name        String?
+  performed_by_role        String?
+  job_id                   String?
+  created_at               DateTime             @default(now())
 
   @@index([created_at])
   @@index([scope])

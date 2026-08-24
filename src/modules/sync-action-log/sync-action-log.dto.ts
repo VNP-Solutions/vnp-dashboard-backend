@@ -6,6 +6,7 @@ import {
 } from '@prisma/client'
 import { Type } from 'class-transformer'
 import {
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -98,11 +99,26 @@ export class CreateSyncActionLogDto {
   @IsString()
   entity_name?: string
 
-  @ApiProperty({ type: [SyncActionLogItemDto] })
+  @ApiPropertyOptional({ type: [SyncActionLogItemDto] })
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SyncActionLogItemDto)
-  items: SyncActionLogItemDto[]
+  items?: SyncActionLogItemDto[]
+
+  @ApiPropertyOptional({ type: [SyncActionLogItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SyncActionLogItemDto)
+  portfolio_items?: SyncActionLogItemDto[]
+
+  @ApiPropertyOptional({ type: [SyncActionLogItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SyncActionLogItemDto)
+  property_items?: SyncActionLogItemDto[]
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -121,6 +137,42 @@ export class CreateSyncActionLogDto {
   @IsInt()
   @Min(0)
   failed_count?: number
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  portfolio_total_count?: number
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  portfolio_success_count?: number
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  portfolio_failed_count?: number
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  property_total_count?: number
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  property_success_count?: number
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  property_failed_count?: number
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -158,4 +210,12 @@ export class SyncActionLogQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   action?: string
+}
+
+export class BulkDeleteSyncActionLogDto {
+  @ApiProperty({ type: [String], description: 'Sync action log ids to delete' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  ids: string[]
 }

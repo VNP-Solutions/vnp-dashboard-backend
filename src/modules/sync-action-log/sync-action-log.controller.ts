@@ -20,6 +20,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { ExternalJwtGuard } from '../portfolio/guards/external-jwt.guard'
 import {
+  BulkDeleteSyncActionLogDto,
   CreateSyncActionLogDto,
   SyncActionLogQueryDto
 } from './sync-action-log.dto'
@@ -52,6 +53,19 @@ export class SyncActionLogController {
     @CurrentUser() user: IUserWithPermissions
   ) {
     return this.service.findAll(query, user)
+  }
+
+  @Post('bulk-delete')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission(ModuleType.SYNC_ACTION_LOG, PermissionAction.DELETE)
+  @ApiOperation({ summary: 'Bulk delete sync action logs' })
+  @ApiResponse({ status: 200, description: 'Logs deleted' })
+  bulkDelete(
+    @Body() dto: BulkDeleteSyncActionLogDto,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.service.bulkDelete(dto, user)
   }
 
   @Get(':id')
