@@ -147,16 +147,6 @@ export class CreateUserRoleDto {
   @Type(() => PermissionDto)
   @IsOptional()
   payout_permission?: PermissionDto
-
-  @ApiPropertyOptional({
-    type: PermissionDto,
-    description: 'Sync action log permission settings (read-only module)'
-  })
-  @IsObject()
-  @ValidateNested()
-  @Type(() => PermissionDto)
-  @IsOptional()
-  sync_action_log_permission?: PermissionDto
 }
 
 export class UpdateUserRoleDto extends PartialType(CreateUserRoleDto) {}

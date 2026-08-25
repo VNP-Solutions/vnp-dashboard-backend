@@ -351,7 +351,6 @@ model UserRole {
   system_settings_permission   SystemSettingsPermission?
   bank_details_permission      BankDetailsPermission?
   payout_permission            PayoutPermission?
-  sync_action_log_permission   SyncActionLogPermission?
   users                        User[]
 
   created_at DateTime @default(now())
@@ -393,11 +392,6 @@ type BankDetailsPermission {
 }
 
 type PayoutPermission {
-  permission_level PermissionLevel
-  access_level     AccessLevel
-}
-
-type SyncActionLogPermission {
   permission_level PermissionLevel
   access_level     AccessLevel
 }
