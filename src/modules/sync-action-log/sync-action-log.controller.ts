@@ -9,12 +9,7 @@ import {
   UseGuards
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
-import {
-  ModuleType,
-  PermissionAction,
-  type IUserWithPermissions
-} from '../../common/interfaces/permission.interface'
-import { RequirePermission } from '../../common/decorators/require-permission.decorator'
+import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
@@ -46,8 +41,7 @@ export class SyncActionLogController {
   @Get()
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @RequirePermission(ModuleType.SYNC_ACTION_LOG, PermissionAction.READ)
-  @ApiOperation({ summary: 'List sync action logs' })
+  @ApiOperation({ summary: 'List sync action logs (super admin only)' })
   findAll(
     @Query() query: SyncActionLogQueryDto,
     @CurrentUser() user: IUserWithPermissions
@@ -58,8 +52,7 @@ export class SyncActionLogController {
   @Post('bulk-delete')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @RequirePermission(ModuleType.SYNC_ACTION_LOG, PermissionAction.DELETE)
-  @ApiOperation({ summary: 'Bulk delete sync action logs' })
+  @ApiOperation({ summary: 'Bulk delete sync action logs (super admin only)' })
   @ApiResponse({ status: 200, description: 'Logs deleted' })
   bulkDelete(
     @Body() dto: BulkDeleteSyncActionLogDto,
@@ -71,8 +64,9 @@ export class SyncActionLogController {
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @RequirePermission(ModuleType.SYNC_ACTION_LOG, PermissionAction.READ)
-  @ApiOperation({ summary: 'Get sync action log detail including items' })
+  @ApiOperation({
+    summary: 'Get sync action log detail including items (super admin only)'
+  })
   findOne(
     @Param('id') id: string,
     @CurrentUser() user: IUserWithPermissions

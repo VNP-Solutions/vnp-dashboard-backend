@@ -1,6 +1,12 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException
+} from '@nestjs/common'
 import type { PaginatedResult } from '../../common/dto/query.dto'
 import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
+import { isUserSuperAdmin } from '../../common/utils/permission.util'
 import { QueryBuilder } from '../../common/utils/query-builder.util'
 import type {
   BulkDeleteSyncActionLogDto,
@@ -28,6 +34,15 @@ export class SyncActionLogService implements ISyncActionLogService {
     @Inject('ISyncActionLogRepository')
     private readonly repository: ISyncActionLogRepository
   ) {}
+
+  /** DBMS updates are a system-wide audit trail, so only super admins may read it. */
+  private assertSuperAdmin(user: IUserWithPermissions): void {
+    if (!isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only Super Admin can access DBMS update history'
+      )
+    }
+  }
 
   async create(data: CreateSyncActionLogDto): Promise<SyncActionLogRecord> {
     const items = data.items ?? []
@@ -101,8 +116,10 @@ export class SyncActionLogService implements ISyncActionLogService {
 
   async findAll(
     query: SyncActionLogQueryDto,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ): Promise<PaginatedResult<SyncActionLogRecord>> {
+    this.assertSuperAdmin(user)
+
     const additionalFilters: Record<string, string> = {}
     if (query.scope) additionalFilters.scope = query.scope
     if (query.entity_type) additionalFilters.entity_type = query.entity_type
@@ -162,8 +179,10 @@ export class SyncActionLogService implements ISyncActionLogService {
 
   async findOne(
     id: string,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ): Promise<SyncActionLogRecord> {
+    this.assertSuperAdmin(user)
+
     const log = await this.repository.findById(id)
     if (!log) {
       throw new NotFoundException('Sync action log not found')
@@ -173,8 +192,10 @@ export class SyncActionLogService implements ISyncActionLogService {
 
   async bulkDelete(
     data: BulkDeleteSyncActionLogDto,
-    _user: IUserWithPermissions
+    user: IUserWithPermissions
   ): Promise<{ deletedCount: number }> {
+    this.assertSuperAdmin(user)
+
     const deletedCount = await this.repository.deleteMany(data.ids)
     return { deletedCount }
   }
