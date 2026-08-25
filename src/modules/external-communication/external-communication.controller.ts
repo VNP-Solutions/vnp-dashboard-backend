@@ -4,6 +4,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Inject,
   Param,
   Post,
   UploadedFile,
@@ -29,6 +30,8 @@ import {
 import { ExternalCommunicationService } from './external-communication.service'
 import { isBulkAuditImportType } from './external-communication.constants'
 import { ExternalJwtGuard } from './guards/external-jwt.guard'
+import { PayoutStatusPushDto } from '../audit/audit.dto'
+import type { IAuditService } from '../audit/audit.interface'
 import { ExternalRawSecretGuard } from './guards/external-raw-secret.guard'
 
 @ApiTags('External Communication')
@@ -37,7 +40,9 @@ import { ExternalRawSecretGuard } from './guards/external-raw-secret.guard'
 @Public()
 export class ExternalCommunicationController {
   constructor(
-    private readonly externalCommunicationService: ExternalCommunicationService
+    private readonly externalCommunicationService: ExternalCommunicationService,
+    @Inject('IAuditService')
+    private readonly auditService: IAuditService
   ) {}
 
   /**
@@ -221,5 +226,34 @@ export class ExternalCommunicationController {
       body.email,
       type
     )
+  }
+
+  /**
+   * @route POST /api/external/audits/:auditId/payout-status
+   * @auth  Bearer <communication JWT>
+   *
+   * The payout service telling us where an audit's payout got to. Display only: the audits table
+   * renders and filters on it, and nothing here decides whether an audit may be paid.
+   *
+   * Idempotent, and safe to deliver out of order. A push older than the one already stored is
+   * accepted and ignored, so a retry can never regress the state.
+   */
+  @Post('audits/:auditId/payout-status')
+  @UseGuards(ExternalJwtGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Record an audit payout status (payout service only)',
+    description:
+      'Sets Audit.payout_status, payout_legs and payout_updated_at. Ordered by `occurred_at`, so a ' +
+      'late-arriving webhook cannot overwrite a newer state. Returns applied:false when ignored as stale.'
+  })
+  @ApiResponse({ status: 200, description: 'Applied, or ignored as stale' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid communication token' })
+  @ApiResponse({ status: 404, description: 'No audit with that id' })
+  applyPayoutStatus(
+    @Param('auditId') auditId: string,
+    @Body() dto: PayoutStatusPushDto
+  ) {
+    return this.auditService.applyPayoutStatus(auditId, dto)
   }
 }

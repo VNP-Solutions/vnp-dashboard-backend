@@ -35,10 +35,21 @@ export interface Configuration {
   invitationRedirectUrl?: string
   dashboardUrl?: string
   externalBaseUrl?: string
+  payoutBaseUrl?: string
   auth: {
     passwordRegex: RegExp
     otpExpiryMinutes: number
     tempPasswordExpiryDays: number
+  }
+  payout: {
+    /**
+     * Above this, a payout needs an emailed OTP before it is dispatched.
+     *
+     * Applied to the WHOLE amount one action moves, however it was triggered: a single audit, a
+     * bulk selection, or a selection spanning properties. Compared per currency, because a mixed
+     * selection has no single total and we hold no FX rate at that moment.
+     */
+    otpThreshold: number
   }
   encryption: {
     secret: string
@@ -87,11 +98,15 @@ export default (): Configuration => ({
   invitationRedirectUrl: process.env.INVITATION_REDIRECT_URL,
   externalBaseUrl: process.env.EXTERNAL_BASE_URL,
   dashboardUrl: process.env.DASHBOARD_URL || 'https://new.dashboardvnps.com/',
+  payoutBaseUrl: process.env.PAYOUT_BASE_URL,
   auth: {
     passwordRegex:
       /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,32}$/,
     otpExpiryMinutes: 5,
     tempPasswordExpiryDays: 5
+  },
+  payout: {
+    otpThreshold: parseFloat(process.env.PAYOUT_OTP_THRESHOLD || '20000')
   },
   encryption: {
     secret: process.env.JWT_ACCESS_SECRET!

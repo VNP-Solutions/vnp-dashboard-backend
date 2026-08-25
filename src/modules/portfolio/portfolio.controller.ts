@@ -253,6 +253,20 @@ export class PortfolioController {
     return this.portfolioService.findOneSecure(id, user)
   }
 
+  @Get('by-parent/:parentId')
+  @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
+  @ApiOperation({
+    summary: 'Resolve a portfolio by DBMS parent_id (for deep links)'
+  })
+  @ApiResponse({ status: 200, description: 'Portfolio id and name' })
+  @ApiResponse({ status: 404, description: 'Portfolio not found' })
+  findByParentId(
+    @Param('parentId') parentId: string,
+    @CurrentUser() user: IUserWithPermissions
+  ) {
+    return this.portfolioService.findByParentId(parentId, user)
+  }
+
   @Get(':id')
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
   @ApiOperation({ summary: 'Get a portfolio by ID' })

@@ -84,4 +84,16 @@ export class ConfigService {
   get externalBaseUrl(): string | undefined {
     return this.configService.get('externalBaseUrl', { infer: true })
   }
+
+  get otpExpiryMinutes(): number {
+    return this.configService.get('auth.otpExpiryMinutes', { infer: true }) ?? 5
+  }
+
+  get payoutOtpThreshold(): number {
+    return this.configService.get('payout.otpThreshold', { infer: true }) ?? 20000
+  }
+
+  get payoutBaseUrl(): string | undefined {
+    return this.configService.get('payoutBaseUrl', { infer: true })
+  }
 }

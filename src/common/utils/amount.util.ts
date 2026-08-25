@@ -30,30 +30,129 @@ export type AuditConfirmedAmounts = {
   booking_amount_confirmed?: number | null
 }
 
+export type AuditOtaType = 'expedia' | 'agoda' | 'booking'
+
 export type AuditDerivedAmounts = {
   gross_total: number
   due_to_vnp: number
   due_to_property: number
 }
 
+function confirmedAmountForOta(
+  typeOfOta: AuditOtaType[] | null | undefined,
+  ota: AuditOtaType,
+  amount: number | null | undefined
+): number | null | undefined {
+  const activeOtas = new Set(
+    (typeOfOta ?? []).map(value => value.toLowerCase() as AuditOtaType)
+  )
+
+  if (!activeOtas.has(ota)) {
+    return null
+  }
+
+  return amount
+}
+
 /**
  * Compute derived audit amounts from OTA confirmed amounts.
+ * Only OTAs present in type_of_ota contribute to gross_total.
  * Missing confirmed values are treated as 0.
  * due_to_vnp = 15% of gross_total; due_to_property = 85% of gross_total.
  */
 export function computeAuditDerivedAmounts(
-  amounts: AuditConfirmedAmounts
+  amounts: AuditConfirmedAmounts,
+  typeOfOta?: AuditOtaType[] | null
 ): AuditDerivedAmounts {
   const gross_total = roundSum([
-    amounts.expedia_amount_confirmed,
-    amounts.agoda_amount_confirmed,
-    amounts.booking_amount_confirmed
+    confirmedAmountForOta(typeOfOta, 'expedia', amounts.expedia_amount_confirmed),
+    confirmedAmountForOta(typeOfOta, 'agoda', amounts.agoda_amount_confirmed),
+    confirmedAmountForOta(typeOfOta, 'booking', amounts.booking_amount_confirmed)
   ])
 
   return {
     gross_total,
     due_to_vnp: roundAmount(gross_total * 0.15),
     due_to_property: roundAmount(gross_total * 0.85)
+  }
+}
+
+/**
+ * Recalculate derived amounts when confirmed amounts or OTA types change.
+ * Super-admin overrides persist until one of these fields is updated.
+ */
+export function shouldRecalculateAuditDerivedAmounts(data: {
+  expedia_amount_confirmed?: number | null
+  agoda_amount_confirmed?: number | null
+  booking_amount_confirmed?: number | null
+  type_of_ota?: unknown
+}): boolean {
+  return (
+    data.expedia_amount_confirmed !== undefined ||
+    data.agoda_amount_confirmed !== undefined ||
+    data.booking_amount_confirmed !== undefined ||
+    data.type_of_ota !== undefined
+  )
+}
+
+export type ManualDerivedAmountInput = {
+  gross_total?: number | null
+  due_to_vnp?: number | null
+  due_to_property?: number | null
+}
+
+/**
+ * Apply a super-admin manual override and keep the three fields in balance:
+ * - gross_total change → due_to_vnp = 15%, due_to_property = 85%
+ * - due_to_vnp change → due_to_property = gross_total - due_to_vnp
+ * - due_to_property change → due_to_vnp = gross_total - due_to_property
+ * If both due fields are sent without a new gross_total, both values are kept.
+ */
+export function applyManualDerivedAmountOverrides(
+  incoming: ManualDerivedAmountInput,
+  current: AuditDerivedAmounts
+): AuditDerivedAmounts | null {
+  if (
+    incoming.gross_total === undefined &&
+    incoming.due_to_vnp === undefined &&
+    incoming.due_to_property === undefined
+  ) {
+    return null
+  }
+
+  if (incoming.gross_total !== undefined) {
+    const gross_total = roundAmount(incoming.gross_total)
+    return {
+      gross_total,
+      due_to_vnp: roundAmount(gross_total * 0.15),
+      due_to_property: roundAmount(gross_total * 0.85)
+    }
+  }
+
+  const gross_total = roundAmount(current.gross_total)
+
+  if (incoming.due_to_vnp !== undefined && incoming.due_to_property !== undefined) {
+    return {
+      gross_total,
+      due_to_vnp: roundAmount(incoming.due_to_vnp),
+      due_to_property: roundAmount(incoming.due_to_property)
+    }
+  }
+
+  if (incoming.due_to_vnp !== undefined) {
+    const due_to_vnp = roundAmount(incoming.due_to_vnp)
+    return {
+      gross_total,
+      due_to_vnp,
+      due_to_property: roundAmount(gross_total - due_to_vnp)
+    }
+  }
+
+  const due_to_property = roundAmount(incoming.due_to_property)
+  return {
+    gross_total,
+    due_to_vnp: roundAmount(gross_total - due_to_property),
+    due_to_property
   }
 }
 

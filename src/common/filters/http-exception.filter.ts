@@ -111,6 +111,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       } else if (exception.message.includes('not found')) {
         status = HttpStatus.NOT_FOUND
         message = 'Resource not found'
+      } else if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+        // Unmapped internal failure. The raw message was previously returned to the caller, which
+        // leaks file paths, model and field names, and library internals from any unexpected throw.
+        // It is still recorded by logError below, so nothing is lost for debugging.
+        message = 'Internal server error'
+        errors = ['An unexpected error occurred']
       }
     }
 
@@ -213,10 +219,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
         }
       }
 
+      // P2023 (malformed ObjectID) is the common one here: any `:id` route on a Mongo id reaches it,
+      // including the service-to-service audit seam. Answer it as the client error it is.
+      case 'P2023': {
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          message: 'Invalid identifier'
+        }
+      }
+
       default: {
+        // Do NOT echo exception.message. Prisma messages carry model names, field names and the
+        // failing invocation, which maps out the schema for anyone probing an endpoint. The detail is
+        // still logged server-side by the caller of this mapper.
         return {
           status: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: `Database error: ${exception.message}`
+          message: 'Database error'
         }
       }
     }

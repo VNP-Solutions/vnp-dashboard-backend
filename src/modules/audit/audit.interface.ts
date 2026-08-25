@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { PayoutStatus, Prisma } from '@prisma/client'
 import { PaginatedResult } from '../../common/dto/query.dto'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
@@ -14,6 +14,7 @@ import {
   DeleteAuditsByPortfolioDto,
   ExternalAuditQueryDto,
   GlobalStatsResponseDto,
+  PayoutStatusPushDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
   UpdateReportUrlDto
@@ -130,6 +131,17 @@ export interface IAuditRepository {
   count(whereClause: any, propertyIds?: string[]): Promise<number>
   findById(id: string): Promise<AuditWithFullDetails | null>
   findByIds(ids: string[]): Promise<AuditWithFullDetails[]>
+  /** Just enough to answer "may this user see these audits". See findByIds for the full object. */
+  findScopeByIds(ids: string[]): Promise<
+    { id: string; property_id: string; property: { portfolio_id: string; name: string } }[]
+  >
+  findPayoutStateById(
+    id: string
+  ): Promise<{ id: string; payout_status: PayoutStatus | null; payout_updated_at: Date | null } | null>
+  updatePayoutState(
+    id: string,
+    data: { payout_status: PayoutStatus; payout_legs: unknown; payout_updated_at: Date }
+  ): Promise<unknown>
   update(id: string, data: UpdateAuditDto): Promise<AuditWithRelations>
   archive(id: string): Promise<AuditWithRelations>
   unarchive(id: string): Promise<AuditWithRelations>
@@ -170,6 +182,23 @@ export interface IAuditService {
     user: IUserWithPermissions
   ): Promise<AuditWithRelations[]>
   findOne(id: string, user: IUserWithPermissions): Promise<AuditWithFullDetails>
+  /** Refuse a bulk selection spanning portfolios. Properties may differ, portfolios may not. */
+  assertSinglePortfolio(auditIds: string[]): Promise<void>
+  /** Apply a payout status pushed by the payout service. Display only. */
+  applyPayoutStatus(
+    auditId: string,
+    dto: PayoutStatusPushDto
+  ): Promise<{ applied: boolean; reason?: string; payout_status: PayoutStatus | null }>
+  /** Narrow caller-supplied audit ids to those this user may read. */
+  accessibleAuditIds(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<string[]>
+  /** Narrow caller-supplied audit ids by payout permission. Used by body-id payout routes. */
+  accessiblePayoutAuditIds(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<string[]>
   update(
     id: string,
     data: UpdateAuditDto,

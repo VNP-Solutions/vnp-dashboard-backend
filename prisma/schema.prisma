@@ -153,6 +153,10 @@ model Otp {
   /// When set, this OTP verifies an admin verifying `user_id`'s account for this target user (user_id on row = admin).
   admin_verify_for_user_id String? @db.ObjectId
 
+  /// When set, this OTP authorises a payout of the audit selection with this fingerprint.
+  /// Scoped so a login code can never authorise a payout, nor one selection's code another's.
+  payout_scope String?
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -186,6 +190,19 @@ model Audit {
   report_url                 String?
   report_data                Json?
   review_collection_date     DateTime?
+
+  /**
+   * Payout state, pushed by the payout service. DISPLAY ONLY.
+   *
+   * Null means no payout has ever been raised for this audit. Every decision that moves money is
+   * still made by the payout service, which holds the locks and the idempotency keys; if the two
+   * ever disagree, that side is right.
+   */
+  payout_status              PayoutStatus?
+  /** Per-rail detail, so a dual-rail audit renders without calling the payout service. */
+  payout_legs                Json?
+  /** Ordering guard: a push older than this is ignored, so concurrent webhooks cannot regress it. */
+  payout_updated_at          DateTime?
 
   notes          Note[]
   tasks          Task[]
@@ -320,20 +337,22 @@ model AuditStatus {
 }
 
 model UserRole {
-  id                         String                    @id @default(auto()) @map("_id") @db.ObjectId
-  name                       String                    @unique
-  description                String
-  is_external                Boolean
-  can_access_mis             Boolean                   @default(false)
-  is_active                  Boolean                   @default(true)
-  order                      Int                       @default(0)
-  portfolio_permission       PortfolioPermission?
-  property_permission        PropertyPermission?
-  audit_permission           AuditPermission?
-  user_permission            UserPermission?
-  system_settings_permission SystemSettingsPermission?
-  bank_details_permission    BankDetailsPermission?
-  users                      User[]
+  id                           String                      @id @default(auto()) @map("_id") @db.ObjectId
+  name                         String                      @unique
+  description                  String
+  is_external                  Boolean
+  can_access_mis               Boolean                     @default(false)
+  is_active                    Boolean                     @default(true)
+  order                        Int                         @default(0)
+  portfolio_permission         PortfolioPermission?
+  property_permission          PropertyPermission?
+  audit_permission             AuditPermission?
+  user_permission              UserPermission?
+  system_settings_permission   SystemSettingsPermission?
+  bank_details_permission      BankDetailsPermission?
+  payout_permission            PayoutPermission?
+  sync_action_log_permission   SyncActionLogPermission?
+  users                        User[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -369,6 +388,16 @@ type SystemSettingsPermission {
 }
 
 type BankDetailsPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type PayoutPermission {
+  permission_level PermissionLevel
+  access_level     AccessLevel
+}
+
+type SyncActionLogPermission {
   permission_level PermissionLevel
   access_level     AccessLevel
 }
@@ -517,6 +546,16 @@ model ConsolidatedReport {
   @@index([user_id])
 }
 
+/** Derived from the audit's payout legs by the payout service. See payoutAuditStatus.ts there. */
+enum PayoutStatus {
+  pending
+  dispatched
+  partially_completed
+  completed
+  failed
+  needs_attention
+}
+
 enum OtaType {
   expedia
   agoda
@@ -621,4 +660,73 @@ model PendingAction {
   @@index([audit_id, status])
   @@index([requested_user_id, status])
   @@index([resource_type, status])
+}
+
+enum SyncActionScope {
+  SINGLE
+  BULK
+}
+
+enum SyncActionEntityType {
+  PORTFOLIO
+  PROPERTY
+  MIXED
+}
+
+enum SyncActionType {
+  CREATE
+  UPDATE
+  DELETE
+  TRANSFER
+  IMPORT
+}
+
+type SyncActionLogItem {
+  id                   String?
+  name                 String
+  success              Boolean  @default(true)
+  reason               String?
+  dbms                 String?
+  dashboard            String?
+  scraper              String?
+  from_portfolio_id    String?
+  from_portfolio_name  String?
+  to_portfolio_id      String?
+  to_portfolio_name    String?
+}
+
+model SyncActionLog {
+  id                       String               @id @default(auto()) @map("_id") @db.ObjectId
+  scope                    SyncActionScope
+  entity_type              SyncActionEntityType
+  action                   SyncActionType
+  entity_id                String?
+  entity_name              String?
+  items                    SyncActionLogItem[]
+  portfolio_items          SyncActionLogItem[]
+  property_items           SyncActionLogItem[]
+  total_count              Int                  @default(0)
+  success_count            Int                  @default(0)
+  failed_count             Int                  @default(0)
+  portfolio_total_count    Int                  @default(0)
+  portfolio_success_count  Int                  @default(0)
+  portfolio_failed_count   Int                  @default(0)
+  property_total_count     Int                  @default(0)
+  property_success_count   Int                  @default(0)
+  property_failed_count    Int                  @default(0)
+  search_text              String?
+  performed_by_email       String?
+  performed_by_name        String?
+  performed_by_role        String?
+  job_id                   String?
+  created_at               DateTime             @default(now())
+
+  @@index([created_at])
+  @@index([scope])
+  @@index([entity_type])
+  @@index([action])
+  @@index([entity_name])
+  @@index([search_text])
+  @@index([job_id])
+  @@index([scope, entity_type, action])
 }

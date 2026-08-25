@@ -8,7 +8,10 @@ import {
 import { OtaType, PendingActionType, Prisma, Property } from '@prisma/client'
 import * as ExcelJS from 'exceljs'
 import { EXTERNAL_API_SUPER_ADMIN_CONTEXT } from '../../common/constants/external-api-user.context'
-import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
+import type {
+  IPermission,
+  IUserWithPermissions
+} from '../../common/interfaces/permission.interface'
 import {
   AccessLevel,
   ModuleType,
@@ -53,6 +56,7 @@ import {
   DeleteAuditsByPortfolioDto,
   ExternalAuditQueryDto,
   GlobalStatsResponseDto,
+  PayoutStatusPushDto,
   RequestUpdateAmountConfirmedDto,
   UpdateAuditDto,
   UpdateReportUrlDto
@@ -875,6 +879,132 @@ export class AuditService implements IAuditService {
     return data
   }
 
+  /**
+   * Narrow caller-supplied audit ids to the ones this user may read.
+   *
+   * The guard checks `params.id`, so a route taking ids in the body gets no resource check at all.
+   * Without this, a partial-access operator could name any audit and read back its rail, currency
+   * and per-OTA amounts.
+   *
+   * Ids they can't see are dropped, not rejected: the caller is a page that was already scoped, so a
+   * foreign id is a probe. A dropped id is simply absent, same as an audit with no payout.
+   */
+  /**
+   * Refuse a bulk selection that spans portfolios.
+   *
+   * Properties may differ, portfolios may not. A payout run is settled and reconciled against one
+   * portfolio's books, and a run mixing two leaves neither side with a total that reconciles.
+   *
+   * Enforced here as well as in the UI, because a warning dialog is a courtesy and this is the rule.
+   */
+  async assertSinglePortfolio(auditIds: string[]): Promise<void> {
+    const audits = await this.auditRepository.findScopeByIds(auditIds)
+    const portfolios = new Map<string, string>()
+    for (const a of audits) {
+      if (a.property?.portfolio_id) portfolios.set(a.property.portfolio_id, a.property.name)
+    }
+    if (portfolios.size > 1) {
+      throw new BadRequestException(
+        `A payout cannot span portfolios. This selection covers ${portfolios.size}: ` +
+          `${[...portfolios.values()].join(', ')}. Select audits from one portfolio at a time.`
+      )
+    }
+  }
+
+  async accessibleAuditIds(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<string[]> {
+    return this.narrowAuditIdsByPermission(
+      auditIds,
+      user,
+      user.role.audit_permission
+    )
+  }
+
+  /**
+   * Same narrowing as accessibleAuditIds, but driven by the payout module.
+   *
+   * Payout routes take audit ids, yet what may be paid is decided by payout_permission, not by who
+   * may read the audit. A role with audit access and no payout access must not reach these ids.
+   */
+  async accessiblePayoutAuditIds(
+    auditIds: string[],
+    user: IUserWithPermissions
+  ): Promise<string[]> {
+    return this.narrowAuditIdsByPermission(
+      auditIds,
+      user,
+      user.role.payout_permission
+    )
+  }
+
+  private async narrowAuditIdsByPermission(
+    auditIds: string[],
+    user: IUserWithPermissions,
+    permission: IPermission | null
+  ): Promise<string[]> {
+    if (auditIds.length === 0) return []
+
+    if (!permission || permission.access_level === AccessLevel.none) {
+      return []
+    }
+
+    // Ids that do not exist are dropped here too: they cannot be checked, so they cannot be allowed.
+    const audits = await this.auditRepository.findScopeByIds(auditIds)
+    if (permission.access_level === AccessLevel.all) {
+      return audits.map(audit => audit.id)
+    }
+
+    // Partial access: one check per distinct property, not per audit. A page of audits is usually a
+    // handful of properties, and canAccessResource hits the database each call.
+    const allowedByProperty = new Map<string, boolean>()
+    const allowed: string[] = []
+    for (const audit of audits) {
+      let canAccess = allowedByProperty.get(audit.property_id)
+      if (canAccess === undefined) {
+        canAccess = await this.permissionService.canAccessResource(
+          user,
+          ModuleType.PROPERTY,
+          audit.property_id
+        )
+        allowedByProperty.set(audit.property_id, canAccess)
+      }
+      if (canAccess) allowed.push(audit.id)
+    }
+    return allowed
+  }
+
+  /**
+   * Record the payout state the payout service just pushed.
+   *
+   * DISPLAY ONLY. Nothing here decides whether an audit may be paid; that stays with the payout
+   * service, which holds the locks and the idempotency keys.
+   *
+   * Ordered by `occurred_at`, not by how "final" a status looks. Stripe delivers some webhook pairs
+   * concurrently and unordered, so a stale push must not overwrite a fresh one. Ranking statuses
+   * instead would block the one backwards move that is real: a Rail B payout can be returned days
+   * after it posted, and the audit must stop reading as completed.
+   */
+  async applyPayoutStatus(auditId: string, dto: PayoutStatusPushDto) {
+    const audit = await this.auditRepository.findPayoutStateById(auditId)
+    if (!audit) {
+      throw new NotFoundException('Audit not found')
+    }
+
+    const occurredAt = new Date(dto.occurred_at)
+    if (audit.payout_updated_at && audit.payout_updated_at >= occurredAt) {
+      return { applied: false, reason: 'stale', payout_status: audit.payout_status }
+    }
+
+    await this.auditRepository.updatePayoutState(auditId, {
+      payout_status: dto.status,
+      payout_legs: dto.legs as unknown as Prisma.InputJsonValue,
+      payout_updated_at: occurredAt
+    })
+    return { applied: true, payout_status: dto.status }
+  }
+
   async findOne(id: string, user: IUserWithPermissions) {
     const audit = await this.auditRepository.findById(id)
 
@@ -985,39 +1115,43 @@ export class AuditService implements IAuditService {
       }
     }
 
+    const derivedFieldProvided =
+      data.gross_total !== undefined ||
+      data.due_to_vnp !== undefined ||
+      data.due_to_property !== undefined
+
+    if (derivedFieldProvided && !isUserSuperAdmin(user)) {
+      throw new ForbiddenException(
+        'Only super admins can update gross total, due to VNP, or due to property'
+      )
+    }
+
     // Round amount fields to 2 decimal places if provided
+    const roundAmountField = (
+      value: number | undefined
+    ): number | undefined => {
+      if (value === undefined) {
+        return undefined
+      }
+
+      return roundToDecimals(value) ?? undefined
+    }
+
     const updateData = {
       ...data,
-      expedia_amount_collectable:
-        data.expedia_amount_collectable !== undefined &&
-        data.expedia_amount_collectable !== null
-          ? (roundToDecimals(data.expedia_amount_collectable) ?? undefined)
-          : data.expedia_amount_collectable,
-      expedia_amount_confirmed:
-        data.expedia_amount_confirmed !== undefined &&
-        data.expedia_amount_confirmed !== null
-          ? (roundToDecimals(data.expedia_amount_confirmed) ?? undefined)
-          : data.expedia_amount_confirmed,
-      agoda_amount_collectable:
-        data.agoda_amount_collectable !== undefined &&
-        data.agoda_amount_collectable !== null
-          ? (roundToDecimals(data.agoda_amount_collectable) ?? undefined)
-          : data.agoda_amount_collectable,
-      agoda_amount_confirmed:
-        data.agoda_amount_confirmed !== undefined &&
-        data.agoda_amount_confirmed !== null
-          ? (roundToDecimals(data.agoda_amount_confirmed) ?? undefined)
-          : data.agoda_amount_confirmed,
-      booking_amount_collectable:
-        data.booking_amount_collectable !== undefined &&
-        data.booking_amount_collectable !== null
-          ? (roundToDecimals(data.booking_amount_collectable) ?? undefined)
-          : data.booking_amount_collectable,
-      booking_amount_confirmed:
-        data.booking_amount_confirmed !== undefined &&
-        data.booking_amount_confirmed !== null
-          ? (roundToDecimals(data.booking_amount_confirmed) ?? undefined)
-          : data.booking_amount_confirmed
+      expedia_amount_collectable: roundAmountField(
+        data.expedia_amount_collectable
+      ),
+      expedia_amount_confirmed: roundAmountField(data.expedia_amount_confirmed),
+      agoda_amount_collectable: roundAmountField(data.agoda_amount_collectable),
+      agoda_amount_confirmed: roundAmountField(data.agoda_amount_confirmed),
+      booking_amount_collectable: roundAmountField(
+        data.booking_amount_collectable
+      ),
+      booking_amount_confirmed: roundAmountField(data.booking_amount_confirmed),
+      gross_total: roundAmountField(data.gross_total),
+      due_to_vnp: roundAmountField(data.due_to_vnp),
+      due_to_property: roundAmountField(data.due_to_property)
     }
 
     const result = await this.auditRepository.update(id, updateData)
@@ -1563,7 +1697,7 @@ export class AuditService implements IAuditService {
             'Expedia Collectable',
             'expedia_amount_collectable'
           ])
-          if (expediaAmountCollectableValue) {
+          if (expediaAmountCollectableValue !== undefined) {
             const expediaAmountCollectable = parseFloat(
               expediaAmountCollectableValue
             )
@@ -1580,7 +1714,7 @@ export class AuditService implements IAuditService {
             'Expedia Confirmed',
             'expedia_amount_confirmed'
           ])
-          if (expediaAmountConfirmedValue) {
+          if (expediaAmountConfirmedValue !== undefined) {
             const expediaAmountConfirmed = parseFloat(
               expediaAmountConfirmedValue
             )
@@ -1613,7 +1747,7 @@ export class AuditService implements IAuditService {
             'Agoda Collectable',
             'agoda_amount_collectable'
           ])
-          if (agodaAmountCollectableValue) {
+          if (agodaAmountCollectableValue !== undefined) {
             const agodaAmountCollectable = parseFloat(
               agodaAmountCollectableValue
             )
@@ -1630,7 +1764,7 @@ export class AuditService implements IAuditService {
             'Agoda Confirmed',
             'agoda_amount_confirmed'
           ])
-          if (agodaAmountConfirmedValue) {
+          if (agodaAmountConfirmedValue !== undefined) {
             const agodaAmountConfirmed = parseFloat(agodaAmountConfirmedValue)
             if (!isNaN(agodaAmountConfirmed)) {
               // Check agoda_amount_confirmed update restriction for non-super-admin internal users
@@ -1660,7 +1794,7 @@ export class AuditService implements IAuditService {
             'Booking Collectable',
             'booking_amount_collectable'
           ])
-          if (bookingAmountCollectableValue) {
+          if (bookingAmountCollectableValue !== undefined) {
             const bookingAmountCollectable = parseFloat(
               bookingAmountCollectableValue
             )
@@ -1677,7 +1811,7 @@ export class AuditService implements IAuditService {
             'Booking Confirmed',
             'booking_amount_confirmed'
           ])
-          if (bookingAmountConfirmedValue) {
+          if (bookingAmountConfirmedValue !== undefined) {
             const bookingAmountConfirmed = parseFloat(
               bookingAmountConfirmedValue
             )
@@ -1701,6 +1835,93 @@ export class AuditService implements IAuditService {
               updateData.booking_amount_confirmed = roundToDecimals(
                 bookingAmountConfirmed
               )
+            }
+          }
+
+          const parseDerivedAmount = (
+            value: string | undefined,
+            fieldLabel: string
+          ): number | null => {
+            if (value === undefined) {
+              return null
+            }
+
+            const parsed = parseFloat(value)
+            if (isNaN(parsed)) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error: `Invalid ${fieldLabel}`
+              })
+              result.failureCount++
+              return NaN
+            }
+
+            return roundToDecimals(parsed) ?? 0
+          }
+
+          const grossTotalValue = findHeaderValue(row, [
+            'Gross Total',
+            'gross_total'
+          ])
+          const dueToVnpValue = findHeaderValue(row, [
+            'Due to VNP',
+            'Due To VNP',
+            'due_to_vnp'
+          ])
+          const dueToPropertyValue = findHeaderValue(row, [
+            'Due to Property',
+            'Due To Property',
+            'due_to_property'
+          ])
+
+          if (
+            grossTotalValue !== undefined ||
+            dueToVnpValue !== undefined ||
+            dueToPropertyValue !== undefined
+          ) {
+            if (!isUserSuperAdmin(user)) {
+              result.errors.push({
+                row: rowNumber,
+                auditId: auditIdValue,
+                error:
+                  'Only super admins can update Gross Total, Due to VNP, or Due to Property'
+              })
+              result.failureCount++
+              continue
+            }
+
+            const parsedGrossTotal = parseDerivedAmount(
+              grossTotalValue,
+              'Gross Total'
+            )
+            if (Number.isNaN(parsedGrossTotal)) {
+              continue
+            }
+            if (parsedGrossTotal !== null) {
+              updateData.gross_total = parsedGrossTotal
+            }
+
+            const parsedDueToVnp = parseDerivedAmount(
+              dueToVnpValue,
+              'Due to VNP'
+            )
+            if (Number.isNaN(parsedDueToVnp)) {
+              continue
+            }
+            if (parsedDueToVnp !== null) {
+              updateData.due_to_vnp = parsedDueToVnp
+            }
+
+            const parsedDueToProperty = parseDerivedAmount(
+              dueToPropertyValue,
+              'Due to Property'
+            )
+            if (Number.isNaN(parsedDueToProperty)) {
+              continue
+            }
+            if (parsedDueToProperty !== null) {
+              updateData.due_to_property = parsedDueToProperty
             }
           }
 
@@ -2233,9 +2454,10 @@ export class AuditService implements IAuditService {
             'Expedia Collectable',
             'expedia_amount_collectable'
           ])
-          const parsedExpediaCollectable = expediaAmountCollectableValue
-            ? parseFloat(expediaAmountCollectableValue)
-            : NaN
+          const parsedExpediaCollectable =
+            expediaAmountCollectableValue !== undefined
+              ? parseFloat(expediaAmountCollectableValue)
+              : NaN
           const expediaAmountCollectable = !isNaN(parsedExpediaCollectable)
             ? (roundToDecimals(parsedExpediaCollectable) ?? undefined)
             : undefined
@@ -2246,9 +2468,10 @@ export class AuditService implements IAuditService {
             'Expedia Confirmed',
             'expedia_amount_confirmed'
           ])
-          const parsedExpediaConfirmed = expediaAmountConfirmedValue
-            ? parseFloat(expediaAmountConfirmedValue)
-            : NaN
+          const parsedExpediaConfirmed =
+            expediaAmountConfirmedValue !== undefined
+              ? parseFloat(expediaAmountConfirmedValue)
+              : NaN
           const expediaAmountConfirmed = !isNaN(parsedExpediaConfirmed)
             ? (roundToDecimals(parsedExpediaConfirmed) ?? undefined)
             : undefined
@@ -2259,9 +2482,10 @@ export class AuditService implements IAuditService {
             'Agoda Collectable',
             'agoda_amount_collectable'
           ])
-          const parsedAgodaCollectable = agodaAmountCollectableValue
-            ? parseFloat(agodaAmountCollectableValue)
-            : NaN
+          const parsedAgodaCollectable =
+            agodaAmountCollectableValue !== undefined
+              ? parseFloat(agodaAmountCollectableValue)
+              : NaN
           const agodaAmountCollectable = !isNaN(parsedAgodaCollectable)
             ? (roundToDecimals(parsedAgodaCollectable) ?? undefined)
             : undefined
@@ -2272,9 +2496,10 @@ export class AuditService implements IAuditService {
             'Agoda Confirmed',
             'agoda_amount_confirmed'
           ])
-          const parsedAgodaConfirmed = agodaAmountConfirmedValue
-            ? parseFloat(agodaAmountConfirmedValue)
-            : NaN
+          const parsedAgodaConfirmed =
+            agodaAmountConfirmedValue !== undefined
+              ? parseFloat(agodaAmountConfirmedValue)
+              : NaN
           const agodaAmountConfirmed = !isNaN(parsedAgodaConfirmed)
             ? (roundToDecimals(parsedAgodaConfirmed) ?? undefined)
             : undefined
@@ -2285,9 +2510,10 @@ export class AuditService implements IAuditService {
             'Booking Collectable',
             'booking_amount_collectable'
           ])
-          const parsedBookingCollectable = bookingAmountCollectableValue
-            ? parseFloat(bookingAmountCollectableValue)
-            : NaN
+          const parsedBookingCollectable =
+            bookingAmountCollectableValue !== undefined
+              ? parseFloat(bookingAmountCollectableValue)
+              : NaN
           const bookingAmountCollectable = !isNaN(parsedBookingCollectable)
             ? (roundToDecimals(parsedBookingCollectable) ?? undefined)
             : undefined
@@ -2298,9 +2524,10 @@ export class AuditService implements IAuditService {
             'Booking Confirmed',
             'booking_amount_confirmed'
           ])
-          const parsedBookingConfirmed = bookingAmountConfirmedValue
-            ? parseFloat(bookingAmountConfirmedValue)
-            : NaN
+          const parsedBookingConfirmed =
+            bookingAmountConfirmedValue !== undefined
+              ? parseFloat(bookingAmountConfirmedValue)
+              : NaN
           const bookingAmountConfirmed = !isNaN(parsedBookingConfirmed)
             ? (roundToDecimals(parsedBookingConfirmed) ?? undefined)
             : undefined

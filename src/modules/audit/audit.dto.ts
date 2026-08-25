@@ -1,8 +1,9 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { OtaType, Prisma } from '@prisma/client'
-import { Transform } from 'class-transformer'
+import { OtaType, Prisma, PayoutStatus } from '@prisma/client'
+import { Transform, Type } from 'class-transformer'
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -10,7 +11,11 @@ import {
   IsNotEmpty,
   IsNumber,
   IsOptional,
-  IsString
+  IsString,
+  ArrayMinSize,
+  IsInt,
+  IsISO8601,
+  ValidateNested
 } from 'class-validator'
 import { QueryDto } from '../../common/dto/query.dto'
 
@@ -94,6 +99,33 @@ export class CreateAuditDto {
   @IsNumber()
   @IsOptional()
   booking_amount_confirmed?: number
+
+  @ApiPropertyOptional({
+    example: 170,
+    description:
+      'Gross total. Computed from confirmed amounts. Only super admins can set this directly; later confirmed-amount updates recalculate it.'
+  })
+  @IsNumber()
+  @IsOptional()
+  gross_total?: number
+
+  @ApiPropertyOptional({
+    example: 25.5,
+    description:
+      'Due to VNP (15% of gross total by default). Only super admins can set this directly; later confirmed-amount updates recalculate it.'
+  })
+  @IsNumber()
+  @IsOptional()
+  due_to_vnp?: number
+
+  @ApiPropertyOptional({
+    example: 144.5,
+    description:
+      'Due to property (85% of gross total by default). Only super admins can set this directly; later confirmed-amount updates recalculate it.'
+  })
+  @IsNumber()
+  @IsOptional()
+  due_to_property?: number
 
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
@@ -536,4 +568,151 @@ export class AutoImportAuditResultDto {
     required: false
   })
   created_audits?: AutoImportAuditSuccessDto[]
+}
+
+export class InitiateAuditPayoutDto {
+  @ApiProperty({
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    description:
+      'Short-lived confirmation token from GET /audit/:id/payout-preview. Bound to this audit and ' +
+      'this user, so a payout can only be dispatched after the operator was shown the amounts.'
+  })
+  @IsString()
+  @IsNotEmpty()
+  confirm_token: string
+
+  @ApiPropertyOptional({
+    example: 123456,
+    description:
+      'Emailed confirmation code. Required only when the payout is at or above the threshold; the ' +
+      'preview says so via otp_required.'
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  otp?: number
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Re-send legs whose previous attempt moved no money. Refused for returned and ' +
+      'reconciliation_required, where money may already be gone.'
+  })
+  @IsOptional()
+  @IsBoolean()
+  retry?: boolean
+}
+
+export class AuditPayoutStatusDto {
+  @ApiProperty({
+    type: [String],
+    example: ['6a6a2017a6890692e3f8a58d', '6a6a2017a6890692e3f8a58e'],
+    description: 'Audit ids from the current table page. Capped to keep the lookup bounded.'
+  })
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  audit_ids: string[]
+}
+
+/**
+ * Must match the payout service's `MAX_BULK_AUDITS`. Each audit is dispatched on its own, so a
+ * selection of 50 is 50 Stripe calls. Refusing here means the operator finds out while they're
+ * still looking at the selection, rather than after the request has left.
+ */
+export const MAX_BULK_PAYOUT_AUDITS = 50
+
+/** The selection a bulk preview resolves. Same ceiling as the dispatch that follows it. */
+export class BulkPayoutPreviewDto {
+  @ApiProperty({
+    type: [String],
+    example: ['6a6a2017a6890692e3f8a58d', '6a6a2017a6890692e3f8a58e'],
+    description:
+      'Audits to plan a payout for. MAY span properties: each audit is dispatched individually, so ' +
+      'there is no single destination for the selection to agree on.'
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_BULK_PAYOUT_AUDITS)
+  @IsString({ each: true })
+  audit_ids: string[]
+}
+
+export class BulkPayoutDto {
+  @ApiProperty({
+    type: [String],
+    example: ['6a6a2017a6890692e3f8a58d', '6a6a2017a6890692e3f8a58e'],
+    description:
+      'Audits to pay, each dispatched individually. MAY span properties and rails: one payment is ' +
+      'made per audit per rail, so a selection has no single destination to agree on.'
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_BULK_PAYOUT_AUDITS)
+  @IsString({ each: true })
+  audit_ids: string[]
+
+  @ApiProperty({
+    description:
+      'From the bulk preview. Bound to this exact set of audit ids and to this user, so a preview ' +
+      'of a few audits cannot be used to dispatch many.'
+  })
+  @IsString()
+  confirm_token: string
+
+  @ApiPropertyOptional({
+    example: 123456,
+    description: 'Emailed confirmation code. Required only when the selection is above the threshold.'
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  otp?: number
+}
+
+/** One payout leg's state, as the payout service reports it. */
+export class PayoutStatusLegDto {
+  @ApiProperty({ example: 'connect', description: 'connect = Rail A, global = Rail B' })
+  @IsString()
+  rail: string
+
+  @ApiProperty({ example: 'completed' })
+  @IsString()
+  status: string
+
+  @ApiPropertyOptional({ example: 'gbp' })
+  @IsOptional()
+  @IsString()
+  currency?: string | null
+
+  @ApiPropertyOptional({ example: 6460 })
+  @IsOptional()
+  @IsInt()
+  amount_minor?: number | null
+}
+
+/**
+ * Payout state pushed by the payout service.
+ *
+ * `occurred_at` is the ordering guard, not decoration. Stripe delivers some webhook pairs
+ * concurrently and unordered, so an older push must not overwrite a newer one. Ordering by time
+ * rather than by status rank also keeps the one legitimate backwards move working: a Rail B payout
+ * can be returned days after it posted, and the audit has to stop reading as completed.
+ */
+export class PayoutStatusPushDto {
+  @ApiProperty({
+    enum: ['pending', 'dispatched', 'partially_completed', 'completed', 'failed', 'needs_attention']
+  })
+  @IsEnum(PayoutStatus)
+  status: PayoutStatus
+
+  @ApiProperty({ type: [PayoutStatusLegDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PayoutStatusLegDto)
+  legs: PayoutStatusLegDto[]
+
+  @ApiProperty({ example: '2026-08-17T10:33:28.167Z' })
+  @IsISO8601()
+  occurred_at: string
 }

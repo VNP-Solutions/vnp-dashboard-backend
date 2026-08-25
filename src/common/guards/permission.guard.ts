@@ -19,7 +19,18 @@ export class PermissionGuard implements CanActivate {
     private permissionService: PermissionService
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  /**
+   * Has to stay async, so the guard can do the ownership check itself.
+   *
+   * It used to call the sync `checkPermission`, which returns `allowed: true` for partial access
+   * with a resourceId and defers the real check to `requirePermission`. That gap has never been
+   * reachable: no route sets `useResourceId`, so `resourceId` is always undefined here, and
+   * ownership is enforced by the service layer, which calls `requirePermission` directly.
+   *
+   * Calling it here closes the gap in advance, so the first route to set `useResourceId: true`
+   * gets the check it is asking for instead of silently allowing everything.
+   */
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const permission = this.reflector.getAllAndOverride<PermissionMetadata>(
       PERMISSION_KEY,
       [context.getHandler(), context.getClass()]
@@ -45,18 +56,13 @@ export class PermissionGuard implements CanActivate {
       resourceId = request.params?.id || request.params?.portfolioId
     }
 
-    const result = this.permissionService.checkPermission(
+    // Throws if the user lacks the permission, or has partial access and doesn't own the resource.
+    await this.permissionService.requirePermission(
       user,
       permission.module,
       permission.action,
       resourceId
     )
-
-    if (!result.allowed) {
-      throw new ForbiddenException(
-        result.reason || 'You do not have permission to perform this action'
-      )
-    }
 
     return true
   }
