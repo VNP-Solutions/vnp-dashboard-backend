@@ -31,7 +31,6 @@ export const EXTERNAL_API_SUPER_ADMIN_CONTEXT: IUserWithPermissions = {
     system_settings_permission: allPermission,
     bank_details_permission: allPermission,
     // Moving money is never something an API key does on a human's behalf.
-    payout_permission: noPermission,
-    sync_action_log_permission: noPermission
+    payout_permission: noPermission
   }
 }

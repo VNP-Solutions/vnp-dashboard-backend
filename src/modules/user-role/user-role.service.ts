@@ -46,8 +46,7 @@ export class UserRoleService implements IUserRoleService {
       user_permission: data.user_permission ?? null,
       system_settings_permission: data.system_settings_permission ?? null,
       bank_details_permission: data.bank_details_permission ?? null,
-      payout_permission: data.payout_permission ?? null,
-      sync_action_log_permission: data.sync_action_log_permission ?? null
+      payout_permission: data.payout_permission ?? null
     })
 
     if (warnings.length > 0) {
@@ -149,11 +148,7 @@ export class UserRoleService implements IUserRoleService {
         userRole.bank_details_permission ??
         null,
       payout_permission:
-        data.payout_permission ?? userRole.payout_permission ?? null,
-      sync_action_log_permission:
-        data.sync_action_log_permission ??
-        userRole.sync_action_log_permission ??
-        null
+        data.payout_permission ?? userRole.payout_permission ?? null
     })
 
     if (warnings.length > 0) {
