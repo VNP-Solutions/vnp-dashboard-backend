@@ -38,10 +38,24 @@ export class PayoutHistoryQueryDto {
   @IsString()
   status?: string
 
-  @ApiPropertyOptional({ description: 'Scope the results to a single property' })
+  @ApiPropertyOptional({
+    description:
+      "Scope the results to a single property, by the PAYOUT SERVICE's hotel id. Operator-facing " +
+      'callers rarely hold this; a dashboard page should send property_id instead.'
+  })
   @IsOptional()
   @IsString()
   hotel_id?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Scope the results to a single property, by the DASHBOARD property id. This is the id every ' +
+      'dashboard page already has in hand. It is resolved to a hotel through the property mapping ' +
+      'and intersected with the caller\'s own access, so it can never widen what they may see.'
+  })
+  @IsOptional()
+  @IsString()
+  property_id?: string
 
   @ApiPropertyOptional({ example: 'usd', description: 'ISO 4217 code, lowercase' })
   @IsOptional()
