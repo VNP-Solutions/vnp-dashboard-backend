@@ -227,7 +227,8 @@ export class PortfolioStatsQueryDto {
   @ApiProperty({
     enum: ['week', 'month', 'year'],
     example: 'month',
-    description: 'Time duration for stats calculation'
+    description:
+      'Time window for the recent audits list only. Amount totals ignore this value.'
   })
   @IsString()
   @IsNotEmpty()
@@ -352,10 +353,16 @@ export class PortfolioStatsAuditDto {
 }
 
 export class PortfolioStatsResponseDto {
-  @ApiProperty({ description: 'Amount collectable breakdown by platform' })
+  @ApiProperty({
+    description:
+      'Amount collectable breakdown by platform. Lifetime total across the portfolio active properties, not limited by the duration.'
+  })
   amount_collectable: PortfolioStatsAmountDto
 
-  @ApiProperty({ description: 'Amount confirmed breakdown by platform' })
+  @ApiProperty({
+    description:
+      'Amount confirmed breakdown by platform. Lifetime total across the portfolio active properties, not limited by the duration.'
+  })
   amount_confirmed: PortfolioStatsAmountDto
 
   @ApiProperty({

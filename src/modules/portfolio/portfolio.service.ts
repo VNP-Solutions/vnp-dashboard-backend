@@ -2238,13 +2238,21 @@ export class PortfolioService implements IPortfolioService {
       }
     }
 
-    // Time window: align with how audits are understood elsewhere (e.g. sales reports):
-    // use review_collection_date when set; fall back to created_at when it is not (legacy rows).
-    // On MongoDB, `field: null` does not match documents where the field was never stored; include
-    // `isSet: false` so omitted review_collection_date still uses created_at for the window.
-    const auditInDurationWhere: Prisma.AuditWhereInput = {
+    // Amounts are lifetime totals for the portfolio's active properties. They must not be bound to
+    // a date window: review_collection_date is free text on import and routinely parses to a wrong
+    // year, which silently drops audits from the cards. Property rows and the global banner sum the
+    // same amounts unbounded, so this keeps all three surfaces in agreement.
+    const auditAmountsWhere: Prisma.AuditWhereInput = {
       property_id: { in: propertyIds },
-      is_archived: false,
+      is_archived: false
+    }
+
+    // The recent-audits list stays inside the requested duration: use review_collection_date when
+    // set; fall back to created_at when it is not (legacy rows). On MongoDB, `field: null` does not
+    // match documents where the field was never stored; include `isSet: false` so omitted
+    // review_collection_date still uses created_at for the window.
+    const auditInDurationWhere: Prisma.AuditWhereInput = {
+      ...auditAmountsWhere,
       OR: [
         {
           review_collection_date: {
@@ -2269,7 +2277,7 @@ export class PortfolioService implements IPortfolioService {
     // Get aggregate data for amount collectable and confirmed
     const auditAggregates = await this.prisma.audit.groupBy({
       by: ['type_of_ota'],
-      where: auditInDurationWhere,
+      where: auditAmountsWhere,
       _sum: {
         expedia_amount_collectable: true,
         expedia_amount_confirmed: true,
