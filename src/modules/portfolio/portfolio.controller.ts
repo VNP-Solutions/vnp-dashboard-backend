@@ -573,7 +573,7 @@ export class PortfolioController {
   @RequirePermission(ModuleType.PORTFOLIO, PermissionAction.READ, true)
   @ApiOperation({
     summary:
-      'Get portfolio statistics with amount breakdown by platform and recent audits (amounts are lifetime totals across the portfolio active properties and ignore the duration; only the recent list is limited to the duration window, using review collection date when set, else record creation date)'
+      'Get portfolio statistics with amount breakdown by platform and recent audits (amounts and the recent list are both scoped to the duration, using audit creation date; "year" means the current calendar year to date, not a rolling 365-day window)'
   })
   @ApiResponse({
     status: 200,

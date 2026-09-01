@@ -1215,7 +1215,8 @@ export class SyncUpsertPropertyDto {
   @ApiPropertyOptional({
     type: SyncUpsertProcessorsDto,
     deprecated: true,
-    description: 'Deprecated. Accepted for backwards compatibility and ignored; the payout rail is now derived per reservation.'
+    description:
+      'Deprecated. Accepted for backwards compatibility and ignored; the payout rail is now derived per reservation.'
   })
   @IsOptional()
   @ValidateNested()

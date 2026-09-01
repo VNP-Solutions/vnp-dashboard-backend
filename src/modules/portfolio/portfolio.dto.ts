@@ -228,7 +228,7 @@ export class PortfolioStatsQueryDto {
     enum: ['week', 'month', 'year'],
     example: 'month',
     description:
-      'Time window for the recent audits list only. Amount totals ignore this value.'
+      'Time window (by audit creation date) applied to both the amount totals and the recent audits list. "week"/"month" are rolling windows (last 7/30 days); "year" is the current calendar year to date (resets on Jan 1), not a rolling 365-day window.'
   })
   @IsString()
   @IsNotEmpty()
@@ -355,13 +355,13 @@ export class PortfolioStatsAuditDto {
 export class PortfolioStatsResponseDto {
   @ApiProperty({
     description:
-      'Amount collectable breakdown by platform. Lifetime total across the portfolio active properties, not limited by the duration.'
+      'Amount collectable breakdown by platform, for the portfolio active properties, scoped to the selected duration by audit creation date. "year" means the current calendar year to date.'
   })
   amount_collectable: PortfolioStatsAmountDto
 
   @ApiProperty({
     description:
-      'Amount confirmed breakdown by platform. Lifetime total across the portfolio active properties, not limited by the duration.'
+      'Amount confirmed breakdown by platform, for the portfolio active properties, scoped to the selected duration by audit creation date. "year" means the current calendar year to date.'
   })
   amount_confirmed: PortfolioStatsAmountDto
 
