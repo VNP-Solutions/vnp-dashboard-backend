@@ -19,6 +19,8 @@ import {
   SharePropertyDto,
   SyncBulkUpsertPropertyItemDto,
   SyncUpsertPropertyDto,
+  UpdatePropertyAccessLevelDto,
+  UpdatePropertyAccessLevelResultDto,
   SyncBulkUpsertPropertyResultDto,
   SyncBulkDeletePropertyDto,
   SyncBulkDeletePropertyResultDto,
@@ -212,6 +214,10 @@ export interface IPropertyService {
     parentId: string,
     dto: SyncUpsertPropertyDto
   ): Promise<PropertyWithRelations & { credentials: any }>
+  updateAccessLevels(
+    parentId: string,
+    dto: UpdatePropertyAccessLevelDto
+  ): Promise<UpdatePropertyAccessLevelResultDto>
   syncBulkUpsert(
     items: SyncBulkUpsertPropertyItemDto[]
   ): Promise<SyncBulkUpsertPropertyResultDto>

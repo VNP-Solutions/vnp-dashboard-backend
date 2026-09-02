@@ -72,6 +72,8 @@ import {
   SyncByOtaPropertyDto,
   SyncBulkUpsertPropertyItemDto,
   SyncUpsertPropertyDto,
+  UpdatePropertyAccessLevelDto,
+  UpdatePropertyAccessLevelResultDto,
   SyncBulkUpsertPropertyResultDto,
   SyncBulkDeletePropertyDto,
   SyncBulkDeletePropertyResultDto,
@@ -4980,6 +4982,62 @@ export class PropertyService implements IPropertyService {
     await this.upsertSyncCredentials(created.id, dto.credentials, true)
     if (opts?.skipFetch) return { id: created.id }
     return this.fetchSyncUpsertProperty(created.id)
+  }
+
+  /** OTA access level fields this endpoint is allowed to touch. */
+  private static readonly ACCESS_LEVEL_PATCH_FIELDS = [
+    'expedia_access_level',
+    'booking_access_level',
+    'agoda_access_level'
+  ] as const
+
+  /**
+   * Partial access level update for `PATCH /property/:parent_id/access-level`.
+   *
+   * Cannot go through `update()` — that takes an `IUserWithPermissions` to
+   * scope the property, and this endpoint is unauthenticated. Only the keys
+   * present in the body are written, so a request carrying one OTA leaves the
+   * other two alone.
+   *
+   * Writes the dashboard only. Nothing is pushed back to the DBMS.
+   */
+  async updateAccessLevels(
+    parentId: string,
+    dto: UpdatePropertyAccessLevelDto
+  ): Promise<UpdatePropertyAccessLevelResultDto> {
+    const existing = await this.propertyRepository.findByParentId(parentId)
+    if (!existing) throw new NotFoundException('Property not found')
+
+    const patch: Record<string, boolean | null> = {}
+    for (const field of PropertyService.ACCESS_LEVEL_PATCH_FIELDS) {
+      const value = dto[field]
+      if (value !== undefined) patch[field] = value
+    }
+
+    if (!Object.keys(patch).length) {
+      return {
+        status: 'no_op',
+        parent_id: parentId,
+        id: existing.id,
+        applied: {}
+      }
+    }
+
+    await this.prisma.property.update({
+      where: { id: existing.id },
+      data: patch
+    })
+
+    this.logger.log(
+      `[access-level] parent_id=${parentId} id=${existing.id} updated ${JSON.stringify(patch)}`
+    )
+
+    return {
+      status: 'updated',
+      parent_id: parentId,
+      id: existing.id,
+      applied: patch
+    }
   }
 
   async syncBulkUpsert(
