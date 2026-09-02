@@ -72,6 +72,8 @@ import {
   SyncByOtaPropertyDto,
   SyncBulkUpsertPropertyItemDto,
   SyncUpsertPropertyDto,
+  UpdatePropertyAccessLevelDto,
+  UpdatePropertyAccessLevelResultDto,
   SyncBulkUpsertPropertyResultDto,
   SyncBulkDeletePropertyDto,
   SyncBulkDeletePropertyResultDto,
@@ -157,34 +159,40 @@ const ACCESS_LEVELS_SHEET_HEADERS = [
 ] as const
 
 /**
- * Comma-separated OTA access levels.
- * Expedia / Booking: listed when both username and password are present.
- * Agoda: listed when username is present (password not required).
+ * Comma-separated OTA access levels, listing each OTA whose access level is
+ * granted.
+ *
+ * Reads the access levels synced from DBMS, which owns them. This used to be
+ * inferred from whether credentials happened to be stored, which answered a
+ * different question ("do we hold a login?") and so disagreed with DBMS
+ * whenever access was revoked but the credentials were still on file. It also
+ * scored Agoda on username alone while Expedia and Booking needed a password;
+ * all three now use the same rule.
+ *
+ * Only `true` counts. `false` (access lost) and `null` (never recorded) are
+ * both omitted, matching how DBMS treats them everywhere.
  */
 function formatPropertyOtaAccessLevels(
-  credentials:
+  property:
     | {
-        expedia_username?: string | null
-        expedia_password?: string | null
-        agoda_username?: string | null
-        booking_username?: string | null
-        booking_password?: string | null
+        expedia_access_level?: boolean | null
+        booking_access_level?: boolean | null
+        agoda_access_level?: boolean | null
       }
     | null
     | undefined
 ): string {
-  if (!credentials) {
+  if (!property) {
     return ''
   }
   const parts: string[] = []
-  const has = (v: string | null | undefined) => v != null && v.trim() !== ''
-  if (has(credentials.expedia_username) && has(credentials.expedia_password)) {
+  if (property.expedia_access_level === true) {
     parts.push('Expedia')
   }
-  if (has(credentials.agoda_username)) {
+  if (property.agoda_access_level === true) {
     parts.push('Agoda')
   }
-  if (has(credentials.booking_username) && has(credentials.booking_password)) {
+  if (property.booking_access_level === true) {
     parts.push('Booking')
   }
   return parts.join(', ')
@@ -397,6 +405,49 @@ export class PropertyService implements IPropertyService {
       default:
         return defaultOrderBy
     }
+  }
+
+  /** The DBMS-owned OTA access level columns, and the query params that filter them. */
+  private static readonly ACCESS_LEVEL_FILTER_FIELDS = [
+    'expedia_access_level',
+    'booking_access_level',
+    'agoda_access_level'
+  ] as const
+
+  /**
+   * Where clause for one OTA access level filter, mirroring the DBMS
+   * `booleanFilterCondition` so both systems answer the same question.
+   *
+   * "No" deliberately matches `null` as well as `false`: null means the value
+   * was never recorded, and grouping it with false is what keeps "No" from
+   * silently hiding rows. Returns null when the filter is inactive.
+   */
+  private accessLevelWhereClause(field: string, raw?: string): any {
+    const value = raw?.toLowerCase().trim()
+    if (!value || value === 'all') return null
+    if (value === 'true') return { [field]: { equals: true } }
+    if (value === 'false') {
+      return { OR: [{ [field]: { equals: false } }, { [field]: null }] }
+    }
+    return null
+  }
+
+  /**
+   * AND-wraps every active access level filter onto an existing where clause.
+   *
+   * Must AND rather than spread: the "No" clause is an `OR`, and more than one
+   * OTA can be filtered at once, so spreading would let the second `OR` key
+   * overwrite the first.
+   */
+  private applyAccessLevelFilters(where: any, query: PropertyQueryDto): any {
+    let next = where
+    for (const field of PropertyService.ACCESS_LEVEL_FILTER_FIELDS) {
+      const clause = this.accessLevelWhereClause(field, query[field])
+      if (!clause) continue
+      next =
+        next && Object.keys(next).length > 0 ? { AND: [next, clause] } : clause
+    }
+    return next
   }
 
   async create(data: CreatePropertyDto, user: IUserWithPermissions) {
@@ -920,6 +971,8 @@ export class PropertyService implements IPropertyService {
       }
     }
 
+    where = this.applyAccessLevelFilters(where, query)
+
     // Fetch data and count
     const [data, total] = await Promise.all([
       this.propertyRepository.findAll(
@@ -1293,6 +1346,8 @@ export class PropertyService implements IPropertyService {
       }
     }
 
+    where = this.applyAccessLevelFilters(where, query)
+
     // Fetch all data without pagination
     const data = await this.propertyRepository.findAll(
       { where, orderBy },
@@ -1462,7 +1517,7 @@ export class PropertyService implements IPropertyService {
         cred?.expedia_id ?? '',
         p.name ?? '',
         port?.name ?? '',
-        formatPropertyOtaAccessLevels(cred),
+        formatPropertyOtaAccessLevels(p),
         exportDateStr
       ])
     }
@@ -2015,11 +2070,13 @@ export class PropertyService implements IPropertyService {
             ]
           }
 
-    const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
+    const built = QueryBuilder.buildPrismaQuery(
       mergedQuery,
       queryConfig,
       baseWhere
     )
+    const { skip, take, orderBy } = built
+    const where = this.applyAccessLevelFilters(built.where, query)
 
     const [properties, total] = await Promise.all([
       this.propertyRepository.findAll(
@@ -4257,7 +4314,10 @@ export class PropertyService implements IPropertyService {
               agoda_id: property?.credentials?.agoda_id || null,
               booking_id: property?.credentials?.booking_id || null
             }
-          : null
+          : null,
+        expedia_access_level: property.expedia_access_level ?? null,
+        booking_access_level: property.booking_access_level ?? null,
+        agoda_access_level: property.agoda_access_level ?? null
       }
     }
   }
@@ -4884,7 +4944,12 @@ export class PropertyService implements IPropertyService {
           card_descriptor: dto.card_descriptor || undefined,
           portfolio_id,
           parent_id: parentId,
-          is_active: dto.is_active
+          is_active: dto.is_active,
+          // `?? null` rather than `|| undefined`: DBMS owns these, so a cleared
+          // value there must clear here too instead of leaving the old one.
+          expedia_access_level: dto.expedia_access_level ?? null,
+          booking_access_level: dto.booking_access_level ?? null,
+          agoda_access_level: dto.agoda_access_level ?? null
         }
       })
       await this.upsertSyncCredentials(existing.id, dto.credentials, false)
@@ -4904,7 +4969,10 @@ export class PropertyService implements IPropertyService {
       card_descriptor: dto.card_descriptor || undefined,
       is_active: dto.is_active,
       portfolio_id,
-      parent_id: parentId
+      parent_id: parentId,
+      expedia_access_level: dto.expedia_access_level ?? null,
+      booking_access_level: dto.booking_access_level ?? null,
+      agoda_access_level: dto.agoda_access_level ?? null
     })
 
     await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
@@ -4914,6 +4982,62 @@ export class PropertyService implements IPropertyService {
     await this.upsertSyncCredentials(created.id, dto.credentials, true)
     if (opts?.skipFetch) return { id: created.id }
     return this.fetchSyncUpsertProperty(created.id)
+  }
+
+  /** OTA access level fields this endpoint is allowed to touch. */
+  private static readonly ACCESS_LEVEL_PATCH_FIELDS = [
+    'expedia_access_level',
+    'booking_access_level',
+    'agoda_access_level'
+  ] as const
+
+  /**
+   * Partial access level update for `PATCH /property/:parent_id/access-level`.
+   *
+   * Cannot go through `update()` — that takes an `IUserWithPermissions` to
+   * scope the property, and this endpoint is unauthenticated. Only the keys
+   * present in the body are written, so a request carrying one OTA leaves the
+   * other two alone.
+   *
+   * Writes the dashboard only. Nothing is pushed back to the DBMS.
+   */
+  async updateAccessLevels(
+    parentId: string,
+    dto: UpdatePropertyAccessLevelDto
+  ): Promise<UpdatePropertyAccessLevelResultDto> {
+    const existing = await this.propertyRepository.findByParentId(parentId)
+    if (!existing) throw new NotFoundException('Property not found')
+
+    const patch: Record<string, boolean | null> = {}
+    for (const field of PropertyService.ACCESS_LEVEL_PATCH_FIELDS) {
+      const value = dto[field]
+      if (value !== undefined) patch[field] = value
+    }
+
+    if (!Object.keys(patch).length) {
+      return {
+        status: 'no_op',
+        parent_id: parentId,
+        id: existing.id,
+        applied: {}
+      }
+    }
+
+    await this.prisma.property.update({
+      where: { id: existing.id },
+      data: patch
+    })
+
+    this.logger.log(
+      `[access-level] parent_id=${parentId} id=${existing.id} updated ${JSON.stringify(patch)}`
+    )
+
+    return {
+      status: 'updated',
+      parent_id: parentId,
+      id: existing.id,
+      applied: patch
+    }
   }
 
   async syncBulkUpsert(
@@ -5088,7 +5212,10 @@ export class PropertyService implements IPropertyService {
               booking_id: optionalString(item.booking_id),
               booking_username: optionalString(item.booking_username),
               booking_password: optionalString(item.booking_password)
-            }
+            },
+            expedia_access_level: item.expedia_access_level ?? null,
+            booking_access_level: item.booking_access_level ?? null,
+            agoda_access_level: item.agoda_access_level ?? null
           },
           {
             existing,

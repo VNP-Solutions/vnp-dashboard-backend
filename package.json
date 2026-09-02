@@ -37,6 +37,7 @@
     "migrate:audit-ota": "ts-node scripts/migrate-audit-ota-to-array.ts",
     "backfill:report-data": "ts-node scripts/backfill-audit-report-data.ts",
     "backfill:audit-derived-amounts": "ts-node scripts/backfill-audit-derived-amounts.ts",
+    "backfill:access-levels": "ts-node scripts/backfill-property-access-levels.ts",
     "verify:audit-ota": "ts-node scripts/verify-audit-ota-migration.ts",
     "validate:migration": "ts-node scripts/validate-migration.ts",
     "cleanup:orphans": "ts-node scripts/cleanup-orphaned-records.ts",
