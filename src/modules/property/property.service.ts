@@ -405,6 +405,49 @@ export class PropertyService implements IPropertyService {
     }
   }
 
+  /** The DBMS-owned OTA access level columns, and the query params that filter them. */
+  private static readonly ACCESS_LEVEL_FILTER_FIELDS = [
+    'expedia_access_level',
+    'booking_access_level',
+    'agoda_access_level'
+  ] as const
+
+  /**
+   * Where clause for one OTA access level filter, mirroring the DBMS
+   * `booleanFilterCondition` so both systems answer the same question.
+   *
+   * "No" deliberately matches `null` as well as `false`: null means the value
+   * was never recorded, and grouping it with false is what keeps "No" from
+   * silently hiding rows. Returns null when the filter is inactive.
+   */
+  private accessLevelWhereClause(field: string, raw?: string): any {
+    const value = raw?.toLowerCase().trim()
+    if (!value || value === 'all') return null
+    if (value === 'true') return { [field]: { equals: true } }
+    if (value === 'false') {
+      return { OR: [{ [field]: { equals: false } }, { [field]: null }] }
+    }
+    return null
+  }
+
+  /**
+   * AND-wraps every active access level filter onto an existing where clause.
+   *
+   * Must AND rather than spread: the "No" clause is an `OR`, and more than one
+   * OTA can be filtered at once, so spreading would let the second `OR` key
+   * overwrite the first.
+   */
+  private applyAccessLevelFilters(where: any, query: PropertyQueryDto): any {
+    let next = where
+    for (const field of PropertyService.ACCESS_LEVEL_FILTER_FIELDS) {
+      const clause = this.accessLevelWhereClause(field, query[field])
+      if (!clause) continue
+      next =
+        next && Object.keys(next).length > 0 ? { AND: [next, clause] } : clause
+    }
+    return next
+  }
+
   async create(data: CreatePropertyDto, user: IUserWithPermissions) {
     // Only internal users can create properties
     if (!isInternalUser(user)) {
@@ -926,6 +969,8 @@ export class PropertyService implements IPropertyService {
       }
     }
 
+    where = this.applyAccessLevelFilters(where, query)
+
     // Fetch data and count
     const [data, total] = await Promise.all([
       this.propertyRepository.findAll(
@@ -1298,6 +1343,8 @@ export class PropertyService implements IPropertyService {
         }
       }
     }
+
+    where = this.applyAccessLevelFilters(where, query)
 
     // Fetch all data without pagination
     const data = await this.propertyRepository.findAll(
@@ -2021,11 +2068,13 @@ export class PropertyService implements IPropertyService {
             ]
           }
 
-    const { where, skip, take, orderBy } = QueryBuilder.buildPrismaQuery(
+    const built = QueryBuilder.buildPrismaQuery(
       mergedQuery,
       queryConfig,
       baseWhere
     )
+    const { skip, take, orderBy } = built
+    const where = this.applyAccessLevelFilters(built.where, query)
 
     const [properties, total] = await Promise.all([
       this.propertyRepository.findAll(
@@ -4263,7 +4312,10 @@ export class PropertyService implements IPropertyService {
               agoda_id: property?.credentials?.agoda_id || null,
               booking_id: property?.credentials?.booking_id || null
             }
-          : null
+          : null,
+        expedia_access_level: property.expedia_access_level ?? null,
+        booking_access_level: property.booking_access_level ?? null,
+        agoda_access_level: property.agoda_access_level ?? null
       }
     }
   }

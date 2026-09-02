@@ -205,6 +205,33 @@ export class PropertyQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   credential_type?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by Expedia access level (true/false/All). "false" also matches never-synced properties, which are stored as null.',
+    example: 'true'
+  })
+  @IsOptional()
+  @IsString()
+  expedia_access_level?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by Booking access level (true/false/All). "false" also matches never-synced properties, which are stored as null.',
+    example: 'true'
+  })
+  @IsOptional()
+  @IsString()
+  booking_access_level?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by Agoda access level (true/false/All). "false" also matches never-synced properties, which are stored as null.',
+    example: 'true'
+  })
+  @IsOptional()
+  @IsString()
+  agoda_access_level?: string
 }
 
 export class ExternalPropertyQueryDto extends QueryDto {
@@ -607,6 +634,9 @@ export class PropertyStatsResponseDto {
       agoda_id: string | null
       booking_id: string | null
     } | null
+    expedia_access_level: boolean | null
+    booking_access_level: boolean | null
+    agoda_access_level: boolean | null
   }
 }
 
