@@ -121,6 +121,14 @@ model Property {
   parent_id             String?
   show_in_portfolio     String[]  @db.ObjectId
 
+  /// OTA access levels are owned by DBMS and arrive only through property sync.
+  /// Never writable from this service: they are deliberately absent from every
+  /// user-facing DTO, so `forbidNonWhitelisted` rejects any attempt to set them.
+  /// null means "not yet synced"; only `true` counts as access granted.
+  expedia_access_level Boolean?
+  booking_access_level Boolean?
+  agoda_access_level   Boolean?
+
   audits               Audit[]
   credentials          PropertyCredentials?
   bankDetails          PropertyBankDetails?

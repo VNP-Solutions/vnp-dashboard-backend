@@ -157,34 +157,40 @@ const ACCESS_LEVELS_SHEET_HEADERS = [
 ] as const
 
 /**
- * Comma-separated OTA access levels.
- * Expedia / Booking: listed when both username and password are present.
- * Agoda: listed when username is present (password not required).
+ * Comma-separated OTA access levels, listing each OTA whose access level is
+ * granted.
+ *
+ * Reads the access levels synced from DBMS, which owns them. This used to be
+ * inferred from whether credentials happened to be stored, which answered a
+ * different question ("do we hold a login?") and so disagreed with DBMS
+ * whenever access was revoked but the credentials were still on file. It also
+ * scored Agoda on username alone while Expedia and Booking needed a password;
+ * all three now use the same rule.
+ *
+ * Only `true` counts. `false` (access lost) and `null` (never recorded) are
+ * both omitted, matching how DBMS treats them everywhere.
  */
 function formatPropertyOtaAccessLevels(
-  credentials:
+  property:
     | {
-        expedia_username?: string | null
-        expedia_password?: string | null
-        agoda_username?: string | null
-        booking_username?: string | null
-        booking_password?: string | null
+        expedia_access_level?: boolean | null
+        booking_access_level?: boolean | null
+        agoda_access_level?: boolean | null
       }
     | null
     | undefined
 ): string {
-  if (!credentials) {
+  if (!property) {
     return ''
   }
   const parts: string[] = []
-  const has = (v: string | null | undefined) => v != null && v.trim() !== ''
-  if (has(credentials.expedia_username) && has(credentials.expedia_password)) {
+  if (property.expedia_access_level === true) {
     parts.push('Expedia')
   }
-  if (has(credentials.agoda_username)) {
+  if (property.agoda_access_level === true) {
     parts.push('Agoda')
   }
-  if (has(credentials.booking_username) && has(credentials.booking_password)) {
+  if (property.booking_access_level === true) {
     parts.push('Booking')
   }
   return parts.join(', ')
@@ -1462,7 +1468,7 @@ export class PropertyService implements IPropertyService {
         cred?.expedia_id ?? '',
         p.name ?? '',
         port?.name ?? '',
-        formatPropertyOtaAccessLevels(cred),
+        formatPropertyOtaAccessLevels(p),
         exportDateStr
       ])
     }
@@ -4884,7 +4890,12 @@ export class PropertyService implements IPropertyService {
           card_descriptor: dto.card_descriptor || undefined,
           portfolio_id,
           parent_id: parentId,
-          is_active: dto.is_active
+          is_active: dto.is_active,
+          // `?? null` rather than `|| undefined`: DBMS owns these, so a cleared
+          // value there must clear here too instead of leaving the old one.
+          expedia_access_level: dto.expedia_access_level ?? null,
+          booking_access_level: dto.booking_access_level ?? null,
+          agoda_access_level: dto.agoda_access_level ?? null
         }
       })
       await this.upsertSyncCredentials(existing.id, dto.credentials, false)
@@ -4904,7 +4915,10 @@ export class PropertyService implements IPropertyService {
       card_descriptor: dto.card_descriptor || undefined,
       is_active: dto.is_active,
       portfolio_id,
-      parent_id: parentId
+      parent_id: parentId,
+      expedia_access_level: dto.expedia_access_level ?? null,
+      booking_access_level: dto.booking_access_level ?? null,
+      agoda_access_level: dto.agoda_access_level ?? null
     })
 
     await this.permissionService.grantPropertyAccessForBankDetailsNotificationRoleUsersOnPortfolio(
@@ -5088,7 +5102,10 @@ export class PropertyService implements IPropertyService {
               booking_id: optionalString(item.booking_id),
               booking_username: optionalString(item.booking_username),
               booking_password: optionalString(item.booking_password)
-            }
+            },
+            expedia_access_level: item.expedia_access_level ?? null,
+            booking_access_level: item.booking_access_level ?? null,
+            agoda_access_level: item.agoda_access_level ?? null
           },
           {
             existing,

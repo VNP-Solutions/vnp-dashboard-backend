@@ -144,8 +144,19 @@ type PropertyWithFullDetails = Prisma.PropertyGetPayload<{
   total_contract_urls?: number
 }
 
+/**
+ * `CreatePropertyDto` plus the DBMS-owned OTA access levels, which are
+ * deliberately absent from the user-facing DTO so they cannot be set over the
+ * API. Only the property sync path supplies them.
+ */
+export type PropertyCreateData = CreatePropertyDto & {
+  expedia_access_level?: boolean | null
+  booking_access_level?: boolean | null
+  agoda_access_level?: boolean | null
+}
+
 export interface IPropertyRepository {
-  create(data: CreatePropertyDto): Promise<PropertyWithRelations>
+  create(data: PropertyCreateData): Promise<PropertyWithRelations>
   completeCreate(
     propertyData: CreatePropertyDto,
     credentialsData?: CompletePropertyCredentialsDto,

@@ -499,6 +499,15 @@ export class SyncBulkUpsertPropertyItemDto {
 
   @ApiPropertyOptional()
   booking_password?: string
+
+  @ApiPropertyOptional({ example: true, nullable: true })
+  expedia_access_level?: boolean | null
+
+  @ApiPropertyOptional({ example: true, nullable: true })
+  booking_access_level?: boolean | null
+
+  @ApiPropertyOptional({ example: true, nullable: true })
+  agoda_access_level?: boolean | null
 }
 
 /// Wrapper for the sync-bulk-upsert endpoint. When `batchId` is present the
@@ -1210,6 +1219,36 @@ export class SyncUpsertPropertyDto {
   @ValidateNested()
   @Type(() => SyncUpsertPropertyCredentialsDto)
   credentials: SyncUpsertPropertyCredentialsDto
+
+  @ApiPropertyOptional({
+    example: true,
+    nullable: true,
+    description:
+      'Expedia access level, owned by DBMS. Omitted or null clears the stored value.'
+  })
+  @IsBoolean()
+  @IsOptional()
+  expedia_access_level?: boolean | null
+
+  @ApiPropertyOptional({
+    example: true,
+    nullable: true,
+    description:
+      'Booking access level, owned by DBMS. Omitted or null clears the stored value.'
+  })
+  @IsBoolean()
+  @IsOptional()
+  booking_access_level?: boolean | null
+
+  @ApiPropertyOptional({
+    example: true,
+    nullable: true,
+    description:
+      'Agoda access level, owned by DBMS. Omitted or null clears the stored value.'
+  })
+  @IsBoolean()
+  @IsOptional()
+  agoda_access_level?: boolean | null
 
   /** @deprecated Accepted so existing DBMS payloads keep validating. Never stored, never read. */
   @ApiPropertyOptional({
