@@ -1118,6 +1118,12 @@ export class SyncUpsertPropertyCurrencyDto {
   symbol?: string
 }
 
+/**
+ * Every field accepts the string 'NULL', which clears the stored credential —
+ * the DBMS omits keys it isn't changing, so an absent key can't mean "empty this
+ * out". `expedia_id` is the exception: it's required and unique here, so a clear
+ * leaves the stored id in place.
+ */
 export class SyncUpsertPropertyCredentialsDto {
   @ApiProperty({
     example: 'EXP123456',
