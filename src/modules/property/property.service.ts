@@ -49,6 +49,10 @@ import {
   spreadsheetCellValueToPlainString,
   validateSpreadsheetFile
 } from '../../common/utils/spreadsheet.util'
+import {
+  isSyncNullToken,
+  syncedText
+} from '../../common/utils/sync-null-token.util'
 import { Configuration } from '../../config/configuration'
 import type { ICurrencyRepository } from '../currency/currency.interface'
 import type { IPendingActionRepository } from '../pending-action/pending-action.interface'
@@ -4772,24 +4776,27 @@ export class PropertyService implements IPropertyService {
   private validateSyncUpsertCredentials(
     credentials: SyncUpsertPropertyDto['credentials']
   ): void {
-    const hasExpediaUsername = !!credentials.expedia_username?.trim()
-    const hasExpediaPassword = !!credentials.expedia_password?.trim()
+    // A NULL token is the DBMS clearing the field, so these rules count it as
+    // empty: clearing one side while the other is already empty is fine,
+    // clearing it while the other still holds a value breaks the pair.
+    const hasExpediaUsername = !!syncedText(credentials.expedia_username)
+    const hasExpediaPassword = !!syncedText(credentials.expedia_password)
     if (hasExpediaUsername !== hasExpediaPassword) {
       throw new BadRequestException(
         'Expedia username and password must be provided together'
       )
     }
 
-    const hasAgodaUsername = !!credentials.agoda_username?.trim()
-    const hasAgodaPassword = !!credentials.agoda_password?.trim()
+    const hasAgodaUsername = !!syncedText(credentials.agoda_username)
+    const hasAgodaPassword = !!syncedText(credentials.agoda_password)
     if (hasAgodaPassword && !hasAgodaUsername) {
       throw new BadRequestException(
         'Agoda username is required when Agoda password is provided'
       )
     }
 
-    const hasBookingUsername = !!credentials.booking_username?.trim()
-    const hasBookingPassword = !!credentials.booking_password?.trim()
+    const hasBookingUsername = !!syncedText(credentials.booking_username)
+    const hasBookingPassword = !!syncedText(credentials.booking_password)
     if (hasBookingUsername !== hasBookingPassword) {
       throw new BadRequestException(
         'Booking username and password must be provided together'
@@ -4802,7 +4809,10 @@ export class PropertyService implements IPropertyService {
     credentials: SyncUpsertPropertyDto['credentials'],
     isCreate: boolean
   ): Promise<void> {
-    if (isCreate && !credentials.expedia_id?.trim()) {
+    // expedia_id is required and unique here, so a clear can't be stored: a
+    // create has nothing to fall back to, and an update keeps the stored id.
+    const clearsExpediaId = isSyncNullToken(credentials.expedia_id)
+    if (isCreate && (clearsExpediaId || !credentials.expedia_id?.trim())) {
       throw new BadRequestException(
         'credentials.expedia_id is required to create a property'
       )
@@ -4812,53 +4822,60 @@ export class PropertyService implements IPropertyService {
       infer: true
     })!
 
-    const existingCredentials =
-      await this.credentialsRepository.findByPropertyId(propertyId)
-    const credentialsData: Record<string, string | null> = {
-      expedia_id: String(credentials.expedia_id)
+    /**
+     * `null` when the DBMS cleared the password, the encrypted value when it
+     * sent one, and `undefined` to leave the stored one alone — an empty string
+     * means "the DBMS holds no password", which is also true of every property
+     * whose password only ever lived here.
+     */
+    const encryptedPassword = (
+      value: string | null | undefined
+    ): string | null | undefined => {
+      if (isSyncNullToken(value)) return null
+      const trimmed = value?.trim()
+      return trimmed
+        ? EncryptionUtil.encrypt(trimmed, encryptionSecret)
+        : undefined
     }
 
+    const existingCredentials =
+      await this.credentialsRepository.findByPropertyId(propertyId)
+    const credentialsData: Record<string, string | null> = clearsExpediaId
+      ? {}
+      : { expedia_id: String(credentials.expedia_id) }
+
     if (credentials.expedia_username !== undefined) {
-      credentialsData.expedia_username =
-        credentials.expedia_username?.trim() || null
-    }
-    if (credentials.expedia_password?.trim()) {
-      credentialsData.expedia_password = EncryptionUtil.encrypt(
-        credentials.expedia_password.trim(),
-        encryptionSecret
+      credentialsData.expedia_username = syncedText(
+        credentials.expedia_username
       )
+    }
+    const expediaPassword = encryptedPassword(credentials.expedia_password)
+    if (expediaPassword !== undefined) {
+      credentialsData.expedia_password = expediaPassword
     }
 
     if (credentials.agoda_id !== undefined) {
-      credentialsData.agoda_id = credentials.agoda_id
-        ? String(credentials.agoda_id)
-        : null
+      credentialsData.agoda_id = syncedText(credentials.agoda_id)
     }
     if (credentials.agoda_username !== undefined) {
-      credentialsData.agoda_username =
-        credentials.agoda_username?.trim() || null
+      credentialsData.agoda_username = syncedText(credentials.agoda_username)
     }
-    if (credentials.agoda_password?.trim()) {
-      credentialsData.agoda_password = EncryptionUtil.encrypt(
-        credentials.agoda_password.trim(),
-        encryptionSecret
-      )
+    const agodaPassword = encryptedPassword(credentials.agoda_password)
+    if (agodaPassword !== undefined) {
+      credentialsData.agoda_password = agodaPassword
     }
 
     if (credentials.booking_id !== undefined) {
-      credentialsData.booking_id = credentials.booking_id
-        ? String(credentials.booking_id)
-        : null
+      credentialsData.booking_id = syncedText(credentials.booking_id)
     }
     if (credentials.booking_username !== undefined) {
-      credentialsData.booking_username =
-        credentials.booking_username?.trim() || null
-    }
-    if (credentials.booking_password?.trim()) {
-      credentialsData.booking_password = EncryptionUtil.encrypt(
-        credentials.booking_password.trim(),
-        encryptionSecret
+      credentialsData.booking_username = syncedText(
+        credentials.booking_username
       )
+    }
+    const bookingPassword = encryptedPassword(credentials.booking_password)
+    if (bookingPassword !== undefined) {
+      credentialsData.booking_password = bookingPassword
     }
 
     if (existingCredentials) {
@@ -4927,6 +4944,14 @@ export class PropertyService implements IPropertyService {
     const existing =
       opts?.existing ?? (await this.propertyRepository.findByParentId(parentId))
 
+    // address is required here, so a clear can't be stored either: an update
+    // keeps the stored one, and a create falls back to the same 'N/A' the DBMS
+    // sends for a property with no address.
+    const clearsAddress = isSyncNullToken(dto.address)
+    const card_descriptor = isSyncNullToken(dto.card_descriptor)
+      ? null
+      : dto.card_descriptor || undefined
+
     if (existing) {
       if (dto.name !== existing.name) {
         const clash = await this.propertyRepository.findByName(dto.name)
@@ -4939,9 +4964,9 @@ export class PropertyService implements IPropertyService {
         where: { id: existing.id },
         data: {
           name: dto.name,
-          address: dto.address,
+          address: clearsAddress ? undefined : dto.address,
           currency_id,
-          card_descriptor: dto.card_descriptor || undefined,
+          card_descriptor,
           portfolio_id,
           parent_id: parentId,
           is_active: dto.is_active,
@@ -4964,9 +4989,10 @@ export class PropertyService implements IPropertyService {
 
     const created = await this.propertyRepository.create({
       name: dto.name,
-      address: dto.address,
+      address: clearsAddress ? 'N/A' : dto.address,
       currency_id,
-      card_descriptor: dto.card_descriptor || undefined,
+      // Nothing to clear on a create, so an unset column stands in for null.
+      card_descriptor: card_descriptor ?? undefined,
       is_active: dto.is_active,
       portfolio_id,
       parent_id: parentId,
