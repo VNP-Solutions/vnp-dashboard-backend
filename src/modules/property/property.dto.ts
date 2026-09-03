@@ -205,6 +205,33 @@ export class PropertyQueryDto extends QueryDto {
   @IsOptional()
   @IsString()
   credential_type?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by Expedia access level (true/false/All). "false" also matches never-synced properties, which are stored as null.',
+    example: 'true'
+  })
+  @IsOptional()
+  @IsString()
+  expedia_access_level?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by Booking access level (true/false/All). "false" also matches never-synced properties, which are stored as null.',
+    example: 'true'
+  })
+  @IsOptional()
+  @IsString()
+  booking_access_level?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by Agoda access level (true/false/All). "false" also matches never-synced properties, which are stored as null.',
+    example: 'true'
+  })
+  @IsOptional()
+  @IsString()
+  agoda_access_level?: string
 }
 
 export class ExternalPropertyQueryDto extends QueryDto {
@@ -499,6 +526,15 @@ export class SyncBulkUpsertPropertyItemDto {
 
   @ApiPropertyOptional()
   booking_password?: string
+
+  @ApiPropertyOptional({ example: true, nullable: true })
+  expedia_access_level?: boolean | null
+
+  @ApiPropertyOptional({ example: true, nullable: true })
+  booking_access_level?: boolean | null
+
+  @ApiPropertyOptional({ example: true, nullable: true })
+  agoda_access_level?: boolean | null
 }
 
 /// Wrapper for the sync-bulk-upsert endpoint. When `batchId` is present the
@@ -598,6 +634,9 @@ export class PropertyStatsResponseDto {
       agoda_id: string | null
       booking_id: string | null
     } | null
+    expedia_access_level: boolean | null
+    booking_access_level: boolean | null
+    agoda_access_level: boolean | null
   }
 }
 
@@ -1079,6 +1118,12 @@ export class SyncUpsertPropertyCurrencyDto {
   symbol?: string
 }
 
+/**
+ * Every field accepts the string 'NULL', which clears the stored credential —
+ * the DBMS omits keys it isn't changing, so an absent key can't mean "empty this
+ * out". `expedia_id` is the exception: it's required and unique here, so a clear
+ * leaves the stored id in place.
+ */
 export class SyncUpsertPropertyCredentialsDto {
   @ApiProperty({
     example: 'EXP123456',
@@ -1211,16 +1256,128 @@ export class SyncUpsertPropertyDto {
   @Type(() => SyncUpsertPropertyCredentialsDto)
   credentials: SyncUpsertPropertyCredentialsDto
 
+  @ApiPropertyOptional({
+    example: true,
+    nullable: true,
+    description:
+      'Expedia access level, owned by DBMS. Omitted or null clears the stored value.'
+  })
+  @IsBoolean()
+  @IsOptional()
+  expedia_access_level?: boolean | null
+
+  @ApiPropertyOptional({
+    example: true,
+    nullable: true,
+    description:
+      'Booking access level, owned by DBMS. Omitted or null clears the stored value.'
+  })
+  @IsBoolean()
+  @IsOptional()
+  booking_access_level?: boolean | null
+
+  @ApiPropertyOptional({
+    example: true,
+    nullable: true,
+    description:
+      'Agoda access level, owned by DBMS. Omitted or null clears the stored value.'
+  })
+  @IsBoolean()
+  @IsOptional()
+  agoda_access_level?: boolean | null
+
   /** @deprecated Accepted so existing DBMS payloads keep validating. Never stored, never read. */
   @ApiPropertyOptional({
     type: SyncUpsertProcessorsDto,
     deprecated: true,
-    description: 'Deprecated. Accepted for backwards compatibility and ignored; the payout rail is now derived per reservation.'
+    description:
+      'Deprecated. Accepted for backwards compatibility and ignored; the payout rail is now derived per reservation.'
   })
   @IsOptional()
   @ValidateNested()
   @Type(() => SyncUpsertProcessorsDto)
   processors?: SyncUpsertProcessorsDto
+}
+
+/**
+ * Body for `PATCH /property/:parent_id/access-level`.
+ *
+ * Every field is independently optional: an omitted key leaves that OTA's
+ * stored value untouched, so a caller can flip one platform without knowing
+ * the other two. Sending an explicit `null` clears the value.
+ */
+export class UpdatePropertyAccessLevelDto {
+  @ApiPropertyOptional({
+    example: true,
+    nullable: true,
+    description:
+      'Expedia access level. Omit to leave unchanged, null to clear. Accepts "true"/"false" strings.'
+  })
+  @Transform(({ value }) => {
+    if (value === 'true') return true
+    if (value === 'false') return false
+    return value
+  })
+  @IsBoolean()
+  @IsOptional()
+  expedia_access_level?: boolean | null
+
+  @ApiPropertyOptional({
+    example: true,
+    nullable: true,
+    description:
+      'Booking access level. Omit to leave unchanged, null to clear. Accepts "true"/"false" strings.'
+  })
+  @Transform(({ value }) => {
+    if (value === 'true') return true
+    if (value === 'false') return false
+    return value
+  })
+  @IsBoolean()
+  @IsOptional()
+  booking_access_level?: boolean | null
+
+  @ApiPropertyOptional({
+    example: true,
+    nullable: true,
+    description:
+      'Agoda access level. Omit to leave unchanged, null to clear. Accepts "true"/"false" strings.'
+  })
+  @Transform(({ value }) => {
+    if (value === 'true') return true
+    if (value === 'false') return false
+    return value
+  })
+  @IsBoolean()
+  @IsOptional()
+  agoda_access_level?: boolean | null
+}
+
+export class UpdatePropertyAccessLevelResultDto {
+  @ApiProperty({
+    example: 'updated',
+    enum: ['updated', 'no_op'],
+    description: '`no_op` when the body carried no access level fields'
+  })
+  status: 'updated' | 'no_op'
+
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'DBMS property id this property is linked to'
+  })
+  parent_id: string
+
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439099',
+    description: 'Dashboard property id'
+  })
+  id: string
+
+  @ApiProperty({
+    example: { booking_access_level: true },
+    description: 'Only the fields the request actually changed'
+  })
+  applied: Record<string, boolean | null>
 }
 
 export class SyncCreatePropertyDto {

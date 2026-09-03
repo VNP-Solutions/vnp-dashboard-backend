@@ -29,13 +29,27 @@ export class PayoutHistoryService implements IPayoutHistoryService {
   private async scopedQuery(
     query: PayoutHistoryQueryDto,
     user: IUserWithPermissions
-  ): Promise<PayoutHistoryQueryDto & { dashboard_property_ids?: string }> {
+  ): Promise<Omit<PayoutHistoryQueryDto, 'property_id'> & { dashboard_property_ids?: string }> {
+    const { property_id, ...rest } = query
     const accessible = await this.permissionService.getAccessibleResourceIds(
       user,
       ModuleType.PAYOUT
     )
-    if (accessible === 'all') return query
-    return { ...query, dashboard_property_ids: accessible.join(',') }
+
+    // Unrestricted user: the page's own subject is the only narrowing there is.
+    if (accessible === 'all') {
+      return property_id ? { ...rest, dashboard_property_ids: property_id } : rest
+    }
+
+    // Both apply: the subject may only ever narrow the user's own access, never reach outside it.
+    // A property the user cannot see resolves to the empty set, which the payout service reads as
+    // deny rather than as "no opinion", so it returns nothing instead of everything.
+    const scope =
+      property_id === undefined
+        ? accessible
+        : accessible.filter(id => id === property_id)
+
+    return { ...rest, dashboard_property_ids: scope.join(',') }
   }
 
   async list(query: PayoutHistoryQueryDto, user: IUserWithPermissions): Promise<unknown> {

@@ -15,7 +15,10 @@ import {
   CreatePropertyDto,
   UpdatePropertyDto
 } from './property.dto'
-import type { IPropertyRepository } from './property.interface'
+import type {
+  IPropertyRepository,
+  PropertyCreateData
+} from './property.interface'
 
 @Injectable()
 export class PropertyRepository implements IPropertyRepository {
@@ -24,7 +27,12 @@ export class PropertyRepository implements IPropertyRepository {
     private otaPasswordPlaintextCache: OtaPasswordPlaintextCacheService
   ) {}
 
-  async create(data: CreatePropertyDto) {
+  /**
+   * Widened past `CreatePropertyDto` so the sync path can set DBMS-owned
+   * columns (the OTA access levels) that must stay off the user-facing
+   * create DTO — leaving them there is what makes them unwritable via the API.
+   */
+  async create(data: PropertyCreateData) {
     return this.prisma.property.create({
       data,
       include: {

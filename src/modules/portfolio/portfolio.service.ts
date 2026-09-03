@@ -15,6 +15,7 @@ import {
 import { PermissionService } from '../../common/services/permission.service'
 import { roundAmount } from '../../common/utils/amount.util'
 import { maskBankDetails } from '../../common/utils/bank-details.util'
+import { getDurationDateRange } from '../../common/utils/date-range.util'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
 import {
@@ -2168,23 +2169,9 @@ export class PortfolioService implements IPortfolioService {
       where: { portfolio_id: portfolioId }
     })
 
-    // Calculate date range based on duration
-    const now = new Date()
-    let startDate: Date
-
-    switch (query.duration) {
-      case 'week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        break
-      case 'month':
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-        break
-      case 'year':
-        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
-        break
-      default:
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    }
+    // Calculate date range based on duration ("year" is the current calendar
+    // year to date, e.g. 2026-01-01 through now, not a rolling 365-day window)
+    const { startDate, endDate: now } = getDurationDateRange(query.duration)
 
     // Get all property IDs for this portfolio
     const allPropertiesInPortfolio = await this.prisma.property.findMany({
@@ -2238,13 +2225,18 @@ export class PortfolioService implements IPortfolioService {
       }
     }
 
-    // Amounts are lifetime totals for the portfolio's active properties. They must not be bound to
-    // a date window: review_collection_date is free text on import and routinely parses to a wrong
-    // year, which silently drops audits from the cards. Property rows and the global banner sum the
-    // same amounts unbounded, so this keeps all three surfaces in agreement.
-    const auditAmountsWhere: Prisma.AuditWhereInput = {
+    const auditBaseWhere: Prisma.AuditWhereInput = {
       property_id: { in: propertyIds },
       is_archived: false
+    }
+
+    // Amounts are scoped to the requested duration using created_at (a reliable,
+    // DB-assigned timestamp), not review_collection_date: that field is free text on
+    // import and routinely parses to a wrong year, which would silently drop audits
+    // from the cards. "year" means the current calendar year to date.
+    const auditAmountsWhere: Prisma.AuditWhereInput = {
+      ...auditBaseWhere,
+      created_at: { gte: startDate, lte: now }
     }
 
     // The recent-audits list stays inside the requested duration: use review_collection_date when
@@ -2252,7 +2244,7 @@ export class PortfolioService implements IPortfolioService {
     // match documents where the field was never stored; include `isSet: false` so omitted
     // review_collection_date still uses created_at for the window.
     const auditInDurationWhere: Prisma.AuditWhereInput = {
-      ...auditAmountsWhere,
+      ...auditBaseWhere,
       OR: [
         {
           review_collection_date: {

@@ -5,6 +5,7 @@ import {
   Delete,
   ExecutionContext,
   Get,
+  HttpCode,
   Inject,
   Param,
   Patch,
@@ -22,6 +23,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags
 } from '@nestjs/swagger'
@@ -58,6 +60,8 @@ import {
   SharePropertyDto,
   TransferPropertyDto,
   UnsharePropertyDto,
+  UpdatePropertyAccessLevelDto,
+  UpdatePropertyAccessLevelResultDto,
   UpdatePropertyDto,
   SyncBulkUpsertPropertyItemDto,
   SyncBulkUpsertRequestDto,
@@ -92,6 +96,56 @@ export class PropertyController {
     @Body() dto: SyncUpsertPropertyDto
   ) {
     return this.propertyService.syncUpsert(parentId, dto)
+  }
+
+  // Deliberately unguarded: @Public() alone, unlike its siblings here which
+  // add ExternalJwtGuard or ServiceTokenGuard on top. @Public() short-circuits
+  // JwtAuthGuard, and PermissionGuard is a no-op without @RequirePermission.
+  // Adding a guard later is a one-line change that does not affect the
+  // request or response contract.
+  @Public()
+  @Patch(':parent_id/access-level')
+  @ApiOperation({
+    summary: "Update a property's OTA access levels",
+    description:
+      'Unauthenticated. `:parent_id` is the DBMS property id, which this backend stores as `parent_id`. ' +
+      'Each field is independently optional: omit a key to leave that OTA untouched, send null to clear it. ' +
+      'A body with none of the three fields is a no-op. Writes the dashboard only — nothing is pushed to the DBMS.'
+  })
+  @ApiParam({
+    name: 'parent_id',
+    description: 'DBMS property id (stored here as parent_id)',
+    example: '507f1f77bcf86cd799439011'
+  })
+  @ApiBody({
+    type: UpdatePropertyAccessLevelDto,
+    examples: {
+      single: {
+        summary: 'Grant Booking access only, leaving Expedia and Agoda as-is',
+        value: { booking_access_level: true }
+      },
+      all: {
+        summary: 'Set all three',
+        value: {
+          expedia_access_level: true,
+          booking_access_level: false,
+          agoda_access_level: true
+        }
+      },
+      clear: {
+        summary: 'Clear the Expedia value back to unrecorded',
+        value: { expedia_access_level: null }
+      }
+    }
+  })
+  @ApiResponse({ status: 200, type: UpdatePropertyAccessLevelResultDto })
+  @ApiResponse({ status: 404, description: 'Property not found' })
+  @HttpCode(200)
+  updateAccessLevels(
+    @Param('parent_id') parentId: string,
+    @Body() dto: UpdatePropertyAccessLevelDto
+  ) {
+    return this.propertyService.updateAccessLevels(parentId, dto)
   }
 
   @Public()
