@@ -310,7 +310,9 @@ export class PortfolioRepository implements IPortfolioRepository {
   }
 
   async findByName(name: string) {
-    return this.prisma.portfolio.findUnique({
+    // findFirst, not findUnique: `name` is no longer a unique column, since the
+    // DBMS owns names and permits duplicates.
+    return this.prisma.portfolio.findFirst({
       where: { name }
     })
   }
@@ -431,7 +433,9 @@ export class PortfolioRepository implements IPortfolioRepository {
   }
 
   async ensureInternalPortfolio(): Promise<{ id: string; name: string }> {
-    const existing = await this.prisma.portfolio.findUnique({
+    // findFirst: `name` is no longer unique, so this reuses whichever
+    // Internal Portfolio already exists rather than creating a second one.
+    const existing = await this.prisma.portfolio.findFirst({
       where: { name: 'Internal Portfolio' }
     })
     if (existing) return existing

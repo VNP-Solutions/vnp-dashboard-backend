@@ -80,27 +80,29 @@ async function main() {
 
   for (const data of portfolioData) {
     try {
-      const portfolio = await prisma.portfolio.upsert({
+      // `name` is not unique, so this can't be a single upsert — find the
+      // existing seed portfolio by name, then update it or create a new one.
+      const found = await prisma.portfolio.findFirst({
         where: { name: data.name },
-        update: {
-          service_type_id: data.service_type_id,
-          currency: data.currency,
-          is_active: data.is_active,
-          is_commissionable: data.is_commissionable,
-          parent_id: data.parent_id
-        },
-        create: {
-          name: data.name,
-          service_type_id: data.service_type_id,
-          currency: data.currency,
-          is_active: data.is_active,
-          is_commissionable: data.is_commissionable,
-          parent_id: data.parent_id
-        },
-        include: {
-          serviceType: true
-        }
+        select: { id: true }
       })
+      const values = {
+        service_type_id: data.service_type_id,
+        currency: data.currency,
+        is_active: data.is_active,
+        is_commissionable: data.is_commissionable,
+        parent_id: data.parent_id
+      }
+      const portfolio = found
+        ? await prisma.portfolio.update({
+            where: { id: found.id },
+            data: values,
+            include: { serviceType: true }
+          })
+        : await prisma.portfolio.create({
+            data: { name: data.name, ...values },
+            include: { serviceType: true }
+          })
       createdPortfolios.push(portfolio)
       console.log(`  ✓ ${portfolio.name}`)
     } catch (error) {

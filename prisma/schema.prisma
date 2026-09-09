@@ -46,7 +46,9 @@ model User {
 
 model Portfolio {
   id                String      @id @default(auto()) @map("_id") @db.ObjectId
-  name              String      @unique
+  // Not unique: the DBMS is the source of truth for names and permits
+  // duplicates. Portfolios are identified by parent_id, not by name.
+  name              String
   service_type_id   String      @db.ObjectId
   serviceType       ServiceType @relation(fields: [service_type_id], references: [id])
   currency          String      @default("USD")
@@ -109,7 +111,9 @@ model SalesAgent {
 
 model Property {
   id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  name                  String    @unique
+  // Not unique: the DBMS is the source of truth for names and permits
+  // duplicates. Properties are identified by parent_id, not by name.
+  name                  String
   address               String
   currency_id           String    @db.ObjectId
   currency              Currency  @relation(fields: [currency_id], references: [id])
