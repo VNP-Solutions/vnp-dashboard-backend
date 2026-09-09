@@ -152,14 +152,11 @@ export class PortfolioService implements IPortfolioService {
 
     const existing = await this.portfolioRepository.findByParentId(parentId)
 
+    // Identity is the DBMS parent_id, never the name. The DBMS owns names and
+    // allows duplicates, so a name check here would reject legitimate syncs —
+    // and, because a failed upsert aborts the whole payload, would block every
+    // property under that portfolio from syncing too.
     if (existing) {
-      if (dto.name !== existing.name) {
-        const clash = await this.portfolioRepository.findByName(dto.name)
-        if (clash && clash.id !== existing.id) {
-          throw new ConflictException('Portfolio with this name already exists')
-        }
-      }
-
       const updated = await this.prisma.portfolio.update({
         where: { id: existing.id },
         data: {
@@ -189,39 +186,8 @@ export class PortfolioService implements IPortfolioService {
       return updated
     }
 
-    const nameClash = await this.portfolioRepository.findByName(dto.name)
-    if (nameClash) {
-      // Portfolio already exists in dashboard by name (e.g. created manually or
-      // from an older sync). Link it to the DBMS parent_id instead of failing.
-      const updated = await this.prisma.portfolio.update({
-        where: { id: nameClash.id },
-        data: {
-          name: dto.name,
-          service_type_id,
-          currency,
-          is_active: dto.is_active,
-          is_commissionable: dto.is_commissionable,
-          parent_id: parentId,
-          ...(dto.file_count !== undefined
-            ? { file_count: dto.file_count }
-            : {})
-        },
-        include: {
-          serviceType: {
-            select: {
-              id: true,
-              type: true,
-              is_active: true
-            }
-          }
-        }
-      })
-      this.logger.log(
-        `[sync-upsert] linked existing portfolio by name id=${updated.id} parent_id=${parentId}`
-      )
-      return updated
-    }
-
+    // No adoption-by-name: a same-named portfolio carrying a different
+    // parent_id is a different portfolio, so this creates a new one.
     const created = await this.portfolioRepository.create({
       name: dto.name,
       service_type_id,
@@ -1011,11 +977,8 @@ export class PortfolioService implements IPortfolioService {
       return { status: 'not_found' }
     }
 
-    if (dto.name && dto.name !== existing.name) {
-      const clash = await this.portfolioRepository.findByName(dto.name)
-      if (clash && clash.id !== existing.id)
-        return { status: 'conflict', id: clash.id }
-    }
+    // A rename onto a name another portfolio already holds is allowed —
+    // portfolio names are not unique, identity is the parent_id.
 
     const data: any = {}
     if (dto.name) data.name = dto.name

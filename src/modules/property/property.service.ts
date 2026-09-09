@@ -4952,14 +4952,11 @@ export class PropertyService implements IPropertyService {
       ? null
       : dto.card_descriptor || undefined
 
+    // Identity is the DBMS parent_id, never the name. The DBMS owns names and
+    // allows duplicates, so a name check here would reject legitimate syncs —
+    // and, because a failed upsert aborts the whole payload, would freeze every
+    // other field for that property too.
     if (existing) {
-      if (dto.name !== existing.name) {
-        const clash = await this.propertyRepository.findByName(dto.name)
-        if (clash && clash.id !== existing.id) {
-          throw new ConflictException('Property with this name already exists')
-        }
-      }
-
       await this.prisma.property.update({
         where: { id: existing.id },
         data: {
@@ -4980,11 +4977,6 @@ export class PropertyService implements IPropertyService {
       await this.upsertSyncCredentials(existing.id, dto.credentials, false)
       if (opts?.skipFetch) return { id: existing.id }
       return this.fetchSyncUpsertProperty(existing.id)
-    }
-
-    const nameClash = await this.propertyRepository.findByName(dto.name)
-    if (nameClash) {
-      throw new ConflictException('Property with this name already exists')
     }
 
     const created = await this.propertyRepository.create({
@@ -5399,8 +5391,10 @@ export class PropertyService implements IPropertyService {
     const expediaId = dto.expedia_id != null ? String(dto.expedia_id) : null
     const bookingId = dto.booking_id != null ? String(dto.booking_id) : null
     const agodaId = dto.agoda_id != null ? String(dto.agoda_id) : null
-    let existing = await this.findByAnyOta(expediaId, bookingId, agodaId)
-    if (!existing) existing = await this.propertyRepository.findByName(dto.name)
+    // Matched on OTA ids only. A name match is not evidence of the same
+    // property — duplicates are legitimate, so falling back to it here could
+    // silently attach to an unrelated record.
+    const existing = await this.findByAnyOta(expediaId, bookingId, agodaId)
     if (existing) return { status: 'already_exists', id: existing.id }
     const portfolio_id = await this.resolvePortfolioIdByName(dto.portfolio_name)
     const currency_id = await this.resolveDefaultCurrencyId()
