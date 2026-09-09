@@ -150,17 +150,19 @@ async function main() {
 
   const portfolios: Portfolio[] = []
   for (const data of portfolioData) {
-    const portfolio = await prisma.portfolio.upsert({
-      where: { name: data.name },
-      update: {},
-      create: {
-        name: data.name,
-        service_type_id: serviceTypes[data.serviceTypeIndex].id,
-        currency: 'USD',
-        is_active: true,
-        is_commissionable: data.is_commissionable
-      }
-    })
+    // `name` is not unique, so this can't be a single upsert — look the seed
+    // portfolio up first and only create it when it isn't already there.
+    const portfolio =
+      (await prisma.portfolio.findFirst({ where: { name: data.name } })) ??
+      (await prisma.portfolio.create({
+        data: {
+          name: data.name,
+          service_type_id: serviceTypes[data.serviceTypeIndex].id,
+          currency: 'USD',
+          is_active: true,
+          is_commissionable: data.is_commissionable
+        }
+      }))
     portfolios.push(portfolio)
   }
   console.log(`Created/found ${portfolios.length} portfolios`)
@@ -254,18 +256,20 @@ async function main() {
 
   const properties: Property[] = []
   for (const config of propertyConfigs) {
-    const property = await prisma.property.upsert({
-      where: { name: config.name },
-      update: {},
-      create: {
-        name: config.name,
-        address: config.address,
-        currency_id: currencies[config.currencyIndex].id,
-        portfolio_id: portfolios[config.portfolioIndex].id,
-        is_active: true,
-        show_in_portfolio: []
-      }
-    })
+    // `name` is not unique, so this can't be a single upsert — look the seed
+    // property up first and only create it when it isn't already there.
+    const property =
+      (await prisma.property.findFirst({ where: { name: config.name } })) ??
+      (await prisma.property.create({
+        data: {
+          name: config.name,
+          address: config.address,
+          currency_id: currencies[config.currencyIndex].id,
+          portfolio_id: portfolios[config.portfolioIndex].id,
+          is_active: true,
+          show_in_portfolio: []
+        }
+      }))
     properties.push(property)
 
     // Generate properly encrypted password for seed data

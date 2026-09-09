@@ -788,7 +788,9 @@ export class PropertyRepository implements IPropertyRepository {
   }
 
   async findByName(name: string) {
-    return this.prisma.property.findUnique({
+    // findFirst, not findUnique: `name` is no longer a unique column, since the
+    // DBMS owns names and permits duplicates.
+    return this.prisma.property.findFirst({
       where: { name }
     })
   }
