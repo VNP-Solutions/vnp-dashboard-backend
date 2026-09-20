@@ -77,6 +77,10 @@ export class ConfigService {
     }
   }
 
+  get supportInboxEmail(): string {
+    return this.configService.get('supportInboxEmail', { infer: true })!
+  }
+
   get invitationRedirectUrl(): string | undefined {
     return this.configService.get('invitationRedirectUrl', { infer: true })
   }
@@ -90,7 +94,9 @@ export class ConfigService {
   }
 
   get payoutOtpThreshold(): number {
-    return this.configService.get('payout.otpThreshold', { infer: true }) ?? 20000
+    return (
+      this.configService.get('payout.otpThreshold', { infer: true }) ?? 20000
+    )
   }
 
   get payoutBaseUrl(): string | undefined {

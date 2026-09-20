@@ -32,6 +32,8 @@ export interface Configuration {
     email: string
     password: string
   }
+  /** Where anonymous help-page messages go; senders cannot choose their own recipient. */
+  supportInboxEmail: string
   invitationRedirectUrl?: string
   dashboardUrl?: string
   externalBaseUrl?: string
@@ -56,7 +58,7 @@ export interface Configuration {
   }
   parallel: {
     workers: number
-  },
+  }
   serviceToken?: string
 }
 
@@ -95,6 +97,7 @@ export default (): Configuration => ({
     email: process.env.SMTP_EMAIL!,
     password: process.env.SMTP_PASSWORD!
   },
+  supportInboxEmail: process.env.SUPPORT_INBOX_EMAIL || process.env.SMTP_EMAIL!,
   invitationRedirectUrl: process.env.INVITATION_REDIRECT_URL,
   externalBaseUrl: process.env.EXTERNAL_BASE_URL,
   dashboardUrl: process.env.DASHBOARD_URL || 'https://new.dashboardvnps.com/',
@@ -114,5 +117,5 @@ export default (): Configuration => ({
   parallel: {
     workers: parseInt(process.env.PARALLEL_WORKERS || '8', 10)
   },
-  serviceToken: process.env.SERVICE_TOKEN,
+  serviceToken: process.env.SERVICE_TOKEN
 })

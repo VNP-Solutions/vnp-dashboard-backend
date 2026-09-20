@@ -4,6 +4,7 @@ import {
   Post,
   UploadedFile,
   UploadedFiles,
+  UseGuards,
   UseInterceptors
 } from '@nestjs/common'
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express'
@@ -14,7 +15,10 @@ import {
   ApiResponse,
   ApiTags
 } from '@nestjs/swagger'
+import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Public } from '../auth/decorators/public.decorator'
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard'
+import type { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import {
   BulkFileUploadResponseDto,
   FileUploadResponseDto
@@ -22,7 +26,6 @@ import {
 import type { IFileUploadService } from './file-upload.interface'
 
 @ApiTags('File Upload')
-@Public()
 @Controller('file-upload')
 export class FileUploadController {
   constructor(
@@ -30,7 +33,13 @@ export class FileUploadController {
     private readonly fileUploadService: IFileUploadService
   ) {}
 
+  /**
+   * Open without a token so the help page can attach a file before anyone signs in. Anonymous
+   * uploads are capped, type-checked and land under their own prefix; see file-upload.policy.
+   */
   @Post()
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 50 * 1024 * 1024 } // 50 MB
@@ -61,9 +70,10 @@ export class FileUploadController {
     description: 'Internal Server Error - Failed to upload file'
   })
   async uploadFile(
-    @UploadedFile() file: Express.Multer.File
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user?: IUserWithPermissions
   ): Promise<FileUploadResponseDto> {
-    return this.fileUploadService.uploadFile(file)
+    return this.fileUploadService.uploadFile(file, Boolean(user?.id))
   }
 
   @Post('bulk')

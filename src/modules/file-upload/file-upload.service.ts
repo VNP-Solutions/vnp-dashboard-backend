@@ -11,6 +11,10 @@ import type {
   FileUploadResponse,
   IFileUploadService
 } from './file-upload.interface'
+import {
+  ANONYMOUS_UPLOAD_PREFIX,
+  assertAnonymousUploadAllowed
+} from './file-upload.policy'
 
 @Injectable()
 export class FileUploadService implements IFileUploadService {
@@ -73,9 +77,10 @@ export class FileUploadService implements IFileUploadService {
    */
   private async resolveUploadKey(
     sanitizedFileName: string,
-    reservedKeys?: Set<string>
+    reservedKeys?: Set<string>,
+    folder = 'uploads'
   ): Promise<string> {
-    const prefix = 'uploads/'
+    const prefix = `${folder}/`
     const isTaken = async (s3Key: string): Promise<boolean> => {
       if (reservedKeys?.has(s3Key)) return true
       return this.objectExists(s3Key)
@@ -105,13 +110,24 @@ export class FileUploadService implements IFileUploadService {
     )
   }
 
-  async uploadFile(file: Express.Multer.File): Promise<FileUploadResponse> {
+  async uploadFile(
+    file: Express.Multer.File,
+    isAuthenticated = true
+  ): Promise<FileUploadResponse> {
     if (!file) {
       throw new BadRequestException('No file provided')
     }
 
+    if (!isAuthenticated) {
+      assertAnonymousUploadAllowed(file)
+    }
+
     const sanitizedFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const key = await this.resolveUploadKey(sanitizedFileName)
+    const key = await this.resolveUploadKey(
+      sanitizedFileName,
+      undefined,
+      isAuthenticated ? 'uploads' : ANONYMOUS_UPLOAD_PREFIX
+    )
 
     try {
       const upload = new Upload({
@@ -202,10 +218,18 @@ export class FileUploadService implements IFileUploadService {
     const results = await Promise.allSettled(uploadPromises)
 
     // Process results
-    results.forEach((result) => {
-      if (result.status === 'fulfilled' && result.value.success && result.value.data) {
+    results.forEach(result => {
+      if (
+        result.status === 'fulfilled' &&
+        result.value.success &&
+        result.value.data
+      ) {
         uploadedFiles.push(result.value.data)
-      } else if (result.status === 'fulfilled' && !result.value.success && result.value.error) {
+      } else if (
+        result.status === 'fulfilled' &&
+        !result.value.success &&
+        result.value.error
+      ) {
         errors.push(result.value.error)
       } else if (result.status === 'rejected') {
         errors.push(result.reason?.message || 'Unknown error occurred')

@@ -1,15 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { IUserWithPermissions } from '../../common/interfaces/permission.interface'
 import { EmailUtil } from '../../common/utils/email.util'
+import { ConfigService } from '../../config/config.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { EmailAttachment, SendEmailDto } from './email.dto'
 import type { IEmailService } from './email.interface'
+import { assertAttachmentUrlsAllowed, resolveRecipients } from './email.policy'
 
 @Injectable()
 export class EmailService implements IEmailService {
   constructor(
     @Inject(EmailUtil) private emailUtil: EmailUtil,
-    @Inject(PrismaService) private prisma: PrismaService
+    @Inject(PrismaService) private prisma: PrismaService,
+    private readonly configService: ConfigService
   ) {}
 
   async sendEmail(
@@ -17,6 +20,11 @@ export class EmailService implements IEmailService {
     user: IUserWithPermissions | undefined,
     uploadedAttachments?: EmailAttachment[]
   ) {
+    assertAttachmentUrlsAllowed(
+      data.attachment_urls,
+      this.configService.s3?.bucketUrl
+    )
+
     // Default send_sender_data to true if not specified
     const shouldSendSenderData = data.send_sender_data !== false
 
@@ -43,13 +51,17 @@ export class EmailService implements IEmailService {
 
     // Fetch and add URL-based attachments if provided
     if (data.attachment_urls && data.attachment_urls.length > 0) {
-      const urlAttachments =
-        await this.emailUtil.fetchAttachmentsFromUrls(data.attachment_urls)
+      const urlAttachments = await this.emailUtil.fetchAttachmentsFromUrls(
+        data.attachment_urls
+      )
       allAttachments = [...allAttachments, ...urlAttachments]
     }
 
-    // Remove duplicates and filter empty values
-    const recipients = [...new Set(data.to.filter(email => email && email.trim()))]
+    const recipients = resolveRecipients(
+      data.to,
+      Boolean(user?.id),
+      this.configService.supportInboxEmail
+    )
 
     if (recipients.length === 0) {
       return { message: 'No valid recipient emails provided' }

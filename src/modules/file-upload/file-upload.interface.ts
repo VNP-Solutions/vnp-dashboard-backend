@@ -1,5 +1,8 @@
 export interface IFileUploadService {
-  uploadFile(file: Express.Multer.File): Promise<FileUploadResponse>
+  uploadFile(
+    file: Express.Multer.File,
+    isAuthenticated?: boolean
+  ): Promise<FileUploadResponse>
   uploadBulkFiles(files: Express.Multer.File[]): Promise<BulkFileUploadResponse>
 }
 

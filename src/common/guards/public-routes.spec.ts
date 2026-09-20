@@ -16,7 +16,7 @@ const UNAUTHENTICATED = [
   'auth/auth.controller.ts :: class',
   'email/email.controller.ts :: sendEmail',
   'external-communication/external-communication.controller.ts :: class',
-  'file-upload/file-upload.controller.ts :: class',
+  'file-upload/file-upload.controller.ts :: uploadFile',
   'property/property.controller.ts :: updateAccessLevels'
 ]
 
