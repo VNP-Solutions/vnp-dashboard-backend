@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '../../config/config.service'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { hasExhaustedAttempts, OTP_PURPOSE } from '../auth/otp.policy'
 import { EmailUtil } from '../../common/utils/email.util'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IAuthRepository } from '../auth/auth.interface'
@@ -68,7 +69,10 @@ export class PayoutOtpService {
       if (!cur) continue
       byCurrency.set(cur, (byCurrency.get(cur) ?? 0) + (r.net_minor ?? 0))
     }
-    return [...byCurrency].map(([currency, amount_minor]) => ({ currency, amount_minor }))
+    return [...byCurrency].map(([currency, amount_minor]) => ({
+      currency,
+      amount_minor
+    }))
   }
 
   /** The threshold, for the UI to explain why it is asking. */
@@ -83,7 +87,10 @@ export class PayoutOtpService {
    * Any earlier unused code for the same user and scope is spent first, so a resend invalidates the
    * message still sitting in their inbox.
    */
-  async send(userId: string, auditIds: string[]): Promise<{ message: string; expires_in_minutes: number }> {
+  async send(
+    userId: string,
+    auditIds: string[]
+  ): Promise<{ message: string; expires_in_minutes: number }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true }
@@ -105,6 +112,8 @@ export class PayoutOtpService {
         otp,
         is_used: false,
         expires_at: expiresAt,
+        purpose: OTP_PURPOSE.payout,
+        attempts: 0,
         payout_scope: scope,
         admin_password_reset_for_user_id: null,
         admin_verify_for_user_id: null
@@ -112,7 +121,44 @@ export class PayoutOtpService {
     })
     await this.emailUtil.sendOtpEmail(user.email, otp)
 
-    return { message: 'A confirmation code has been sent to your email', expires_in_minutes: expiryMinutes }
+    return {
+      message: 'A confirmation code has been sent to your email',
+      expires_in_minutes: expiryMinutes
+    }
+  }
+
+  /** Counts a wrong guess against the live code for this selection, spending it when they run out. */
+  private async registerFailedAttempt(
+    userId: string,
+    scope: string
+  ): Promise<boolean> {
+    const live = await this.prisma.otp.findMany({
+      where: {
+        user_id: userId,
+        payout_scope: scope,
+        is_used: false,
+        expires_at: { gte: new Date() }
+      },
+      select: { id: true, attempts: true }
+    })
+
+    if (live.length === 0) return false
+
+    const exhausted = live.filter(row => hasExhaustedAttempts(row.attempts))
+
+    await this.prisma.otp.updateMany({
+      where: { id: { in: live.map(row => row.id) } },
+      data: { attempts: { increment: 1 } }
+    })
+
+    if (exhausted.length > 0) {
+      await this.prisma.otp.updateMany({
+        where: { id: { in: exhausted.map(row => row.id) } },
+        data: { is_used: true }
+      })
+    }
+
+    return exhausted.length === live.length
   }
 
   /**
@@ -121,7 +167,11 @@ export class PayoutOtpService {
    * Marked used BEFORE the dispatch runs. A code that survived a failed dispatch could authorise a
    * second attempt the operator never confirmed, and re-requesting one costs them an email.
    */
-  async verifyAndSpend(userId: string, auditIds: string[], otp: number | undefined): Promise<void> {
+  async verifyAndSpend(
+    userId: string,
+    auditIds: string[],
+    otp: number | undefined
+  ): Promise<void> {
     if (otp === undefined || otp === null) {
       throw new ForbiddenException(
         'This payout is above the confirmation threshold and needs the code emailed to you'
@@ -134,21 +184,34 @@ export class PayoutOtpService {
         user_id: userId,
         otp,
         is_used: false,
+        purpose: OTP_PURPOSE.payout,
         expires_at: { gte: new Date() },
         payout_scope: scope
       }
     })
 
     if (!valid) {
+      const exhausted = await this.registerFailedAttempt(userId, scope)
+      if (exhausted) {
+        throw new BadRequestException(
+          'Too many incorrect attempts. Request a new code.'
+        )
+      }
+
       // Separate the two so an operator knows whether to retype or to request a new code.
       const expired = await this.prisma.otp.findFirst({
         where: { user_id: userId, otp, is_used: false, payout_scope: scope }
       })
       throw new BadRequestException(
-        expired ? 'That code has expired, request a new one' : 'That code is not valid for this payout'
+        expired
+          ? 'That code has expired, request a new one'
+          : 'That code is not valid for this payout'
       )
     }
 
-    await this.prisma.otp.update({ where: { id: valid.id }, data: { is_used: true } })
+    await this.prisma.otp.update({
+      where: { id: valid.id },
+      data: { is_used: true }
+    })
   }
 }

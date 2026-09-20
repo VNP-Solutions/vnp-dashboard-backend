@@ -169,6 +169,14 @@ model Otp {
   /// Scoped so a login code can never authorise a payout, nor one selection's code another's.
   payout_scope String?
 
+  /// What this code authorises: login, password_reset, admin_password_reset, admin_verify, payout.
+  /// Optional only so codes issued before this field existed still read back; lookups require it,
+  /// so those legacy rows match nothing and simply expire.
+  purpose String?
+
+  /// Wrong guesses against this code. The code is spent once they run out.
+  attempts Int?
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -176,6 +184,7 @@ model Otp {
   @@index([is_used])
   @@index([expires_at])
   @@index([user_id, is_used, expires_at])
+  @@index([user_id, purpose, is_used, expires_at])
   @@index([admin_verify_for_user_id])
 }
 

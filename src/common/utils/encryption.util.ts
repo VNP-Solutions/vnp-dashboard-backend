@@ -1,3 +1,4 @@
+import { generateOtpCode } from '../../modules/auth/otp.policy'
 import * as bcrypt from 'bcryptjs'
 import * as crypto from 'crypto'
 
@@ -122,7 +123,7 @@ export class EncryptionUtil {
   }
 
   static generateOtp(): number {
-    return Math.floor(100000 + Math.random() * 900000)
+    return generateOtpCode()
   }
 
   static generateTempPassword(): string {

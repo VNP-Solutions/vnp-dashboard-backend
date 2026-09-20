@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { ServeStaticModule } from '@nestjs/serve-static'
 import { join } from 'path'
 import { AppController } from './app.controller'
@@ -56,6 +57,8 @@ import { ExternalCommunicationModule } from './modules/external-communication/ex
       }
     }),
     OtaPasswordPlaintextCacheModule,
+    // A floor under every route. Auth routes set their own, tighter limits with @Throttle.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     ConfigModule.forRoot({
       load: [configuration],
       validate,
@@ -96,6 +99,10 @@ import { ExternalCommunicationModule } from './modules/external-communication/ex
     ConfigService,
     PrismaService,
     PermissionService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard

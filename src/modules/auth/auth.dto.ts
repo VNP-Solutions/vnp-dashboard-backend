@@ -83,7 +83,10 @@ export class InviteUserDto {
   @IsNotEmpty()
   language: string
 
-  @ApiPropertyOptional({ example: 'Software Engineer', description: 'Job title' })
+  @ApiPropertyOptional({
+    example: 'Software Engineer',
+    description: 'Job title'
+  })
   @IsString()
   @IsOptional()
   job_title?: string

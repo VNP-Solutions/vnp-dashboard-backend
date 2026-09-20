@@ -14,6 +14,7 @@ import { ModuleType } from '../../common/interfaces/permission.interface'
 import { PermissionService } from '../../common/services/permission.service'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { OTP_PURPOSE, OtpPurpose } from './otp.policy'
 import { canInviteRole } from '../../common/utils/permission.util'
 import { Configuration } from '../../config/configuration'
 import { PrismaService } from '../prisma/prisma.service'
@@ -107,11 +108,15 @@ export class AuthService implements IAuthService {
       const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
 
       await this.prisma.$transaction(async tx => {
-        await this.authRepository.createOtpTx(tx, user.id, otp, expiresAt)
+        await this.authRepository.createOtpTx(
+          tx,
+          user.id,
+          otp,
+          expiresAt,
+          OTP_PURPOSE.login
+        )
         await this.emailUtil.sendOtpEmail(user.email, otp)
       }, DB_EMAIL_TX)
-
-      console.log(`Login OTP for ${user.email}: ${otp}`)
 
       return { message: 'OTP sent to your email' }
     } catch (error) {
@@ -128,17 +133,14 @@ export class AuthService implements IAuthService {
         throw new NotFoundException('User not found with this email address')
       }
 
-      const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
+      const validOtp = await this.authRepository.findValidOtp(
+        user.id,
+        data.otp,
+        OTP_PURPOSE.login
+      )
 
       if (!validOtp) {
-        const unusedMatch = await this.authRepository.findUnusedOtpByCode(
-          user.id,
-          data.otp
-        )
-        if (unusedMatch && unusedMatch.expires_at < new Date()) {
-          throw new BadRequestException('OTP is expired')
-        }
-        throw new BadRequestException('Invalid OTP')
+        throw await this.otpRejection(user.id, data.otp, OTP_PURPOSE.login)
       }
 
       await this.authRepository.markOtpAsUsed(validOtp.id)
@@ -287,10 +289,6 @@ export class AuthService implements IAuthService {
         )
       }, DB_EMAIL_TX)
 
-      console.log(
-        `Invitation sent to ${data.email}. Temp password: ${tempPassword}`
-      )
-
       return {
         message: `Invitation sent successfully. Temporary password is valid for ${expiryDays} days.`
       }
@@ -383,10 +381,6 @@ export class AuthService implements IAuthService {
         )
       }, DB_EMAIL_TX)
 
-      console.log(
-        `Invitation resent to ${email}. Temp password: ${tempPassword}`
-      )
-
       return {
         message: `Invitation resent successfully. Temporary password is valid for ${expiryDays} days.`
       }
@@ -468,7 +462,13 @@ export class AuthService implements IAuthService {
       const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
 
       await this.prisma.$transaction(async tx => {
-        await this.authRepository.createOtpTx(tx, user.id, otp, expiresAt)
+        await this.authRepository.createOtpTx(
+          tx,
+          user.id,
+          otp,
+          expiresAt,
+          OTP_PURPOSE.passwordReset
+        )
         await this.emailUtil.sendPasswordResetOtpEmail(user.email, otp)
       }, DB_EMAIL_TX)
 
@@ -496,17 +496,18 @@ export class AuthService implements IAuthService {
         )
       }
 
-      const validOtp = await this.authRepository.findValidOtp(user.id, data.otp)
+      const validOtp = await this.authRepository.findValidOtp(
+        user.id,
+        data.otp,
+        OTP_PURPOSE.passwordReset
+      )
 
       if (!validOtp) {
-        const unusedMatch = await this.authRepository.findUnusedOtpByCode(
+        throw await this.otpRejection(
           user.id,
-          data.otp
+          data.otp,
+          OTP_PURPOSE.passwordReset
         )
-        if (unusedMatch && unusedMatch.expires_at < new Date()) {
-          throw new BadRequestException('OTP is expired')
-        }
-        throw new BadRequestException('Invalid OTP')
       }
 
       const hashedNewPassword = await EncryptionUtil.hashPassword(
@@ -558,6 +559,40 @@ export class AuthService implements IAuthService {
       )
       throw new UnauthorizedException('Invalid or expired refresh token')
     }
+  }
+
+  /**
+   * Builds the rejection for a bad code, counting the wrong guess first so a caller cannot sit on
+   * one live code and walk the 900k space. Wrong and expired stay distinguishable because that
+   * tells an honest user whether to retype or request a new code.
+   */
+  private async otpRejection(
+    userId: string,
+    otp: number,
+    purpose: OtpPurpose
+  ): Promise<BadRequestException> {
+    const exhausted = await this.authRepository.registerFailedOtpAttempt(
+      userId,
+      purpose
+    )
+
+    if (exhausted) {
+      return new BadRequestException(
+        'Too many incorrect attempts. Request a new code.'
+      )
+    }
+
+    const unusedMatch = await this.authRepository.findUnusedOtpByCode(
+      userId,
+      otp,
+      purpose
+    )
+
+    if (unusedMatch && unusedMatch.expires_at < new Date()) {
+      return new BadRequestException('OTP is expired')
+    }
+
+    return new BadRequestException('Invalid OTP')
   }
 
   private logError(context: string, error: unknown, email?: string): void {

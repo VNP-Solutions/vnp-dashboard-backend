@@ -27,6 +27,7 @@ import {
 } from './auth.dto'
 import type { IAuthService } from './auth.interface'
 import { CurrentUser } from './decorators/current-user.decorator'
+import { Throttle } from '@nestjs/throttler'
 import { Public } from './decorators/public.decorator'
 
 @ApiTags('Authentication')
@@ -38,6 +39,7 @@ export class AuthController {
     private readonly authService: IAuthService
   ) {}
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login/request-otp')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request OTP for login' })
@@ -53,6 +55,7 @@ export class AuthController {
     }
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login/verify-otp')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
@@ -131,6 +134,7 @@ export class AuthController {
     }
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('verify-invitation')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
@@ -150,6 +154,7 @@ export class AuthController {
     }
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('password/request-reset')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request password reset OTP' })
@@ -162,6 +167,7 @@ export class AuthController {
     }
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('password/reset')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset password with OTP' })

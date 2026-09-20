@@ -12,6 +12,7 @@ import { PermissionService } from '../../common/services/permission.service'
 import { Configuration } from '../../config/configuration'
 import { EmailUtil } from '../../common/utils/email.util'
 import { EncryptionUtil } from '../../common/utils/encryption.util'
+import { OTP_PURPOSE } from '../auth/otp.policy'
 import {
   canInviteRole,
   isUserSuperAdmin
@@ -478,6 +479,7 @@ export class UserService implements IUserService {
         currentUser.id,
         otp,
         expiresAt,
+        OTP_PURPOSE.adminPasswordReset,
         id
       )
 
@@ -488,10 +490,6 @@ export class UserService implements IUserService {
         targetUser.email
       )
     }, DB_EMAIL_TX)
-
-    console.log(
-      `Admin user password reset OTP for ${currentUser.email} (target ${targetUser.email}): ${otp}`
-    )
 
     return { message: 'An OTP has been sent to your email address' }
   }
@@ -506,10 +504,15 @@ export class UserService implements IUserService {
     const validOtp = await this.authRepository.findValidOtp(
       currentUser.id,
       data.otp,
+      OTP_PURPOSE.adminPasswordReset,
       { adminPasswordResetForUserId: id }
     )
 
     if (!validOtp) {
+      await this.authRepository.registerFailedOtpAttempt(
+        currentUser.id,
+        OTP_PURPOSE.adminPasswordReset
+      )
       throw new BadRequestException('Invalid or expired OTP')
     }
 
@@ -601,6 +604,7 @@ export class UserService implements IUserService {
         currentUser.id,
         otp,
         expiresAt,
+        OTP_PURPOSE.adminVerify,
         null,
         id
       )
@@ -612,10 +616,6 @@ export class UserService implements IUserService {
         targetUser.email
       )
     }, DB_EMAIL_TX)
-
-    console.log(
-      `Admin user activate OTP for ${currentUser.email} (target ${targetUser.email}): ${otp}`
-    )
 
     return { message: 'An OTP has been sent to your email address' }
   }
@@ -644,10 +644,15 @@ export class UserService implements IUserService {
     const validOtp = await this.authRepository.findValidOtp(
       currentUser.id,
       data.otp,
+      OTP_PURPOSE.adminVerify,
       { adminVerifyForUserId: id }
     )
 
     if (!validOtp) {
+      await this.authRepository.registerFailedOtpAttempt(
+        currentUser.id,
+        OTP_PURPOSE.adminVerify
+      )
       throw new BadRequestException('Invalid or expired OTP')
     }
 

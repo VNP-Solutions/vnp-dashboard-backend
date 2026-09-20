@@ -1,4 +1,5 @@
 import { Otp, Prisma, User } from '@prisma/client'
+import { OtpPurpose } from './otp.policy'
 import {
   AuthResponseDto,
   InviteUserDto,
@@ -25,14 +26,21 @@ export interface IAuthRepository {
     userId: string,
     otp: number,
     expiresAt: Date,
+    purpose: OtpPurpose,
     adminPasswordResetForUserId?: string | null,
     adminVerifyForUserId?: string | null
   ): Promise<void>
+  invalidateOtps(userId: string, purpose: OtpPurpose): Promise<void>
+  registerFailedOtpAttempt(
+    userId: string,
+    purpose: OtpPurpose
+  ): Promise<boolean>
   createOtpTx(
     tx: Prisma.TransactionClient,
     userId: string,
     otp: number,
     expiresAt: Date,
+    purpose: OtpPurpose,
     adminPasswordResetForUserId?: string | null,
     adminVerifyForUserId?: string | null
   ): Promise<void>
@@ -61,17 +69,21 @@ export interface IAuthRepository {
   findValidOtp(
     userId: string,
     otp: number,
+    purpose: OtpPurpose,
     options?: {
       adminPasswordResetForUserId?: string
       adminVerifyForUserId?: string
+      payoutScope?: string
     }
   ): Promise<Otp | null>
   findUnusedOtpByCode(
     userId: string,
     otp: number,
+    purpose: OtpPurpose,
     options?: {
       adminPasswordResetForUserId?: string
       adminVerifyForUserId?: string
+      payoutScope?: string
     }
   ): Promise<Otp | null>
   markOtpAsUsed(otpId: string): Promise<void>
