@@ -15,6 +15,7 @@ import {
   GenerateTokenResponseDto
 } from './external-communication.dto'
 import type { BulkAuditImportType } from './external-communication.constants'
+import { COMMUNICATION_AUDIENCE } from './guards/communication-audience'
 import {
   AuditImportSqsMessage,
   createS3Client,
@@ -23,7 +24,7 @@ import {
   uploadFileToS3
 } from './sqs/audit-import-sqs.util'
 
-const TOKEN_EXPIRES_IN = '24h'
+const TOKEN_EXPIRES_IN = '1h'
 
 @Injectable()
 export class ExternalCommunicationService {
@@ -49,8 +50,13 @@ export class ExternalCommunicationService {
   }
 
   generateToken(): GenerateTokenResponseDto {
+    // Audience marks this as a browser token: our own service guards refuse it, so handing it to
+    // the frontend does not also hand over the service seams signed with the same secret.
     const token = this.jwtService.sign(
-      { type: 'external-communication' },
+      {
+        type: 'external-communication',
+        aud: COMMUNICATION_AUDIENCE.browser
+      },
       { expiresIn: TOKEN_EXPIRES_IN }
     )
     return { token, expiresIn: TOKEN_EXPIRES_IN }

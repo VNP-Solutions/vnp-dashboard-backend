@@ -5,63 +5,74 @@ import {
   UnauthorizedException
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
+import { Reflector } from '@nestjs/core'
 import { ConfigService } from '../../../config/config.service'
-
-const TAG = '[ExternalJwtGuard]'
+import {
+  COMMUNICATION_AUDIENCE,
+  REQUIRED_AUDIENCE_KEY
+} from './communication-audience'
 
 /**
- * Guard that validates a Bearer JWT signed with JWT_COMMUNICATION_SECRET.
- * Used for endpoints that require a pre-generated communication token.
+ * Validates a Bearer JWT signed with JWT_COMMUNICATION_SECRET.
+ *
+ * Signature alone is not enough: the same secret signs the browser tokens handed out by
+ * `/external/user-generate-token`, so a token minted for a browser is rejected here, and a route
+ * may name the audience it accepts with `@RequireAudience()`.
  */
 @Injectable()
 export class ExternalJwtGuard implements CanActivate {
   constructor(
     private readonly configService: ConfigService,
-    private readonly jwtService: JwtService
+    private readonly jwtService: JwtService,
+    private readonly reflector: Reflector
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Record<string, any>>()
-    const route = `${request.method} ${request.url}`
-
-    console.log(`${TAG} Checking auth for: ${route}`)
-
     const authHeader = request.headers?.['authorization'] as string | undefined
-    console.log(`${TAG} Authorization header present: ${!!authHeader}`)
 
     if (!authHeader?.startsWith('Bearer ')) {
-      console.warn(
-        `${TAG} REJECTED — missing or malformed Authorization header`
-      )
       throw new UnauthorizedException('Missing or invalid authorization header')
     }
 
-    const token = authHeader.substring(7).trim()
-    // Never log the bearer token itself - it is a live service credential until it expires.
-    console.log(`${TAG} Received token: [redacted, len=${token.length}]`)
-
     const secret = this.configService.jwt.communicationSecret
-    console.log(`${TAG} Communication secret configured: ${!!secret}`)
 
     if (!secret) {
-      console.error(`${TAG} REJECTED — JWT_COMMUNICATION_SECRET is not set`)
       throw new UnauthorizedException(
         'Communication secret is not configured on this server'
       )
     }
 
+    let payload: Record<string, unknown>
     try {
-      const payload = this.jwtService.verify(token, { secret })
-      console.log(
-        `${TAG} ACCEPTED — JWT valid. Payload: ${JSON.stringify(payload)}`
-      )
-      request['externalAuthPayload'] = payload
-      return true
-    } catch (err) {
-      console.warn(
-        `${TAG} REJECTED — JWT verification failed: ${(err as Error).message}`
-      )
+      payload = this.jwtService.verify(authHeader.substring(7).trim(), {
+        secret,
+        // Pinned: an unpinned verify would accept whatever `alg` the token names.
+        algorithms: ['HS256']
+      })
+    } catch {
       throw new UnauthorizedException('Invalid or expired communication token')
     }
+
+    const audience = payload?.aud
+    const required = this.reflector.getAllAndOverride<string | undefined>(
+      REQUIRED_AUDIENCE_KEY,
+      [context.getHandler(), context.getClass()]
+    )
+
+    if (audience === COMMUNICATION_AUDIENCE.browser) {
+      throw new UnauthorizedException(
+        'This token was issued for browser use and cannot call service endpoints'
+      )
+    }
+
+    if (required && audience !== required) {
+      throw new UnauthorizedException(
+        'This token was not issued for this endpoint'
+      )
+    }
+
+    request['externalAuthPayload'] = payload
+    return true
   }
 }

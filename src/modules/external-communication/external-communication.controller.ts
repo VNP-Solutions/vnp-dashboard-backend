@@ -29,6 +29,10 @@ import {
 } from './external-communication.dto'
 import { ExternalCommunicationService } from './external-communication.service'
 import { isBulkAuditImportType } from './external-communication.constants'
+import {
+  COMMUNICATION_AUDIENCE,
+  RequireAudience
+} from './guards/communication-audience'
 import { ExternalJwtGuard } from './guards/external-jwt.guard'
 import { PayoutStatusPushDto } from '../audit/audit.dto'
 import type { IAuditService } from '../audit/audit.interface'
@@ -240,6 +244,7 @@ export class ExternalCommunicationController {
    */
   @Post('audits/:auditId/payout-status')
   @UseGuards(ExternalJwtGuard)
+  @RequireAudience(COMMUNICATION_AUDIENCE.payoutService)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Record an audit payout status (payout service only)',
@@ -248,7 +253,10 @@ export class ExternalCommunicationController {
       'late-arriving webhook cannot overwrite a newer state. Returns applied:false when ignored as stale.'
   })
   @ApiResponse({ status: 200, description: 'Applied, or ignored as stale' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid communication token' })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid communication token'
+  })
   @ApiResponse({ status: 404, description: 'No audit with that id' })
   applyPayoutStatus(
     @Param('auditId') auditId: string,
