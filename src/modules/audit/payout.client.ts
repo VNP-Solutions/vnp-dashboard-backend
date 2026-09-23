@@ -1,5 +1,9 @@
-import { HttpException, Injectable, InternalServerErrorException } from '@nestjs/common'
-import { JwtService } from '@nestjs/jwt'
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  InternalServerErrorException
+} from '@nestjs/common'
 import { ConfigService } from '../../config/config.service'
 
 /**
@@ -37,19 +41,19 @@ export interface PayoutHistoryQuery {
   dashboard_property_ids?: string
 }
 
-/**
- * The payout service requires this audience, and it matters. We also hand
- * `{type:'external-communication'}` tokens to browsers via /external/user-generate-token, so a token
- * without an audience is one any logged-in user already has. Requiring it keeps them off the money.
- */
-const PAYOUT_TOKEN_AUDIENCE = 'vnps-payout-service'
+interface CachedCommunicationToken {
+  token: string
+  expiresAtMs: number
+}
+
+const COMMUNICATION_TOKEN_PATH = 'external-auth/generate-token'
+const COMMUNICATION_TOKEN_EXPIRY_SKEW_MS = 60_000
 
 @Injectable()
 export class PayoutClient {
-  constructor(
-    private readonly config: ConfigService,
-    private readonly jwtService: JwtService
-  ) {}
+  private communicationTokenCache: CachedCommunicationToken | null = null
+
+  constructor(private readonly config: ConfigService) {}
 
   private baseUrl(): string {
     const base = this.config.payoutBaseUrl
@@ -59,14 +63,84 @@ export class PayoutClient {
     return base.replace(/\/$/, '')
   }
 
-  /** Sign a communication token, the same way the DBMS callbacks do. */
-  private communicationToken(): string | null {
+  private communicationTokenExpiry(token: string): number {
+    const parts = token.split('.')
+    if (parts.length !== 3) return Date.now() + COMMUNICATION_TOKEN_EXPIRY_SKEW_MS
+
+    try {
+      const payload = JSON.parse(
+        Buffer.from(parts[1], 'base64url').toString('utf8')
+      ) as { exp?: number }
+      if (typeof payload.exp === 'number') return payload.exp * 1000
+    } catch {
+      // A token that cannot be decoded is cached only briefly. The payout service still verifies it.
+    }
+    return Date.now() + COMMUNICATION_TOKEN_EXPIRY_SKEW_MS
+  }
+
+  /** Exchange the shared secret once for a short-lived token minted by the payout service. */
+  private async communicationToken(baseUrl: string): Promise<string> {
+    if (
+      this.communicationTokenCache &&
+      this.communicationTokenCache.expiresAtMs - COMMUNICATION_TOKEN_EXPIRY_SKEW_MS > Date.now()
+    ) {
+      return this.communicationTokenCache.token
+    }
+
     const secret = this.config.jwt.communicationSecret
-    if (!secret) return null
-    return this.jwtService.sign(
-      { type: 'external-communication' },
-      { secret, audience: PAYOUT_TOKEN_AUDIENCE, expiresIn: '24h' }
-    )
+    if (!secret) {
+      throw new HttpException(
+        'Payout service authentication is not configured',
+        HttpStatus.SERVICE_UNAVAILABLE
+      )
+    }
+
+    const url = new URL(COMMUNICATION_TOKEN_PATH, `${baseUrl.replace(/\/+$/, '')}/`).toString()
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${secret}`,
+          'content-type': 'application/json',
+          accept: 'application/json'
+        },
+        body: '{}'
+      })
+    } catch {
+      throw new HttpException(
+        'Payout service is unreachable while authenticating',
+        HttpStatus.BAD_GATEWAY
+      )
+    }
+
+    if (!response.ok) {
+      throw new HttpException(
+        {
+          code: 'PAYOUT_SERVICE_AUTH_FAILED',
+          message: 'Payout service authentication failed'
+        },
+        HttpStatus.BAD_GATEWAY
+      )
+    }
+
+    const body = (await response.json()) as {
+      token?: string
+      data?: { token?: string }
+    }
+    const token = body?.data?.token ?? body?.token
+    if (!token) {
+      throw new HttpException(
+        'Payout service token exchange returned no token',
+        HttpStatus.BAD_GATEWAY
+      )
+    }
+
+    this.communicationTokenCache = {
+      token,
+      expiresAtMs: this.communicationTokenExpiry(token)
+    }
+    return token
   }
 
   /**
@@ -97,12 +171,12 @@ export class PayoutClient {
   ): Promise<Record<string, any> | null> {
     const base = this.baseUrl()
 
-    const bearer = this.communicationToken()
+    let bearer = await this.communicationToken(base)
     const headers: Record<string, string> = {
       'content-type': 'application/json',
-      'x-actor-user-id': actorUserId
+      'x-actor-user-id': actorUserId,
+      authorization: `Bearer ${bearer}`
     }
-    if (bearer) headers.authorization = `Bearer ${bearer}`
 
     let res: Response
     try {
@@ -116,10 +190,40 @@ export class PayoutClient {
       throw new HttpException('Payout service is unreachable', 502)
     }
 
+    // The peer may have restarted with a rotated secret while our cached token is still alive.
+    // Exchange once more and retry the business request; never retry a second rejection.
+    if (res.status === 401) {
+      this.communicationTokenCache = null
+      bearer = await this.communicationToken(base)
+      headers.authorization = `Bearer ${bearer}`
+      try {
+        res = await fetch(`${base}${path}`, {
+          method,
+          headers,
+          ...(method === 'POST' ? { body: JSON.stringify(payload) } : {})
+        })
+      } catch {
+        throw new HttpException('Payout service is unreachable', HttpStatus.BAD_GATEWAY)
+      }
+    }
+
     const text = await res.text()
     const body = text ? (JSON.parse(text) as Record<string, any>) : null
 
     if (!res.ok) {
+      // This credential belongs to the dashboard service, not the browser session. Forwarding an
+      // upstream 401 makes the frontend refresh a valid user token and eventually log the operator
+      // out. Keep that failure on the service boundary instead.
+      if (res.status === 401) {
+        throw new HttpException(
+          {
+            code: 'PAYOUT_SERVICE_AUTH_FAILED',
+            message: 'Payout service authentication failed'
+          },
+          HttpStatus.BAD_GATEWAY
+        )
+      }
+
       const message = body?.error?.message ?? 'Payout request failed'
       throw new HttpException(message, res.status)
     }
